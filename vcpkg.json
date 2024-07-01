@@ -1,0 +1,8 @@
+{
+  "dependencies": [
+    {
+      "name": "recastnavigation",
+      "version>=": "1.6.0"
+    }
+  ]
+}
