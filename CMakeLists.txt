@@ -15,9 +15,13 @@ find_package(recastnavigation CONFIG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 
 # Add source to this project's executable.
-add_executable (NavKit "NavKit.cpp" "NavKit.h")
+add_executable (NavKit "NavKit.cpp" "NavKit.h" "External/fastlz/fastlz.c" "External/fastlz/fastlz.h")
 
 target_link_libraries(NavKit PRIVATE RecastNavigation::Recast)
+target_link_libraries(NavKit PRIVATE RecastNavigation::DebugUtils)
+target_link_libraries(NavKit PRIVATE RecastNavigation::Detour)
+target_link_libraries(NavKit PRIVATE RecastNavigation::DetourCrowd)
+target_link_libraries(NavKit PRIVATE RecastNavigation::DetourTileCache)
 
 target_link_libraries(NavKit
     PRIVATE
