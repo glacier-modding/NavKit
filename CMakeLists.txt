@@ -12,12 +12,18 @@ endif()
 project ("NavKit")
 
 find_package(recastnavigation CONFIG REQUIRED)
+find_package(SDL2 CONFIG REQUIRED)
 
 # Add source to this project's executable.
 add_executable (NavKit "NavKit.cpp" "NavKit.h")
 
 target_link_libraries(NavKit PRIVATE RecastNavigation::Recast)
 
+target_link_libraries(NavKit
+    PRIVATE
+    $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
+    $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
+)
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)
 endif()

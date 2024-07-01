@@ -3,6 +3,10 @@
     {
       "name": "recastnavigation",
       "version>=": "1.6.0"
+    },
+    {
+      "name": "sdl2",
+      "version>=": "2.30.3#1"
     }
   ]
 }

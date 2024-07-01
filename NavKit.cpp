@@ -3,6 +3,8 @@
 
 #include "NavKit.h"
 #include <Recast.h>
+#include "SDL.h"
+#include "SDL_opengl.h"
 using namespace std;
 
 int main()
