@@ -13,15 +13,19 @@ project ("NavKit")
 
 find_package(recastnavigation CONFIG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
+find_package(OpenGL REQUIRED)
+# find_package(GLUT REQUIRED)
+# include_directories( ${OPENGL_INCLUDE_DIRS}  ${GLUT_INCLUDE_DIRS} )
 
-# Add source to this project's executable.
 add_executable (NavKit "NavKit.cpp" "NavKit.h" "External/fastlz/fastlz.c" "External/fastlz/fastlz.h")
 
+target_link_libraries(NavKit PRIVATE OpenGL::GL)
 target_link_libraries(NavKit PRIVATE RecastNavigation::Recast)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DebugUtils)
 target_link_libraries(NavKit PRIVATE RecastNavigation::Detour)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourCrowd)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourTileCache)
+# target_link_libraries(NavKit ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} )
 
 target_link_libraries(NavKit
     PRIVATE
@@ -31,5 +35,3 @@ target_link_libraries(NavKit
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)
 endif()
-
-# TODO: Add tests and install targets if needed.
