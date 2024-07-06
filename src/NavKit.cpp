@@ -1,18 +1,19 @@
 ﻿// NavKit.cpp : Defines the entry point for the application.
 //
-
-#include "NavKit.h"
+#include "..\include\NavKit\NavKit.h"
+#include "..\include\NavKit\NavKitConfig.h"
 #include <Recast.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
-#include "External\fastlz\fastlz.h"
+//#include "extern\fastlz\fastlz.h"
+//#include "include\NavWeakness\NavWeakness.h"
+//#include "include\NavWeakness\NavPower.h"1
 #undef main
 
 using namespace std;
 
 int main()
 {
-
 	// Init SDL
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
 	{
@@ -205,7 +206,9 @@ int main()
 
 	//delete sample;
 	//delete geom;
-	printf("Got here!!");
+	printf("Converting 009F622BC6A91CC4.NAVP.json to 009F622BC6A91CC4.NAVP");
+	//OutputNavMesh_NAVP("C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3\\Simple Mod Framework\\Mods\\NavpTestWorld\\content\\chunk2\\009F622BC6A91CC4.NAVP.json", "009F622BC6A91CC4.NAVP", true);
+	printf("Converted!");
 
 	return 0;
 }
