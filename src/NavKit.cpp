@@ -2,17 +2,28 @@
 //
 #include "..\include\NavKit\NavKit.h"
 #include "..\include\NavKit\NavKitConfig.h"
+#include "..\include\RecastDemo\imgui.h"
+#include "..\include\RecastDemo\imguiRenderGL.h"
+#include <vector>
+#include <time.h>
+#include <stdlib.h>
+
 #include <Recast.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glut.h>
 //#include "extern\fastlz\fastlz.h"
 //#include "include\NavWeakness\NavWeakness.h"
-//#include "include\NavWeakness\NavPower.h"1
+//#include "include\NavWeakness\NavPower.h"
 #undef main
 
-using namespace std;
+using std::string;
+using std::vector;
+void renderFunction(double angle);
 
-int main()
+int main(int argc, char** argv)
 {
 	// Init SDL
 	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
@@ -70,12 +81,12 @@ int main()
 
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
-	////if (!imguiRenderGLInit("DroidSans.ttf"))
-	////{
-	////	printf("Could not init GUI renderer.\n");
-	////	SDL_Quit();
-	////	return -1;
-	////}
+	if (!imguiRenderGLInit("DroidSans.ttf"))
+	{
+		printf("Could not init GUI renderer.\n");
+		SDL_Quit();
+		return -1;
+	}
 
 	float timeAcc = 0.0f;
 	Uint32 prevFrameTime = SDL_GetTicks();
@@ -109,21 +120,13 @@ int main()
 	int toolsScroll = 0;
 
 	string sampleName = "Choose Sample...";
-
-	//vector<string> files;
+	
+	vector<string> files;
 	const string meshesFolder = "Meshes";
 	string meshName = "Choose Mesh...";
 
 	float markerPosition[3] = { 0, 0, 0 };
 	bool markerPositionSet = false;
-
-	//InputGeom* geom = 0;
-	//Sample* sample = 0;
-
-	const string testCasesFolder = "TestCases";
-	//TestCase* test = 0;
-
-	//BuildContext ctx;
 
 	//// Fog.
 	float fogColor[4] = { 0.32f, 0.31f, 0.30f, 1.0f };
@@ -136,9 +139,13 @@ int main()
 	glEnable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
 
+	double angle = 1.0;
+	srand(time(NULL));
+
 	bool done = false;
 	while (!done)
 	{
+		angle += 1;
 		// Handle input events.
 		int mouseScroll = 0;
 		bool processHitTest = false;
@@ -164,9 +171,29 @@ int main()
 				break;
 			}
 		}
+
+		unsigned char mouseButtonMask = 0;
+		if (SDL_GetMouseState(0, 0) & SDL_BUTTON_LMASK)
+			mouseButtonMask |= IMGUI_MBUT_LEFT;
+		if (SDL_GetMouseState(0, 0) & SDL_BUTTON_RMASK)
+			mouseButtonMask |= IMGUI_MBUT_RIGHT;
+
 		Uint32 time = SDL_GetTicks();
 		float dt = (time - prevFrameTime) / 1000.0f;
 		prevFrameTime = time;
+
+
+		// Update sample simulation.
+		const float SIM_RATE = 20;
+		const float DELTA_TIME = 1.0f / SIM_RATE;
+		timeAcc = rcClamp(timeAcc + dt, -1.0f, 1.0f);
+		int simIter = 0;
+		while (timeAcc > DELTA_TIME)
+		{
+			timeAcc -= DELTA_TIME;
+			simIter++;
+		}
+
 		// Clamp the framerate so that we do not hog all the CPU.
 		const float MIN_FRAME_TIME = 1.0f / 40.0f;
 		if (dt < MIN_FRAME_TIME)
@@ -198,17 +225,72 @@ int main()
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 
+		imguiBeginFrame(mousePos[0], mousePos[1], mouseButtonMask, mouseScroll);
+		if (showMenu)
+		{
+			const char msg[] = "W/S/A/D: Move  RMB: Rotate";
+			imguiDrawText(280, height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
+		}
+		renderFunction(angle);
+		imguiEndFrame();
+		imguiRenderGLDraw();
+
+		glEnable(GL_DEPTH_TEST);
+		SDL_GL_SwapWindow(window);
 	}
 
-	//imguiRenderGLDestroy();
+	imguiRenderGLDestroy();
 
 	SDL_Quit();
 
-	//delete sample;
-	//delete geom;
-	printf("Converting 009F622BC6A91CC4.NAVP.json to 009F622BC6A91CC4.NAVP");
+	printf("Converting 009F622BC6A91CC4.NAVP.json to 009F622BC6A91CC4.NAVP\n");
 	//OutputNavMesh_NAVP("C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3\\Simple Mod Framework\\Mods\\NavpTestWorld\\content\\chunk2\\009F622BC6A91CC4.NAVP.json", "009F622BC6A91CC4.NAVP", true);
 	printf("Converted!");
 
+
+	//std::cerr << "[INFO] Starting OpenGL main loop." << std::endl;
+
+	//glutInit(&argc, argv);
+	//glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+	//glutInitWindowSize(500, 500);
+	//glutCreateWindow("Window 1");
+	//// Display Callback Function 
+	//glutDisplayFunc(&renderFunction);
+	//// Start main loop 
+	//glutMainLoop();
+	//std::cerr << "[INFO] Exit OpenGL main loop." << std::endl;
+
+
 	return 0;
+}
+void renderFunction(double angle) {
+	// Clear the current output buffer
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Rotate 10 degrees counterclockwise around z axis
+	glRotated(
+		angle, 0, 0, 1
+	);
+
+	// Set the current color (RGB) drawing to blue
+	glColor3f(0.0, 0.0, 1.0);
+
+	// Start polygon 
+	glBegin(GL_POLYGON);
+	glVertex3f(-0.5, -0.5, 0);
+	glVertex3f(0.5, -0.5, 0);
+	glVertex3f(0.5, 0.5, 0);
+	glVertex3f(-0.5, 0.5, 0);
+	// End polygon 
+	glEnd();
+
+	// Start polygon 
+	glBegin(GL_POLYGON);
+	glVertex3f(-0.5, 0.5, 0);
+	glVertex3f(0.5, 0.5, 0);
+	glVertex3f(0.5, -0.5, 0);
+	glVertex3f(-0.5, -0.5, 0);
+	// End polygon 
+	glEnd();
+	glFlush();
 }
