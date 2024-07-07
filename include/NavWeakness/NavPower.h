@@ -35,9 +35,9 @@ SOFTWARE.
 #include <stdlib.h>
 
 #if _WIN32
-#define SIMD_PATH "..\\simdjson\\simdjson.h"
+#define SIMD_PATH "..\\..\extern\\simdjson\\simdjson.h"
 #else
-#define SIMD_PATH "../simdjson/simdjson.h"
+#define SIMD_PATH "../../extern/simdjson/simdjson.h"
 #endif
 #include SIMD_PATH
 

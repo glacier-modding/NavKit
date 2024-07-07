@@ -20,10 +20,18 @@ target_link_libraries(NavKit PRIVATE RecastNavigation::Detour)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourCrowd)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourTileCache)
 
-file(COPY "${NavKit_SOURCE_DIR}/bin/DroidSans.ttf" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-#TARGET_LINK_LIBRARIES(NavKit PRIVATE NavWeakness::NavWeakness)
+add_library(NavWeakness SHARED IMPORTED)
+target_link_libraries(NavKit PRIVATE NavWeakness)
 
-#target_link_libraries(NavKit PRIVATE "D:\\workspace\\NavKit\\External\\NavWeakness\\NavWeakness.lib")
+file(COPY "${NavKit_SOURCE_DIR}/bin/DroidSans.ttf" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+
+set_target_properties(NavWeakness PROPERTIES
+  IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
+  IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/NavWeakness.dll"
+  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/NavWeakness/NavWeakness.lib"
+  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll"
+)
 
 target_link_libraries(NavKit
     PRIVATE
