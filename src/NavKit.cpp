@@ -1,28 +1,12 @@
 ﻿// NavKit.cpp : Defines the entry point for the application.
 //
 #include "..\include\NavKit\NavKit.h"
-#include "..\include\NavKit\NavKitConfig.h"
-#include "..\include\RecastDemo\imgui.h"
-#include "..\include\RecastDemo\imguiRenderGL.h"
-#include <vector>
-#include <time.h>
-#include <stdlib.h>
+#include "../extern/vcpkg/packages/recastnavigation_x64-windows/include/recastnavigation/RecastAlloc.h"
 
-#include <Recast.h>
-#include <SDL.h>
-#include <SDL_opengl.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
-//#include "extern\fastlz\fastlz.h"
-#include "../include\NavWeakness\NavWeakness.h"
-#include "../include\NavWeakness\NavPower.h"
 #undef main
 
 using std::string;
 using std::vector;
-void renderNavMesh(NavPower::NavMesh navMesh);
-void renderArea(NavPower::Area area);
 
 int main(int argc, char** argv)
 {
@@ -121,14 +105,19 @@ int main(int argc, char** argv)
 	int logScroll = 0;
 	int toolsScroll = 0;
 
-	string sampleName = "Choose Sample...";
-	
+	string navpName = "Choose NAVP file...";
+	string lastNavpFolder = "C:\\";
+	string lastObjFolder = "C:\\";
 	vector<string> files;
-	const string meshesFolder = "Meshes";
-	string meshName = "Choose Mesh...";
+	const string meshesFolder = "OBJ";
+	string objName = "Choose OBJ file...";
 
 	float markerPosition[3] = { 0, 0, 0 };
 	bool markerPositionSet = false;
+
+	InputGeom* geom = 0;
+	BuildContext ctx;
+	DebugDrawGL m_dd;
 
 	// Fog.
 	float fogColor[4] = { 0.32f, 0.31f, 0.30f, 1.0f };
@@ -138,17 +127,17 @@ int main(int argc, char** argv)
 	glFogf(GL_FOG_END, camr * 1.25f);
 	glFogfv(GL_FOG_COLOR, fogColor);
 
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 
-	printf("Converting 009F622BC6A91CC4.NAVP.json to 009F622BC6A91CC4.NAVP, and 009F622BC6A91CC4.NAVP to 009F622BC6A91CC4.NAVP.JSON\n");
-	OutputNavMesh_NAVP("C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3\\Simple Mod Framework\\Mods\\NavpTestWorld\\content\\chunk2\\009F622BC6A91CC4.NAVP.json", "009F622BC6A91CC4.NAVP", true);
-	OutputNavMesh_JSON("C:\\workspace\\ZHMTools-dbierek\\Debug\\miami vanilla.NAVP", "miami.navp.json", false);
-	printf("Converted!\n");
-	NavPower::NavMesh navMesh = LoadNavMeshFromJson("D:\\workspace\\NavKit\\build\\x64-debug\\src\\miami.navp.json");
+	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
+	bool navpLoaded = false; 
+	bool showNavp = true;
+	bool objLoaded = false;
+	bool showObj = true;
 
 	double angle = 0.0;
 	srand(time(NULL));
@@ -372,7 +361,12 @@ int main(int argc, char** argv)
 		cameraPos[1] += (moveUp - moveDown) * keybSpeed * dt;
 
 		glFrontFace(GL_CW);
-		renderNavMesh(navMesh);
+		if (navpLoaded && showNavp) {
+			renderNavMesh(navMesh);
+		}
+		if (objLoaded && showObj) {
+			renderObj(geom, &m_dd);
+		}
 		// Render GUI
 
 		glFrontFace(GL_CCW);
@@ -394,57 +388,96 @@ int main(int argc, char** argv)
 			imguiDrawText(280, height - 40, IMGUI_ALIGN_LEFT, cameraPosMessage, imguiRGBA(255, 255, 255, 128));
 			char cameraAngleMessage[128];
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
-			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraPosMessage, imguiRGBA(255, 255, 255, 128));
-			if (imguiBeginScrollArea("Properties", width - 250 - 10, 10, 250, height - 20, &propScroll))
+			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
+			if (imguiBeginScrollArea("Load menu", width - 250 - 10, height - 200, 250, 200, &propScroll))
 				mouseOverMenu = true;
 
-			if (imguiCheck("Show Log", showLog))
-				showLog = !showLog;
-			if (imguiCheck("Show Tools", showTools))
-				showTools = !showTools;
+			if (imguiCheck("Show Navp", showNavp))
+				showNavp = !showNavp;
+			if (imguiCheck("Show Obj", showObj))
+				showObj = !showObj;
 
-			imguiSeparator();
-			imguiLabel("Sample");
-			if (imguiButton(sampleName.c_str()))
+			//imguiSeparator();
+			imguiLabel("Load NAVP from file");
+			if (imguiButton(navpName.c_str()))
 			{
-				if (showSample)
+				char* fileName = openNavpFile(lastNavpFolder.data());
+				if (fileName)
 				{
-					showSample = false;
-				}
-				else
-				{
-					showSample = true;
-					showLevels = false;
-					showTestCases = false;
+					navpName = fileName;
+					lastNavpFolder = navpName.data();
+					navpName = navpName.substr(navpName.find_last_of("/\\") + 1);
+					string extension = navpName.substr(navpName.length() - 4, navpName.length());
+					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+
+					if (extension == "JSON") {
+						navpLoaded = true;
+						NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(fileName);
+						std::swap(*navMesh, newNavMesh);
+					}
+					else if (extension == "NAVP") {
+						navpLoaded = true;
+						NavPower::NavMesh newNavMesh = LoadNavMeshFromBinary(fileName);
+						std::swap(*navMesh, newNavMesh);
+					}
 				}
 			}
 
 			imguiSeparator();
-			imguiLabel("Input Mesh");
-			if (imguiButton(meshName.c_str()))
-			{
-				if (showLevels)
+			imguiLabel("Load OBJ file");
+			if (imguiButton(objName.c_str())) {
+				char* fileName = openObjFile(objName.data());
+				if (fileName)
 				{
-					showLevels = false;
-				}
-				else
-				{
-					showSample = false;
-					showTestCases = false;
-					showLevels = true;
+					objName = fileName;
+					lastObjFolder = objName.data();
+					objName = objName.substr(objName.find_last_of("/\\") + 1);
+					geom = new InputGeom;
+					objLoaded = true;
+
+					if (!geom->load(&ctx, fileName))
+					{
+						showLog = true;
+						logScroll = 0;
+						ctx.dumpLog("Geom load log %s:", objName.c_str());
+
+						if (geom)
+						{
+							const float* bmin = 0;
+							const float* bmax = 0;
+							if (geom)
+							{
+								bmin = geom->getNavMeshBoundsMin();
+								bmax = geom->getNavMeshBoundsMax();
+							}
+							// Reset camera and fog to match the mesh bounds.
+							if (bmin && bmax)
+							{
+								camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
+									rcSqr(bmax[1] - bmin[1]) +
+									rcSqr(bmax[2] - bmin[2])) / 2;
+								cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
+								cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
+								cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
+								camr *= 3;
+							}
+							cameraEulers[0] = 45;
+							cameraEulers[1] = -45;
+						}
+					}
 				}
 			}
 			imguiSeparator();
 
-			imguiSeparatorLine();
+			//imguiSeparatorLine();
 
 
-			if (imguiButton("Build"))
-			{
-				printf("Build pressed");
-			}
+			//if (imguiButton("Build"))
+			//{
+			//	printf("Build pressed");
+			//}
 
-			imguiSeparator();
+			//imguiSeparator();
 			imguiEndScrollArea();
 		}
 		// Marker
@@ -476,43 +509,65 @@ int main(int argc, char** argv)
 	imguiRenderGLDestroy();
 
 	SDL_Quit();
-
-	//std::cerr << "[INFO] Starting OpenGL main loop." << std::endl;
-
-	//glutInit(&argc, argv);
-	//glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-	//glutInitWindowSize(500, 500);
-	//glutCreateWindow("Window 1");
-	//// Display Callback Function 
-	//glutDisplayFunc(&renderFunction);
-	//// Start main loop 
-	//glutMainLoop();
-	//std::cerr << "[INFO] Exit OpenGL main loop." << std::endl;
-
-
+	
 	return 0;
 }
+
+char* openNavpFile(char* lastNavpFolder) {
+	char* lTheOpenFileName;
+	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
+	return tinyfd_openFileDialog(
+		"Open Navp file",
+		lastNavpFolder,
+		2,
+		lFilterPatterns,
+		"Navp files",
+		0);
+	
+	//OutputNavMesh_NAVP("C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3\\Simple Mod Framework\\Mods\\NavpTestWorld\\content\\chunk2\\009F622BC6A91CC4.NAVP.json", "009F622BC6A91CC4.NAVP", true);
+	//OutputNavMesh_JSON("C:\\workspace\\ZHMTools-dbierek\\Debug\\miami vanilla.NAVP", "miami.navp.json", false);
+
+}
+
+char* openObjFile(char* lastObjFolder) {
+	char* lTheOpenFileName;
+	char const* lFilterPatterns[1] = { "*.obj" };
+	return tinyfd_openFileDialog(
+		"Open Objfile",
+		lastObjFolder,
+		1,
+		lFilterPatterns,
+		"Obj files",
+		0);
+}
+
+void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {
+	// Draw mesh
+	duDebugDrawTriMesh(m_dd, m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
+		m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(), m_geom->getMesh()->getTriCount(), 0, 1.0f);
+	// Draw bounds
+	const float* bmin = m_geom->getMeshBoundsMin();
+	const float* bmax = m_geom->getMeshBoundsMax();
+	duDebugDrawBoxWire(m_dd, bmin[0], bmin[1], bmin[2], bmax[0], bmax[1], bmax[2], duRGBA(255, 255, 255, 128), 1.0f);
+}
+
 void renderArea(NavPower::Area area) {
 	glColor4f(0.0, 0.0, 0.5, 0.6);
 	glBegin(GL_POLYGON);
-	//std::cout << "Area:";
 	for (auto vertex : area.m_edges) {
-		//std::cout << "Edge:" << vertex->m_pos.X << ", " << vertex->m_pos.Y << ", " << vertex->m_pos.Z << "\n";
 		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, vertex->m_pos.Y);
 	}
 	glEnd();
 	glColor3f(0.0, 0.0, 1.0);
 	glBegin(GL_LINES);
-	//std::cout << "Area:";
 	for (auto vertex : area.m_edges) {
-		//std::cout << "Edge:" << vertex->m_pos.X << ", " << vertex->m_pos.Y << ", " << vertex->m_pos.Z << "\n";
 		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, vertex->m_pos.Y);
 	}
 	glEnd();
 }
-void renderNavMesh(NavPower::NavMesh navMesh) {
-	for (auto area : navMesh.m_areas) {
+
+void renderNavMesh(NavPower::NavMesh* navMesh) {
+	for (auto area : navMesh->m_areas) {
 		renderArea(area);
 	}
-	//glFlush();
 }
