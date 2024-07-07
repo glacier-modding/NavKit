@@ -4,5 +4,7 @@ A tool to generate NAVP and AIRG files for Hitman: World of Assassination Scenes
 # Building instructions
 1. Open in Visual Studio
 1. Cmake should load
-1. In the x64 command prompt run:  
+1. In the x64 command prompt make a build folder, cd into it, and run:  
+`cmake -B . -S ..`
+1. Then change back to the main directory and run  
 `cmake --preset x64-debug .`
