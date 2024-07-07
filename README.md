@@ -8,3 +8,15 @@ A tool to generate NAVP and AIRG files for Hitman: World of Assassination Scenes
 `cmake -B . -S ..`
 1. Then change back to the main directory and run  
 `cmake --preset x64-debug .`
+
+# Credits
+NoFate  
+Atampy25  
+Notex  
+Anthony Fuller  
+Recast team  
+rdil  
+2kpr  
+kercyx  
+Kevin Rudd  
+And everyone at the Glacier 2 discord!
