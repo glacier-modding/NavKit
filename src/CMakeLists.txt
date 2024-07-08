@@ -22,16 +22,26 @@ target_link_libraries(NavKit PRIVATE RecastNavigation::DetourCrowd)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourTileCache)
 
 add_library(NavWeakness SHARED IMPORTED)
+add_library(ResourceLib SHARED IMPORTED)
 target_link_libraries(NavKit PRIVATE NavWeakness)
+target_link_libraries(NavKit PRIVATE ResourceLib)
 
 file(COPY "${NavKit_SOURCE_DIR}/bin/DroidSans.ttf" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/bin/NavWeakness.pdb" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/bin/ResourceLib_HM3.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/bin/ResourceLib_HM3.pdb" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 set_target_properties(NavWeakness PROPERTIES
   IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/NavWeakness.dll"
   IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/NavWeakness/NavWeakness.lib"
   IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll"
+)
+set_target_properties(ResourceLib PROPERTIES
+  IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/ResourceLib_HM3.dll"
+  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/ResourceLib/ResourceLib_HM3.lib"
+  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/ResourceLib_HM3.dll"
 )
 
 target_link_libraries(NavKit

@@ -15,7 +15,7 @@
 
 #include <Recast.h>
 #include <RecastDebugDraw.h>
-
+#include "..\..\extern\vcpkg\packages\recastnavigation_x64-windows\include\recastnavigation\RecastAlloc.h"
 
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"
@@ -27,11 +27,20 @@
 #include "..\NavWeakness\NavWeakness.h"
 #include "..\NavWeakness\NavPower.h"
 
+#include "..\ResourceLib\ResourceConverter.h"
+#include "..\ResourceLib\ResourceGenerator.h"
+#include "..\ResourceLib\ResourceLib.h"
+#include "..\ResourceLib\ResourceLibCommon.h"
+#include "..\ResourceLib\ResourceLib_HM3.h"
+#include "..\ResourceLib\Generated\ZHMGen.h"
+
 #include "..\..\extern\tinyfiledialogs\tinyfiledialogs.h"
 //#include "extern\fastlz\fastlz.h"
 
 void renderNavMesh(NavPower::NavMesh* navMesh);
+void renderAirg(SReasoningGrid* airg);
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
 void renderArea(NavPower::Area area);
-char* openNavpFile(char* lastNavpFolder);
-char* openObjFile(char* lastObjFolder);
+char* openNavpFileDialog(char* lastNavpFolder);
+char* openAirgFileDialog(char* lastAirgFolder);
+char* openObjFileDialog(char* lastObjFolder);

@@ -1,7 +1,25 @@
-﻿// NavKit.cpp : Defines the entry point for the application.
-//
+﻿/**
+ * Copyright (c) 2024 Daniel Bierek
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+*/
 #include "..\include\NavKit\NavKit.h"
-#include "../extern/vcpkg/packages/recastnavigation_x64-windows/include/recastnavigation/RecastAlloc.h"
 
 #undef main
 
@@ -107,10 +125,23 @@ int main(int argc, char** argv)
 
 	string navpName = "Choose NAVP file...";
 	string lastNavpFolder = "C:\\";
+	bool navpLoaded = false;
+	bool showNavp = true;
+	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
+	string airgName = "Choose AIRG file...";
+	string lastAirgFolder = "C:\\";
+	bool airgLoaded = false;
+	bool showAirg = true;
+	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
+	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
+	SReasoningGrid* airg = NULL;
+
+	string objName = "Choose OBJ file...";
 	string lastObjFolder = "C:\\";
+	bool objLoaded = false;
+	bool showObj = true;
 	vector<string> files;
 	const string meshesFolder = "OBJ";
-	string objName = "Choose OBJ file...";
 
 	float markerPosition[3] = { 0, 0, 0 };
 	bool markerPositionSet = false;
@@ -132,12 +163,6 @@ int main(int argc, char** argv)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
-
-	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
-	bool navpLoaded = false; 
-	bool showNavp = true;
-	bool objLoaded = false;
-	bool showObj = true;
 
 	double angle = 0.0;
 	srand(time(NULL));
@@ -364,6 +389,9 @@ int main(int argc, char** argv)
 		if (navpLoaded && showNavp) {
 			renderNavMesh(navMesh);
 		}
+		if (airgLoaded && showAirg) {
+			renderAirg(airg);
+		}
 		if (objLoaded && showObj) {
 			renderObj(geom, &m_dd);
 		}
@@ -389,7 +417,8 @@ int main(int argc, char** argv)
 			char cameraAngleMessage[128];
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
-			if (imguiBeginScrollArea("Load menu", width - 250 - 10, height - 200, 250, 200, &propScroll))
+
+			if (imguiBeginScrollArea("Load menu", width - 250 - 10, height - 300 - 10, 250, 300, &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -401,7 +430,7 @@ int main(int argc, char** argv)
 			imguiLabel("Load NAVP from file");
 			if (imguiButton(navpName.c_str()))
 			{
-				char* fileName = openNavpFile(lastNavpFolder.data());
+				char* fileName = openNavpFileDialog(lastNavpFolder.data());
 				if (fileName)
 				{
 					navpName = fileName;
@@ -422,11 +451,36 @@ int main(int argc, char** argv)
 					}
 				}
 			}
+			imguiLabel("Load AIRG from file");
+			if (imguiButton(airgName.c_str()))
+			{
+				char* fileName = openAirgFileDialog(lastAirgFolder.data());
+				if (fileName)
+				{
+					airgName = fileName;
+					lastAirgFolder = airgName.data();
+					airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
+					string extension = airgName.substr(airgName.length() - 4, airgName.length());
+					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+
+					if (extension == "JSON") {
+						airgLoaded = true;
+						ResourceMem* airgResourceMem = airgResourceGenerator->FromJsonFileToResourceMem(fileName, false);
+						airg = reinterpret_cast<SReasoningGrid*>(const_cast<void*>(airgResourceMem->ResourceData));
+					}
+					else if (extension == "AIRG") {
+						airgLoaded = true;
+						JsonString* airgJson = airgResourceConverter->FromResourceFileToJsonString(fileName);
+						ResourceMem* airgResourceMem = airgResourceGenerator->FromJsonStringToResourceMem(airgJson->JsonData, airgJson->StrSize, false);
+						airg = reinterpret_cast<SReasoningGrid*>(const_cast<void*>(airgResourceMem->ResourceData));
+					}
+				}
+			}
 
 			imguiSeparator();
 			imguiLabel("Load OBJ file");
 			if (imguiButton(objName.c_str())) {
-				char* fileName = openObjFile(objName.data());
+				char* fileName = openObjFileDialog(objName.data());
 				if (fileName)
 				{
 					objName = fileName;
@@ -513,7 +567,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-char* openNavpFile(char* lastNavpFolder) {
+char* openNavpFileDialog(char* lastNavpFolder) {
 	char* lTheOpenFileName;
 	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
 	return tinyfd_openFileDialog(
@@ -529,7 +583,19 @@ char* openNavpFile(char* lastNavpFolder) {
 
 }
 
-char* openObjFile(char* lastObjFolder) {
+char* openAirgFileDialog(char* lastAirgFolder) {
+	char* lTheOpenFileName;
+	char const* lFilterPatterns[2] = { "*.airg", "*.airg.json" };
+	return tinyfd_openFileDialog(
+		"Open Airg file",
+		lastAirgFolder,
+		2,
+		lFilterPatterns,
+		"Airg files",
+		0);
+}
+
+char* openObjFileDialog(char* lastObjFolder) {
 	char* lTheOpenFileName;
 	char const* lFilterPatterns[1] = { "*.obj" };
 	return tinyfd_openFileDialog(
@@ -570,4 +636,22 @@ void renderNavMesh(NavPower::NavMesh* navMesh) {
 	for (auto area : navMesh->m_areas) {
 		renderArea(area);
 	}
+}
+
+void renderAirg(SReasoningGrid* airg) {
+	printf("Render AIRG");
+	//for (SGWaypoint waypoint : airg->m_WaypointList) {
+		//glColor4f(1.0, 0.0, 0.5, 0.6);
+		//glBegin(GL_LINE_LOOP);
+		//const float r = 5.0f;
+		//for (int i = 0; i < 8; ++i)
+		//{
+		//	const float a = (float)i / 8.0f * RC_PI * 2;
+		//	const float fx = (float)waypoint->vPos.x + cosf(a) * r;
+		//	const float fy = (float)waypoint->vPos.y + sinf(a) * r;
+		//	const float fz = (float)waypoint->vPos.z + sinf(a) * r;
+		//	glVertex3f(fx, fy, fz);
+		//}
+		//glEnd();
+	//}
 }
