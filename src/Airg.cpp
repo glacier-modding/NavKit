@@ -1,5 +1,5 @@
 #include "..\include\NavKit\Airg.h"
-void Vec4::writeJson(std::ostream& f) {
+const void Vec4::writeJson(std::ostream& f) {
 	f << "{";
 
 	f << "\"x\"" << ":";
@@ -20,14 +20,14 @@ void Vec4::writeJson(std::ostream& f) {
 	f << "}";
 }
 
-void Vec4::readJson(auto p_Json) {
+void Vec4::readJson(simdjson::ondemand::object p_Json) {
 	x = double(p_Json["x"]);
 	y = double(p_Json["y"]);
 	z = double(p_Json["z"]);
 	w = double(p_Json["w"]);
 }
 
-void Properties::writeJson(std::ostream& f) {
+const void Properties::writeJson(std::ostream& f) {
 	f << "{";
 
 	f << "\"vMin\"" << ":" << "{";
@@ -55,11 +55,11 @@ void Properties::writeJson(std::ostream& f) {
 	f << "}";
 }
 
-void Properties::readJson(auto p_Json) {
-	simdjson::ondemand::array vMinJson = p_Json["vMin"];
+void Properties::readJson(simdjson::ondemand::object p_Json) {
+	simdjson::ondemand::object vMinJson = p_Json["vMin"];
 	vMin.readJson(vMinJson);
 
-	simdjson::ondemand::array vMaxJson = p_Json["vMax"];
+	simdjson::ondemand::object vMaxJson = p_Json["vMax"];
 	vMax.readJson(vMaxJson);
 	
 	nGridWidth = uint64_t(p_Json["nGridWidth"]);
@@ -69,7 +69,7 @@ void Properties::readJson(auto p_Json) {
 	nGridWidth = uint64_t(p_Json["nGridWidth"]);
 }
 
-void SizedArray::writeJson(std::ostream& f) {
+const void SizedArray::writeJson(std::ostream& f) {
 	f << "{";
 	f << "\"m_aBytes\"" << ":";
 	f << "[";
@@ -89,7 +89,7 @@ void SizedArray::writeJson(std::ostream& f) {
 	f << "}";
 }
 
-void SizedArray::readJson(auto p_Json) {
+void SizedArray::readJson(simdjson::ondemand::object p_Json) {
 	simdjson::ondemand::array m_aBytesJson = p_Json["m_aBytes"];
 	for (uint64_t byteJson : m_aBytesJson) {
 		m_aBytes.push_back(byteJson);
@@ -97,31 +97,31 @@ void SizedArray::readJson(auto p_Json) {
 	m_nSize = uint64_t(p_Json["m_nSize"]);
 }
 
-void Waypoint::writeJson(std::ostream& f) {
+const void Waypoint::writeJson(std::ostream& f) {
 	f << "{";
 	f << "\"nNeighbor0\"" << ":";
-	f << nNeighbor0;
+	f << nNeighbors[0];
 	f << ",";
 	f << "\"nNeighbor1\"" << ":";
-	f << nNeighbor1;
+	f << nNeighbors[1];
 	f << ",";
 	f << "\"nNeighbor2\"" << ":";
-	f << nNeighbor2;
+	f << nNeighbors[2];
 	f << ",";
 	f << "\"nNeighbor3\"" << ":";
-	f << nNeighbor3;
+	f << nNeighbors[3];
 	f << ",";
 	f << "\"nNeighbor4\"" << ":";
-	f << nNeighbor4;
+	f << nNeighbors[4];
 	f << ",";
 	f << "\"nNeighbor5\"" << ":";
-	f << nNeighbor5;
+	f << nNeighbors[5];
 	f << ",";
 	f << "\"nNeighbor6\"" << ":";
-	f << nNeighbor6;
+	f << nNeighbors[6];
 	f << ",";
 	f << "\"nNeighbor7\"" << ":";
-	f << nNeighbor7;
+	f << nNeighbors[7];
 	f << ",";
 	f << "\"vPos\"" << ":";
 	vPos.writeJson(f);
@@ -134,24 +134,24 @@ void Waypoint::writeJson(std::ostream& f) {
 	f << "}";
 }
 
-void Waypoint::readJson(auto p_Json) {
-	nNeighbor0 = uint64_t(p_Json["nNeighbor0"]);
-	nNeighbor1 = uint64_t(p_Json["nNeighbor1"]);
-	nNeighbor2 = uint64_t(p_Json["nNeighbor2"]);
-	nNeighbor3 = uint64_t(p_Json["nNeighbor3"]);
-	nNeighbor4 = uint64_t(p_Json["nNeighbor4"]);
-	nNeighbor5 = uint64_t(p_Json["nNeighbor5"]);
-	nNeighbor6 = uint64_t(p_Json["nNeighbor6"]);
-	nNeighbor7 = uint64_t(p_Json["nNeighbor7"]);
+void Waypoint::readJson(simdjson::ondemand::object p_Json) {
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor0"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor1"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor2"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor3"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor4"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor5"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor6"]));
+	nNeighbors.push_back(uint64_t(p_Json["nNeighbor7"]));
 
-	simdjson::ondemand::array vPosJson = p_Json["vPos"];
+	simdjson::ondemand::object vPosJson = p_Json["vPos"];
 	vPos.readJson(vPosJson);
 
 	nVisionDataOffset = uint64_t(p_Json["nVisionDataOffset"]);
 	nLayerIndex = uint64_t(p_Json["nLayerIndex"]);
 }
 
-void Airg::writeJson(std::ostream& f) {
+const void Airg::writeJson(std::ostream& f) {
 	f << "{";
 
 	f << "\"m_WaypointList\"" << ":";
@@ -212,7 +212,7 @@ void Airg::readJson(const char* p_AirgPath) {
 	m_HighVisibilityBits.readJson(m_HighVisibilityBitsJson);
 	simdjson::ondemand::object m_LowVisibilityBitsJson = p_AirgDocument["m_LowVisibilityBits"];
 	m_LowVisibilityBits.readJson(m_LowVisibilityBitsJson);
-	simdjson::ondemand::array m_deadEndDataJson = p_AirgDocument["m_deadEndData"];
+	simdjson::ondemand::object m_deadEndDataJson = p_AirgDocument["m_deadEndData"];
 	m_deadEndData.readJson(m_deadEndDataJson);
 	m_nNodeCount = int64_t(p_AirgDocument["m_nNodeCount"]);
 	simdjson::ondemand::array m_WaypointListJson = p_AirgDocument["m_WaypointList"];

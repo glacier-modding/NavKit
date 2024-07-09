@@ -21,8 +21,8 @@ public:
 	float z;
 	float w;
 
-	void writeJson(std::ostream& f);
-	void readJson(auto p_Json);
+	const void writeJson(std::ostream& f);
+	void readJson(simdjson::ondemand::object p_Json);
 };
 
 class Properties {
@@ -33,8 +33,8 @@ public:
 	float fGridSpacing;
 	uint32_t nVisibilityRange;
 
-	void writeJson(std::ostream& f);
-	void readJson(auto p_Json);
+	const void writeJson(std::ostream& f);
+	void readJson(simdjson::ondemand::object p_Json);
 };
 
 class SizedArray {
@@ -42,26 +42,19 @@ public:
 	std::vector<uint32_t> m_aBytes;
 	uint32_t m_nSize;
 
-	void writeJson(std::ostream& f);
-	void readJson(auto p_Json);
+	const void writeJson(std::ostream& f);
+	void readJson(simdjson::ondemand::object p_Json);
 };
 
 class Waypoint {
 public:
-	short nNeighbor0;
-	short nNeighbor1;
-	short nNeighbor2;
-	short nNeighbor3;
-	short nNeighbor4;
-	short nNeighbor5;
-	short nNeighbor6;
-	short nNeighbor7;
+	std::vector<short> nNeighbors;
 	Vec4 vPos;
 	uint32_t nVisionDataOffset;
 	uint32_t nLayerIndex;
 
-	void writeJson(std::ostream& f);
-	void readJson(auto p_Json);
+	const void writeJson(std::ostream& f);
+	void readJson(simdjson::ondemand::object p_Json);
 };
 
 class Airg {
@@ -74,6 +67,6 @@ public:
 	std::vector<Waypoint> m_WaypointList;
 	std::vector<uint32_t> m_pVisibilityData;
 
-	void writeJson(std::ostream& f);
+	const void writeJson(std::ostream& f);
 	void readJson(const char* p_AirgPath);
 };

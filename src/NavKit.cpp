@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 	}
 
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-	SDL_SetWindowTitle(window, "NavKit v0.1");
+	SDL_SetWindowTitle(window, "NavKit v0.2");
 
 	if (!imguiRenderGLInit("DroidSans.ttf"))
 	{
@@ -426,7 +426,6 @@ int main(int argc, char** argv)
 			if (imguiCheck("Show Obj", showObj))
 				showObj = !showObj;
 
-			//imguiSeparator();
 			imguiLabel("Load NAVP from file");
 			if (imguiButton(navpName.c_str()))
 			{
@@ -451,6 +450,7 @@ int main(int argc, char** argv)
 					}
 				}
 			}
+
 			imguiLabel("Load AIRG from file");
 			if (imguiButton(airgName.c_str()))
 			{
@@ -464,18 +464,21 @@ int main(int argc, char** argv)
 					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
 					if (extension == "JSON") {
+						delete airg;
 						airgLoaded = true;
+						airg = new Airg();
 						airg->readJson(fileName);
 					}
 					else if (extension == "AIRG") {
+						delete airg;
 						airgLoaded = true;
+						airg = new Airg();
 						airgResourceConverter->FromResourceFileToJsonFile(fileName, airgName.c_str());
 						airg->readJson(airgName.c_str());
 					}
 				}
 			}
 
-			imguiSeparator();
 			imguiLabel("Load OBJ file");
 			if (imguiButton(objName.c_str())) {
 				char* fileName = openObjFileDialog(objName.data());
@@ -619,38 +622,46 @@ void renderArea(NavPower::Area area) {
 	glColor4f(0.0, 0.0, 0.5, 0.6);
 	glBegin(GL_POLYGON);
 	for (auto vertex : area.m_edges) {
-		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, vertex->m_pos.Y);
+		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
 	}
 	glEnd();
 	glColor3f(0.0, 0.0, 1.0);
 	glBegin(GL_LINES);
 	for (auto vertex : area.m_edges) {
-		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, vertex->m_pos.Y);
+		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
 	}
 	glEnd();
 }
 
 void renderNavMesh(NavPower::NavMesh* navMesh) {
-	for (auto area : navMesh->m_areas) {
+	for (const NavPower::Area& area : navMesh->m_areas) {
 		renderArea(area);
 	}
 }
 
 void renderAirg(Airg* airg) {
-	printf("Render AIRG");
-	//TArray<SGWaypoint> waypoints = airg->m_WaypointList;
-	//for (SGWaypoint waypoint : airg->m_WaypointList) {
-	//	glColor4f(1.0, 0.0, 0.5, 0.6);
-	//	glBegin(GL_LINE_LOOP);
-	//	const float r = 5.0f;
-	//	for (int i = 0; i < 8; ++i)
-	//	{
-	//		const float a = (float)i / 8.0f * RC_PI * 2;
-	//		const float fx = (float)waypoint.vPos.x + cosf(a) * r;
-	//		const float fy = (float)waypoint.vPos.y + sinf(a) * r;
-	//		const float fz = (float)waypoint.vPos.z + sinf(a) * r;
-	//		glVertex3f(fx, fy, fz);
-	//	}
-	//	glEnd();
-	//}
+	int numWaypoints = airg->m_WaypointList.size();
+	for (size_t i = 0; i < numWaypoints; i++) {
+		const Waypoint& waypoint = airg->m_WaypointList[i];
+		glColor4f(1.0, 0.0, 0, 0.6);
+		glBegin(GL_LINE_LOOP);
+		const float r = 0.1f;
+		for (int i = 0; i < 8; i++) {
+			const float a = (float)i / 8.0f * RC_PI * 2;
+			const float fx = (float)waypoint.vPos.x + cosf(a) * r;
+			const float fy = (float)waypoint.vPos.y + sinf(a) * r;
+			const float fz = (float)waypoint.vPos.z;
+			glVertex3f(fx, fz, -fy);
+		}
+		glEnd();
+		for (int neighborIndex = 0; neighborIndex < 8; neighborIndex++) {
+			if (waypoint.nNeighbors[neighborIndex] != -1) {
+				const Waypoint& neighbor = airg->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
+				glBegin(GL_LINES);
+				glVertex3f(waypoint.vPos.x, waypoint.vPos.z, -waypoint.vPos.y);
+				glVertex3f(neighbor.vPos.x, neighbor.vPos.z, -neighbor.vPos.y);
+				glEnd();
+			}
+		}
+	}
 }

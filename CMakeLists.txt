@@ -16,6 +16,7 @@ find_package(SDL2 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(GLU REQUIRED)
+find_package(simdjson REQUIRED)
 
 add_subdirectory(src)
 #FIND_LIBRARY(NAVWEAKNESS_LIBRARIES NAMES navweakness NavWeakness.lib PATHS "External/NavWeakness/NavWeakness.lib")
