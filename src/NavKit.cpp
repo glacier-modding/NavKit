@@ -640,18 +640,19 @@ void renderNavMesh(NavPower::NavMesh* navMesh) {
 
 void renderAirg(SReasoningGrid* airg) {
 	printf("Render AIRG");
+	//TArray<SGWaypoint> waypoints = airg->m_WaypointList;
 	//for (SGWaypoint waypoint : airg->m_WaypointList) {
-		//glColor4f(1.0, 0.0, 0.5, 0.6);
-		//glBegin(GL_LINE_LOOP);
-		//const float r = 5.0f;
-		//for (int i = 0; i < 8; ++i)
-		//{
-		//	const float a = (float)i / 8.0f * RC_PI * 2;
-		//	const float fx = (float)waypoint->vPos.x + cosf(a) * r;
-		//	const float fy = (float)waypoint->vPos.y + sinf(a) * r;
-		//	const float fz = (float)waypoint->vPos.z + sinf(a) * r;
-		//	glVertex3f(fx, fy, fz);
-		//}
-		//glEnd();
+	//	glColor4f(1.0, 0.0, 0.5, 0.6);
+	//	glBegin(GL_LINE_LOOP);
+	//	const float r = 5.0f;
+	//	for (int i = 0; i < 8; ++i)
+	//	{
+	//		const float a = (float)i / 8.0f * RC_PI * 2;
+	//		const float fx = (float)waypoint.vPos.x + cosf(a) * r;
+	//		const float fy = (float)waypoint.vPos.y + sinf(a) * r;
+	//		const float fz = (float)waypoint.vPos.z + sinf(a) * r;
+	//		glVertex3f(fx, fy, fz);
+	//	}
+	//	glEnd();
 	//}
 }

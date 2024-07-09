@@ -27,15 +27,14 @@
 #include "..\NavWeakness\NavWeakness.h"
 #include "..\NavWeakness\NavPower.h"
 
-#include "..\ResourceLib\ResourceConverter.h"
-#include "..\ResourceLib\ResourceGenerator.h"
-#include "..\ResourceLib\ResourceLib.h"
-#include "..\ResourceLib\ResourceLibCommon.h"
-#include "..\ResourceLib\ResourceLib_HM3.h"
-#include "..\ResourceLib\Generated\ZHMGen.h"
+#include "..\ResourceLib_HM3\ResourceConverter.h"
+#include "..\ResourceLib_HM3\ResourceGenerator.h"
+#include "..\ResourceLib_HM3\ResourceLib.h"
+#include "..\ResourceLib_HM3\ResourceLibCommon.h"
+#include "..\ResourceLib_HM3\ResourceLib_HM3.h"
+#include "..\ResourceLib_HM3\Generated\ZHMGen.h"
 
 #include "..\..\extern\tinyfiledialogs\tinyfiledialogs.h"
-//#include "extern\fastlz\fastlz.h"
 
 void renderNavMesh(NavPower::NavMesh* navMesh);
 void renderAirg(SReasoningGrid* airg);
