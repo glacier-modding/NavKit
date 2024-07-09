@@ -17,6 +17,8 @@
 #include <RecastDebugDraw.h>
 #include "..\..\extern\vcpkg\packages\recastnavigation_x64-windows\include\recastnavigation\RecastAlloc.h"
 
+#include "Airg.h"
+
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"
 #include "..\RecastDemo\imguiRenderGL.h"
@@ -37,7 +39,7 @@
 #include "..\..\extern\tinyfiledialogs\tinyfiledialogs.h"
 
 void renderNavMesh(NavPower::NavMesh* navMesh);
-void renderAirg(SReasoningGrid* airg);
+void renderAirg(Airg* airg);
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
 void renderArea(NavPower::Area area);
 char* openNavpFileDialog(char* lastNavpFolder);

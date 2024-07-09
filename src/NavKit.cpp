@@ -134,7 +134,7 @@ int main(int argc, char** argv)
 	bool showAirg = true;
 	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
 	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
-	SReasoningGrid* airg = NULL;
+	Airg* airg = new Airg();
 
 	string objName = "Choose OBJ file...";
 	string lastObjFolder = "C:\\";
@@ -465,14 +465,12 @@ int main(int argc, char** argv)
 
 					if (extension == "JSON") {
 						airgLoaded = true;
-						ResourceMem* airgResourceMem = airgResourceGenerator->FromJsonFileToResourceMem(fileName, false);
-						airg = reinterpret_cast<SReasoningGrid*>(const_cast<void*>(airgResourceMem->ResourceData));
+						airg->readJson(fileName);
 					}
 					else if (extension == "AIRG") {
 						airgLoaded = true;
-						JsonString* airgJson = airgResourceConverter->FromResourceFileToJsonString(fileName);
-						ResourceMem* airgResourceMem = airgResourceGenerator->FromJsonStringToResourceMem(airgJson->JsonData, airgJson->StrSize, false);
-						airg = reinterpret_cast<SReasoningGrid*>(const_cast<void*>(airgResourceMem->ResourceData));
+						airgResourceConverter->FromResourceFileToJsonFile(fileName, airgName.c_str());
+						airg->readJson(airgName.c_str());
 					}
 				}
 			}
@@ -638,7 +636,7 @@ void renderNavMesh(NavPower::NavMesh* navMesh) {
 	}
 }
 
-void renderAirg(SReasoningGrid* airg) {
+void renderAirg(Airg* airg) {
 	printf("Render AIRG");
 	//TArray<SGWaypoint> waypoints = airg->m_WaypointList;
 	//for (SGWaypoint waypoint : airg->m_WaypointList) {
