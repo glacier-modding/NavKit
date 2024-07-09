@@ -1,2 +1,2 @@
 ﻿#define NavKit_VERSION_MAJOR 0
-#define NavKit_VERSION_MINOR 2
+#define NavKit_VERSION_MINOR 1

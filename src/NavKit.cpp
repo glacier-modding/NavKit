@@ -425,6 +425,8 @@ int main(int argc, char** argv)
 				showNavp = !showNavp;
 			if (imguiCheck("Show Obj", showObj))
 				showObj = !showObj;
+			if (imguiCheck("Show Airg", showAirg))
+				showAirg = !showAirg;
 
 			imguiLabel("Load NAVP from file");
 			if (imguiButton(navpName.c_str()))
