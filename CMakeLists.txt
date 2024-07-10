@@ -2,7 +2,7 @@
 
 project(
   NavKit 
-  VERSION 0.1
+  VERSION 0.3
   DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman"
   LANGUAGES CXX)
 
