@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 	}
 
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-	SDL_SetWindowTitle(window, "NavKit v0.2");
+	SDL_SetWindowTitle(window, "NavKit v0.3");
 
 	if (!imguiRenderGLInit("DroidSans.ttf"))
 	{
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
 	bool mouseOverMenu = false;
 
 	bool showMenu = !presentationMode;
-	bool showLog = false;
+	bool showLog = true;
 	bool showTools = true;
 	bool showLevels = false;
 	bool showSample = false;
@@ -128,6 +128,7 @@ int main(int argc, char** argv)
 	bool navpLoaded = false;
 	bool showNavp = true;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
+
 	string airgName = "Choose AIRG file...";
 	string lastAirgFolder = "C:\\";
 	bool airgLoaded = false;
@@ -142,6 +143,17 @@ int main(int argc, char** argv)
 	bool showObj = true;
 	vector<string> files;
 	const string meshesFolder = "OBJ";
+	string objToLoad = "";
+
+	bool showExtractMenu = false;
+	string hitmanFolderName = "Choose Hitman folder...";
+	string lastHitmanFolder = "C:\\";
+	bool hitmanSet = false;
+	string sceneName = "Choose Scene TEMP...";
+	bool sceneSet = false;
+	string outputFolderName = "Choose Output folder...";
+	string lastOutputFolder = "C:\\";
+	bool outputSet = false;
 
 	float markerPosition[3] = { 0, 0, 0 };
 	bool markerPositionSet = false;
@@ -418,7 +430,7 @@ int main(int argc, char** argv)
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			if (imguiBeginScrollArea("Load menu", width - 250 - 10, height - 300 - 10, 250, 300, &propScroll))
+			if (imguiBeginScrollArea("Load menu", width - 250 - 10, height - 350 - 10, 250, 350, &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -428,9 +440,15 @@ int main(int argc, char** argv)
 			if (imguiCheck("Show Airg", showAirg))
 				showAirg = !showAirg;
 
+			imguiSeparator();
+
+			imguiLabel("Extract scene from game");
+			if (imguiButton(showExtractMenu ? "Close Extract Menu"  : "Open Extract Menu")) {
+				showExtractMenu = !showExtractMenu;
+			}
+
 			imguiLabel("Load NAVP from file");
-			if (imguiButton(navpName.c_str()))
-			{
+			if (imguiButton(navpName.c_str())) {
 				char* fileName = openNavpFileDialog(lastNavpFolder.data());
 				if (fileName)
 				{
@@ -454,8 +472,7 @@ int main(int argc, char** argv)
 			}
 
 			imguiLabel("Load AIRG from file");
-			if (imguiButton(airgName.c_str()))
-			{
+			if (imguiButton(airgName.c_str())) {
 				char* fileName = openAirgFileDialog(lastAirgFolder.data());
 				if (fileName)
 				{
@@ -491,40 +508,14 @@ int main(int argc, char** argv)
 					objName = objName.substr(objName.find_last_of("/\\") + 1);
 					geom = new InputGeom;
 					objLoaded = true;
-
-					if (!geom->load(&ctx, fileName))
-					{
-						showLog = true;
-						logScroll = 0;
-						ctx.dumpLog("Geom load log %s:", objName.c_str());
-
-						if (geom)
-						{
-							const float* bmin = 0;
-							const float* bmax = 0;
-							if (geom)
-							{
-								bmin = geom->getNavMeshBoundsMin();
-								bmax = geom->getNavMeshBoundsMax();
-							}
-							// Reset camera and fog to match the mesh bounds.
-							if (bmin && bmax)
-							{
-								camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
-									rcSqr(bmax[1] - bmin[1]) +
-									rcSqr(bmax[2] - bmin[2])) / 2;
-								cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
-								cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
-								cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
-								camr *= 3;
-							}
-							cameraEulers[0] = 45;
-							cameraEulers[1] = -45;
-						}
-					}
+					objToLoad = fileName;
 				}
 			}
 			imguiSeparator();
+
+			if (imguiCheck("Show Log", showLog))
+				showLog = !showLog;
+
 
 			//imguiSeparatorLine();
 
@@ -535,6 +526,88 @@ int main(int argc, char** argv)
 			//}
 
 			//imguiSeparator();
+			imguiEndScrollArea();
+
+			if (showExtractMenu) {
+				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 300 - 10, 250, 300, &propScroll);
+				imguiLabel("Set Hitman Directory");
+				if (imguiButton(hitmanFolderName.c_str())) {
+					char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
+					if (folderName){
+						hitmanSet = true;
+						lastHitmanFolder = folderName;
+						hitmanFolderName = folderName;
+						hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
+					}
+				}
+				imguiLabel("Select Scene file");
+				if (imguiButton(sceneName.c_str())) {
+					char* inputText = openSceneInputDialog(sceneName.data());
+					if (inputText) {
+						sceneName = inputText;
+						sceneSet = true;
+					}
+				}
+				imguiLabel("Set Output Directory");
+				if (imguiButton(outputFolderName.c_str())) {
+					char* folderName = openOutputFolderDialog(lastOutputFolder.data());
+					if (folderName) {
+						outputSet = true;
+						lastOutputFolder = folderName;
+						outputFolderName = folderName;
+						outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
+					}
+				}
+				imguiLabel("Extract from game");
+				if (imguiButton("Extract", hitmanSet && sceneSet && outputSet)) {
+					showLog = true;
+					extractScene(&ctx, lastHitmanFolder.data(), sceneName.data(), lastOutputFolder.data());
+					objToLoad = lastOutputFolder;
+					objToLoad += "\\output.obj";
+					geom = new InputGeom;
+					objLoaded = true;
+				}
+				imguiEndScrollArea();
+			}
+		}
+
+		if (objToLoad != "" && !geom->load(&ctx, objToLoad))
+		{
+			showLog = true;
+			logScroll = 0;
+			ctx.dumpLog("Geom load log %s:", objName.c_str());
+
+			if (geom)
+			{
+				const float* bmin = 0;
+				const float* bmax = 0;
+				if (geom)
+				{
+					bmin = geom->getNavMeshBoundsMin();
+					bmax = geom->getNavMeshBoundsMax();
+				}
+				// Reset camera and fog to match the mesh bounds.
+				if (bmin && bmax)
+				{
+					camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
+						rcSqr(bmax[1] - bmin[1]) +
+						rcSqr(bmax[2] - bmin[2])) / 2;
+					cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
+					cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
+					cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
+					camr *= 3;
+				}
+				cameraEulers[0] = 45;
+				cameraEulers[1] = -45;
+			}
+			objToLoad = "";
+		}
+		if (showLog && showMenu)
+		{
+			if (imguiBeginScrollArea("Log", 250 + 20, 10, width - 300 - 250, 200, &logScroll))
+				mouseOverMenu = true;
+			for (int i = 0; i < ctx.getLogCount(); ++i)
+				imguiLabel(ctx.getLogText(i));
 			imguiEndScrollArea();
 		}
 		// Marker
@@ -586,8 +659,26 @@ char* openNavpFileDialog(char* lastNavpFolder) {
 
 }
 
+char* openHitmanFolderDialog(char* lastHitmanFolder) {
+	return tinyfd_selectFolderDialog(
+		"Choose Hitman folder",
+		lastHitmanFolder);
+}
+
+char* openSceneInputDialog(char* lastScene) {
+	return tinyfd_inputBox(
+		"Choose scene TEMP",
+		"Select a scene TEMP to extract, either as a hash or an ioi string",
+		"");
+}
+
+char* openOutputFolderDialog(char* lastOutputFolder) {
+	return tinyfd_selectFolderDialog(
+		"Choose output folder",
+		lastOutputFolder);
+}
+
 char* openAirgFileDialog(char* lastAirgFolder) {
-	char* lTheOpenFileName;
 	char const* lFilterPatterns[2] = { "*.airg", "*.airg.json" };
 	return tinyfd_openFileDialog(
 		"Open Airg file",
@@ -599,7 +690,6 @@ char* openAirgFileDialog(char* lastAirgFolder) {
 }
 
 char* openObjFileDialog(char* lastObjFolder) {
-	char* lTheOpenFileName;
 	char const* lFilterPatterns[1] = { "*.obj" };
 	return tinyfd_openFileDialog(
 		"Open Objfile",

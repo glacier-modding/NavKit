@@ -12,6 +12,7 @@
 #include <GL/glut.h>
 
 #include "NavKitConfig.h"
+#include "Glacier2Obj.h"
 
 #include <Recast.h>
 #include <RecastDebugDraw.h>
@@ -45,3 +46,6 @@ void renderArea(NavPower::Area area);
 char* openNavpFileDialog(char* lastNavpFolder);
 char* openAirgFileDialog(char* lastAirgFolder);
 char* openObjFileDialog(char* lastObjFolder);
+char* openHitmanFolderDialog(char* lastHitmanFolder);
+char* openOutputFolderDialog(char* lastOutputFolder);
+char* openSceneInputDialog(char* lastScene);
