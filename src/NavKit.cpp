@@ -110,6 +110,7 @@ int main(int argc, char** argv)
 	float rayStart[3];
 	float rayEnd[3];
 	bool mouseOverMenu = false;
+	int lastLogCount = -1;
 
 	bool showMenu = !presentationMode;
 	bool showLog = true;
@@ -128,6 +129,8 @@ int main(int argc, char** argv)
 	bool navpLoaded = false;
 	bool showNavp = true;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
+	std::vector<bool> extractionDone;
+	bool startedObjGeneration = false;
 
 	string airgName = "Choose AIRG file...";
 	string lastAirgFolder = "C:\\";
@@ -561,44 +564,55 @@ int main(int argc, char** argv)
 				imguiLabel("Extract from game");
 				if (imguiButton("Extract", hitmanSet && sceneSet && outputSet)) {
 					showLog = true;
-					extractScene(&ctx, lastHitmanFolder.data(), sceneName.data(), lastOutputFolder.data());
-					objToLoad = lastOutputFolder;
-					objToLoad += "\\output.obj";
-					geom = new InputGeom;
-					objLoaded = true;
+					extractScene(&ctx, lastHitmanFolder.data(), sceneName.data(), lastOutputFolder.data(), &extractionDone);
 				}
 				imguiEndScrollArea();
 			}
 		}
+		if (extractionDone.size() == 1 && !startedObjGeneration) {
+			startedObjGeneration = true;
+			generateObj(&ctx, lastOutputFolder.data(), &extractionDone);
+		}
 
-		if (objToLoad != "" && !geom->load(&ctx, objToLoad))
+		if (extractionDone.size() == 2) {
+			startedObjGeneration = false;
+			extractionDone.clear();
+			objToLoad = lastOutputFolder;
+			objToLoad += "\\output.obj";
+			geom = new InputGeom;
+			objLoaded = true;
+		}
+
+		if (!objToLoad.empty())
 		{
-			showLog = true;
-			logScroll = 0;
-			ctx.dumpLog("Geom load log %s:", objName.c_str());
+			if (!geom->load(&ctx, objToLoad)) {
+				showLog = true;
+				logScroll = 0;
+				ctx.dumpLog("Geom load log %s:", objName.c_str());
 
-			if (geom)
-			{
-				const float* bmin = 0;
-				const float* bmax = 0;
 				if (geom)
 				{
-					bmin = geom->getNavMeshBoundsMin();
-					bmax = geom->getNavMeshBoundsMax();
+					const float* bmin = 0;
+					const float* bmax = 0;
+					if (geom)
+					{
+						bmin = geom->getNavMeshBoundsMin();
+						bmax = geom->getNavMeshBoundsMax();
+					}
+					// Reset camera and fog to match the mesh bounds.
+					if (bmin && bmax)
+					{
+						camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
+							rcSqr(bmax[1] - bmin[1]) +
+							rcSqr(bmax[2] - bmin[2])) / 2;
+						cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
+						cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
+						cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
+						camr *= 3;
+					}
+					cameraEulers[0] = 45;
+					cameraEulers[1] = -45;
 				}
-				// Reset camera and fog to match the mesh bounds.
-				if (bmin && bmax)
-				{
-					camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
-						rcSqr(bmax[1] - bmin[1]) +
-						rcSqr(bmax[2] - bmin[2])) / 2;
-					cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
-					cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
-					cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
-					camr *= 3;
-				}
-				cameraEulers[0] = 45;
-				cameraEulers[1] = -45;
 			}
 			objToLoad = "";
 		}
@@ -608,6 +622,10 @@ int main(int argc, char** argv)
 				mouseOverMenu = true;
 			for (int i = 0; i < ctx.getLogCount(); ++i)
 				imguiLabel(ctx.getLogText(i));
+			if (lastLogCount != ctx.getLogCount()) {
+				logScroll = std::max(0, ctx.getLogCount() * 20 - 160);
+				lastLogCount = ctx.getLogCount();
+			}
 			imguiEndScrollArea();
 		}
 		// Marker

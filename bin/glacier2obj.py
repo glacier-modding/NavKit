@@ -1657,7 +1657,7 @@ def load_prim(operator, context, collection, filepath, use_rig, rig_filepath):
     """Imports a mesh from the given path"""
 
     prim_name = bpy.path.display_name_from_filepath(filepath)
-    print("Started reading: " + str(prim_name) + "\n")
+    print("Started reading: " + str(prim_name) + "\n", flush=True)
 
     fp = os.fsencode(filepath)
     file = open(fp, "rb")
@@ -1688,7 +1688,7 @@ def load_prim(operator, context, collection, filepath, use_rig, rig_filepath):
     borg = None
     if use_rig:
         borg_name = bpy.path.display_name_from_filepath(filepath)
-        print("Started reading: " + str(borg_name) + "\n")
+        print("Started reading: " + str(borg_name) + "\n", flush=True)
         fp = os.fsencode(rig_filepath)
         file = open(fp, "rb")
         br = BinaryReader(file)
@@ -1887,6 +1887,7 @@ def load_scenario(context, collection, path_to_prims_json):
     data = json.loads(f.read())
     f.close()
     transforms = {}
+    total_prims = 0
     for hash_and_entity in data['entities']:
         prim_hash = hash_and_entity['primHash']
         entity = hash_and_entity['entity']
@@ -1896,10 +1897,11 @@ def load_scenario(context, collection, path_to_prims_json):
         if prim_hash not in transforms:
             transforms[prim_hash] = []
         transforms[prim_hash].append(transform)
-
+        total_prims += 1
+    cur_prim = 0
     path_to_prim_dir = "%s\\%s" % (os.path.dirname(path_to_prims_json), "prim")
-    print("Path to prim dir:")
-    print(path_to_prim_dir)
+    print("Path to prim dir:", flush=True)
+    print(path_to_prim_dir, flush=True)
     file_list = sorted(os.listdir(path_to_prim_dir))
     prim_list = [item for item in file_list if item.lower().endswith('.prim')]
     for prim_filename in prim_list:
@@ -1908,14 +1910,14 @@ def load_scenario(context, collection, path_to_prims_json):
             continue
         prim_path = os.path.join(path_to_prim_dir, prim_filename)
 
-        print("Loading prim:")
-        print(prim_hash)
+        print("Loading prim:", flush=True)
+        print(prim_hash, flush=True)
         objects = load_prim(
             None, context, collection, prim_path, False, None
         )
         if not objects:
-            print("Error Loading prim:")
-            print(prim_hash)
+            print("Error Loading prim:", flush=True)
+            print(prim_hash, flush=True)
             return 1
         highest_lod = -1
         for obj in objects:
@@ -1931,7 +1933,8 @@ def load_scenario(context, collection, path_to_prims_json):
             r = transform["rotate"]
             s = transform["scale"]
             r["roll"] = math.pi * 2 - r["roll"]
-            print("Transforming prim:" + prim_hash + " #" + str(i))
+            print("[" + str(cur_prim) + "/" + str(total_prims) + "] Transforming prim:" + prim_hash + " #" + str(i), flush=True)
+            cur_prim += 1
             for obj in objects:
                 if obj.data['prim_properties']['lod'][highest_lod] == 0:
                     continue
@@ -1950,10 +1953,10 @@ def load_scenario(context, collection, path_to_prims_json):
 
 
 def main():
-    print("Usage: blender -b -P glacier2obj.py -- <prims.json path> <output.obj path>")
+    print("Usage: blender -b -P glacier2obj.py -- <prims.json path> <output.obj path>", flush=True)
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
-    print(argv)  # --> ['example', 'args', '123']
+    print(argv, flush=True)  # --> ['example', 'args', '123']
     scenario_path = argv[0]
     output_path = argv[1]
     collection = bpy.data.collections.new(

@@ -8,7 +8,6 @@
 #include "../../include/RecastDemo/PerfTimer.h"
 #include "SDL.h"
 #include "SDL_opengl.h"
-
 #ifdef WIN32
 #	define snprintf _snprintf
 #endif
@@ -34,12 +33,18 @@ void BuildContext::doResetLog()
 void BuildContext::doLog(const rcLogCategory category, const char* msg, const int len)
 {
 	if (!len) return;
-	if (m_messageCount >= MAX_MESSAGES)
+	if (m_messageCount >= MAX_MESSAGES) {
+		resetLog();
 		return;
+	}
 	char* dst = &m_textPool[m_textPoolSize];
 	int n = TEXT_POOL_SIZE - m_textPoolSize;
-	if (n < 2)
-		return;
+	if (n < 2) {
+		resetLog();
+		dst = &m_textPool[m_textPoolSize];
+		n = TEXT_POOL_SIZE - m_textPoolSize;
+	}
+
 	char* cat = dst;
 	char* text = dst+1;
 	const int maxtext = n-1;
