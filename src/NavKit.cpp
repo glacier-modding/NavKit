@@ -83,7 +83,10 @@ int main(int argc, char** argv)
 	}
 
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-	SDL_SetWindowTitle(window, "NavKit v0.3");
+	string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR;
+	string title = "NavKit v";
+	title += navKitVersion;
+	SDL_SetWindowTitle(window, title.data());
 
 	if (!imguiRenderGLInit("DroidSans.ttf"))
 	{
@@ -124,46 +127,53 @@ int main(int argc, char** argv)
 	int logScroll = 0;
 	int toolsScroll = 0;
 
-	string navpName = "Choose NAVP file...";
-	string lastNavpFolder = "C:\\";
+	string loadNavpName = "Choose NAVP file...";
+	string lastLoadNavpFolder = loadNavpName;
+	string saveNavpName = "Choose NAVP file...";
+	string lastSaveNavpFolder = saveNavpName;
 	bool navpLoaded = false;
 	bool showNavp = true;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
-	std::vector<bool> extractionDone;
-	bool startedObjGeneration = false;
+	vector<bool> navpBuildDone;
 
 	string airgName = "Choose AIRG file...";
-	string lastAirgFolder = "C:\\";
-	bool airgLoaded = false;
+	string lastAirgFolder = airgName;
+	vector<bool> airgLoaded;
 	bool showAirg = true;
 	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
 	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
 	Airg* airg = new Airg();
 
 	string objName = "Choose OBJ file...";
-	string lastObjFolder = "C:\\";
+	string lastObjFileName = objName;
 	bool objLoaded = false;
 	bool showObj = true;
 	vector<string> files;
 	const string meshesFolder = "OBJ";
 	string objToLoad = "";
+	vector<bool> objLoadDone;
+
+	vector<bool> extractionDone;
+	bool startedObjGeneration = false;
 
 	bool showExtractMenu = false;
 	string hitmanFolderName = "Choose Hitman folder...";
-	string lastHitmanFolder = "C:\\";
+	string lastHitmanFolder = hitmanFolderName;
 	bool hitmanSet = false;
 	string sceneName = "Choose Scene TEMP...";
 	bool sceneSet = false;
 	string outputFolderName = "Choose Output folder...";
-	string lastOutputFolder = "C:\\";
+	string lastOutputFolder = outputFolderName;
 	bool outputSet = false;
 
 	float markerPosition[3] = { 0, 0, 0 };
 	bool markerPositionSet = false;
-
+	
+	Sample* sample = new Sample_SoloMesh();
 	InputGeom* geom = 0;
 	BuildContext ctx;
 	DebugDrawGL m_dd;
+	sample->setContext(&ctx);
 
 	// Fog.
 	float fogColor[4] = { 0.32f, 0.31f, 0.30f, 1.0f };
@@ -310,6 +320,40 @@ int main(int argc, char** argv)
 		float dt = (time - prevFrameTime) / 1000.0f;
 		prevFrameTime = time;
 
+		// Hit test mesh.
+		if (processHitTest && geom && objLoaded)
+		{
+			float hitTime;
+			bool hit = geom->raycastMesh(rayStart, rayEnd, hitTime);
+
+			if (hit)
+			{
+				if (SDL_GetModState() & KMOD_CTRL)
+				{
+					// Marker
+					markerPositionSet = true;
+					markerPosition[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
+					markerPosition[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
+					markerPosition[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
+				}
+				else
+				{
+					float pos[3];
+					pos[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
+					pos[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
+					pos[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
+					sample->handleClick(rayStart, pos, processHitTestShift);
+				}
+			}
+			else
+			{
+				if (SDL_GetModState() & KMOD_CTRL)
+				{
+					// Marker
+					markerPositionSet = false;
+				}
+			}
+		}
 
 		// Update sample simulation.
 		const float SIM_RATE = 20;
@@ -319,6 +363,10 @@ int main(int argc, char** argv)
 		while (timeAcc > DELTA_TIME)
 		{
 			timeAcc -= DELTA_TIME;
+			if (simIter < 5)
+			{
+				sample->handleUpdate(DELTA_TIME);
+			}
 			simIter++;
 		}
 
@@ -404,7 +452,7 @@ int main(int argc, char** argv)
 		if (navpLoaded && showNavp) {
 			renderNavMesh(navMesh);
 		}
-		if (airgLoaded && showAirg) {
+		if (!airgLoaded.empty() && showAirg) {
 			renderAirg(airg);
 		}
 		if (objLoaded && showObj) {
@@ -422,6 +470,7 @@ int main(int argc, char** argv)
 		mouseOverMenu = false;
 
 		imguiBeginFrame(mousePos[0], mousePos[1], mouseButtonMask, mouseScroll);
+		sample->handleRenderOverlay((double*)projectionMatrix, (double*)modelviewMatrix, (int*)viewport);
 		if (showMenu)
 		{
 			const char msg[] = "W/S/A/D: Move  RMB: Rotate";
@@ -433,7 +482,7 @@ int main(int argc, char** argv)
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			if (imguiBeginScrollArea("Load menu", width - 250 - 10, height - 350 - 10, 250, 350, &propScroll))
+			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1175 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1175 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -451,25 +500,61 @@ int main(int argc, char** argv)
 			}
 
 			imguiLabel("Load NAVP from file");
-			if (imguiButton(navpName.c_str())) {
-				char* fileName = openNavpFileDialog(lastNavpFolder.data());
+			if (imguiButton(loadNavpName.c_str())) {
+				char* fileName = openLoadNavpFileDialog(lastLoadNavpFolder.data());
 				if (fileName)
 				{
-					navpName = fileName;
-					lastNavpFolder = navpName.data();
-					navpName = navpName.substr(navpName.find_last_of("/\\") + 1);
-					string extension = navpName.substr(navpName.length() - 4, navpName.length());
+					loadNavpName = fileName;
+					lastLoadNavpFolder = loadNavpName.data();
+					loadNavpName = loadNavpName.substr(loadNavpName.find_last_of("/\\") + 1);
+					string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
 					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
 					if (extension == "JSON") {
 						navpLoaded = true;
-						NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(fileName);
-						std::swap(*navMesh, newNavMesh);
+						string msg = "Loading NAVP.JSON file: '";
+						msg += fileName;
+						msg += "'...";
+						ctx.log(RC_LOG_PROGRESS, msg.data());
+						std::thread loadNavMeshThread(loadNavMesh, navMesh, &ctx, fileName, true);
+						loadNavMeshThread.detach();
 					}
 					else if (extension == "NAVP") {
 						navpLoaded = true;
-						NavPower::NavMesh newNavMesh = LoadNavMeshFromBinary(fileName);
-						std::swap(*navMesh, newNavMesh);
+						string msg = "Loading NAVP file: '";
+						msg += fileName;
+						msg += "'...";
+						ctx.log(RC_LOG_PROGRESS, msg.data());
+						std::thread loadNavMeshThread(loadNavMesh, navMesh, &ctx, fileName, false);
+						loadNavMeshThread.detach();
+					}
+				}
+			}
+
+			imguiLabel("Save NAVP to file");
+			if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
+				char* fileName = openSaveNavpFileDialog(lastLoadNavpFolder.data());
+				if (fileName)
+				{
+					saveNavpName = fileName;
+					lastSaveNavpFolder = saveNavpName.data();
+					saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
+					string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
+					string msg = "Saving NAVP";
+					if (extension == "JSON") {
+						msg += ".JSON";
+					}
+					msg += " file: '";
+					msg += fileName;
+					msg += "'...";
+					ctx.log(RC_LOG_PROGRESS, msg.data());
+					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+
+					if (extension == "JSON") {
+						OutputNavMesh_JSON_Write(navMesh, fileName);
+					}
+					else if (extension == "NAVP") {
+						OutputNavMesh_NAVP_Write(navMesh, fileName);
 					}
 				}
 			}
@@ -487,16 +572,23 @@ int main(int argc, char** argv)
 
 					if (extension == "JSON") {
 						delete airg;
-						airgLoaded = true;
 						airg = new Airg();
-						airg->readJson(fileName);
+						string msg = "Loading AIRG.JSON file: '";
+						msg += fileName;
+						msg += "'...";
+						ctx.log(RC_LOG_PROGRESS, msg.data());
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, fileName, true, &airgLoaded);
+						loadAirgThread.detach();
 					}
 					else if (extension == "AIRG") {
 						delete airg;
-						airgLoaded = true;
 						airg = new Airg();
-						airgResourceConverter->FromResourceFileToJsonFile(fileName, airgName.c_str());
-						airg->readJson(airgName.c_str());
+						string msg = "Loading AIRG file: '";
+						msg += fileName;
+						msg += "'...";
+						ctx.log(RC_LOG_PROGRESS, msg.data());
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, fileName, false, &airgLoaded);
+						loadAirgThread.detach();
 					}
 				}
 			}
@@ -507,10 +599,13 @@ int main(int argc, char** argv)
 				if (fileName)
 				{
 					objName = fileName;
-					lastObjFolder = objName.data();
+					string msg = "Loading OBJ file: '";
+					msg += fileName;
+					msg += "'...";
+					ctx.log(RC_LOG_PROGRESS, msg.data());
+
+					lastObjFileName = objName.data();
 					objName = objName.substr(objName.find_last_of("/\\") + 1);
-					geom = new InputGeom;
-					objLoaded = true;
 					objToLoad = fileName;
 				}
 			}
@@ -520,19 +615,36 @@ int main(int argc, char** argv)
 				showLog = !showLog;
 
 
-			//imguiSeparatorLine();
+			if (geom && objToLoad.empty() && objLoaded)
+			{
+				imguiSeparatorLine();
+				char text[64];
+				snprintf(text, 64, "Verts: %.1fk  Tris: %.1fk",
+					geom->getMesh()->getVertCount() / 1000.0f,
+					geom->getMesh()->getTriCount() / 1000.0f);
+				imguiValue(text);
+			}
 
+			if (geom && objLoaded)
+			{
+				imguiSeparatorLine();
 
-			//if (imguiButton("Build"))
-			//{
-			//	printf("Build pressed");
-			//}
+				sample->handleCommonSettings();
 
-			//imguiSeparator();
+				imguiSeparator();
+				if (imguiButton("Build"))
+				{
+					std::thread buildNavpThread(buildNavp, sample, &ctx, &navpBuildDone);
+					buildNavpThread.detach();
+				}
+
+				imguiSeparator();
+			}
+
 			imguiEndScrollArea();
 
 			if (showExtractMenu) {
-				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 300 - 10, 250, 300, &propScroll);
+				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 215 - 10, 250, 215, &propScroll);
 				imguiLabel("Set Hitman Directory");
 				if (imguiButton(hitmanFolderName.c_str())) {
 					char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
@@ -579,42 +691,57 @@ int main(int argc, char** argv)
 			extractionDone.clear();
 			objToLoad = lastOutputFolder;
 			objToLoad += "\\output.obj";
+			string msg = "Loading OBJ file: '";
+			msg += objToLoad;
+			msg += "'...";
+			ctx.log(RC_LOG_PROGRESS, msg.data());
 			geom = new InputGeom;
-			objLoaded = true;
 		}
 
-		if (!objToLoad.empty())
-		{
-			if (!geom->load(&ctx, objToLoad)) {
-				showLog = true;
-				logScroll = 0;
-				ctx.dumpLog("Geom load log %s:", objName.c_str());
+		if (!navpBuildDone.empty()) {
+			navpLoaded = true;
+			sample->saveAll("output.navp.json");
+			NavPower::NavMesh newNavMesh = LoadNavMeshFromJson("output.navp.json");
+			std::swap(*navMesh, newNavMesh);
+			navpBuildDone.clear();
+		}
 
-				if (geom)
-				{
-					const float* bmin = 0;
-					const float* bmax = 0;
-					if (geom)
-					{
-						bmin = geom->getNavMeshBoundsMin();
-						bmax = geom->getNavMeshBoundsMax();
-					}
-					// Reset camera and fog to match the mesh bounds.
-					if (bmin && bmax)
-					{
-						camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
-							rcSqr(bmax[1] - bmin[1]) +
-							rcSqr(bmax[2] - bmin[2])) / 2;
-						cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
-						cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
-						cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
-						camr *= 3;
-					}
-					cameraEulers[0] = 45;
-					cameraEulers[1] = -45;
-				}
-			}
+		if (!objToLoad.empty()) {
+			geom = new InputGeom;
+			string fileName = objToLoad;
+			std::thread loadObjThread(loadObjMesh, geom, &ctx, lastObjFileName.data(), &objLoadDone);
+			loadObjThread.detach();
 			objToLoad = "";
+		}
+
+		if (!objLoadDone.empty()) {
+			showLog = true;
+			logScroll = 0;
+			ctx.dumpLog("Geom load log %s:", objName.c_str());
+
+			if (geom)
+			{
+				sample->handleMeshChanged(geom);
+				const float* bmin = 0;
+				const float* bmax = 0;
+				bmin = geom->getNavMeshBoundsMin();
+				// Reset camera and fog to match the mesh bounds.
+				if (bmin && bmax)
+				{
+					//camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
+					//	rcSqr(bmax[1] - bmin[1]) +
+					//	rcSqr(bmax[2] - bmin[2])) / 2;
+					cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
+					cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
+					cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
+					bmax = geom->getNavMeshBoundsMax();
+				}
+				//camr *= 3;
+				cameraEulers[0] = 45;
+				cameraEulers[1] = -45;
+				objLoaded = true;
+			}
+			objLoadDone.clear();
 		}
 		if (showLog && showMenu)
 		{
@@ -661,61 +788,98 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-char* openNavpFileDialog(char* lastNavpFolder) {
-	char* lTheOpenFileName;
-	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
-	return tinyfd_openFileDialog(
-		"Open Navp file",
-		lastNavpFolder,
-		2,
-		lFilterPatterns,
-		"Navp files",
-		0);
-	
-	//OutputNavMesh_NAVP("C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3\\Simple Mod Framework\\Mods\\NavpTestWorld\\content\\chunk2\\009F622BC6A91CC4.NAVP.json", "009F622BC6A91CC4.NAVP", true);
-	//OutputNavMesh_JSON("C:\\workspace\\ZHMTools-dbierek\\Debug\\miami vanilla.NAVP", "miami.navp.json", false);
+void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, bool isFromJson) {
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	string msg = "Loading NAVP from file at ";
+	msg += std::ctime(&start_time);
+	ctx->log(RC_LOG_PROGRESS, msg.data());
+	auto start = std::chrono::high_resolution_clock::now();
 
+	NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
+	std::swap(*navMesh, newNavMesh);
+
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	msg = "Finished loading NAVP in ";
+	msg += std::to_string(duration.count());
+	msg += " seconds";
+	ctx->log(RC_LOG_PROGRESS, msg.data());
 }
 
-char* openHitmanFolderDialog(char* lastHitmanFolder) {
-	return tinyfd_selectFolderDialog(
-		"Choose Hitman folder",
-		lastHitmanFolder);
+void buildNavp(Sample* sample, BuildContext* ctx, vector<bool>* navpBuildDone) {
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	string msg = "Building NAVP at ";
+	msg += std::ctime(&start_time);
+	ctx->log(RC_LOG_PROGRESS, msg.data());
+	auto start = std::chrono::high_resolution_clock::now();
+
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+
+	if (sample->handleBuild()) {
+		navpBuildDone->push_back(true);
+		msg = "Finished building NAVP in ";
+		msg += std::to_string(duration.count());
+		msg += " seconds";
+		ctx->log(RC_LOG_PROGRESS, msg.data());
+	}
+	else {
+		ctx->log(RC_LOG_ERROR, "Error building NAVP");
+	}
 }
 
-char* openSceneInputDialog(char* lastScene) {
-	return tinyfd_inputBox(
-		"Choose scene TEMP",
-		"Select a scene TEMP to extract, either as a hash or an ioi string",
-		"");
+void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoaded) {
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	string msg = "Loading AIRG from file at ";
+	msg += std::ctime(&start_time);
+	ctx->log(RC_LOG_PROGRESS, msg.data());
+	auto start = std::chrono::high_resolution_clock::now();
+
+	string jsonFileName = fileName;
+	if (!isFromJson) {
+		jsonFileName += ".JSON";
+		airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
+	}
+	airg->readJson(jsonFileName.data());
+	if (airgLoaded->empty()) {
+		airgLoaded->push_back(true);
+	}
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	msg = "Finished loading AIRG in ";
+	msg += std::to_string(duration.count());
+	msg += " seconds";
+	ctx->log(RC_LOG_PROGRESS, msg.data());
 }
 
-char* openOutputFolderDialog(char* lastOutputFolder) {
-	return tinyfd_selectFolderDialog(
-		"Choose output folder",
-		lastOutputFolder);
-}
+void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone) {
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	string msg = "Loading OBJ from file at ";
+	msg += std::ctime(&start_time);
+	ctx->log(RC_LOG_PROGRESS, msg.data());
+	auto start = std::chrono::high_resolution_clock::now();
 
-char* openAirgFileDialog(char* lastAirgFolder) {
-	char const* lFilterPatterns[2] = { "*.airg", "*.airg.json" };
-	return tinyfd_openFileDialog(
-		"Open Airg file",
-		lastAirgFolder,
-		2,
-		lFilterPatterns,
-		"Airg files",
-		0);
-}
+	if (geom->load(ctx, objToLoad)) {
+		if (objLoadDone->empty()) {
+			objLoadDone->push_back(true);
+			auto end = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+			msg = "Finished loading OBJ in ";
+			msg += std::to_string(duration.count());
+			msg += " seconds";
+			ctx->log(RC_LOG_PROGRESS, msg.data());
+		}
+	}
+	else {
+		ctx->log(RC_LOG_ERROR, "Error loading obj.");
+	}
 
-char* openObjFileDialog(char* lastObjFolder) {
-	char const* lFilterPatterns[1] = { "*.obj" };
-	return tinyfd_openFileDialog(
-		"Open Objfile",
-		lastObjFolder,
-		1,
-		lFilterPatterns,
-		"Obj files",
-		0);
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	msg = "Finished loading NAVP in ";
+	msg += std::to_string(duration.count());
+	msg += " seconds";
+	ctx->log(RC_LOG_PROGRESS, msg.data());
 }
 
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {
@@ -774,4 +938,66 @@ void renderAirg(Airg* airg) {
 			}
 		}
 	}
+}
+
+char* openLoadNavpFileDialog(char* lastNavpFolder) {
+	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
+	return tinyfd_openFileDialog(
+		"Open Navp file",
+		lastNavpFolder,
+		2,
+		lFilterPatterns,
+		"Navp files",
+		0);
+}
+
+char* openSaveNavpFileDialog(char* lastNavpFolder) {
+	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
+	return tinyfd_saveFileDialog(
+		"Save Navp file",
+		lastNavpFolder,
+		2,
+		lFilterPatterns,
+		"Navp files");
+}
+
+char* openHitmanFolderDialog(char* lastHitmanFolder) {
+	return tinyfd_selectFolderDialog(
+		"Choose Hitman folder",
+		lastHitmanFolder);
+}
+
+char* openSceneInputDialog(char* lastScene) {
+	return tinyfd_inputBox(
+		"Choose scene TEMP",
+		"Select a scene TEMP to extract, either as a hash or an ioi string",
+		"");
+}
+
+char* openOutputFolderDialog(char* lastOutputFolder) {
+	return tinyfd_selectFolderDialog(
+		"Choose output folder",
+		lastOutputFolder);
+}
+
+char* openAirgFileDialog(char* lastAirgFolder) {
+	char const* lFilterPatterns[2] = { "*.airg", "*.airg.json" };
+	return tinyfd_openFileDialog(
+		"Open Airg file",
+		lastAirgFolder,
+		2,
+		lFilterPatterns,
+		"Airg files",
+		0);
+}
+
+char* openObjFileDialog(char* lastObjFolder) {
+	char const* lFilterPatterns[1] = { "*.obj" };
+	return tinyfd_openFileDialog(
+		"Open Objfile",
+		lastObjFolder,
+		1,
+		lFilterPatterns,
+		"Obj files",
+		0);
 }

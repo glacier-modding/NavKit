@@ -4,6 +4,7 @@
 #include <vector>
 #include <time.h>
 #include <stdlib.h>
+#include <chrono>
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -26,6 +27,8 @@
 #include "..\RecastDemo\InputGeom.h"
 #include "..\RecastDemo\MeshLoaderObj.h"
 #include "..\RecastDemo\SampleInterfaces.h"
+#include "..\RecastDemo\Sample.h"
+#include "..\RecastDemo\Sample_SoloMesh.h"
 
 #include "..\NavWeakness\NavWeakness.h"
 #include "..\NavWeakness\NavPower.h"
@@ -43,9 +46,14 @@ void renderNavMesh(NavPower::NavMesh* navMesh);
 void renderAirg(Airg* airg);
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
 void renderArea(NavPower::Area area);
-char* openNavpFileDialog(char* lastNavpFolder);
+char* openLoadNavpFileDialog(char* lastNavpFolder);
+char* openSaveNavpFileDialog(char* lastNavpFolder);
 char* openAirgFileDialog(char* lastAirgFolder);
 char* openObjFileDialog(char* lastObjFolder);
 char* openHitmanFolderDialog(char* lastHitmanFolder);
 char* openOutputFolderDialog(char* lastOutputFolder);
 char* openSceneInputDialog(char* lastScene);
+void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, bool isFromJson);
+void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoaded);
+void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone);
+void buildNavp(Sample* sample, BuildContext* ctx, std::vector<bool>* navpBuildDone);

@@ -9,7 +9,7 @@ include_directories(SYSTEM include)
 
 configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h")
 
-add_executable (NavKit "NavKit.cpp" "extern/tinyfiledialogs.cpp" "RecastDemo/imgui.cpp" "RecastDemo/imguiRenderGL.cpp" "RecastDemo/MeshLoaderObj.cpp" "RecastDemo/InputGeom.cpp" "RecastDemo/ChunkyTriMesh.cpp" "RecastDemo/SampleInterfaces.cpp" "RecastDemo/PerfTimer.cpp" "Airg.cpp" "Glacier2Obj.cpp" )
+add_executable (NavKit "NavKit.cpp" "extern/tinyfiledialogs.cpp" "RecastDemo/imgui.cpp" "RecastDemo/imguiRenderGL.cpp" "RecastDemo/MeshLoaderObj.cpp" "RecastDemo/InputGeom.cpp" "RecastDemo/ChunkyTriMesh.cpp" "RecastDemo/SampleInterfaces.cpp" "RecastDemo/PerfTimer.cpp" "Airg.cpp" "Glacier2Obj.cpp"  "RecastDemo/Sample.cpp" "RecastDemo/Sample_SoloMesh.cpp")
 target_include_directories(NavKit PUBLIC "${PROJECT_BINARY_DIR}")
 target_link_libraries(NavKit PRIVATE ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} )
 target_link_libraries(NavKit PRIVATE OpenGL::GLU)

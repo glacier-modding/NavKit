@@ -22,7 +22,7 @@ BuildContext::BuildContext() :
 
 	resetTimers();
 }
-
+ 
 // Virtual functions for custom implementations.
 void BuildContext::doResetLog()
 {

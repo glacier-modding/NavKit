@@ -145,15 +145,15 @@ bool InputGeom::loadMesh(rcContext* ctx, const std::string& filepath)
 		return false;
 	}
 
-	//rcCalcBounds(m_mesh->getVerts(), m_mesh->getVertCount(), m_meshBMin, m_meshBMax);
-	float bmin[3] = { -425.0, -332, -47 };
-	float bmax[3] = { 326, 380, 47 };
-	m_meshBMin[0] = bmin[0];
-	m_meshBMin[1] = bmin[2];
-	m_meshBMin[2] = bmin[1];
-	m_meshBMax[0] = bmax[0];
-	m_meshBMax[1] = bmax[2];
-	m_meshBMax[2] = bmax[1];
+	rcCalcBounds(m_mesh->getVerts(), m_mesh->getVertCount(), m_meshBMin, m_meshBMax);
+	//float bmin[3] = { -425.0, -332, -47 };
+	//float bmax[3] = { 326, 380, 47 };
+	//m_meshBMin[0] = bmin[0];
+	//m_meshBMin[1] = bmin[2];
+	//m_meshBMin[2] = bmin[1];
+	//m_meshBMax[0] = bmax[0];
+	//m_meshBMax[1] = bmax[2];
+	//m_meshBMax[2] = bmax[1];
 	m_chunkyMesh = new rcChunkyTriMesh;
 	if (!m_chunkyMesh)
 	{

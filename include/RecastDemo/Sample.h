@@ -132,13 +132,13 @@ protected:
 
 	SampleDebugDraw m_dd;
 	
-	dtNavMesh* loadAll(const char* path);
-	void saveAll(const char* path, const dtNavMesh* mesh);
 
 public:
 	Sample();
 	virtual ~Sample();
-	
+
+	dtNavMesh* loadAll(const char* path);
+	void saveAll(const char* s_OutputFileName);
 	void setContext(BuildContext* ctx) { m_ctx = ctx; }
 	
 	void setTool(SampleTool* tool);
