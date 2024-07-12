@@ -127,16 +127,16 @@ int main(int argc, char** argv)
 	int logScroll = 0;
 	int toolsScroll = 0;
 
-	string loadNavpName = "Choose NAVP file...";
+	string loadNavpName = "Load Navp";
 	string lastLoadNavpFolder = loadNavpName;
-	string saveNavpName = "Choose NAVP file...";
+	string saveNavpName = "Save Navp";
 	string lastSaveNavpFolder = saveNavpName;
 	bool navpLoaded = false;
 	bool showNavp = true;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
 	vector<bool> navpBuildDone;
 
-	string airgName = "Choose AIRG file...";
+	string airgName = "Load Airg";
 	string lastAirgFolder = airgName;
 	vector<bool> airgLoaded;
 	bool showAirg = true;
@@ -144,12 +144,12 @@ int main(int argc, char** argv)
 	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
 	Airg* airg = new Airg();
 
-	string objName = "Choose OBJ file...";
+	string objName = "Load Obj";
 	string lastObjFileName = objName;
 	bool objLoaded = false;
 	bool showObj = true;
 	vector<string> files;
-	const string meshesFolder = "OBJ";
+	const string meshesFolder = "Obj";
 	string objToLoad = "";
 	vector<bool> objLoadDone;
 
@@ -157,12 +157,12 @@ int main(int argc, char** argv)
 	bool startedObjGeneration = false;
 
 	bool showExtractMenu = false;
-	string hitmanFolderName = "Choose Hitman folder...";
+	string hitmanFolderName = "Choose Hitman folder";
 	string lastHitmanFolder = hitmanFolderName;
 	bool hitmanSet = false;
-	string sceneName = "Choose Scene TEMP...";
+	string sceneName = "Choose Scene Temp";
 	bool sceneSet = false;
-	string outputFolderName = "Choose Output folder...";
+	string outputFolderName = "Choose Output folder";
 	string lastOutputFolder = outputFolderName;
 	bool outputSet = false;
 
@@ -499,7 +499,7 @@ int main(int argc, char** argv)
 				showExtractMenu = !showExtractMenu;
 			}
 
-			imguiLabel("Load NAVP from file");
+			imguiLabel("Load Navp from file");
 			if (imguiButton(loadNavpName.c_str())) {
 				char* fileName = openLoadNavpFileDialog(lastLoadNavpFolder.data());
 				if (fileName)
@@ -512,7 +512,7 @@ int main(int argc, char** argv)
 
 					if (extension == "JSON") {
 						navpLoaded = true;
-						string msg = "Loading NAVP.JSON file: '";
+						string msg = "Loading Navp.json file: '";
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
@@ -521,7 +521,7 @@ int main(int argc, char** argv)
 					}
 					else if (extension == "NAVP") {
 						navpLoaded = true;
-						string msg = "Loading NAVP file: '";
+						string msg = "Loading Navp file: '";
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
@@ -531,7 +531,7 @@ int main(int argc, char** argv)
 				}
 			}
 
-			imguiLabel("Save NAVP to file");
+			imguiLabel("Save Navp to file");
 			if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
 				char* fileName = openSaveNavpFileDialog(lastLoadNavpFolder.data());
 				if (fileName)
@@ -540,9 +540,9 @@ int main(int argc, char** argv)
 					lastSaveNavpFolder = saveNavpName.data();
 					saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 					string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
-					string msg = "Saving NAVP";
+					string msg = "Saving Navp";
 					if (extension == "JSON") {
-						msg += ".JSON";
+						msg += ".Json";
 					}
 					msg += " file: '";
 					msg += fileName;
@@ -559,7 +559,7 @@ int main(int argc, char** argv)
 				}
 			}
 
-			imguiLabel("Load AIRG from file");
+			imguiLabel("Load Airg from file");
 			if (imguiButton(airgName.c_str())) {
 				char* fileName = openAirgFileDialog(lastAirgFolder.data());
 				if (fileName)
@@ -573,7 +573,7 @@ int main(int argc, char** argv)
 					if (extension == "JSON") {
 						delete airg;
 						airg = new Airg();
-						string msg = "Loading AIRG.JSON file: '";
+						string msg = "Loading Airg.Json file: '";
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
@@ -583,7 +583,7 @@ int main(int argc, char** argv)
 					else if (extension == "AIRG") {
 						delete airg;
 						airg = new Airg();
-						string msg = "Loading AIRG file: '";
+						string msg = "Loading Airg file: '";
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
@@ -593,13 +593,13 @@ int main(int argc, char** argv)
 				}
 			}
 
-			imguiLabel("Load OBJ file");
+			imguiLabel("Load Obj file");
 			if (imguiButton(objName.c_str())) {
 				char* fileName = openObjFileDialog(objName.data());
 				if (fileName)
 				{
 					objName = fileName;
-					string msg = "Loading OBJ file: '";
+					string msg = "Loading Obj file: '";
 					msg += fileName;
 					msg += "'...";
 					ctx.log(RC_LOG_PROGRESS, msg.data());
@@ -691,7 +691,7 @@ int main(int argc, char** argv)
 			extractionDone.clear();
 			objToLoad = lastOutputFolder;
 			objToLoad += "\\output.obj";
-			string msg = "Loading OBJ file: '";
+			string msg = "Loading Obj file: '";
 			msg += objToLoad;
 			msg += "'...";
 			ctx.log(RC_LOG_PROGRESS, msg.data());
@@ -790,7 +790,7 @@ int main(int argc, char** argv)
 
 void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, bool isFromJson) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	string msg = "Loading NAVP from file at ";
+	string msg = "Loading Navp from file at ";
 	msg += std::ctime(&start_time);
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
@@ -800,7 +800,7 @@ void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, 
 
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-	msg = "Finished loading NAVP in ";
+	msg = "Finished loading Navp in ";
 	msg += std::to_string(duration.count());
 	msg += " seconds";
 	ctx->log(RC_LOG_PROGRESS, msg.data());
@@ -808,36 +808,36 @@ void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, 
 
 void buildNavp(Sample* sample, BuildContext* ctx, vector<bool>* navpBuildDone) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	string msg = "Building NAVP at ";
+	string msg = "Building Navp at ";
 	msg += std::ctime(&start_time);
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
 
 	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 
 	if (sample->handleBuild()) {
+		auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 		navpBuildDone->push_back(true);
-		msg = "Finished building NAVP in ";
+		msg = "Finished building Navp in ";
 		msg += std::to_string(duration.count());
 		msg += " seconds";
 		ctx->log(RC_LOG_PROGRESS, msg.data());
 	}
 	else {
-		ctx->log(RC_LOG_ERROR, "Error building NAVP");
+		ctx->log(RC_LOG_ERROR, "Error building Navp");
 	}
 }
 
 void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoaded) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	string msg = "Loading AIRG from file at ";
+	string msg = "Loading Airg from file at ";
 	msg += std::ctime(&start_time);
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
 
 	string jsonFileName = fileName;
 	if (!isFromJson) {
-		jsonFileName += ".JSON";
+		jsonFileName += ".Json";
 		airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
 	}
 	airg->readJson(jsonFileName.data());
@@ -846,7 +846,7 @@ void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConv
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-	msg = "Finished loading AIRG in ";
+	msg = "Finished loading Airg in ";
 	msg += std::to_string(duration.count());
 	msg += " seconds";
 	ctx->log(RC_LOG_PROGRESS, msg.data());
@@ -854,7 +854,7 @@ void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConv
 
 void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	string msg = "Loading OBJ from file at ";
+	string msg = "Loading Obj from file at ";
 	msg += std::ctime(&start_time);
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
@@ -864,7 +864,7 @@ void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vecto
 			objLoadDone->push_back(true);
 			auto end = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-			msg = "Finished loading OBJ in ";
+			msg = "Finished loading Obj in ";
 			msg += std::to_string(duration.count());
 			msg += " seconds";
 			ctx->log(RC_LOG_PROGRESS, msg.data());
@@ -873,13 +873,6 @@ void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vecto
 	else {
 		ctx->log(RC_LOG_ERROR, "Error loading obj.");
 	}
-
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-	msg = "Finished loading NAVP in ";
-	msg += std::to_string(duration.count());
-	msg += " seconds";
-	ctx->log(RC_LOG_PROGRESS, msg.data());
 }
 
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {
@@ -943,22 +936,22 @@ void renderAirg(Airg* airg) {
 char* openLoadNavpFileDialog(char* lastNavpFolder) {
 	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
 	return tinyfd_openFileDialog(
-		"Open Navp file",
+		"Open Navp or Navp.json file",
 		lastNavpFolder,
 		2,
 		lFilterPatterns,
-		"Navp files",
+		"Navp file or Navp.jsons",
 		0);
 }
 
 char* openSaveNavpFileDialog(char* lastNavpFolder) {
 	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
 	return tinyfd_saveFileDialog(
-		"Save Navp file",
+		"Save Navp or Navp.json file",
 		lastNavpFolder,
 		2,
 		lFilterPatterns,
-		"Navp files");
+		"Navp or Navp.json files");
 }
 
 char* openHitmanFolderDialog(char* lastHitmanFolder) {
@@ -983,11 +976,11 @@ char* openOutputFolderDialog(char* lastOutputFolder) {
 char* openAirgFileDialog(char* lastAirgFolder) {
 	char const* lFilterPatterns[2] = { "*.airg", "*.airg.json" };
 	return tinyfd_openFileDialog(
-		"Open Airg file",
+		"Open Airg or Airg.json file",
 		lastAirgFolder,
 		2,
 		lFilterPatterns,
-		"Airg files",
+		"Airg or Airg.json files",
 		0);
 }
 
