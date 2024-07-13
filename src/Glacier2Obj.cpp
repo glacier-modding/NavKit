@@ -17,16 +17,18 @@ void runCommand(string command, BuildContext* context, std::vector<bool>* done) 
 	}
 	fclose(glacier2Obj);
 	fclose(result);
-	done->push_back(true);
-	if (done->size() == 1) {
+
+	if (done->size() == 0) {
 		context->log(RC_LOG_PROGRESS, "Finished extracting scene from game to prims.json.");
+		done->push_back(true);
 	}
 	else {
+		done->push_back(true);
 		context->log(RC_LOG_PROGRESS, "Finished generating obj from prims.json.");
 	}
 }
 
-void extractScene(BuildContext* context, char* hitmanFolder, char* sceneName, char* outputFolder, std::vector<bool>* done) {
+void extractScene(BuildContext* context, char* hitmanFolder, char* outputFolder, std::vector<bool>* done) {
 	context->log(RC_LOG_PROGRESS, "Extracting scene from game.");
 	string retailFolder = "\"";
 	retailFolder += hitmanFolder;
@@ -41,6 +43,9 @@ void extractScene(BuildContext* context, char* hitmanFolder, char* sceneName, ch
 	string prims = "\"";
 	prims += outputFolder;
 	prims += "\\prims.json\"";
+	string pfBoxes = "\"";
+	pfBoxes += outputFolder;
+	pfBoxes += "\\pfBoxes.json\"";
 	string runtimeFolder = "\"";
 	runtimeFolder += hitmanFolder;
 	runtimeFolder += "\\Runtime\"";
@@ -66,13 +71,13 @@ void extractScene(BuildContext* context, char* hitmanFolder, char* sceneName, ch
 	command += " ";
 	command += gameVersion;
 	command += " ";
-	command += sceneName;
-	command += " ";
 	command += hashList;
 	command += " ";
 	command += toFind;
 	command += " ";
 	command += prims;
+	command += " ";
+	command += pfBoxes;
 	command += " ";
 	command += runtimeFolder;
 	command += " \"";

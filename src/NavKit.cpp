@@ -95,6 +95,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
+	NFD_Init();
 	float timeAcc = 0.0f;
 	Uint32 prevFrameTime = SDL_GetTicks();
 	int mousePos[2] = { 0, 0 };
@@ -128,16 +129,16 @@ int main(int argc, char** argv)
 	int toolsScroll = 0;
 
 	string loadNavpName = "Load Navp";
-	string lastLoadNavpFolder = loadNavpName;
+	string lastLoadNavpFile = loadNavpName;
 	string saveNavpName = "Save Navp";
-	string lastSaveNavpFolder = saveNavpName;
+	string lastSaveNavpFile = saveNavpName;
 	bool navpLoaded = false;
 	bool showNavp = true;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
 	vector<bool> navpBuildDone;
 
 	string airgName = "Load Airg";
-	string lastAirgFolder = airgName;
+	string lastAirgFile = airgName;
 	vector<bool> airgLoaded;
 	bool showAirg = true;
 	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
@@ -160,8 +161,6 @@ int main(int argc, char** argv)
 	string hitmanFolderName = "Choose Hitman folder";
 	string lastHitmanFolder = hitmanFolderName;
 	bool hitmanSet = false;
-	string sceneName = "Choose Scene Temp";
-	bool sceneSet = false;
 	string outputFolderName = "Choose Output folder";
 	string lastOutputFolder = outputFolderName;
 	bool outputSet = false;
@@ -501,11 +500,11 @@ int main(int argc, char** argv)
 
 			imguiLabel("Load Navp from file");
 			if (imguiButton(loadNavpName.c_str())) {
-				char* fileName = openLoadNavpFileDialog(lastLoadNavpFolder.data());
+				char* fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
 				if (fileName)
 				{
 					loadNavpName = fileName;
-					lastLoadNavpFolder = loadNavpName.data();
+					lastLoadNavpFile = loadNavpName.data();
 					loadNavpName = loadNavpName.substr(loadNavpName.find_last_of("/\\") + 1);
 					string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
 					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
@@ -516,7 +515,7 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadNavMeshThread(loadNavMesh, navMesh, &ctx, fileName, true);
+						std::thread loadNavMeshThread(loadNavMesh, navMesh, &ctx, lastLoadNavpFile.data(), true);
 						loadNavMeshThread.detach();
 					}
 					else if (extension == "NAVP") {
@@ -525,7 +524,7 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadNavMeshThread(loadNavMesh, navMesh, &ctx, fileName, false);
+						std::thread loadNavMeshThread(loadNavMesh, navMesh, &ctx, lastLoadNavpFile.data(), false);
 						loadNavMeshThread.detach();
 					}
 				}
@@ -533,13 +532,14 @@ int main(int argc, char** argv)
 
 			imguiLabel("Save Navp to file");
 			if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
-				char* fileName = openSaveNavpFileDialog(lastLoadNavpFolder.data());
+				char* fileName = openSaveNavpFileDialog(lastLoadNavpFile.data());
 				if (fileName)
 				{
 					saveNavpName = fileName;
-					lastSaveNavpFolder = saveNavpName.data();
+					lastSaveNavpFile = saveNavpName.data();
 					saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 					string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
+					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 					string msg = "Saving Navp";
 					if (extension == "JSON") {
 						msg += ".Json";
@@ -548,24 +548,23 @@ int main(int argc, char** argv)
 					msg += fileName;
 					msg += "'...";
 					ctx.log(RC_LOG_PROGRESS, msg.data());
-					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
 					if (extension == "JSON") {
-						OutputNavMesh_JSON_Write(navMesh, fileName);
+						OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
 					}
 					else if (extension == "NAVP") {
-						OutputNavMesh_NAVP_Write(navMesh, fileName);
+						OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
 					}
 				}
 			}
 
 			imguiLabel("Load Airg from file");
 			if (imguiButton(airgName.c_str())) {
-				char* fileName = openAirgFileDialog(lastAirgFolder.data());
+				char* fileName = openAirgFileDialog(lastAirgFile.data());
 				if (fileName)
 				{
 					airgName = fileName;
-					lastAirgFolder = airgName.data();
+					lastAirgFile = airgName.data();
 					airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
 					string extension = airgName.substr(airgName.length() - 4, airgName.length());
 					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
@@ -577,7 +576,7 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, fileName, true, &airgLoaded);
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), true, &airgLoaded);
 						loadAirgThread.detach();
 					}
 					else if (extension == "AIRG") {
@@ -587,7 +586,7 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, fileName, false, &airgLoaded);
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), false, &airgLoaded);
 						loadAirgThread.detach();
 					}
 				}
@@ -644,7 +643,7 @@ int main(int argc, char** argv)
 			imguiEndScrollArea();
 
 			if (showExtractMenu) {
-				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 215 - 10, 250, 215, &propScroll);
+				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 175 - 10, 250, 175, &propScroll);
 				imguiLabel("Set Hitman Directory");
 				if (imguiButton(hitmanFolderName.c_str())) {
 					char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
@@ -653,14 +652,6 @@ int main(int argc, char** argv)
 						lastHitmanFolder = folderName;
 						hitmanFolderName = folderName;
 						hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
-					}
-				}
-				imguiLabel("Select Scene file");
-				if (imguiButton(sceneName.c_str())) {
-					char* inputText = openSceneInputDialog(sceneName.data());
-					if (inputText) {
-						sceneName = inputText;
-						sceneSet = true;
 					}
 				}
 				imguiLabel("Set Output Directory");
@@ -674,9 +665,9 @@ int main(int argc, char** argv)
 					}
 				}
 				imguiLabel("Extract from game");
-				if (imguiButton("Extract", hitmanSet && sceneSet && outputSet)) {
+				if (imguiButton("Extract", hitmanSet && outputSet)) {
 					showLog = true;
-					extractScene(&ctx, lastHitmanFolder.data(), sceneName.data(), lastOutputFolder.data(), &extractionDone);
+					extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone);
 				}
 				imguiEndScrollArea();
 			}
@@ -691,10 +682,6 @@ int main(int argc, char** argv)
 			extractionDone.clear();
 			objToLoad = lastOutputFolder;
 			objToLoad += "\\output.obj";
-			string msg = "Loading Obj file: '";
-			msg += objToLoad;
-			msg += "'...";
-			ctx.log(RC_LOG_PROGRESS, msg.data());
 			geom = new InputGeom;
 		}
 
@@ -708,7 +695,11 @@ int main(int argc, char** argv)
 
 		if (!objToLoad.empty()) {
 			geom = new InputGeom;
-			string fileName = objToLoad;
+			lastObjFileName = objToLoad;
+			string msg = "Loading Obj file: '";
+			msg += objToLoad;
+			msg += "'...";
+			ctx.log(RC_LOG_PROGRESS, msg.data());
 			std::thread loadObjThread(loadObjMesh, geom, &ctx, lastObjFileName.data(), &objLoadDone);
 			loadObjThread.detach();
 			objToLoad = "";
@@ -784,7 +775,8 @@ int main(int argc, char** argv)
 	imguiRenderGLDestroy();
 
 	SDL_Quit();
-	
+
+	NFD_Quit();
 	return 0;
 }
 
@@ -933,64 +925,95 @@ void renderAirg(Airg* airg) {
 	}
 }
 
+char* openNfdLoadDialog(nfdu8filteritem_t* filters, int filterCount, char* defaultPath = NULL) {
+	nfdu8char_t* outPath;
+	nfdopendialogu8args_t args = { 0 };
+	args.filterList = filters;
+	args.filterCount = filterCount;
+	//args.defaultPath = defaultPath;
+	nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+	if (result == NFD_OKAY)
+	{
+		return outPath;
+		NFD_FreePathU8(outPath);
+	}
+	else if (result == NFD_CANCEL)
+	{
+		return NULL;
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
+char* openNfdSaveDialog(nfdu8filteritem_t* filters, const nfdu8char_t* defaultName, char* defaultPath = NULL) {
+	nfdu8char_t* outPath;
+	nfdsavedialogu8args_t args = { 0 };
+	args.filterList = filters;
+	args.filterCount = 2;
+	args.defaultName = defaultName;
+	//args.defaultPath = defaultPath;
+	nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);
+	if (result == NFD_OKAY)
+	{
+		return outPath;
+		NFD_FreePathU8(outPath);
+	}
+	else if (result == NFD_CANCEL)
+	{
+		return NULL;
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
+char* openNfdFolderDialog(char* defaultPath = NULL) {
+	nfdu8char_t* outPath;
+	nfdpickfolderu8args_t args = { 0 };
+	//args.defaultPath = defaultPath;
+	nfdresult_t result = NFD_PickFolderU8_With(&outPath, &args);
+	if (result == NFD_OKAY)
+	{
+		return outPath;
+		NFD_FreePathU8(outPath);
+	}
+	else if (result == NFD_CANCEL)
+	{
+		return NULL;
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
 char* openLoadNavpFileDialog(char* lastNavpFolder) {
-	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
-	return tinyfd_openFileDialog(
-		"Open Navp or Navp.json file",
-		lastNavpFolder,
-		2,
-		lFilterPatterns,
-		"Navp file or Navp.jsons",
-		0);
+	nfdu8filteritem_t filters[2] = { { "Navp files", "navp" }, { "Navp.json files", "navp.json" } };
+	return openNfdLoadDialog(filters, 2);
 }
 
 char* openSaveNavpFileDialog(char* lastNavpFolder) {
-	char const* lFilterPatterns[2] = { "*.navp", "*.navp.json" };
-	return tinyfd_saveFileDialog(
-		"Save Navp or Navp.json file",
-		lastNavpFolder,
-		2,
-		lFilterPatterns,
-		"Navp or Navp.json files");
+	nfdu8filteritem_t filters[2] = { { "Navp files", "navp" }, { "Navp.json files", "navp.json" } };
+	return openNfdSaveDialog(filters, "output");
 }
 
 char* openHitmanFolderDialog(char* lastHitmanFolder) {
-	return tinyfd_selectFolderDialog(
-		"Choose Hitman folder",
-		lastHitmanFolder);
-}
-
-char* openSceneInputDialog(char* lastScene) {
-	return tinyfd_inputBox(
-		"Choose scene TEMP",
-		"Select a scene TEMP to extract, either as a hash or an ioi string",
-		"");
+	return openNfdFolderDialog();
 }
 
 char* openOutputFolderDialog(char* lastOutputFolder) {
-	return tinyfd_selectFolderDialog(
-		"Choose output folder",
-		lastOutputFolder);
+	return openNfdFolderDialog();
 }
 
 char* openAirgFileDialog(char* lastAirgFolder) {
-	char const* lFilterPatterns[2] = { "*.airg", "*.airg.json" };
-	return tinyfd_openFileDialog(
-		"Open Airg or Airg.json file",
-		lastAirgFolder,
-		2,
-		lFilterPatterns,
-		"Airg or Airg.json files",
-		0);
+	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
+	return openNfdLoadDialog(filters, 2);
 }
 
 char* openObjFileDialog(char* lastObjFolder) {
-	char const* lFilterPatterns[1] = { "*.obj" };
-	return tinyfd_openFileDialog(
-		"Open Objfile",
-		lastObjFolder,
-		1,
-		lFilterPatterns,
-		"Obj files",
-		0);
+	nfdu8filteritem_t filters[1] = { { "Obj files", "obj" } };
+	return openNfdLoadDialog(filters, 1);
 }

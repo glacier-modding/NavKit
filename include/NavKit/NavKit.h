@@ -11,6 +11,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
+#include <nfd.h>
 
 #include "NavKitConfig.h"
 #include "Glacier2Obj.h"
@@ -40,8 +41,6 @@
 #include "..\ResourceLib_HM3\ResourceLib_HM3.h"
 #include "..\ResourceLib_HM3\Generated\ZHMGen.h"
 
-#include "..\..\extern\tinyfiledialogs\tinyfiledialogs.h"
-
 void renderNavMesh(NavPower::NavMesh* navMesh);
 void renderAirg(Airg* airg);
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
@@ -52,7 +51,6 @@ char* openAirgFileDialog(char* lastAirgFolder);
 char* openObjFileDialog(char* lastObjFolder);
 char* openHitmanFolderDialog(char* lastHitmanFolder);
 char* openOutputFolderDialog(char* lastOutputFolder);
-char* openSceneInputDialog(char* lastScene);
 void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, bool isFromJson);
 void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoaded);
 void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone);
