@@ -31,10 +31,12 @@ NavKit performs a series of steps to be able to generate Navp files.
 
 * Airg Generation
 * Faster Scene generation
+* Linux and MacOs support
 
 You can also build NavKit yourself:
 
 # Building instructions
+1. Clone this repository with the '--recurse-submodules' option
 1. Open in Visual Studio
 1. Cmake should load
 1. In the x64 command prompt make a build folder, cd into it, and run:  
