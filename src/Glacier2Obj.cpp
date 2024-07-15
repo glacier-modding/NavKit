@@ -83,15 +83,6 @@ void extractScene(BuildContext* context, char* hitmanFolder, char* outputFolder,
 	command += " \"";
 	command += primFolder;
 	command += "\" 2>&1";
-	//cargo run 
-	// <path to a Retail directory> 
-	// <game version(H2016 | HM2 | HM3)> 
-	// <scenario ioi string or hash> 
-	// <path to a hashlist>
-	// <path to toFind.json file> 
-	// <path to prims.json file> 
-	// <path to a Runtime directory> 
-	// <path to output prims directory>
 	std::thread commandThread(runCommand, command, context, done);
 	commandThread.detach();
 }

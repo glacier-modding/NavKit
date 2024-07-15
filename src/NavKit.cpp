@@ -145,8 +145,10 @@ int main(int argc, char** argv)
 	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
 	Airg* airg = new Airg();
 
-	string objName = "Load Obj";
-	string lastObjFileName = objName;
+	string loadObjName = "Load Obj";
+	string saveObjName = "Save Obj";
+	string lastObjFileName = loadObjName;
+	string lastSaveObjFileName = saveObjName;
 	bool objLoaded = false;
 	bool showObj = true;
 	vector<string> files;
@@ -481,7 +483,7 @@ int main(int argc, char** argv)
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1175 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1175 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
+			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1220 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1220 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -548,7 +550,6 @@ int main(int argc, char** argv)
 					msg += fileName;
 					msg += "'...";
 					ctx.log(RC_LOG_PROGRESS, msg.data());
-
 					if (extension == "JSON") {
 						OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
 					}
@@ -593,19 +594,27 @@ int main(int argc, char** argv)
 			}
 
 			imguiLabel("Load Obj file");
-			if (imguiButton(objName.c_str())) {
-				char* fileName = openObjFileDialog(objName.data());
+			if (imguiButton(loadObjName.c_str())) {
+				char* fileName = openLoadObjFileDialog(loadObjName.data());
 				if (fileName)
 				{
-					objName = fileName;
-					string msg = "Loading Obj file: '";
-					msg += fileName;
-					msg += "'...";
-					ctx.log(RC_LOG_PROGRESS, msg.data());
-
-					lastObjFileName = objName.data();
-					objName = objName.substr(objName.find_last_of("/\\") + 1);
+					loadObjName = fileName;
+					lastObjFileName = loadObjName;
+					loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
 					objToLoad = fileName;
+				}
+			}
+
+			imguiLabel("Save Obj file");
+			if (imguiButton(saveObjName.c_str(), objLoaded)) {
+				char* fileName = openSaveObjFileDialog(loadObjName.data());
+				if (fileName)
+				{
+					loadObjName = fileName;
+					lastSaveObjFileName = fileName;
+					saveObjMesh(lastObjFileName.data(), &ctx, lastSaveObjFileName.data());
+					loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
+					saveObjName = loadObjName;
 				}
 			}
 			imguiSeparator();
@@ -667,7 +676,7 @@ int main(int argc, char** argv)
 				imguiLabel("Extract from game");
 				if (imguiButton("Extract", hitmanSet && outputSet)) {
 					showLog = true;
-					extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone);
+					extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone, &pfBoxes);
 				}
 				imguiEndScrollArea();
 			}
@@ -682,6 +691,8 @@ int main(int argc, char** argv)
 			extractionDone.clear();
 			objToLoad = lastOutputFolder;
 			objToLoad += "\\output.obj";
+			lastObjFileName = lastOutputFolder.data();
+			lastObjFileName += "output.obj";
 			geom = new InputGeom;
 		}
 
@@ -708,29 +719,21 @@ int main(int argc, char** argv)
 		if (!objLoadDone.empty()) {
 			showLog = true;
 			logScroll = 0;
-			ctx.dumpLog("Geom load log %s:", objName.c_str());
+			ctx.dumpLog("Geom load log %s:", loadObjName.c_str());
 
 			if (geom)
 			{
 				sample->handleMeshChanged(geom);
-				const float* bmin = 0;
-				const float* bmax = 0;
-				bmin = geom->getNavMeshBoundsMin();
-				// Reset camera and fog to match the mesh bounds.
-				if (bmin && bmax)
-				{
-					//camr = sqrtf(rcSqr(bmax[0] - bmin[0]) +
-					//	rcSqr(bmax[1] - bmin[1]) +
-					//	rcSqr(bmax[2] - bmin[2])) / 2;
-					cameraPos[0] = (bmax[0] + bmin[0]) / 2 + camr;
-					cameraPos[1] = (bmax[1] + bmin[1]) / 2 + camr;
-					cameraPos[2] = (bmax[2] + bmin[2]) / 2 + camr;
-					bmax = geom->getNavMeshBoundsMax();
-				}
-				//camr *= 3;
-				cameraEulers[0] = 45;
-				cameraEulers[1] = -45;
 				objLoaded = true;
+
+				//float bmin[3] = { -425.0, -332, -47 };
+				//float bmax[3] = { 326, 380, 47 };
+				//geom->m_meshBMin[0] = bmin[0];
+				//geom->m_meshBMin[1] = bmin[2];
+				//geom->m_meshBMin[2] = bmin[1];
+				//geom->m_meshBMax[0] = bmax[0];
+				//geom->m_meshBMax[1] = bmax[2];
+				//geom->m_meshBMax[2] = bmax[1];
 			}
 			objLoadDone.clear();
 		}
@@ -786,9 +789,17 @@ void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, 
 	msg += std::ctime(&start_time);
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
-
-	NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
-	std::swap(*navMesh, newNavMesh);
+	try {
+		NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
+		std::swap(*navMesh, newNavMesh);
+	}
+	catch (...) {
+		msg = "Invalid Navp file: '";
+		msg += fileName;
+		msg += "'...";
+		ctx->log(RC_LOG_ERROR, msg.data());
+		return;
+	}
 
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -804,10 +815,8 @@ void buildNavp(Sample* sample, BuildContext* ctx, vector<bool>* navpBuildDone) {
 	msg += std::ctime(&start_time);
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
-
-	auto end = std::chrono::high_resolution_clock::now();
-
 	if (sample->handleBuild()) {
+		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 		navpBuildDone->push_back(true);
 		msg = "Finished building Navp in ";
@@ -842,6 +851,35 @@ void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConv
 	msg += std::to_string(duration.count());
 	msg += " seconds";
 	ctx->log(RC_LOG_PROGRESS, msg.data());
+}
+
+void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to) {
+	auto start = std::chrono::high_resolution_clock::now();
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+	std::ifstream is(from, std::ios::in | std::ios::binary);
+	std::ofstream os(to, std::ios::out | std::ios::binary);
+
+	std::copy(std::istreambuf_iterator(is), std::istreambuf_iterator<char>(),
+		std::ostreambuf_iterator(os));
+	is.close();
+	os.close();
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	string msg = "Finished saving Obj in ";
+	msg += std::to_string(duration.count());
+	msg += " seconds";
+	ctx->log(RC_LOG_PROGRESS, msg.data());
+}
+
+void saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName) {
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	string msg = "Saving Obj to file at ";
+	msg += std::ctime(&start_time);
+	ctx->log(RC_LOG_PROGRESS, msg.data());
+	CopyFile(objToCopy, newFileName, true);
+	//std::thread saveObjThread(copyObjFile, objToCopy, ctx, newFileName);
+	//saveObjThread.detach();
 }
 
 void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone) {
@@ -947,11 +985,11 @@ char* openNfdLoadDialog(nfdu8filteritem_t* filters, int filterCount, char* defau
 	}
 }
 
-char* openNfdSaveDialog(nfdu8filteritem_t* filters, const nfdu8char_t* defaultName, char* defaultPath = NULL) {
+char* openNfdSaveDialog(nfdu8filteritem_t* filters, int filterCount, const nfdu8char_t* defaultName, char* defaultPath = NULL) {
 	nfdu8char_t* outPath;
 	nfdsavedialogu8args_t args = { 0 };
 	args.filterList = filters;
-	args.filterCount = 2;
+	args.filterCount = filterCount;
 	args.defaultName = defaultName;
 	//args.defaultPath = defaultPath;
 	nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);
@@ -997,7 +1035,7 @@ char* openLoadNavpFileDialog(char* lastNavpFolder) {
 
 char* openSaveNavpFileDialog(char* lastNavpFolder) {
 	nfdu8filteritem_t filters[2] = { { "Navp files", "navp" }, { "Navp.json files", "navp.json" } };
-	return openNfdSaveDialog(filters, "output");
+	return openNfdSaveDialog(filters, 2, "output");
 }
 
 char* openHitmanFolderDialog(char* lastHitmanFolder) {
@@ -1013,7 +1051,12 @@ char* openAirgFileDialog(char* lastAirgFolder) {
 	return openNfdLoadDialog(filters, 2);
 }
 
-char* openObjFileDialog(char* lastObjFolder) {
+char* openLoadObjFileDialog(char* lastObjFolder) {
 	nfdu8filteritem_t filters[1] = { { "Obj files", "obj" } };
 	return openNfdLoadDialog(filters, 1);
+}
+
+char* openSaveObjFileDialog(char* lastObjFolder) {
+	nfdu8filteritem_t filters[1] = { { "Obj files", "obj" } };
+	return openNfdSaveDialog(filters, 1, "output");
 }
