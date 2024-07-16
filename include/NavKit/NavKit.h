@@ -15,6 +15,7 @@
 
 #include "NavKitConfig.h"
 #include "Glacier2Obj.h"
+#include "GameConnection.h"
 
 #include <Recast.h>
 #include <RecastDebugDraw.h>

@@ -128,6 +128,7 @@ int main(int argc, char** argv)
 	int logScroll = 0;
 	int toolsScroll = 0;
 
+	GameConnection* gameConnection;
 	string loadNavpName = "Load Navp";
 	string lastLoadNavpFile = loadNavpName;
 	string saveNavpName = "Save Navp";
@@ -559,6 +560,12 @@ int main(int argc, char** argv)
 				}
 			}
 
+			imguiLabel("Send Navp to game");
+			if (imguiButton("Send NAVP", navpLoaded)) {
+				gameConnection = new GameConnection(&ctx);
+				gameConnection->SendNavp(navMesh);
+			}
+
 			imguiLabel("Load Airg from file");
 			if (imguiButton(airgName.c_str())) {
 				char* fileName = openAirgFileDialog(lastAirgFile.data());
@@ -676,7 +683,7 @@ int main(int argc, char** argv)
 				imguiLabel("Extract from game");
 				if (imguiButton("Extract", hitmanSet && outputSet)) {
 					showLog = true;
-					extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone, &pfBoxes);
+					extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone);// , & pfBoxes);
 				}
 				imguiEndScrollArea();
 			}
