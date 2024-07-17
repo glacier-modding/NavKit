@@ -22,10 +22,10 @@ NavKit performs the following series of steps to be able to generate Navp files.
 1. Connect to the Editor server of the running Hitman game again, and issue a command with all of the ZGeomEntity / Prim hashes to get the transforms of all the ZGeomEntities and send them back to NavKit and save them to `prims.json` in the specified output folder.
 1. Extract all of the needed Prim files from the rpkg files to the `prim` folder of the specified output folder.
 1. Open the blender cli and run `glacier2obj.py` to generate an obj by importing all of the Prim files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` in the specified output folder.
-1. Load `output.obj` from the specified output folder in NavKit. you can also save the obj file to another filename by pressing the Save obj button.
-1. At this point, the build Navp section of the menu will be available and you can customize the parameters, then press build to call Recast to generate the Navmesh. then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
+1. Load `output.obj` from the specified output folder in NavKit. You can also save the obj file to another filename by pressing the Save obj button.
+1. At this point, the build Navp section of the menu will be available and you can customize the parameters, then press build to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
 # Disclaimer
-*NavKit is still a work in progress, and there may be glitches or issues with navp generation in the current version. if your encounter any problems while running NavKit please create an issue on this GitHub repo.**
+*NavKit is still a work in progress, and there may be glitches or issues with navp generation in the current version. If you encounter any problems while running NavKit please create an issue on this GitHub repo.*
 # Future enhancements
 * Airg Generation
 * Faster Scene generation
