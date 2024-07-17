@@ -32,8 +32,14 @@ void GameConnection::HandleMessages() {
         WebSocket::pointer wsp = &*ws;
         ws->poll();
         ws->dispatch([&](const std::string& message) {
-            m_Ctx->log(RC_LOG_PROGRESS, "Received message: {}", message.c_str());
-            if (message == "Done loading Navp.") { wsp->close(); }
+            m_Ctx->log(RC_LOG_PROGRESS, "Received message: %s", message.c_str());
+            if (message == "Done loading Navp.") { 
+                wsp->close();
+            }
+            if (message.find("Failed to handle editor message with error : Unknown editor message type: loadNavp") != -1) {
+                m_Ctx->log(RC_LOG_ERROR, "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
+                wsp->close();
+            }
         });
     }
 }

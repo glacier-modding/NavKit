@@ -1,41 +1,37 @@
 # NavKit
-A tool to generate NAVP files for Hitman: World of Assassination Scenes in the Glacier 2 Engine
-
+*A tool to generate Navp files for Hitman: World of Assassination Scenes in the Glacier 2 Engine*
 # Running instructions
+You can run NavKit by opening `NavKit.exe`. To use the **View Navp in game** and **Scene Extraction** features, you will need ZHMModSdk installed, and you will need to copy the included `Editor.dll` to your `Hitman 3\Retail\mods` folder. For the **Scene Extraction** feature, you will also need to have Blender installed.
 
-You can run NavKit by opening `NavKit.exe`.  
+Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, scene extraction, building Navp, and viewing navp in game.  
+# View Navp in game
+1. Open Hitman and launch a mission.
+1. Open NavKit and load a Navp file for that mission.
+1. Click the `Send Navp` button in NavKit.
+# Scene Extraction
+1. Open Hitman and start the mission you wish to extract.
+1. Open NavKit and click the Open Extract Menu button.
+1. Set your Hitman folder, Output directory, and Blender .exe file.
+1. Press the Extract button.  
 
-Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, generating Navp, and scene extraction.
-
-Note: NavKit is still a work in progress, and there may be glitches or issues with navp generation in the current version. if your encounter any problems while running NavKit please create an issue on this GitHub repo.
-
-# Scene extraction
-
-To extract from scene you must have Blender installed and currently it must be installed to `C:\Program Files\Blender Foundation\Blender 3.4\blender.exe`. This will be customizable later.  
-You will also need to compile the latest version of ZHModSDK from this branch (https://github.com/dbierek/ZHMModSDK/tree/Add-listPrimEntities) and copy the Editor.dll file to your retail/mods folder in your Hitman folder.  
-Open Hitman and start the mission you wish to extract. In NavKit, click the Open Extract Menu button and set your Hitman folder and Output directory, then press the Build button. It may take anywhere from 1 minute to upwards of 30 minutes depending on the complexity of the mission being extracted, and whether the prims have already been extracted from the rpkg files.  
-
-# How it works 
-
-NavKit performs a series of steps to be able to generate Navp files. 
-
-1. Connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, and find the scene's brick tblu hashes and send them back to NavKit.  
-1. Get the temp hashes for those bricks, and scan them to get the hashes for all prim dependencies that are children of geomentities and save it to 'toFind.json' in the output folder.  
-1. Connect to the Editor server of the running Hitman game again, and issue a command with all of the geomentity / prim hashes to get the transforms of all the geomentities and send them back to NavKit and save them to 'prims.json' in the output folder.  
-1. Extract all of the prim files from the rpkg files to the 'prim' folder of the output folder.  
-1. Open the blender cli and run a command to generate an obj by importing all of the prim files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to 'output.obj' in the NavKit folder.
-1. Open that obj in NavKit. you can also save the obj file to another filename by pressing the Save obj button.  
-1. At this point, the build Navp section of the menu will be available and you can customize the parameters, then press build to call Recast to generate the Navmesh. then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.  
-
+It may take anywhere from 1 minute to upwards of 30 minutes depending on the complexity of the mission being extracted, and whether the prims have already been extracted from the rpkg files.  
+# How NavKit generates Navp files 
+NavKit performs the following series of steps to be able to generate Navp files.
+1. Run `glacier2obj.exe` to connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's brick tblu hashes, and send them back to NavKit.
+1. Get the temp hashes for those bricks, and scan those bricks' dependencies to get the hashes for all Prim dependencies that are children of ALOCs and save them to `toFind.json` in the specified output folder.
+1. Connect to the Editor server of the running Hitman game again, and issue a command with all of the ZGeomEntity / Prim hashes to get the transforms of all the ZGeomEntities and send them back to NavKit and save them to `prims.json` in the specified output folder.
+1. Extract all of the needed Prim files from the rpkg files to the `prim` folder of the specified output folder.
+1. Open the blender cli and run `glacier2obj.py` to generate an obj by importing all of the Prim files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` in the specified output folder.
+1. Load `output.obj` from the specified output folder in NavKit. you can also save the obj file to another filename by pressing the Save obj button.
+1. At this point, the build Navp section of the menu will be available and you can customize the parameters, then press build to call Recast to generate the Navmesh. then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
+# Disclaimer
+*NavKit is still a work in progress, and there may be glitches or issues with navp generation in the current version. if your encounter any problems while running NavKit please create an issue on this GitHub repo.**
 # Future enhancements
-
 * Airg Generation
 * Faster Scene generation
 * Linux and MacOs support
-
-You can also build NavKit yourself:
-
 # Building instructions
+You can also build NavKit yourself. To build NavKit:
 1. Clone this repository with the '--recurse-submodules' option
 1. Open in Visual Studio
 1. Cmake should load
@@ -43,7 +39,6 @@ You can also build NavKit yourself:
 `cmake -B . -S ..`
 1. Then change back to the main directory and run  
 `cmake --preset x64-debug`
-
 # Credits
 NoFate  
 Atampy25  

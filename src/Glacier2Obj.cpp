@@ -64,7 +64,6 @@ void extractScene(BuildContext* context, char* hitmanFolder, char* outputFolder,
 			}
 		}
 	}
-	// Glacier2Obj.exe "C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3\Retail" HM3 [assembly:/_pro/scenes/atomicforce/navptestworld/scenario_navptestworld.entity].pc_entitytemplate "C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3\rpkg\hash_list.txt" "D:\workspace\NavKit\output\toFind.json" D:\workspace\NavKit\output\prims.json "C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3\Runtime" "D:\workspace\NavKit\output\prim" 2>&1
 
 	string command = "Glacier2Obj.exe ";
 	command += retailFolder;
@@ -87,9 +86,11 @@ void extractScene(BuildContext* context, char* hitmanFolder, char* outputFolder,
 	commandThread.detach();
 }
 
-void generateObj(BuildContext* context, char* outputFolder, std::vector<bool>* done) {
+void generateObj(BuildContext* context, char* blenderPath, char* outputFolder, std::vector<bool>* done) {
 	context->log(RC_LOG_PROGRESS, "Generating obj from prims.json.");
-	string command = "\"\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\" -b -P glacier2obj.py -- ";
+	string command = "\"";
+	command += blenderPath;
+	command += "\" -b -P glacier2obj.py -- ";
 	string prims = "\"";
 	prims += outputFolder;
 	prims += "\\prims.json\"";

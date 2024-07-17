@@ -50,6 +50,7 @@ char* openLoadNavpFileDialog(char* lastNavpFolder);
 char* openSaveNavpFileDialog(char* lastNavpFolder);
 char* openAirgFileDialog(char* lastAirgFolder);
 char* openLoadObjFileDialog(char* lastObjFolder);
+char* openSetBlenderFileDialog(char* lastBlenderFile);
 char* openSaveObjFileDialog(char* lastObjFolder);
 char* openHitmanFolderDialog(char* lastHitmanFolder);
 char* openOutputFolderDialog(char* lastOutputFolder);

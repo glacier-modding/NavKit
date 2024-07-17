@@ -10,4 +10,4 @@
 #include "..\RecastDemo\SampleInterfaces.h"
 
 void extractScene(BuildContext* context, char* hitmanFolder, char* outputFolder, std::vector<bool>* done);
-void generateObj(BuildContext* context, char* outputFolder, std::vector<bool>* done);
+void generateObj(BuildContext* context, char* blenderPath, char* outputFolder, std::vector<bool>* done);

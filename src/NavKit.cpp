@@ -140,11 +140,13 @@ int main(int argc, char** argv)
 	bool navpLoaded = false;
 	bool showNavp = true;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
+	vector<bool> navpLoadDone;
 	vector<bool> navpBuildDone;
 
 	string airgName = "Load Airg";
 	string lastAirgFile = airgName;
-	vector<bool> airgLoaded;
+	bool airgLoaded = false;
+	vector<bool> airgLoadDone;
 	bool showAirg = true;
 	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
 	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
@@ -160,6 +162,10 @@ int main(int argc, char** argv)
 	const string meshesFolder = "Obj";
 	string objToLoad = "";
 	vector<bool> objLoadDone;
+	
+	string lastBlenderFile = "\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\"";
+	string blenderName = "Choose Blender app";
+	bool blenderSet = false;
 
 	vector<bool> extractionDone;
 	bool startedObjGeneration = false;
@@ -458,7 +464,7 @@ int main(int argc, char** argv)
 		if (navpLoaded && showNavp) {
 			renderNavMesh(navMesh);
 		}
-		if (!airgLoaded.empty() && showAirg) {
+		if (airgLoaded && showAirg) {
 			renderAirg(airg);
 		}
 		if (objLoaded && showObj) {
@@ -488,7 +494,7 @@ int main(int argc, char** argv)
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1220 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1220 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
+			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1270 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1270 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -506,7 +512,7 @@ int main(int argc, char** argv)
 			}
 
 			imguiLabel("Load Navp from file");
-			if (imguiButton(loadNavpName.c_str())) {
+			if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
 				char* fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
 				if (fileName)
 				{
@@ -572,7 +578,7 @@ int main(int argc, char** argv)
 			}
 
 			imguiLabel("Load Airg from file");
-			if (imguiButton(airgName.c_str())) {
+			if (imguiButton(airgName.c_str(), airgLoadDone.empty())) {
 				char* fileName = openAirgFileDialog(lastAirgFile.data());
 				if (fileName)
 				{
@@ -589,7 +595,7 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), true, &airgLoaded);
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), true, &airgLoadDone);
 						loadAirgThread.detach();
 					}
 					else if (extension == "AIRG") {
@@ -599,14 +605,14 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), false, &airgLoaded);
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), false, &airgLoadDone);
 						loadAirgThread.detach();
 					}
 				}
 			}
 
 			imguiLabel("Load Obj file");
-			if (imguiButton(loadObjName.c_str())) {
+			if (imguiButton(loadObjName.c_str(), objToLoad.empty())) {
 				char* fileName = openLoadObjFileDialog(loadObjName.data());
 				if (fileName)
 				{
@@ -652,7 +658,7 @@ int main(int argc, char** argv)
 				sample->handleCommonSettings();
 
 				imguiSeparator();
-				if (imguiButton("Build"))
+				if (imguiButton("Build", navpBuildDone.empty()))
 				{
 					std::thread buildNavpThread(buildNavp, sample, &ctx, &navpBuildDone);
 					buildNavpThread.detach();
@@ -664,7 +670,7 @@ int main(int argc, char** argv)
 			imguiEndScrollArea();
 
 			if (showExtractMenu) {
-				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 175 - 10, 250, 175, &propScroll);
+				imguiBeginScrollArea("Extract menu", width - 500 - 20, height - 225 - 10, 250, 225, &propScroll);
 				imguiLabel("Set Hitman Directory");
 				if (imguiButton(hitmanFolderName.c_str())) {
 					char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
@@ -685,19 +691,37 @@ int main(int argc, char** argv)
 						outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
 					}
 				}
+				imguiLabel("Set Blender Executable");
+				if (imguiButton(blenderName.c_str())) {
+					char* blenderFileName = openSetBlenderFileDialog(lastBlenderFile.data());
+					if (blenderFileName) {
+						blenderSet = true;
+						lastBlenderFile = blenderFileName;
+						blenderName = blenderFileName;
+						blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
+					}
+				}
 				imguiLabel("Extract from game");
-				if (imguiButton("Extract", hitmanSet && outputSet)) {
+				if (imguiButton("Extract", hitmanSet && outputSet && blenderSet && extractionDone.empty())) {
 					showLog = true;
 					extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone);// , & pfBoxes);
 				}
 				imguiEndScrollArea();
 			}
 		}
+
+		if (airgLoadDone.size() == 1) {
+			airgLoadDone.clear();
+			airgLoaded = true;
+		}
+		if (navpLoadDone.size() == 1) {
+			navpLoadDone.clear();
+			navpLoaded = true;
+		}
 		if (extractionDone.size() == 1 && !startedObjGeneration) {
 			startedObjGeneration = true;
-			generateObj(&ctx, lastOutputFolder.data(), &extractionDone);
+			generateObj(&ctx, lastBlenderFile.data(), lastOutputFolder.data(), &extractionDone);
 		}
-
 		if (extractionDone.size() == 2) {
 			startedObjGeneration = false;
 			extractionDone.clear();
@@ -841,7 +865,7 @@ void buildNavp(Sample* sample, BuildContext* ctx, vector<bool>* navpBuildDone) {
 	}
 }
 
-void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoaded) {
+void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoadDone) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	string msg = "Loading Airg from file at ";
 	msg += std::ctime(&start_time);
@@ -854,8 +878,8 @@ void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConv
 		airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
 	}
 	airg->readJson(jsonFileName.data());
-	if (airgLoaded->empty()) {
-		airgLoaded->push_back(true);
+	if (airgLoadDone->empty()) {
+		airgLoadDone->push_back(true);
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -1065,6 +1089,11 @@ char* openAirgFileDialog(char* lastAirgFolder) {
 
 char* openLoadObjFileDialog(char* lastObjFolder) {
 	nfdu8filteritem_t filters[1] = { { "Obj files", "obj" } };
+	return openNfdLoadDialog(filters, 1);
+}
+
+char* openSetBlenderFileDialog(char* lastBlenderFile) {
+	nfdu8filteritem_t filters[1] = { { "Exe files", "exe" } };
 	return openNfdLoadDialog(filters, 1);
 }
 
