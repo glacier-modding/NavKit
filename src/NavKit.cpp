@@ -129,6 +129,10 @@ int main(int argc, char** argv)
 	int toolsScroll = 0;
 
 	GameConnection* gameConnection;
+	// TODO: Add mutex for tbuffer to keep processing messages in the background.
+	// std::thread handleMessagesThread([=] { HandleMessages(); });
+	// handleMessagesThread.detach();
+
 	string loadNavpName = "Load Navp";
 	string lastLoadNavpFile = loadNavpName;
 	string saveNavpName = "Save Navp";
@@ -564,6 +568,7 @@ int main(int argc, char** argv)
 			if (imguiButton("Send NAVP", navpLoaded)) {
 				gameConnection = new GameConnection(&ctx);
 				gameConnection->SendNavp(navMesh);
+				gameConnection->HandleMessages();
 			}
 
 			imguiLabel("Load Airg from file");

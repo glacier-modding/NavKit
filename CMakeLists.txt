@@ -30,4 +30,3 @@ find_package(simdjson REQUIRED)
 find_package(nfd REQUIRED)
 
 add_subdirectory(src)
-#FIND_LIBRARY(NAVWEAKNESS_LIBRARIES NAMES navweakness NavWeakness.lib PATHS "External/NavWeakness/NavWeakness.lib")

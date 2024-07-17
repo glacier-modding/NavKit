@@ -19,6 +19,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string>
+#include <iomanip>
+#include <sstream>
 #include <memory>
 using easywsclient::WebSocket;
 
@@ -27,9 +29,10 @@ public:
 	GameConnection(BuildContext* ctx);
 	~GameConnection();
 	void SendNavp(NavPower::NavMesh* navMesh);
+	void SendChunk(std::vector<NavPower::Area> areas, int chunkIndex, int chunkCount);
+	void HandleMessages();
 private:
 	void SendHelloMessage();
-	void HandleMessages();
 	int ConnectToGame();
 	BuildContext* m_Ctx;
 	int rc;

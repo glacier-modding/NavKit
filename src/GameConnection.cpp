@@ -24,8 +24,6 @@ int GameConnection::ConnectToGame() {
     ws.reset(WebSocket::from_url("ws://localhost:46735/socket"));
     assert(ws);
     SendHelloMessage();
-    std::thread handleMessagesThread([=] { HandleMessages(); });
-    handleMessagesThread.detach();
 
     return 0;
 }
@@ -45,8 +43,52 @@ void GameConnection::SendHelloMessage() {
 }
 
 void GameConnection::SendNavp(NavPower::NavMesh* navMesh) {
-    //for (auto area : navMesh->m_areas) {
-    //    for (auto)
-    //}
-    ws->send("{\"type\":\"loadNavp\",\"areas\":[[[4.0,-6.0,0.0], [8.0,-6.0,0.0], [8.0,6.0,0.0], [4.0,6.0,0.0]],[[-8.0,-6.0,0.0], [-4.0,-6.0,0.0], [-4.0,6.0,0.0], [-8.0,6.0,0.0]],[[-4.0,-22.0,0.0], [4.0,-22.0,0.0], [4.0,-6.0,0.0], [-4.0,-6.0,0.0]],[[-4.0,-6.0,0.0], [4.0,-6.0,0.0], [4.0,6.0,0.0], [-4.0,6.0,0.0]]]}");
+    int chunkSize = 30;
+    auto chunkHead = navMesh->m_areas.begin();
+    int areaCount = navMesh->m_areas.size();
+    int chunkCount = (areaCount % chunkSize == 0) ? (areaCount / chunkSize) : ((areaCount / chunkSize) + 1);
+    for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+        int curChunkSize = (chunkIndex < (chunkCount - 1)) ? chunkSize : (areaCount % chunkSize);
+        std::vector<NavPower::Area> areas = std::vector<NavPower::Area>(chunkHead, chunkHead + curChunkSize);
+        SendChunk(areas, chunkIndex, chunkCount);
+        chunkHead += curChunkSize;
+    }
+}
+
+void GameConnection::SendChunk(std::vector<NavPower::Area> areas, int chunkIndex, int chunkCount) {
+    std::stringstream m;
+    m << std::fixed << std::setprecision(3);
+    m << "{\"type\":\"loadNavp\",\"chunkCount\":";
+    m << chunkCount;
+    m << ",\"chunk\":";
+    m << chunkIndex;
+    m << ",\"areas\":[";
+    int numArea = 0;
+    
+    for (auto& navPowerArea : areas) {
+        numArea++;
+        m << "[";
+        int numEdge = 0;
+        for (auto& edge : navPowerArea.m_edges) {
+            numEdge++;
+            auto point = edge->m_pos;
+            m << "[";
+            m << point.X;
+            m << ",";
+            m << point.Y;
+            m << ",";
+            m << point.Z;
+            m << "]";
+            if (numEdge != navPowerArea.m_edges.size()) {
+                m << ",";
+            }
+        }
+        m << "]";
+        if (numArea != areas.size()) {
+            m << ",";
+        }
+    }
+    m << "]}";
+    std::string msg = m.str();
+    ws->send(msg);
 }
