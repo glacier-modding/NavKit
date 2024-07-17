@@ -36,7 +36,7 @@ void GameConnection::HandleMessages() {
             if (message == "Done loading Navp.") { 
                 wsp->close();
             }
-            if (message.find("Failed to handle editor message with error : Unknown editor message type: loadNavp") != -1) {
+            if (message.find("Unknown editor message type: loadNavp") != -1) {
                 m_Ctx->log(RC_LOG_ERROR, "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
                 wsp->close();
             }
