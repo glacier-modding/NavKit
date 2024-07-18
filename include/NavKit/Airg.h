@@ -48,7 +48,7 @@ public:
 
 class Waypoint {
 public:
-	std::vector<short> nNeighbors;
+	std::vector<int> nNeighbors;
 	Vec4 vPos;
 	uint32_t nVisionDataOffset;
 	uint32_t nLayerIndex;

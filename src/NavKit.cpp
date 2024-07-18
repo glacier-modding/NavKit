@@ -144,7 +144,9 @@ int main(int argc, char** argv)
 	vector<bool> navpBuildDone;
 
 	string airgName = "Load Airg";
-	string lastAirgFile = airgName;
+	string lastLoadAirgFile = airgName;
+	string saveAirgName = "Save Airg";
+	string lastSaveAirgFile = saveAirgName;
 	bool airgLoaded = false;
 	vector<bool> airgLoadDone;
 	bool showAirg = true;
@@ -494,7 +496,7 @@ int main(int argc, char** argv)
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1270 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1270 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
+			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1320 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1320 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -579,11 +581,11 @@ int main(int argc, char** argv)
 
 			imguiLabel("Load Airg from file");
 			if (imguiButton(airgName.c_str(), airgLoadDone.empty())) {
-				char* fileName = openAirgFileDialog(lastAirgFile.data());
+				char* fileName = openAirgFileDialog(lastLoadAirgFile.data());
 				if (fileName)
 				{
 					airgName = fileName;
-					lastAirgFile = airgName.data();
+					lastLoadAirgFile = airgName.data();
 					airgLoaded = false;
 					airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
 					string extension = airgName.substr(airgName.length() - 4, airgName.length());
@@ -596,7 +598,7 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), true, &airgLoadDone);
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastLoadAirgFile.data(), true, &airgLoadDone);
 						loadAirgThread.detach();
 					}
 					else if (extension == "AIRG") {
@@ -606,8 +608,38 @@ int main(int argc, char** argv)
 						msg += fileName;
 						msg += "'...";
 						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastAirgFile.data(), false, &airgLoadDone);
+						std::thread loadAirgThread(loadAirg, airg, &ctx, airgResourceConverter, lastLoadAirgFile.data(), false, &airgLoadDone);
 						loadAirgThread.detach();
+					}
+				}
+			}
+
+			imguiLabel("Save Airg to file");
+			if (imguiButton(saveAirgName.c_str(), airgLoaded)) {
+				char* fileName = openSaveAirgFileDialog(lastLoadAirgFile.data());
+				if (fileName)
+				{
+					saveAirgName = fileName;
+					lastSaveAirgFile = saveAirgName.data();
+					saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
+					string extension = saveAirgName.substr(saveAirgName.length() - 4, saveAirgName.length());
+					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+					string msg = "Saving Airg";
+					if (extension == "JSON") {
+						msg += ".Json";
+					}
+					msg += " file: '";
+					msg += fileName;
+					msg += "'...";
+					ctx.log(RC_LOG_PROGRESS, msg.data());
+					if (extension == "JSON") {
+						saveAirg(airg, &ctx, lastSaveAirgFile.data());
+					}
+					else if (extension == "AIRG") {
+						string tempJsonFile = lastSaveAirgFile.data();
+						tempJsonFile += ".temp.json";
+						saveAirg(airg, &ctx, tempJsonFile.data());
+						airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), lastSaveAirgFile.data(), false);
 					}
 				}
 			}
@@ -890,6 +922,17 @@ void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConv
 	ctx->log(RC_LOG_PROGRESS, msg.data());
 }
 
+void saveAirg(Airg* airg, BuildContext* ctx, char* fileName) {
+
+	const std::string s_OutputFileName = std::filesystem::path(fileName).string();
+	std::filesystem::remove(s_OutputFileName);
+
+	// Write the airg to JSON file
+	std::ofstream fileOutputStream(s_OutputFileName);
+	airg->writeJson(fileOutputStream);
+	fileOutputStream.close();
+}
+
 void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to) {
 	auto start = std::chrono::high_resolution_clock::now();
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -989,7 +1032,7 @@ void renderAirg(Airg* airg) {
 		}
 		glEnd();
 		for (int neighborIndex = 0; neighborIndex < 8; neighborIndex++) {
-			if (waypoint.nNeighbors[neighborIndex] != -1) {
+			if (waypoint.nNeighbors[neighborIndex] != 65535) {
 				const Waypoint& neighbor = airg->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
 				glBegin(GL_LINES);
 				glVertex3f(waypoint.vPos.x, waypoint.vPos.z, -waypoint.vPos.y);
@@ -1086,6 +1129,11 @@ char* openOutputFolderDialog(char* lastOutputFolder) {
 char* openAirgFileDialog(char* lastAirgFolder) {
 	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
 	return openNfdLoadDialog(filters, 2);
+}
+
+char* openSaveAirgFileDialog(char* lastAirgFolder) {
+	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
+	return openNfdSaveDialog(filters, 2, "output");
 }
 
 char* openLoadObjFileDialog(char* lastObjFolder) {

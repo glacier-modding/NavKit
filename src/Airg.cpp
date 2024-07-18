@@ -30,16 +30,12 @@ void Vec4::readJson(simdjson::ondemand::object p_Json) {
 const void Properties::writeJson(std::ostream& f) {
 	f << "{";
 
-	f << "\"vMin\"" << ":" << "{";
+	f << "\"vMin\"" << ":";
 	vMin.writeJson(f);
-	f << "}" << ",";
+	f << ",";
 
-	f << "\"vMax\"" << ":" << "{";
+	f << "\"vMax\"" << ":";
 	vMax.writeJson(f);
-	f << "}" << ",";
-
-	f << "\"nGridWidth\"" << ":";
-	f << nGridWidth;
 	f << ",";
 
 	f << "\"nGridWidth\"" << ":";
@@ -51,7 +47,7 @@ const void Properties::writeJson(std::ostream& f) {
 	f << ",";
 
 	f << "\"nVisibilityRange\"" << ":";
-	f << fGridSpacing;
+	f << nVisibilityRange;
 	f << "}";
 }
 
