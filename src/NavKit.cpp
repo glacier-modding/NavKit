@@ -584,6 +584,7 @@ int main(int argc, char** argv)
 				{
 					airgName = fileName;
 					lastAirgFile = airgName.data();
+					airgLoaded = false;
 					airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
 					string extension = airgName.substr(airgName.length() - 4, airgName.length());
 					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
