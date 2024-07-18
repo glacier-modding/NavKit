@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <fstream>
 #include <stdlib.h>
+#include "..\NavWeakness\NavPower.h"
+#include "..\RecastDemo\SampleInterfaces.h"
 #if _WIN32
 #define SIMD_PATH "..\\..\\extern\\simdjson\\simdjson.h"
 #else
@@ -69,4 +71,5 @@ public:
 
 	const void writeJson(std::ostream& f);
 	void readJson(const char* p_AirgPath);
+	void build(NavPower::NavMesh* navMesh, BuildContext* ctx);
 };

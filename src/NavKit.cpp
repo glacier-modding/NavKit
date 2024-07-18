@@ -496,7 +496,7 @@ int main(int argc, char** argv)
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1320 - ((!geom || !objLoaded) ? 800 : 0)) - 10, 250, 1320 - ((!geom || !objLoaded) ? 800: 0), &propScroll))
+			if (imguiBeginScrollArea("Main menu", width - 250 - 10, height - (1335 - ((!geom || !objLoaded) ? 785 : 0)) - 10, 250, 1335 - ((!geom || !objLoaded) ? 785: 0), &propScroll))
 				mouseOverMenu = true;
 
 			if (imguiCheck("Show Navp", showNavp))
@@ -640,8 +640,20 @@ int main(int argc, char** argv)
 						tempJsonFile += ".temp.json";
 						saveAirg(airg, &ctx, tempJsonFile.data());
 						airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), lastSaveAirgFile.data(), false);
+						std::filesystem::remove(tempJsonFile);
 					}
 				}
+			}
+
+			imguiLabel("Build Airg from Navp");
+			if (imguiButton("Build Airg", navpLoaded)) {
+				airgLoaded = false;
+				delete airg;
+				airg = new Airg();
+				string msg = "Building Airg from Navp";
+				ctx.log(RC_LOG_PROGRESS, msg.data());
+				airg->build(navMesh, &ctx);
+				airgLoaded = true;
 			}
 
 			imguiLabel("Load Obj file");
@@ -690,14 +702,11 @@ int main(int argc, char** argv)
 
 				sample->handleCommonSettings();
 
-				imguiSeparator();
-				if (imguiButton("Build", navpBuildDone.empty()))
+				if (imguiButton("Build Navp", navpBuildDone.empty()))
 				{
 					std::thread buildNavpThread(buildNavp, sample, &ctx, &navpBuildDone);
 					buildNavpThread.detach();
 				}
-
-				imguiSeparator();
 			}
 
 			imguiEndScrollArea();
@@ -1031,7 +1040,7 @@ void renderAirg(Airg* airg) {
 			glVertex3f(fx, fz, -fy);
 		}
 		glEnd();
-		for (int neighborIndex = 0; neighborIndex < 8; neighborIndex++) {
+		for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
 			if (waypoint.nNeighbors[neighborIndex] != 65535) {
 				const Waypoint& neighbor = airg->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
 				glBegin(GL_LINES);

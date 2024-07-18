@@ -223,3 +223,97 @@ void Airg::readJson(const char* p_AirgPath) {
 		m_pVisibilityData.push_back(visibilityDatum);
 	}
 }
+
+// From https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy)
+{
+	int i, j, c = 0;
+	for (i = 0, j = nvert - 1; i < nvert; j = i++) {
+		if (((verty[i] > testy) != (verty[j] > testy)) &&
+			(testx < (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]))
+			c = !c;
+	}
+	return c;
+}
+
+void Airg::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
+	ctx->log(RC_LOG_PROGRESS, "Started building Airg.");
+	double spacing = 1;
+	// Grid = Z[Y[X[]]]
+	std::vector<std::vector<std::vector<int>>> grid;
+	Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
+	min.X += spacing / 2;
+	min.Y += spacing / 2;
+	Vec3 max = navMesh->m_graphHdr->m_bbox.m_max;
+	int gridXSize = std::ceil((max.X - min.X) / spacing);
+	int gridYSize = std::ceil((max.Y - min.Y) / spacing);
+	int gridZSize = 1;
+	int wayPointIndex = 0;
+	for (int zi = 0; zi < gridZSize; zi++) {
+		std::vector<std::vector<int>> yRow;
+		for (int yi = 0; yi < gridYSize; yi++) {
+			std::vector<int> xRow;
+			for (int xi = 0; xi < gridXSize; xi++) {
+				bool pointInArea = false;
+				double x = min.X + xi * spacing;
+				double y = min.Y + yi * spacing;
+				double z = min.Z + zi * spacing;
+				for (auto area : navMesh->m_areas) {
+					const int areaPointCount = area.m_edges.size();
+					float areaXCoords[10];
+					float areaYCoords[10];
+					for (int i = 0; i < areaPointCount; i++) {
+						areaXCoords[i] = area.m_edges[i]->m_pos.X;
+						areaYCoords[i] = area.m_edges[i]->m_pos.Y;
+					}
+					pointInArea = pnpoly(areaPointCount, areaXCoords, areaYCoords, x, y);
+					if (pointInArea) {
+						break;
+					}
+				}
+				xRow.push_back(pointInArea ? wayPointIndex++ : 65535);
+				if (pointInArea) {
+					Waypoint waypoint;
+					waypoint.vPos.x = x;
+					waypoint.vPos.y = y;
+					waypoint.vPos.z = z;
+					m_WaypointList.push_back(waypoint);
+				}
+			}
+			yRow.push_back(xRow);
+		}
+		grid.push_back(yRow);
+	}
+	
+	// Neighbors: South is 0, increases CCW
+	std::pair<int, int> gridIndexDiff[8]{
+		std::pair(0, -1),
+		std::pair(1, -1),
+		std::pair(1, 0),
+		std::pair(1, 1),
+		std::pair(0, 1),
+		std::pair(-1, 1),
+		std::pair(-1, 0),
+		std::pair(-1, -1)
+	};
+
+	for (int zi = 0; zi < gridZSize; zi++) {
+		for (int yi = 0; yi < gridYSize; yi++) {
+			for (int xi = 0; xi < gridXSize; xi++) {
+				int waypointIndex = grid[zi][yi][xi];
+				if (waypointIndex != 65535) {
+					for (int neighborNum = 0; neighborNum < 8; neighborNum++) {
+						int neighborWaypointIndex = 65535;
+						int nxi = xi + gridIndexDiff[neighborNum].first;
+						int nyi = yi + gridIndexDiff[neighborNum].second;
+						if (nxi >= 0 && nxi < gridXSize &&
+							nyi >= 0 && nyi < gridYSize) {
+							neighborWaypointIndex = grid[zi][nyi][nxi];
+						}
+						m_WaypointList[waypointIndex].nNeighbors.push_back(neighborWaypointIndex);
+					}
+				}
+			}
+		}
+	}
+}

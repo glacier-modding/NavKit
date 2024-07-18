@@ -18,16 +18,23 @@ GameConnection::~GameConnection() {
 int GameConnection::ConnectToGame() {
     rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (rc) {
-        m_Ctx->log(RC_LOG_ERROR, "WSAStartup Failed.");
+        m_Ctx->log(RC_LOG_ERROR, "GameConnection: WSAStartup Failed.");
         return 1;
     }
     ws.reset(WebSocket::from_url("ws://localhost:46735/socket"));
-    assert(ws);
+    if (!ws) {
+        m_Ctx->log(RC_LOG_ERROR, "GameConnection: Could not connect to game. Is the game running?");
+        return 0;
+    }
     SendHelloMessage();
 
     return 0;
 }
 void GameConnection::HandleMessages() {
+    if (!ws) {
+        m_Ctx->log(RC_LOG_ERROR, "GameConnection: HandleMessages failed because the socket is not open.");
+        return;
+    }
     while (ws->getReadyState() != WebSocket::CLOSED) {
         WebSocket::pointer wsp = &*ws;
         ws->poll();
@@ -49,6 +56,10 @@ void GameConnection::SendHelloMessage() {
 }
 
 void GameConnection::SendNavp(NavPower::NavMesh* navMesh) {
+    if (!ws) {
+        m_Ctx->log(RC_LOG_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
+        return;
+    }
     int chunkSize = 30;
     auto chunkHead = navMesh->m_areas.begin();
     int areaCount = navMesh->m_areas.size();
