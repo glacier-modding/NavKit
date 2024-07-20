@@ -21,11 +21,30 @@
 */
 #include "..\include\NavKit\NavKit.h"
 
-#undef main
-
 using std::string;
 using std::vector;
+GLuint framebuffer;
+GLuint color_rb;
+GLuint depth_rb;
 
+void initFrameBuffer(int width, int height) {
+	glewInit();
+	// Build the framebuffer.
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+	glGenRenderbuffers(1, &color_rb);
+	glBindRenderbuffer(GL_RENDERBUFFER, color_rb);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, color_rb);
+
+	glGenRenderbuffers(1, &depth_rb);
+	glBindRenderbuffer(GL_RENDERBUFFER, depth_rb);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rb);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 int main(int argc, char** argv)
 {
 	// Init SDL
@@ -71,10 +90,10 @@ int main(int argc, char** argv)
 		width = rcMin(displayMode.w, (int)(displayMode.h * aspect)) - 80;
 		height = displayMode.h - 80;
 	}
-
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int errorCode = SDL_CreateWindowAndRenderer(width, height, flags, &window, &renderer);
+	initFrameBuffer(width, height);
 
 	if (errorCode != 0 || !window || !renderer)
 	{
@@ -139,9 +158,11 @@ int main(int argc, char** argv)
 	string lastSaveNavpFile = saveNavpName;
 	bool navpLoaded = false;
 	bool showNavp = true;
+	bool doNavpHitTest = false;
 	NavPower::NavMesh* navMesh = new NavPower::NavMesh();
 	vector<bool> navpLoadDone;
 	vector<bool> navpBuildDone;
+	int selectedNavpArea = -1;
 
 	string airgName = "Load Airg";
 	string lastLoadAirgFile = airgName;
@@ -214,6 +235,7 @@ int main(int argc, char** argv)
 		int mouseScroll = 0;
 		bool processHitTest = false;
 		bool processHitTestShift = false;
+		doNavpHitTest = false;
 		SDL_Event event;
 
 		while (SDL_PollEvent(&event))
@@ -292,6 +314,7 @@ int main(int argc, char** argv)
 					if (!mouseOverMenu)
 					{
 						processHitTest = true;
+						doNavpHitTest = true;
 						processHitTestShift = (SDL_GetModState() & KMOD_SHIFT) ? true : false;
 					}
 				}
@@ -462,9 +485,20 @@ int main(int argc, char** argv)
 
 		cameraPos[1] += (moveUp - moveDown) * keybSpeed * dt;
 
+		if (doNavpHitTest) {
+			int newSelectedNavpArea = navpHitTest(&ctx, navMesh, mousePos[0], mousePos[1], width, height);
+			if (newSelectedNavpArea == selectedNavpArea) {
+				selectedNavpArea = -1;
+			}
+			else {
+				selectedNavpArea = newSelectedNavpArea;
+			}
+			doNavpHitTest = false;
+		}
+
 		glFrontFace(GL_CW);
 		if (navpLoaded && showNavp) {
-			renderNavMesh(navMesh);
+			renderNavMesh(navMesh, selectedNavpArea);
 		}
 		if (airgLoaded && showAirg) {
 			renderAirg(airg);
@@ -1004,14 +1038,24 @@ void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {
 	duDebugDrawBoxWire(m_dd, bmin[0], bmin[1], bmin[2], bmax[0], bmax[1], bmax[2], duRGBA(255, 255, 255, 128), 1.0f);
 }
 
-void renderArea(NavPower::Area area) {
-	glColor4f(0.0, 0.0, 0.5, 0.6);
+void renderArea(NavPower::Area area, bool selected) {
+	if (!selected) {
+		glColor4f(0.0, 0.0, 0.5, 0.6);
+	}
+	else {
+		glColor4f(0.0, 0.5, 0.5, 0.6);
+	}
 	glBegin(GL_POLYGON);
 	for (auto vertex : area.m_edges) {
 		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
 	}
 	glEnd();
-	glColor3f(0.0, 0.0, 1.0);
+	if (!selected) {
+		glColor3f(0.0, 0.0, 1.0);
+	}
+	else {
+		glColor3f(0.0, 1.0, 1.0);
+	}
 	glBegin(GL_LINES);
 	for (auto vertex : area.m_edges) {
 		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
@@ -1019,10 +1063,43 @@ void renderArea(NavPower::Area area) {
 	glEnd();
 }
 
-void renderNavMesh(NavPower::NavMesh* navMesh) {
+void renderNavMesh(NavPower::NavMesh* navMesh, int selectedNavpArea) {
+	int areaIndex = 0;
 	for (const NavPower::Area& area : navMesh->m_areas) {
-		renderArea(area);
+		renderArea(area, areaIndex == selectedNavpArea);
+		areaIndex++;
 	}
+}
+int navpHitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height) {
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glClearColor(1.0, 1.0, 1.0, 0.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (status != GL_FRAMEBUFFER_COMPLETE) {
+		ctx->log(RC_LOG_ERROR, "FB error, status: 0x%x", status);
+
+		printf("FB error, status: 0x%x\n", status);
+		return -1;
+	}
+	int areaIndex = 0;
+	for (const NavPower::Area& area : navMesh->m_areas) {
+		glColor3ub(60, areaIndex / 255, areaIndex % 255);
+		areaIndex++;
+		glBegin(GL_POLYGON);
+		for (auto vertex : area.m_edges) {
+			glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
+		}
+		glEnd();
+	}
+	GLubyte pixel[4];
+
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
+	int selectedArea = pixel[1] * 255 + pixel[2];
+	ctx->log(RC_LOG_PROGRESS, "Selected area: %d", mx, my, selectedArea);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	return selectedArea;
 }
 
 void renderAirg(Airg* airg) {

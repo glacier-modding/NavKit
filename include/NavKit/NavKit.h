@@ -7,8 +7,8 @@
 #include <chrono>
 
 #include <SDL.h>
+#include <GL/glew.h>
 #include <SDL_opengl.h>
-#include <GL/gl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include <nfd.h>
@@ -41,11 +41,13 @@
 #include "..\ResourceLib_HM3\ResourceLibCommon.h"
 #include "..\ResourceLib_HM3\ResourceLib_HM3.h"
 #include "..\ResourceLib_HM3\Generated\ZHMGen.h"
+#undef main
 
-void renderNavMesh(NavPower::NavMesh* navMesh);
+void renderNavMesh(NavPower::NavMesh* navMesh, int selectedArea);
+int navpHitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
 void renderAirg(Airg* airg);
 void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
-void renderArea(NavPower::Area area);
+void renderArea(NavPower::Area area, bool selected);
 char* openLoadNavpFileDialog(char* lastNavpFolder);
 char* openSaveNavpFileDialog(char* lastNavpFolder);
 char* openAirgFileDialog(char* lastAirgFolder);

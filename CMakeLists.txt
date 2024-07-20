@@ -12,7 +12,7 @@ endif()
 
 project(
   NavKit 
-  VERSION 0.5
+  VERSION 0.6
   DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman"
   LANGUAGES CXX)
 
@@ -26,6 +26,7 @@ find_package(SDL2 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(GLU REQUIRED)
+find_package(GLEW REQUIRED)
 find_package(simdjson REQUIRED)
 find_package(nfd REQUIRED)
 
