@@ -19,6 +19,7 @@ public:
 	const std::string meshesFolder = "Obj";
 	std::string objToLoad;
 	std::vector<bool> objLoadDone;
+	int objScroll;
 
 	void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to);
 	void saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName);

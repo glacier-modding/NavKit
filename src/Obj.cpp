@@ -10,6 +10,7 @@ Obj::Obj(NavKit* navKit): navKit(navKit) {
 	showObj = true;
 	objToLoad = "";
 	loadObj = false;
+	objScroll = 0;
 }
 
 void Obj::copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to) {
@@ -86,7 +87,7 @@ char* Obj::openSaveObjFileDialog(char* lastObjFolder) {
 }
 
 void Obj::drawMenu() {
-	if (imguiBeginScrollArea("Obj menu", navKit->width - 250 - 10, navKit->height - 10 - 205 - 15 - 200, 250, 205, &navKit->objScroll))
+	if (imguiBeginScrollArea("Obj menu", navKit->width - 250 - 10, navKit->height - 10 - 205 - 15 - 200, 250, 205, &objScroll))
 		navKit->mouseOverMenu = true;
 	if (imguiCheck("Show Obj", showObj))
 		showObj = !showObj;

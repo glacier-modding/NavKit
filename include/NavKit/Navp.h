@@ -18,6 +18,7 @@ public:
 	bool navpLoaded;
 	bool showNavp;
 	bool doNavpHitTest;
+	int navpScroll;
 
 private:
 	NavKit* navKit;

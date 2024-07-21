@@ -24,6 +24,7 @@
 #include "ReasoningGrid.h"
 #include "Navp.h"
 #include "Obj.h"
+#include "Airg.h"
 #include "FileUtil.h"
 
 #include "..\RecastDemo\ChunkyTriMesh.h"
@@ -48,78 +49,56 @@
 
 class Navp;
 class Obj;
+class Airg;
 class NavKit {
 public:
 	NavKit();
 	~NavKit();
+
 	Navp* navp;
 	Obj* obj;
+	Airg* airg;
 
 	int width;
 	int height;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
-	int runProgram(int argc, char** argv);
 	GameConnection* gameConnection;
-	Sample* sample = new Sample_SoloMesh();
+	Sample* sample;
 
 	BuildContext ctx;
 
 	bool mouseOverMenu = false;
-	std::string airgName = "Load Airg";
-	std::string lastLoadAirgFile = airgName;
-	std::string saveAirgName = "Save Airg";
-	std::string lastSaveAirgFile = saveAirgName;
-	bool airgLoaded = false;
-	std::vector<bool> airgLoadDone;
-	bool showAirg = true;
-	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
-	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
-	ReasoningGrid* airg = new ReasoningGrid();
 
-	std::string lastBlenderFile = "\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\"";
-	std::string blenderName = "Choose Blender app";
-	bool blenderSet = false;
+	std::string lastBlenderFile;
+	std::string blenderName;
+	bool blenderSet;
 
 	std::vector<bool> extractionDone;
-	bool startedObjGeneration = false;
+	bool startedObjGeneration;
 
-	std::string hitmanFolderName = "Choose Hitman folder";
-	std::string lastHitmanFolder = hitmanFolderName;
-	bool hitmanSet = false;
-	std::string outputFolderName = "Choose Output folder";
-	std::string lastOutputFolder = outputFolderName;
-	bool outputSet = false;
-	bool showMenu = true;
-	bool showLog = true;
+	std::string hitmanFolderName;
+	std::string lastHitmanFolder;
+	bool hitmanSet;
+	std::string outputFolderName;
+	std::string lastOutputFolder;
+	bool outputSet;
+	bool showMenu;
+	bool showLog;
 
-	int extractScroll = 0;
-	int navpScroll = 0;
-	int airgScroll = 0;
-	int objScroll = 0;
-	int logScroll = 0;
-	int lastLogCount = -1;
+	int extractScroll;
+	int logScroll;
+	int lastLogCount;
 
-	InputGeom* geom = 0;
+	InputGeom* geom;
 	DebugDrawGL m_dd;
+
+	int runProgram(int argc, char** argv);
 private:
-	void init();
 	void initFrameBuffer(int width, int height);
 	int hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
-	void renderAirg(ReasoningGrid* airg);
-	void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
-	void renderArea(NavPower::Area area, bool selected);
-	char* openAirgFileDialog(char* lastAirgFolder);
-	char* openSaveAirgFileDialog(char* lastAirgFolder);
-	char* openLoadObjFileDialog(char* lastObjFolder);
 	char* openSetBlenderFileDialog(char* lastBlenderFile);
-	char* openSaveObjFileDialog(char* lastObjFolder);
 	char* openHitmanFolderDialog(char* lastHitmanFolder);
 	char* openOutputFolderDialog(char* lastOutputFolder);
-	static void loadAirg(NavKit* navKit, char* fileName, bool isFromJson);
-	void saveAirg(ReasoningGrid* airg, BuildContext* ctx, char* fileName);
-	void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone);
-	void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to);
-	void saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName);
 };
 

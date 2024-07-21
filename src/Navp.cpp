@@ -1,5 +1,4 @@
 #include "..\include\NavKit\Navp.h"
-#include "..\include\NavKit\FileUtil.h"
 
 Navp::Navp(NavKit* navKit): navKit(navKit) {
 	loadNavpName = "Load Navp";
@@ -10,15 +9,11 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 	showNavp = true;
 	doNavpHitTest = false;
 	navMesh = new NavPower::NavMesh();
-	navpLoadDone;
-	navpBuildDone;
 	selectedNavpArea = -1;
+	navpScroll = 0;
 }
 
 Navp::~Navp() {
-	if (navMesh) {
-		delete navMesh;
-	}
 }
 
 char* Navp::openLoadNavpFileDialog(char* lastNavpFolder) {
@@ -124,7 +119,7 @@ void Navp::buildNavp(Navp* navp) {
 }
 	
 void Navp::drawMenu() {
-	if (imguiBeginScrollArea("Navp menu", 10, navKit->height - 225 - 935 - 15, 250, 935, &navKit->navpScroll))
+	if (imguiBeginScrollArea("Navp menu", 10, navKit->height - 225 - 935 - 15, 250, 935, &navpScroll))
 		navKit->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;

@@ -405,8 +405,8 @@ int NavKit::runProgram(int argc, char** argv) {
 		if (navp->navpLoaded && navp->showNavp) {
 			navp->renderNavMesh();
 		}
-		if (airgLoaded && showAirg) {
-			renderAirg(airg);
+		if (airg->airgLoaded && airg->showAirg) {
+			airg->renderAirg();
 		}
 		if (obj->objLoaded && obj->showObj) {
 			obj->renderObj(geom, &m_dd);
@@ -475,94 +475,10 @@ int NavKit::runProgram(int argc, char** argv) {
 
 
 			navp->drawMenu();
-
-			if (imguiBeginScrollArea("Airg menu", width - 250 - 10, height - 10 - 200 - 10, 250, 200, &airgScroll))
-				mouseOverMenu = true;
-			if (imguiCheck("Show Airg", showAirg))
-				showAirg = !showAirg;
-			imguiLabel("Load Airg from file");
-			if (imguiButton(airgName.c_str(), airgLoadDone.empty())) {
-				char* fileName = openAirgFileDialog(lastLoadAirgFile.data());
-				if (fileName)
-				{
-					airgName = fileName;
-					lastLoadAirgFile = airgName.data();
-					airgLoaded = false;
-					airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
-					string extension = airgName.substr(airgName.length() - 4, airgName.length());
-					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-
-					if (extension == "JSON") {
-						delete airg;
-						airg = new ReasoningGrid();
-						string msg = "Loading Airg.Json file: '";
-						msg += fileName;
-						msg += "'...";
-						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(&NavKit::loadAirg, this, lastLoadAirgFile.data(), true);
-						loadAirgThread.detach();
-					}
-					else if (extension == "AIRG") {
-						delete airg;
-						airg = new ReasoningGrid();
-						string msg = "Loading Airg file: '";
-						msg += fileName;
-						msg += "'...";
-						ctx.log(RC_LOG_PROGRESS, msg.data());
-						std::thread loadAirgThread(&NavKit::loadAirg, this, lastLoadAirgFile.data(), false);
-						loadAirgThread.detach();
-					}
-				}
-			}
-			imguiLabel("Save Airg to file");
-			if (imguiButton(saveAirgName.c_str(), airgLoaded)) {
-				char* fileName = openSaveAirgFileDialog(lastLoadAirgFile.data());
-				if (fileName)
-				{
-					saveAirgName = fileName;
-					lastSaveAirgFile = saveAirgName.data();
-					saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
-					string extension = saveAirgName.substr(saveAirgName.length() - 4, saveAirgName.length());
-					std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-					string msg = "Saving Airg";
-					if (extension == "JSON") {
-						msg += ".Json";
-					}
-					msg += " file: '";
-					msg += fileName;
-					msg += "'...";
-					ctx.log(RC_LOG_PROGRESS, msg.data());
-					if (extension == "JSON") {
-						saveAirg(airg, &ctx, lastSaveAirgFile.data());
-					}
-					else if (extension == "AIRG") {
-						string tempJsonFile = lastSaveAirgFile.data();
-						tempJsonFile += ".temp.json";
-						saveAirg(airg, &ctx, tempJsonFile.data());
-						airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), lastSaveAirgFile.data(), false);
-						std::filesystem::remove(tempJsonFile);
-					}
-				}
-			}
-			imguiLabel("Build Airg from Navp");
-			if (imguiButton("Build Airg", navp->navpLoaded)) {
-				airgLoaded = false;
-				delete airg;
-				airg = new ReasoningGrid();
-				string msg = "Building Airg from Navp";
-				ctx.log(RC_LOG_PROGRESS, msg.data());
-				airg->build(navp->navMesh, &ctx);
-				airgLoaded = true;
-			}
-			imguiEndScrollArea();
-
+			airg->drawMenu();
 			obj->drawMenu();
 		}
 
-		if (airgLoadDone.size() == 1) {
-			airgLoadDone.clear();
-			airgLoaded = true;
-		}
 		if (extractionDone.size() == 1 && !startedObjGeneration) {
 			startedObjGeneration = true;
 			generateObj(&ctx, lastBlenderFile.data(), lastOutputFolder.data(), &extractionDone);
@@ -579,6 +495,7 @@ int NavKit::runProgram(int argc, char** argv) {
 		}
 		navp->finalizeLoad();
 		obj->finalizeLoad();
+		airg->finalizeLoad();
 		// Marker
 		if (markerPositionSet && gluProject((GLdouble)markerPosition[0], (GLdouble)markerPosition[1], (GLdouble)markerPosition[2],
 			modelviewMatrix, projectionMatrix, viewport, &x, &y, &z))
@@ -616,17 +533,9 @@ int NavKit::runProgram(int argc, char** argv) {
 NavKit::NavKit() {
 	navp = new Navp(this);
 	obj = new Obj(this);
-	airgName = "Load Airg";
-	lastLoadAirgFile = airgName;
-	saveAirgName = "Save Airg";
-	lastSaveAirgFile = saveAirgName;
-	airgLoaded = false;
-	airgLoadDone;
-	showAirg = true;
-	airgResourceConverter = HM3_GetConverterForResource("AIRG");;
-	airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
-	airg = new ReasoningGrid();
+	airg = new Airg(this);
 
+	sample = new Sample_SoloMesh();
 	lastBlenderFile = "\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\"";
 	blenderName = "Choose Blender app";
 	blenderSet = false;
@@ -640,6 +549,17 @@ NavKit::NavKit() {
 	outputFolderName = "Choose Output folder";
 	lastOutputFolder = outputFolderName;
 	outputSet = false;
+	showMenu = true;
+	showLog = true;
+	extractScroll = 0;
+	height = 0;
+	width = 0;
+	logScroll = 0;
+	gameConnection = 0;
+	geom = 0;
+	renderer = 0;
+	window = 0;
+	lastLogCount = -1;
 }
 
 NavKit::~NavKit() {
@@ -664,40 +584,6 @@ void NavKit::initFrameBuffer(int width, int height) {
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rb);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-void NavKit::loadAirg(NavKit* navKit, char* fileName, bool isFromJson) {
-	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	string msg = "Loading Airg from file at ";
-	msg += std::ctime(&start_time);
-	navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
-	auto start = std::chrono::high_resolution_clock::now();
-
-	string jsonFileName = fileName;
-	if (!isFromJson) {
-		jsonFileName += ".Json";
-		navKit->airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
-	}
-	navKit->airg->readJson(jsonFileName.data());
-	if (navKit->airgLoadDone.empty()) {
-		navKit->airgLoadDone.push_back(true);
-	}
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-	msg = "Finished loading Airg in ";
-	msg += std::to_string(duration.count());
-	msg += " seconds";
-	navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
-}
-
-void NavKit::saveAirg(ReasoningGrid* airg, BuildContext* ctx, char* fileName) {
-
-	const std::string s_OutputFileName = std::filesystem::path(fileName).string();
-	std::filesystem::remove(s_OutputFileName);
-
-	// Write the airg to JSON file
-	std::ofstream fileOutputStream(s_OutputFileName);
-	airg->writeJson(fileOutputStream);
-	fileOutputStream.close();
 }
 
 int NavKit::hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height) {
@@ -727,49 +613,12 @@ int NavKit::hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int m
 	return selectedArea;
 }
 
-void NavKit::renderAirg(ReasoningGrid* airg) {
-	int numWaypoints = airg->m_WaypointList.size();
-	for (size_t i = 0; i < numWaypoints; i++) {
-		const Waypoint& waypoint = airg->m_WaypointList[i];
-		glColor4f(1.0, 0.0, 0, 0.6);
-		glBegin(GL_LINE_LOOP);
-		const float r = 0.1f;
-		for (int i = 0; i < 8; i++) {
-			const float a = (float)i / 8.0f * RC_PI * 2;
-			const float fx = (float)waypoint.vPos.x + cosf(a) * r;
-			const float fy = (float)waypoint.vPos.y + sinf(a) * r;
-			const float fz = (float)waypoint.vPos.z;
-			glVertex3f(fx, fz, -fy);
-		}
-		glEnd();
-		for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
-			if (waypoint.nNeighbors[neighborIndex] != 65535) {
-				const Waypoint& neighbor = airg->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
-				glBegin(GL_LINES);
-				glVertex3f(waypoint.vPos.x, waypoint.vPos.z, -waypoint.vPos.y);
-				glVertex3f(neighbor.vPos.x, neighbor.vPos.z, -neighbor.vPos.y);
-				glEnd();
-			}
-		}
-	}
-}
-
 char* NavKit::openHitmanFolderDialog(char* lastHitmanFolder) {
 	return FileUtil::openNfdFolderDialog();
 }
 
 char* NavKit::openOutputFolderDialog(char* lastOutputFolder) {
 	return FileUtil::openNfdFolderDialog();
-}
-
-char* NavKit::openAirgFileDialog(char* lastAirgFolder) {
-	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
-	return FileUtil::openNfdLoadDialog(filters, 2);
-}
-
-char* NavKit::openSaveAirgFileDialog(char* lastAirgFolder) {
-	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
-	return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
 
 char* NavKit::openSetBlenderFileDialog(char* lastBlenderFile) {
