@@ -99,14 +99,12 @@ struct SampleToolState {
 class Sample
 {
 protected:
-	class InputGeom* m_geom;
 	class dtNavMesh* m_navMesh;
 	class dtNavMeshQuery* m_navQuery;
 	class dtCrowd* m_crowd;
 
 	unsigned char m_navMeshDrawFlags;
 
-	float m_cellSize;
 	float m_cellHeight;
 	float m_agentHeight;
 	float m_agentRadius;
@@ -146,6 +144,9 @@ public:
 	void setToolState(int type, SampleToolState* s) { m_toolStates[type] = s; }
 
 	SampleDebugDraw& getDebugDraw() { return m_dd; }
+	
+	class InputGeom* m_geom;
+	float m_cellSize;
 
 	virtual void handleSettings();
 	virtual void handleTools();

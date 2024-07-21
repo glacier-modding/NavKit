@@ -21,7 +21,10 @@
 #include <RecastDebugDraw.h>
 #include "..\..\extern\vcpkg\packages\recastnavigation_x64-windows\include\recastnavigation\RecastAlloc.h"
 
-#include "Airg.h"
+#include "ReasoningGrid.h"
+#include "Navp.h"
+#include "Obj.h"
+#include "FileUtil.h"
 
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"
@@ -43,24 +46,80 @@
 #include "..\ResourceLib_HM3\Generated\ZHMGen.h"
 #undef main
 
-void renderNavMesh(NavPower::NavMesh* navMesh, int selectedArea);
-int navpHitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
-void renderAirg(Airg* airg);
-void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
-void renderArea(NavPower::Area area, bool selected);
-char* openLoadNavpFileDialog(char* lastNavpFolder);
-char* openSaveNavpFileDialog(char* lastNavpFolder);
-char* openAirgFileDialog(char* lastAirgFolder);
-char* openSaveAirgFileDialog(char* lastAirgFolder);
-char* openLoadObjFileDialog(char* lastObjFolder);
-char* openSetBlenderFileDialog(char* lastBlenderFile);
-char* openSaveObjFileDialog(char* lastObjFolder);
-char* openHitmanFolderDialog(char* lastHitmanFolder);
-char* openOutputFolderDialog(char* lastOutputFolder);
-void loadNavMesh(NavPower::NavMesh* navMesh, BuildContext* ctx, char* fileName, bool isFromJson);
-void loadAirg(Airg* airg, BuildContext* ctx, ResourceConverter* airgResourceConverter, char* fileName, bool isFromJson, std::vector<bool>* airgLoaded);
-void saveAirg(Airg* airg, BuildContext* ctx, char* fileName);
-void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone);
-void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to);
-void saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName);
-void buildNavp(Sample* sample, BuildContext* ctx, std::vector<bool>* navpBuildDone);
+class Navp;
+class Obj;
+class NavKit {
+public:
+	NavKit();
+	~NavKit();
+	Navp* navp;
+	Obj* obj;
+
+	int width;
+	int height;
+	SDL_Window* window;
+	SDL_Renderer* renderer;
+	int runProgram(int argc, char** argv);
+	GameConnection* gameConnection;
+	Sample* sample = new Sample_SoloMesh();
+
+	BuildContext ctx;
+
+	bool mouseOverMenu = false;
+	std::string airgName = "Load Airg";
+	std::string lastLoadAirgFile = airgName;
+	std::string saveAirgName = "Save Airg";
+	std::string lastSaveAirgFile = saveAirgName;
+	bool airgLoaded = false;
+	std::vector<bool> airgLoadDone;
+	bool showAirg = true;
+	ResourceConverter* airgResourceConverter = HM3_GetConverterForResource("AIRG");;
+	ResourceGenerator* airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
+	ReasoningGrid* airg = new ReasoningGrid();
+
+	std::string lastBlenderFile = "\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\"";
+	std::string blenderName = "Choose Blender app";
+	bool blenderSet = false;
+
+	std::vector<bool> extractionDone;
+	bool startedObjGeneration = false;
+
+	std::string hitmanFolderName = "Choose Hitman folder";
+	std::string lastHitmanFolder = hitmanFolderName;
+	bool hitmanSet = false;
+	std::string outputFolderName = "Choose Output folder";
+	std::string lastOutputFolder = outputFolderName;
+	bool outputSet = false;
+	bool showMenu = true;
+	bool showLog = true;
+
+	int extractScroll = 0;
+	int navpScroll = 0;
+	int airgScroll = 0;
+	int objScroll = 0;
+	int logScroll = 0;
+	int lastLogCount = -1;
+
+	InputGeom* geom = 0;
+	DebugDrawGL m_dd;
+private:
+	void init();
+	void initFrameBuffer(int width, int height);
+	int hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
+	void renderAirg(ReasoningGrid* airg);
+	void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
+	void renderArea(NavPower::Area area, bool selected);
+	char* openAirgFileDialog(char* lastAirgFolder);
+	char* openSaveAirgFileDialog(char* lastAirgFolder);
+	char* openLoadObjFileDialog(char* lastObjFolder);
+	char* openSetBlenderFileDialog(char* lastBlenderFile);
+	char* openSaveObjFileDialog(char* lastObjFolder);
+	char* openHitmanFolderDialog(char* lastHitmanFolder);
+	char* openOutputFolderDialog(char* lastOutputFolder);
+	static void loadAirg(NavKit* navKit, char* fileName, bool isFromJson);
+	void saveAirg(ReasoningGrid* airg, BuildContext* ctx, char* fileName);
+	void loadObjMesh(InputGeom* geom, BuildContext* ctx, char* objToLoad, std::vector<bool>* objLoadDone);
+	void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to);
+	void saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName);
+};
+

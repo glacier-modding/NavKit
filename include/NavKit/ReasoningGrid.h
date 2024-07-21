@@ -59,7 +59,7 @@ public:
 	void readJson(simdjson::ondemand::object p_Json);
 };
 
-class Airg {
+class ReasoningGrid {
 public:
 	Properties m_Properties;
 	SizedArray m_HighVisibilityBits;

@@ -1,4 +1,4 @@
-#include "..\include\NavKit\Airg.h"
+#include "..\include\NavKit\ReasoningGrid.h"
 const void Vec4::writeJson(std::ostream& f) {
 	f << "{";
 
@@ -147,7 +147,7 @@ void Waypoint::readJson(simdjson::ondemand::object p_Json) {
 	nLayerIndex = uint64_t(p_Json["nLayerIndex"]);
 }
 
-const void Airg::writeJson(std::ostream& f) {
+const void ReasoningGrid::writeJson(std::ostream& f) {
 	f << "{";
 
 	f << "\"m_WaypointList\"" << ":";
@@ -197,7 +197,7 @@ const void Airg::writeJson(std::ostream& f) {
 	f << "}";
 }
 
-void Airg::readJson(const char* p_AirgPath) {
+void ReasoningGrid::readJson(const char* p_AirgPath) {
 	simdjson::ondemand::parser p_Parser;
 	simdjson::padded_string p_Json = simdjson::padded_string::load(p_AirgPath);
 	simdjson::ondemand::document p_AirgDocument = p_Parser.iterate(p_Json);
@@ -236,7 +236,7 @@ int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy)
 	return c;
 }
 
-void Airg::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
+void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 	ctx->log(RC_LOG_PROGRESS, "Started building Airg.");
 	double spacing = 1;
 	// Grid = Z[Y[X[]]]
@@ -277,6 +277,7 @@ void Airg::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 					waypoint.vPos.x = x;
 					waypoint.vPos.y = y;
 					waypoint.vPos.z = z;
+					waypoint.vPos.w = 1.0;
 					m_WaypointList.push_back(waypoint);
 				}
 			}
