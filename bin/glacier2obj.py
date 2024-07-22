@@ -11,6 +11,130 @@ from enum import IntEnum
 import struct
 import binascii
 
+from bpy.props import (
+    StringProperty,
+    BoolProperty,
+    BoolVectorProperty,
+    CollectionProperty,
+    PointerProperty,
+    IntProperty,
+    EnumProperty,
+    FloatProperty,
+    FloatVectorProperty,
+    IntVectorProperty,
+)
+
+from bpy.types import (
+    Context,
+    Panel,
+    Operator,
+    PropertyGroup,
+)
+
+
+class PrimProperties(PropertyGroup):
+    """ "Stored exposed variables relevant to the RenderPrimitive files"""
+
+    lod: BoolVectorProperty(
+        name="lod_mask",
+        description="Set which LOD levels should be shown",
+        default=(True, True, True, True, True, True, True, True),
+        size=8,
+        subtype="LAYER",
+    )
+
+    material_id: IntProperty(
+        name="Material ID", description="Set the Material ID", default=0, min=0, max=255
+    )
+
+    prim_type: EnumProperty(
+        name="Type",
+        description="The type of the prim",
+        items=[
+            ("PrimType.Unknown", "Unknown", ""),
+            ("PrimType.ObjectHeader", "Object Header", "The header of an Object"),
+            ("PrimType.Mesh", "Mesh", ""),
+            ("PrimType.Decal", "Decal", ""),
+            ("PrimType.Sprites", "Sprite", ""),
+            ("PrimType.Shape", "Shape", ""),
+        ],
+        default="PrimType.Mesh",
+    )
+
+    prim_subtype: EnumProperty(
+        name="Sub-Type",
+        description="The type of the prim",
+        items=[
+            ("PrimObjectSubtype.Standard", "Standard", ""),
+            ("PrimObjectSubtype.Linked", "Linked", ""),
+            ("PrimObjectSubtype.Weighted", "Weighted", ""),
+        ],
+        default="PrimObjectSubtype.Standard",
+    )
+
+    axis_lock: BoolVectorProperty(
+        name="", description="Locks an axis", size=3, subtype="LAYER"
+    )
+
+    no_physics: BoolProperty(
+        name="No physics",
+    )
+
+    # properties found in PrimSubMesh
+
+    variant_id: IntProperty(
+        name="Variant ID", description="Set the Variant ID", default=0, min=0, max=255
+    )
+
+    z_bias: IntProperty(
+        name="Z Bias", description="Set the Z Bias", default=0, min=0, max=255
+    )
+
+    z_offset: IntProperty(
+        name="Z Offset", description="Set the Z Offset", default=0, min=0, max=255
+    )
+
+    use_mesh_color: BoolProperty(name="Use Mesh Color")
+
+    mesh_color: FloatVectorProperty(
+        name="Mesh Color",
+        description="Applies a global color to the mesh. Will replace all vertex colors!",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(1.0, 1.0, 1.0, 1.0),
+    )
+
+
+class PrimCollectionProperties(PropertyGroup):
+    bone_rig_resource_index: IntProperty(
+        name="Bone Rig Resource Index",
+        description="",
+        default=-1,
+        min=-1,
+        max=1000,
+        step=1,
+    )
+
+    has_bones: BoolProperty(
+        name="Has Bones",
+        description="The prim has bones",
+    )
+
+    has_frames: BoolProperty(
+        name="Has Frames",
+    )
+
+    is_linked: BoolProperty(
+        name="Linked",
+        description="The prim is linked",
+    )
+
+    is_weighted: BoolProperty(
+        name="Weighted",
+        description="The prim is weighted",
+    )
 
 class BinaryReader:
     def __init__(self, stream):
@@ -1972,4 +2096,14 @@ def main():
 
 
 if __name__ == "__main__":
+    classes = [
+        PrimProperties,
+        PrimCollectionProperties,
+    ]
+    for c in classes:
+        bpy.utils.register_class(c)
+    bpy.types.Mesh.prim_properties = PointerProperty(type=PrimProperties)
+    bpy.types.Collection.prim_collection_properties = PointerProperty(
+        type=PrimCollectionProperties
+    )
     main()

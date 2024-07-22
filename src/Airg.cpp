@@ -18,7 +18,7 @@ Airg::~Airg() {
 }
 
 void Airg::drawMenu() {
-	if (imguiBeginScrollArea("Airg menu", navKit->width - 250 - 10, navKit->height - 10 - 200 - 10, 250, 200, &airgScroll))
+	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 200 - 10, 250, 200, &airgScroll))
 		navKit->mouseOverMenu = true;
 	if (imguiCheck("Show Airg", showAirg))
 		showAirg = !showAirg;

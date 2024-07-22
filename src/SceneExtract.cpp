@@ -16,7 +16,7 @@ SceneExtract::SceneExtract(NavKit* navKit): navKit(navKit) {
 }
 
 void SceneExtract::drawMenu() {
-	imguiBeginScrollArea("Extract menu", 10, navKit->height - 225 - 10, 250, 225, &extractScroll);
+	imguiBeginScrollArea("Extract menu", 10, navKit->renderer->height - 225 - 10, 250, 225, &extractScroll);
 	imguiLabel("Set Hitman Directory");
 	if (imguiButton(hitmanFolderName.c_str())) {
 		char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());

@@ -119,7 +119,7 @@ void Navp::buildNavp(Navp* navp) {
 }
 	
 void Navp::drawMenu() {
-	if (imguiBeginScrollArea("Navp menu", 10, navKit->height - 225 - 935 - 15, 250, 935, &navpScroll))
+	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 225 - 935 - 15, 250, 935, &navpScroll))
 		navKit->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;

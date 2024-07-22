@@ -278,6 +278,8 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 					waypoint.vPos.y = y;
 					waypoint.vPos.z = z;
 					waypoint.vPos.w = 1.0;
+					waypoint.nVisionDataOffset = 0;
+					waypoint.nLayerIndex = 0;
 					m_WaypointList.push_back(waypoint);
 				}
 			}

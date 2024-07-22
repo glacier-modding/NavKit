@@ -27,6 +27,7 @@
 #include "Obj.h"
 #include "Airg.h"
 #include "FileUtil.h"
+#include "Renderer.h"
 
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"
@@ -52,6 +53,7 @@ class Navp;
 class Obj;
 class Airg;
 class SceneExtract;
+class Renderer;
 
 class NavKit {
 public:
@@ -62,14 +64,7 @@ public:
 	Navp* navp;
 	Obj* obj;
 	Airg* airg;
-
-	GLuint framebuffer;
-	GLuint color_rb;
-	GLuint depth_rb;
-	int width;
-	int height;
-	SDL_Window* window;
-	SDL_Renderer* renderer;
+	Renderer* renderer;
 	GameConnection* gameConnection;
 	Sample* sample;
 	BuildContext ctx;
@@ -80,13 +75,19 @@ public:
 	bool showLog;
 	int logScroll;
 	int lastLogCount;
+	int mousePos[2];
+	int origMousePos[2];
+
+	float scrollZoom;
+	bool rotate;
+	bool movedDuringRotate;
+	float keybSpeed = 22.0f;
 
 	InputGeom* geom;
 	DebugDrawGL m_dd;
 
 	int runProgram(int argc, char** argv);
 private:
-	void initFrameBuffer(int width, int height);
 	int hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
 };
 

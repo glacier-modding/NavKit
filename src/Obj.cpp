@@ -88,7 +88,7 @@ char* Obj::openSaveObjFileDialog(char* lastObjFolder) {
 }
 
 void Obj::drawMenu() {
-	if (imguiBeginScrollArea("Obj menu", navKit->width - 250 - 10, navKit->height - 10 - 205 - 15 - 200, 250, 205, &objScroll))
+	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 15 - 200, 250, 205, &objScroll))
 		navKit->mouseOverMenu = true;
 	if (imguiCheck("Show Obj", showObj))
 		showObj = !showObj;
