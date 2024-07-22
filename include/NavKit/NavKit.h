@@ -28,6 +28,7 @@
 #include "Airg.h"
 #include "FileUtil.h"
 #include "Renderer.h"
+#include "InputHandler.h"
 
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"
@@ -54,6 +55,7 @@ class Obj;
 class Airg;
 class SceneExtract;
 class Renderer;
+class InputHandler;
 
 class NavKit {
 public:
@@ -65,18 +67,18 @@ public:
 	Obj* obj;
 	Airg* airg;
 	Renderer* renderer;
+	InputHandler* inputHandler;
 	GameConnection* gameConnection;
 	Sample* sample;
 	BuildContext ctx;
 
 	bool mouseOverMenu = false;
 
+	bool done;
 	bool showMenu;
 	bool showLog;
 	int logScroll;
 	int lastLogCount;
-	int mousePos[2];
-	int origMousePos[2];
 
 	float scrollZoom;
 	bool rotate;
