@@ -23,9 +23,6 @@
 
 using std::string;
 using std::vector;
-GLuint framebuffer;
-GLuint color_rb;
-GLuint depth_rb;
 
 int main(int argc, char** argv) {
 	NavKit navKitProgram;
@@ -390,17 +387,6 @@ int NavKit::runProgram(int argc, char** argv) {
 
 		cameraPos[1] += (moveUp - moveDown) * keybSpeed * dt;
 
-		if (navp->doNavpHitTest) {
-			int newSelectedNavpArea = hitTest(&ctx, navp->navMesh, mousePos[0], mousePos[1], width, height);
-			if (newSelectedNavpArea == navp->selectedNavpArea) {
-				navp->selectedNavpArea = -1;
-			}
-			else {
-				navp->selectedNavpArea = newSelectedNavpArea;
-			}
-			navp->doNavpHitTest = false;
-		}
-
 		glFrontFace(GL_CW);
 		if (navp->navpLoaded && navp->showNavp) {
 			navp->renderNavMesh();
@@ -411,8 +397,21 @@ int NavKit::runProgram(int argc, char** argv) {
 		if (obj->objLoaded && obj->showObj) {
 			obj->renderObj(geom, &m_dd);
 		}
-		// Render GUI
 
+		if (!mouseOverMenu) {
+			if (navp->doNavpHitTest) {
+				int newSelectedNavpArea = hitTest(&ctx, navp->navMesh, mousePos[0], mousePos[1], width, height);
+				if (newSelectedNavpArea == navp->selectedNavpArea) {
+					navp->selectedNavpArea = -1;
+				}
+				else {
+					navp->selectedNavpArea = newSelectedNavpArea;
+				}
+				navp->doNavpHitTest = false;
+			}
+		}
+
+		// Render GUI
 		glFrontFace(GL_CCW);
 		glDisable(GL_DEPTH_TEST);
 		glMatrixMode(GL_PROJECTION);
@@ -435,64 +434,28 @@ int NavKit::runProgram(int argc, char** argv) {
 			snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f", cameraEulers[0], cameraEulers[1]);
 			imguiDrawText(280, height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage, imguiRGBA(255, 255, 255, 128));
 
-			imguiBeginScrollArea("Extract menu", 10, height - 225 - 10, 250, 225, &extractScroll);
-			imguiLabel("Set Hitman Directory");
-			if (imguiButton(hitmanFolderName.c_str())) {
-				char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
-				if (folderName) {
-					hitmanSet = true;
-					lastHitmanFolder = folderName;
-					hitmanFolderName = folderName;
-					hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
-				}
-			}
-			imguiLabel("Set Output Directory");
-			if (imguiButton(outputFolderName.c_str())) {
-				char* folderName = openOutputFolderDialog(lastOutputFolder.data());
-				if (folderName) {
-					outputSet = true;
-					lastOutputFolder = folderName;
-					outputFolderName = folderName;
-					outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
-				}
-			}
-			imguiLabel("Set Blender Executable");
-			if (imguiButton(blenderName.c_str())) {
-				char* blenderFileName = openSetBlenderFileDialog(lastBlenderFile.data());
-				if (blenderFileName) {
-					blenderSet = true;
-					lastBlenderFile = blenderFileName;
-					blenderName = blenderFileName;
-					blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
-				}
-			}
-			imguiLabel("Extract from game");
-			if (imguiButton("Extract", hitmanSet && outputSet && blenderSet && extractionDone.empty())) {
-				showLog = true;
-				extractScene(&ctx, lastHitmanFolder.data(), lastOutputFolder.data(), &extractionDone);// , & pfBoxes);
-			}
-			imguiEndScrollArea();
-
-
+			sceneExtract->drawMenu();
 			navp->drawMenu();
 			airg->drawMenu();
 			obj->drawMenu();
+
+			int consoleHeight = showLog ? 200 : 60;
+			if (imguiBeginScrollArea("Log", 250 + 20, 10, width - 300 - 250, consoleHeight, &logScroll))
+				mouseOverMenu = true;
+			if (imguiCheck("Show Log", showLog))
+				showLog = !showLog;
+			if (showLog) {
+				for (int i = 0; i < ctx.getLogCount(); ++i)
+					imguiLabel(ctx.getLogText(i));
+				if (lastLogCount != ctx.getLogCount()) {
+					logScroll = std::max(0, ctx.getLogCount() * 20 - 160);
+					lastLogCount = ctx.getLogCount();
+				}
+			}
+			imguiEndScrollArea();
 		}
 
-		if (extractionDone.size() == 1 && !startedObjGeneration) {
-			startedObjGeneration = true;
-			generateObj(&ctx, lastBlenderFile.data(), lastOutputFolder.data(), &extractionDone);
-		}
-		if (extractionDone.size() == 2) {
-			startedObjGeneration = false;
-			extractionDone.clear();
-			obj->objToLoad = lastOutputFolder;
-			obj->objToLoad += "\\output.obj";
-			obj->loadObj = true;
-			obj->lastObjFileName = lastOutputFolder.data();
-			obj->lastObjFileName += "output.obj";
-			geom = new InputGeom;
-		}
+		sceneExtract->finalizeExtract();
 		navp->finalizeLoad();
 		obj->finalizeLoad();
 		airg->finalizeLoad();
@@ -531,27 +494,17 @@ int NavKit::runProgram(int argc, char** argv) {
 }
 
 NavKit::NavKit() {
+	sceneExtract = new SceneExtract(this);
 	navp = new Navp(this);
 	obj = new Obj(this);
 	airg = new Airg(this);
 
+	framebuffer = 0;
+	color_rb = 0;
+	depth_rb = 0;
 	sample = new Sample_SoloMesh();
-	lastBlenderFile = "\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\"";
-	blenderName = "Choose Blender app";
-	blenderSet = false;
-
-	extractionDone;
-	startedObjGeneration = false;
-
-	hitmanFolderName = "Choose Hitman folder";
-	lastHitmanFolder = hitmanFolderName;
-	hitmanSet = false;
-	outputFolderName = "Choose Output folder";
-	lastOutputFolder = outputFolderName;
-	outputSet = false;
 	showMenu = true;
 	showLog = true;
-	extractScroll = 0;
 	height = 0;
 	width = 0;
 	logScroll = 0;
@@ -563,8 +516,10 @@ NavKit::NavKit() {
 }
 
 NavKit::~NavKit() {
+	delete sceneExtract;
 	delete navp;
 	delete obj;
+	delete airg;
 }
 
 void NavKit::initFrameBuffer(int width, int height) {
@@ -611,17 +566,4 @@ int NavKit::hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int m
 	}
 	ctx->log(RC_LOG_PROGRESS, "Selected area: %d", selectedArea);
 	return selectedArea;
-}
-
-char* NavKit::openHitmanFolderDialog(char* lastHitmanFolder) {
-	return FileUtil::openNfdFolderDialog();
-}
-
-char* NavKit::openOutputFolderDialog(char* lastOutputFolder) {
-	return FileUtil::openNfdFolderDialog();
-}
-
-char* NavKit::openSetBlenderFileDialog(char* lastBlenderFile) {
-	nfdu8filteritem_t filters[1] = { { "Exe files", "exe" } };
-	return FileUtil::openNfdLoadDialog(filters, 1);
 }

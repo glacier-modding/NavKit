@@ -3,6 +3,7 @@
 #include "NavKit.h"
 
 class NavKit;
+
 class Navp {
 public:
 	Navp(NavKit* navKit);

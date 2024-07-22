@@ -63,6 +63,7 @@ void Obj::loadObjMesh(Obj* obj) {
 	else {
 		obj->navKit->ctx.log(RC_LOG_ERROR, "Error loading obj.");
 	}
+	obj->objToLoad.clear();
 }
 
 void Obj::renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {
@@ -135,21 +136,6 @@ void Obj::drawMenu() {
 	}
 	imguiValue(polyText);
 	imguiValue(voxelText);
-	imguiEndScrollArea();
-
-	int consoleHeight = navKit->showLog ? 200 : 60;
-	if (imguiBeginScrollArea("Log", 250 + 20, 10, navKit->width - 300 - 250, consoleHeight, &navKit->logScroll))
-		navKit->mouseOverMenu = true;
-	if (imguiCheck("Show Log", navKit->showLog))
-		navKit->showLog = !navKit->showLog;
-	if (navKit->showLog) {
-		for (int i = 0; i < navKit->ctx.getLogCount(); ++i)
-			imguiLabel(navKit->ctx.getLogText(i));
-		if (navKit->lastLogCount != navKit->ctx.getLogCount()) {
-			navKit->logScroll = std::max(0, navKit->ctx.getLogCount() * 20 - 160);
-			navKit->lastLogCount = navKit->ctx.getLogCount();
-		}
-	}
 	imguiEndScrollArea();
 }
 

@@ -4,6 +4,7 @@
 
 class NavKit;
 class InputGeom;
+
 class Obj {
 public:
 	Obj(NavKit* navKit);

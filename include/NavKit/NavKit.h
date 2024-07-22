@@ -22,6 +22,7 @@
 #include "..\..\extern\vcpkg\packages\recastnavigation_x64-windows\include\recastnavigation\RecastAlloc.h"
 
 #include "ReasoningGrid.h"
+#include "SceneExtract.h"
 #include "Navp.h"
 #include "Obj.h"
 #include "Airg.h"
@@ -50,43 +51,33 @@
 class Navp;
 class Obj;
 class Airg;
+class SceneExtract;
+
 class NavKit {
 public:
 	NavKit();
 	~NavKit();
 
+	SceneExtract* sceneExtract;
 	Navp* navp;
 	Obj* obj;
 	Airg* airg;
 
+	GLuint framebuffer;
+	GLuint color_rb;
+	GLuint depth_rb;
 	int width;
 	int height;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	GameConnection* gameConnection;
 	Sample* sample;
-
 	BuildContext ctx;
 
 	bool mouseOverMenu = false;
 
-	std::string lastBlenderFile;
-	std::string blenderName;
-	bool blenderSet;
-
-	std::vector<bool> extractionDone;
-	bool startedObjGeneration;
-
-	std::string hitmanFolderName;
-	std::string lastHitmanFolder;
-	bool hitmanSet;
-	std::string outputFolderName;
-	std::string lastOutputFolder;
-	bool outputSet;
 	bool showMenu;
 	bool showLog;
-
-	int extractScroll;
 	int logScroll;
 	int lastLogCount;
 
@@ -97,8 +88,5 @@ public:
 private:
 	void initFrameBuffer(int width, int height);
 	int hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
-	char* openSetBlenderFileDialog(char* lastBlenderFile);
-	char* openHitmanFolderDialog(char* lastHitmanFolder);
-	char* openOutputFolderDialog(char* lastOutputFolder);
 };
 

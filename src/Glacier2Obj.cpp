@@ -88,7 +88,7 @@ void extractScene(BuildContext* context, char* hitmanFolder, char* outputFolder,
 
 void generateObj(BuildContext* context, char* blenderPath, char* outputFolder, std::vector<bool>* done) {
 	context->log(RC_LOG_PROGRESS, "Generating obj from prims.json.");
-	string command = "\"";
+	string command = "\"\"";
 	command += blenderPath;
 	command += "\" -b -P glacier2obj.py -- ";
 	string prims = "\"";
@@ -98,6 +98,7 @@ void generateObj(BuildContext* context, char* blenderPath, char* outputFolder, s
 	command += " \"";
 	command += outputFolder;
 	command += "\\output.obj\"\"";
+	//"D:\workspace\NavKit\output"
 	std::thread commandThread(runCommand, command, context, done);
 	commandThread.detach();
 }

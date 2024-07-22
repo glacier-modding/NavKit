@@ -6,6 +6,7 @@ class NavKit;
 class ResourceConverter;
 class ResourceGenerator;
 class ReasoningGrid;
+
 class Airg {
 public:
 	Airg(NavKit* navKit);
