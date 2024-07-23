@@ -13,23 +13,9 @@
 #include <GL/glut.h>
 #include <nfd.h>
 
-#include "NavKitConfig.h"
-#include "Glacier2Obj.h"
-#include "GameConnection.h"
-
 #include <Recast.h>
 #include <RecastDebugDraw.h>
 #include "..\..\extern\vcpkg\packages\recastnavigation_x64-windows\include\recastnavigation\RecastAlloc.h"
-
-#include "ReasoningGrid.h"
-#include "SceneExtract.h"
-#include "Navp.h"
-#include "Obj.h"
-#include "Airg.h"
-#include "FileUtil.h"
-#include "Renderer.h"
-#include "InputHandler.h"
-
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"
 #include "..\RecastDemo\imguiRenderGL.h"
@@ -41,13 +27,24 @@
 
 #include "..\NavWeakness\NavWeakness.h"
 #include "..\NavWeakness\NavPower.h"
-
 #include "..\ResourceLib_HM3\ResourceConverter.h"
 #include "..\ResourceLib_HM3\ResourceGenerator.h"
 #include "..\ResourceLib_HM3\ResourceLib.h"
 #include "..\ResourceLib_HM3\ResourceLibCommon.h"
 #include "..\ResourceLib_HM3\ResourceLib_HM3.h"
 #include "..\ResourceLib_HM3\Generated\ZHMGen.h"
+
+#include "NavKitConfig.h"
+#include "GameConnection.h"
+#include "ReasoningGrid.h"
+#include "SceneExtract.h"
+#include "Navp.h"
+#include "Obj.h"
+#include "Airg.h"
+#include "FileUtil.h"
+#include "Renderer.h"
+#include "InputHandler.h"
+#include "Gui.h"
 #undef main
 
 class Navp;
@@ -56,6 +53,7 @@ class Airg;
 class SceneExtract;
 class Renderer;
 class InputHandler;
+class Gui;
 
 class NavKit {
 public:
@@ -68,17 +66,13 @@ public:
 	Airg* airg;
 	Renderer* renderer;
 	InputHandler* inputHandler;
+	Gui* gui;
+
 	GameConnection* gameConnection;
 	Sample* sample;
 	BuildContext ctx;
 
-	bool mouseOverMenu = false;
-
 	bool done;
-	bool showMenu;
-	bool showLog;
-	int logScroll;
-	int lastLogCount;
 
 	float scrollZoom;
 	bool rotate;

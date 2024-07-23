@@ -24,7 +24,7 @@ void InputHandler::handleInput() {
 			}
 			else if (event.key.keysym.sym == SDLK_TAB)
 			{
-				navKit->showMenu = !navKit->showMenu;
+				navKit->gui->showMenu = !navKit->gui->showMenu;
 			}
 			break;
 
@@ -32,7 +32,7 @@ void InputHandler::handleInput() {
 			if (event.wheel.y < 0)
 			{
 				// wheel down
-				if (navKit->mouseOverMenu)
+				if (navKit->gui->mouseOverMenu)
 				{
 					mouseScroll++;
 				}
@@ -43,7 +43,7 @@ void InputHandler::handleInput() {
 			}
 			else
 			{
-				if (navKit->mouseOverMenu)
+				if (navKit->gui->mouseOverMenu)
 				{
 					mouseScroll--;
 				}
@@ -56,7 +56,7 @@ void InputHandler::handleInput() {
 		case SDL_MOUSEBUTTONDOWN:
 			if (event.button.button == SDL_BUTTON_RIGHT)
 			{
-				if (!navKit->mouseOverMenu)
+				if (!navKit->gui->mouseOverMenu)
 				{
 					// Rotate view
 					navKit->rotate = true;
@@ -77,7 +77,7 @@ void InputHandler::handleInput() {
 			}
 			else if (event.button.button == SDL_BUTTON_LEFT)
 			{
-				if (!navKit->mouseOverMenu)
+				if (!navKit->gui->mouseOverMenu)
 				{
 					navKit->navp->doNavpHitTest = true;
 				}
@@ -125,45 +125,19 @@ void InputHandler::handleInput() {
 	{
 		navKit->keybSpeed /= 4.0f;
 	}
+}
 
-	if (!navKit->mouseOverMenu) {
+void InputHandler::hitTest() {
+	if (!navKit->gui->mouseOverMenu) {
 		if (navKit->navp->doNavpHitTest && navKit->navp->navpLoaded && navKit->navp->showNavp) {
-			int newSelectedNavpArea = hitTest(&navKit->ctx, navKit->navp->navMesh, mousePos[0], mousePos[1], navKit->renderer->width, navKit->renderer->height);
-			if (newSelectedNavpArea == navKit->navp->selectedNavpArea) {
-				navKit->navp->selectedNavpArea = -1;
+			int newSelectedNavpAreaIndex = navKit->renderer->hitTestRender(mousePos[0], mousePos[1]);
+			if (newSelectedNavpAreaIndex == navKit->navp->selectedNavpAreaIndex) {
+				navKit->navp->selectedNavpAreaIndex = -1;
 			}
 			else {
-				navKit->navp->selectedNavpArea = newSelectedNavpArea;
+				navKit->navp->setSelectedNavpAreaIndex(newSelectedNavpAreaIndex);
 			}
 			navKit->navp->doNavpHitTest = false;
 		}
 	}
-
-}
-
-int InputHandler::hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height) {
-	glBindFramebuffer(GL_FRAMEBUFFER, navKit->renderer->framebuffer);
-	glClearColor(1.0, 1.0, 1.0, 0.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		ctx->log(RC_LOG_ERROR, "FB error, status: 0x%x", status);
-
-		printf("FB error, status: 0x%x\n", status);
-		return -1;
-	}
-	navKit->navp->renderNavMeshForHitTest();
-	GLubyte pixel[4];
-
-	glReadBuffer(GL_COLOR_ATTACHMENT0);
-	glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	int selectedArea = int(pixel[1]) * 255 + int(pixel[2]);
-	if (selectedArea == 65280) {
-		ctx->log(RC_LOG_PROGRESS, "Deselected area.");
-		return -1;
-	}
-	ctx->log(RC_LOG_PROGRESS, "Selected area: %d", selectedArea);
-	return selectedArea;
 }

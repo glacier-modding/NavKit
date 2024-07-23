@@ -182,3 +182,35 @@ void Renderer::renderFrame() {
 		navKit->obj->renderObj(navKit->geom, &navKit->m_dd);
 	}
 }
+
+void Renderer::finalizeFrame() {
+	glEnable(GL_DEPTH_TEST);
+	SDL_GL_SwapWindow(window);
+}
+
+int Renderer::hitTestRender(int mx, int my) {
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glClearColor(1.0, 1.0, 1.0, 0.0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			navKit->ctx.log(RC_LOG_ERROR, "FB error, status: 0x%x", status);
+
+			printf("FB error, status: 0x%x\n", status);
+			return -1;
+		}
+		navKit->navp->renderNavMeshForHitTest();
+
+		GLubyte pixel[4];
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
+		glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		int selectedArea = int(pixel[1]) * 255 + int(pixel[2]);
+		if (selectedArea == 65280) {
+			navKit->ctx.log(RC_LOG_PROGRESS, "Deselected area.");
+			return -1;
+		}
+		navKit->ctx.log(RC_LOG_PROGRESS, "Selected area: %d", selectedArea);
+		return selectedArea;
+	}

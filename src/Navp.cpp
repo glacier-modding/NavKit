@@ -9,8 +9,10 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 	showNavp = true;
 	doNavpHitTest = false;
 	navMesh = new NavPower::NavMesh();
-	selectedNavpArea = -1;
+	selectedNavpAreaIndex = -1;
 	navpScroll = 0;
+	stairsCheckboxValue = false;
+	loading = false;
 }
 
 Navp::~Navp() {
@@ -26,12 +28,26 @@ char* Navp::openSaveNavpFileDialog(char* lastNavpFolder) {
 	return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
 
+bool Navp::areaIsStairs(NavPower::Area area) {
+	return area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
+}
+
 void Navp::renderArea(NavPower::Area area, bool selected) {
-	if (!selected) {
-		glColor4f(0.0, 0.0, 0.5, 0.6);
+	if (areaIsStairs(area)) {
+		if (!selected) {
+			glColor4f(0.5, 0.0, 0.5, 0.6);
+		}
+		else {
+			glColor4f(1.0, 0.0, 1.0, 0.3);
+		}
 	}
 	else {
-		glColor4f(0.0, 0.5, 0.5, 0.6);
+		if (!selected) {
+			glColor4f(0.0, 0.0, 0.5, 0.6);
+		}
+		else {
+			glColor4f(0.0, 0.5, 0.5, 0.6);
+		}
 	}
 	glBegin(GL_POLYGON);
 	for (auto vertex : area.m_edges) {
@@ -51,24 +67,39 @@ void Navp::renderArea(NavPower::Area area, bool selected) {
 	glEnd();
 }
 
+void Navp::setSelectedNavpAreaIndex(int index) {
+	selectedNavpAreaIndex = index;
+	if (index != -1) {
+		int edgeIndex = 0;
+		for (auto edge : navMesh->m_areas[index].m_edges) {
+			navKit->ctx.log(RC_LOG_PROGRESS, "Vertex / Edge: %d Flags: %d", edgeIndex, edge->m_flags2);
+			edgeIndex++;
+		}
+	}
+}
+
 void Navp::renderNavMesh() {
-	int areaIndex = 0;
-	for (const NavPower::Area& area : navMesh->m_areas) {
-		renderArea(area, areaIndex == selectedNavpArea);
-		areaIndex++;
+	if (!loading) {
+		int areaIndex = 0;
+		for (const NavPower::Area& area : navMesh->m_areas) {
+			renderArea(area, areaIndex == selectedNavpAreaIndex);
+			areaIndex++;
+		}
 	}
 }
 
 void Navp::renderNavMeshForHitTest() {
-	int areaIndex = 0;
-	for (const NavPower::Area& area : navMesh->m_areas) {
-		glColor3ub(60, areaIndex / 255, areaIndex % 255);
-		areaIndex++;
-		glBegin(GL_POLYGON);
-		for (auto vertex : area.m_edges) {
-			glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
+	if (!loading) {
+		int areaIndex = 0;
+		for (const NavPower::Area& area : navMesh->m_areas) {
+			glColor3ub(60, areaIndex / 255, areaIndex % 255);
+			areaIndex++;
+			glBegin(GL_POLYGON);
+			for (auto vertex : area.m_edges) {
+				glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
+			}
+			glEnd();
 		}
-		glEnd();
 	}
 }
 
@@ -78,6 +109,7 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	msg += std::ctime(&start_time);
 	navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
+	navp->loading = true;
 	try {
 		NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
 		std::swap(*navp->navMesh, newNavMesh);
@@ -96,6 +128,8 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	msg += std::to_string(duration.count());
 	msg += " seconds";
 	navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	navp->setSelectedNavpAreaIndex(-1);
+	navp->loading = false;
 }
 
 void Navp::buildNavp(Navp* navp) {
@@ -119,8 +153,8 @@ void Navp::buildNavp(Navp* navp) {
 }
 	
 void Navp::drawMenu() {
-	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 225 - 935 - 15, 250, 935, &navpScroll))
-		navKit->mouseOverMenu = true;
+	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 225 - 995 - 15, 250, 995, &navpScroll))
+		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;
 	imguiLabel("Load Navp from file");
@@ -186,9 +220,20 @@ void Navp::drawMenu() {
 		navKit->gameConnection->SendNavp(navMesh);
 		navKit->gameConnection->HandleMessages();
 	}
+	imguiSeparatorLine();
+	imguiLabel("Selected Area");
 	char selectedNavpText[64];
-	snprintf(selectedNavpText, 64, selectedNavpArea != -1 ? "Selected Area: %d" : "Selected Area: None", selectedNavpArea);
+	snprintf(selectedNavpText, 64, selectedNavpAreaIndex != -1 ? "Area Index: %d" : "Area Index: None", selectedNavpAreaIndex);
 	imguiValue(selectedNavpText);
+	
+	if (imguiCheck("Stairs", selectedNavpAreaIndex == -1 ? false : areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex]), selectedNavpAreaIndex != -1)) {
+		if (selectedNavpAreaIndex != -1) {
+			NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) ? NavPower::AreaUsageFlags::AREA_FLAT : NavPower::AreaUsageFlags::AREA_STEPS;
+			navKit->ctx.log(RC_LOG_PROGRESS, "Setting area type to: %d", newType);
+			navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
+		}
+	}
+
 	imguiSeparatorLine();
 
 	navKit->sample->handleCommonSettings();

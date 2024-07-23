@@ -89,7 +89,7 @@ char* Obj::openSaveObjFileDialog(char* lastObjFolder) {
 
 void Obj::drawMenu() {
 	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 15 - 200, 250, 205, &objScroll))
-		navKit->mouseOverMenu = true;
+		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Obj", showObj))
 		showObj = !showObj;
 	imguiLabel("Load Obj file");
@@ -153,8 +153,8 @@ void Obj::finalizeLoad() {
 	}
 
 	if (!objLoadDone.empty()) {
-		navKit->showLog = true;
-		navKit->logScroll = 0;
+		navKit->gui->showLog = true;
+		navKit->gui->logScroll = 0;
 		navKit->ctx.dumpLog("Geom load log %s:", loadObjName.c_str());
 
 		if (navKit->geom)

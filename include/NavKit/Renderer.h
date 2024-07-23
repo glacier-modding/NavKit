@@ -11,6 +11,8 @@ public:
 	void initFrameBuffer(int width, int height);
 	bool initWindowAndRenderer();
 	void renderFrame();
+	void finalizeFrame();
+	int hitTestRender(int mx, int my);
 
 	GLuint framebuffer;
 	GLuint color_rb;
