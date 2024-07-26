@@ -1,6 +1,7 @@
 #pragma once
 
 #include "NavKit.h"
+#include "PfBoxes.h"
 
 class NavKit;
 

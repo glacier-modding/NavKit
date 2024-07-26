@@ -1,7 +1,6 @@
 #include "..\include\NavKit\Obj.h"
 
 Obj::Obj(NavKit* navKit): navKit(navKit) {
-
 	loadObjName = "Load Obj";
 	saveObjName = "Save Obj";
 	lastObjFileName = loadObjName;
@@ -11,6 +10,14 @@ Obj::Obj(NavKit* navKit): navKit(navKit) {
 	objToLoad = "";
 	loadObj = false;
 	objScroll = 0;
+	bBoxPos[0] = 0;
+	bBoxPos[1] = 0;
+	bBoxPos[2] = 0;
+	bBoxSize[0] = 600;
+	bBoxSize[1] = 600;
+	bBoxSize[2] = 600;
+	navKit->ctx.log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", bBoxPos[0], bBoxPos[1], bBoxPos[2], bBoxSize[0], bBoxSize[1], bBoxSize[2]);
+
 }
 
 void Obj::copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to) {
@@ -51,6 +58,15 @@ void Obj::loadObjMesh(Obj* obj) {
 
 	if (obj->navKit->geom->load(&obj->navKit->ctx, obj->objToLoad)) {
 		if (obj->objLoadDone.empty()) {
+			
+			obj->navKit->geom->m_meshBMin[0] = obj->bBoxPos[0] - obj->bBoxSize[0] / 2;
+			obj->navKit->geom->m_meshBMin[1] = obj->bBoxPos[1] - obj->bBoxSize[1] / 2;
+			obj->navKit->geom->m_meshBMin[2] = obj->bBoxPos[2] - obj->bBoxSize[2] / 2;
+			obj->navKit->geom->m_meshBMax[0] = obj->bBoxPos[0] + obj->bBoxSize[0] / 2;
+			obj->navKit->geom->m_meshBMax[1] = obj->bBoxPos[1] + obj->bBoxSize[1] / 2;
+			obj->navKit->geom->m_meshBMax[2] = obj->bBoxPos[2] + obj->bBoxSize[2] / 2;
+			obj->navKit->ctx.log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", obj->bBoxPos[0], obj->bBoxPos[1], obj->bBoxPos[2], obj->bBoxSize[0], obj->bBoxSize[1], obj->bBoxSize[2]);
+
 			obj->objLoadDone.push_back(true);
 			auto end = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -64,6 +80,15 @@ void Obj::loadObjMesh(Obj* obj) {
 		obj->navKit->ctx.log(RC_LOG_ERROR, "Error loading obj.");
 	}
 	obj->objToLoad.clear();
+}
+
+void Obj::setBBox(float* pos, float* size) {
+	bBoxPos[0] = pos[0];
+	bBoxPos[1] = pos[1];
+	bBoxPos[2] = pos[2];
+	bBoxSize[0] = size[0];
+	bBoxSize[1] = size[1];
+	bBoxSize[2] = size[2];
 }
 
 void Obj::renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {
@@ -161,15 +186,6 @@ void Obj::finalizeLoad() {
 		{
 			navKit->sample->handleMeshChanged(navKit->geom);
 			objLoaded = true;
-
-			//float bmin[3] = { -425.0, -332, -47 };
-			//float bmax[3] = { 326, 380, 47 };
-			//geom->m_meshBMin[0] = bmin[0];
-			//geom->m_meshBMin[1] = bmin[2];
-			//geom->m_meshBMin[2] = bmin[1];
-			//geom->m_meshBMax[0] = bmax[0];
-			//geom->m_meshBMax[1] = bmax[2];
-			//geom->m_meshBMax[2] = bmax[1];
 		}
 		objLoadDone.clear();
 	}

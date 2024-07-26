@@ -1781,7 +1781,7 @@ def load_prim(operator, context, collection, filepath, use_rig, rig_filepath):
     """Imports a mesh from the given path"""
 
     prim_name = bpy.path.display_name_from_filepath(filepath)
-    print("Started reading: " + str(prim_name) + "\n", flush=True)
+    print("Started reading: " + str(prim_name), flush=True)
 
     fp = os.fsencode(filepath)
     file = open(fp, "rb")
@@ -2006,10 +2006,36 @@ def load_prim_mesh(prim, borg, prim_name: str, mesh_index: int):
     return mesh
 
 
-def load_scenario(context, collection, path_to_prims_json):
+def load_scenario(context, collection, path_to_prims_json, path_to_pf_boxes_json):
     f = open(path_to_prims_json, "r")
     data = json.loads(f.read())
     f.close()
+    f = open(path_to_pf_boxes_json, "r")
+    pf_boxes_data = json.loads(f.read())
+    f.close()
+
+    has_pf_box = False
+    bbox = {}
+    for hash_and_entity in pf_boxes_data['entities']:
+        print(hash_and_entity)
+        pf_box_type = hash_and_entity['entity']['type']['data']
+        if pf_box_type == "PFBT_INCLUDE_MESH_COLLISION":
+            pos = hash_and_entity['entity']['position']
+            size = hash_and_entity['entity']['size']['data']
+            bbox['min'] = {}
+            bbox['max'] = {}
+            bbox['min']['x'] = pos['x'] - size['x'] / 2
+            bbox['min']['y'] = pos['y'] - size['y'] / 2
+            bbox['min']['z'] = pos['z'] - size['z'] / 2
+            bbox['max']['x'] = pos['x'] + size['x'] / 2
+            bbox['max']['y'] = pos['y'] + size['y'] / 2
+            bbox['max']['z'] = pos['z'] + size['z'] / 2
+            has_pf_box = True
+            break
+    if has_pf_box:
+        print("Pathfinding Bounding box:")
+        print(f"Min: X: {bbox['min']['x']}, Y: {bbox['min']['y']}, Z: {bbox['min']['z']}")
+        print(f"Max: X: {bbox['max']['x']}, Y: {bbox['max']['y']}, Z: {bbox['max']['z']}")
     transforms = {}
     total_prims = 0
     for hash_and_entity in data['entities']:
@@ -2024,8 +2050,7 @@ def load_scenario(context, collection, path_to_prims_json):
         total_prims += 1
     cur_prim = 0
     path_to_prim_dir = "%s\\%s" % (os.path.dirname(path_to_prims_json), "prim")
-    print("Path to prim dir:", flush=True)
-    print(path_to_prim_dir, flush=True)
+    print(f"Path to prim dir: {path_to_prim_dir}", flush=True)
     file_list = sorted(os.listdir(path_to_prim_dir))
     prim_list = [item for item in file_list if item.lower().endswith('.prim')]
     for prim_filename in prim_list:
@@ -2033,9 +2058,8 @@ def load_scenario(context, collection, path_to_prims_json):
         if prim_hash not in transforms:
             continue
         prim_path = os.path.join(path_to_prim_dir, prim_filename)
-
-        print("Loading prim:", flush=True)
-        print(prim_hash, flush=True)
+        print("", flush=True)
+        print(f"Loading prim: {prim_hash}", flush=True)
         objects = load_prim(
             None, context, collection, prim_path, False, None
         )
@@ -2054,10 +2078,20 @@ def load_scenario(context, collection, path_to_prims_json):
         for i in range(0, t_size):
             transform = transforms[prim_hash][i]
             p = transform["position"]
+            if has_pf_box and (
+                    p['x'] < bbox['min']['x'] or
+                    p['y'] < bbox['min']['y'] or
+                    p['z'] < bbox['min']['z'] or
+                    p['x'] > bbox['max']['x'] or
+                    p['y'] > bbox['max']['y'] or
+                    p['z'] > bbox['max']['z']
+                ):
+                print("[" + str(cur_prim) + "/" + str(total_prims) + "] Outside of Pathfinding Include box. Skipping prim:" + prim_hash + " #" + str(i), flush=True)
+                continue
             r = transform["rotate"]
             s = transform["scale"]
             r["roll"] = math.pi * 2 - r["roll"]
-            print("[" + str(cur_prim) + "/" + str(total_prims) + "] Transforming prim:" + prim_hash + " #" + str(i), flush=True)
+            print("[" + str(cur_prim) + "/" + str(total_prims) + "] Transforming prim: " + prim_hash + " #" + str(i), flush=True)
             cur_prim += 1
             for obj in objects:
                 if obj.data['prim_properties']['lod'][highest_lod] == 0:
@@ -2077,20 +2111,21 @@ def load_scenario(context, collection, path_to_prims_json):
 
 
 def main():
-    print("Usage: blender -b -P glacier2obj.py -- <prims.json path> <output.obj path>", flush=True)
+    print("Usage: blender -b -P glacier2obj.py -- <prims.json path> <pfBoxes.json> <output.obj path>", flush=True)
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     print(argv, flush=True)  # --> ['example', 'args', '123']
-    scenario_path = argv[0]
-    output_path = argv[1]
+    prims_path = argv[0]
+    pf_boxes_path = argv[1]
+    output_path = argv[2]
     collection = bpy.data.collections.new(
-        bpy.path.display_name_from_filepath(scenario_path)
+        bpy.path.display_name_from_filepath(prims_path)
     )
     bpy.context.scene.collection.children.link(collection)
 
-    scenario = load_scenario(bpy.context, collection, scenario_path)
+    scenario = load_scenario(bpy.context, collection, prims_path, pf_boxes_path)
     if scenario == 1:
-        print('Failed to import scenario "%s"' % scenario_path, "Importing error", "ERROR")
+        print('Failed to import scenario "%s"' % prims_path, "Importing error", "ERROR")
         return
     bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
 

@@ -126,7 +126,7 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	command += " ";
 	command += toFind;
 	command += " ";
-	command += prims;
+	command += prims;	
 	command += " ";
 	command += pfBoxes;
 	command += " ";
@@ -147,10 +147,13 @@ void SceneExtract::generateObj(char* blenderPath, char* outputFolder) {
 	prims += outputFolder;
 	prims += "\\prims.json\"";
 	command += prims;
+	std::string pfBoxes = " \"";
+	pfBoxes += outputFolder;
+	pfBoxes += "\\pfBoxes.json\"";
+	command += pfBoxes;
 	command += " \"";
 	command += outputFolder;
 	command += "\\output.obj\"\"";
-	//"D:\workspace\NavKit\output"
 	std::thread commandThread(runCommand, this, command);
 	commandThread.detach();
 }
@@ -162,6 +165,12 @@ void SceneExtract::finalizeExtract() {
 		generateObj(lastBlenderFile.data(), lastOutputFolder.data());
 	}
 	if (extractionDone.size() == 2) {
+		std::string pfBoxesFile = lastOutputFolder.data();
+		pfBoxesFile += "\\pfBoxes.json";
+		PfBoxes::PfBoxes pfBoxes = PfBoxes::PfBoxes(pfBoxesFile.data());
+		std::pair<float*, float*> bBox = pfBoxes.getPathfindingBBox();
+		navKit->geom = new InputGeom;
+		navKit->obj->setBBox(bBox.first, bBox.second);
 		startedObjGeneration = false;
 		extractionDone.clear();
 		navKit->obj->objToLoad = lastOutputFolder;
@@ -169,7 +178,7 @@ void SceneExtract::finalizeExtract() {
 		navKit->obj->loadObj = true;
 		navKit->obj->lastObjFileName = lastOutputFolder.data();
 		navKit->obj->lastObjFileName += "output.obj";
-		navKit->geom = new InputGeom;
+
 	}
 }
 

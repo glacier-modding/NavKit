@@ -145,7 +145,7 @@ bool InputGeom::loadMesh(rcContext* ctx, const std::string& filepath)
 		return false;
 	}
 
-	rcCalcBounds(m_mesh->getVerts(), m_mesh->getVertCount(), m_meshBMin, m_meshBMax);
+	//rcCalcBounds(m_mesh->getVerts(), m_mesh->getVertCount(), m_meshBMin, m_meshBMax);
 	//float bmin[3] = { -425.0, -332, -47 };
 	//float bmax[3] = { 326, 380, 47 };
 	//m_meshBMin[0] = bmin[0];

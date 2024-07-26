@@ -21,11 +21,14 @@ public:
 	std::string objToLoad;
 	std::vector<bool> objLoadDone;
 	int objScroll;
+	float bBoxPos[3];
+	float bBoxSize[3];
 
+	static void loadObjMesh(Obj* obj);
 	void copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to);
 	void saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName);
-	static void loadObjMesh(Obj* obj);
 	void renderObj(InputGeom* m_geom, DebugDrawGL* m_dd);
+	void setBBox(float* pos, float* size);
 	char* openLoadObjFileDialog(char* lastObjFolder);
 	char* openSaveObjFileDialog(char* lastObjFolder);
 	void drawMenu();

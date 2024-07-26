@@ -59,20 +59,20 @@ PfBoxes::PfBoxes::PfBoxes(char* fileName) {
 }
 
 std::pair<float*, float*> PfBoxes::PfBoxes::getPathfindingBBox() {
-    float min[3] = { -300, -300, -300 };
-    float max[3] = { 300, 300, 300 };
+    float pos[3] = { 0, 0, 0 };
+    float size[3] = { 600, 600, 600 };
     for (HashAndEntity hashAndEntity : hashesAndEntities) {
         if (hashAndEntity.entity.type.data == INCLUDE_TYPE) {
             Vec3 p = hashAndEntity.entity.position;
             Vec3 s = hashAndEntity.entity.size.data;
-            min[0] = p.x - s.x / 2;
-            min[1]  = p.y - s.y / 2;
-            min[2] = p.z - s.z / 2;
-            max[0] = p.x + s.x / 2;
-            max[1] = p.y + s.y / 2;
-            max[2] = p.z + s.z / 2;
+            pos[0] = p.x;
+            pos[1]  = p.y;
+            pos[2] = p.z;
+            size[0] = s.x;
+            size[1] = s.y;
+            size[2] = s.z;
             break;
         }
     }
-    return std::pair<float*, float*>(min, max);
+    return std::pair<float*, float*>(pos, size);
 }

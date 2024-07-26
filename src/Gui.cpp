@@ -5,7 +5,6 @@ Gui::Gui(NavKit* navKit) : navKit(navKit) {
 	showLog = true;
 	logScroll = 0;
 	lastLogCount = -1;
-	lastLogCount = -1;
 	mouseOverMenu = false;
 }
 

@@ -11,7 +11,7 @@ void InputHandler::handleInput() {
 	// Handle input events.
 	navKit->navp->doNavpHitTest = false;
 	SDL_Event event;
-
+	mouseScroll = 0;
 	while (SDL_PollEvent(&event))
 	{
 		switch (event.type)

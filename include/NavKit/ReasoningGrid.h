@@ -8,13 +8,7 @@
 #include <stdlib.h>
 #include "..\NavWeakness\NavPower.h"
 #include "..\RecastDemo\SampleInterfaces.h"
-#if _WIN32
-#define SIMD_PATH "..\\..\\extern\\simdjson\\simdjson.h"
-#else
-#define SIMD_PATH "../../extern/simdjson/simdjson.h"
-#endif
-#include SIMD_PATH
-
+#include "..\..\extern\simdjson\simdjson.h"
 
 class Vec4 {
 public:
