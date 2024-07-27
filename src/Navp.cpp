@@ -11,6 +11,13 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 	navMesh = new NavPower::NavMesh();
 	selectedNavpAreaIndex = -1;
 	navpScroll = 0;
+	bBoxPosX = 0.0;
+	bBoxPosY = 0.0;
+	bBoxPosZ = 0.0;
+	bBoxSizeX = 20.0;
+	bBoxSizeY = 20.0;
+	bBoxSizeZ = 20.0;
+
 	stairsCheckboxValue = false;
 	loading = false;
 }
@@ -69,7 +76,7 @@ void Navp::renderArea(NavPower::Area area, bool selected) {
 
 void Navp::setSelectedNavpAreaIndex(int index) {
 	selectedNavpAreaIndex = index;
-	if (index != -1) {
+	if (index != -1 && index < navMesh->m_areas.size()) {
 		int edgeIndex = 0;
 		for (auto edge : navMesh->m_areas[index].m_edges) {
 			navKit->ctx.log(RC_LOG_PROGRESS, "Vertex / Edge: %d Flags: %d", edgeIndex, edge->m_flags2);
@@ -153,7 +160,7 @@ void Navp::buildNavp(Navp* navp) {
 }
 	
 void Navp::drawMenu() {
-	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 225 - 995 - 15, 250, 995, &navpScroll))
+	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 1140 - 10, 250, 1140, &navpScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;
@@ -238,6 +245,16 @@ void Navp::drawMenu() {
 
 	navKit->sample->handleCommonSettings();
 
+	imguiSlider("Bounding Box Origin X", &bBoxPosX, -300.0f, 300.0f, 1.0f);
+	imguiSlider("Bounding Box Origin Y", &bBoxPosZ, -300.0f, 300.0f, 1.0f);
+	imguiSlider("Bounding Box Origin Z", &bBoxPosY, -300.0f, 300.0f, 1.0f);
+	imguiSlider("Bounding Box Size X", &bBoxSizeX, 1.0f, 600.0f, 1.0f);
+	imguiSlider("Bounding Box Size Y", &bBoxSizeZ, 1.0f, 600.0f, 1.0f);
+	imguiSlider("Bounding Box Size Z", &bBoxSizeY, 1.0f, 600.0f, 1.0f);
+
+	float bBoxPos[3] = { bBoxPosX, bBoxPosY, bBoxPosZ };
+	float bBoxSize[3] = { bBoxSizeX, bBoxSizeY, bBoxSizeZ };
+	navKit->obj->setBBox(bBoxPos, bBoxSize);
 	if (imguiButton("Build Navp", navpBuildDone.empty() && navKit->geom && navKit->obj->objLoaded))
 	{
 		std::thread buildNavpThread(&Navp::buildNavp, this);

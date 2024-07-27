@@ -23,6 +23,13 @@ public:
 	int navpScroll;
 	bool loading;
 
+	float bBoxPosX;
+	float bBoxPosY;
+	float bBoxPosZ;
+	float bBoxSizeX;
+	float bBoxSizeY;
+	float bBoxSizeZ;
+
 	bool stairsCheckboxValue;
 
 private:

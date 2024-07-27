@@ -89,6 +89,14 @@ void Obj::setBBox(float* pos, float* size) {
 	bBoxSize[0] = size[0];
 	bBoxSize[1] = size[1];
 	bBoxSize[2] = size[2];
+	if (navKit->geom != NULL) {
+		navKit->geom->m_meshBMin[0] = bBoxPos[0] - bBoxSize[0] / 2;
+		navKit->geom->m_meshBMin[1] = bBoxPos[1] - bBoxSize[1] / 2;
+		navKit->geom->m_meshBMin[2] = bBoxPos[2] - bBoxSize[2] / 2;
+		navKit->geom->m_meshBMax[0] = bBoxPos[0] + bBoxSize[0] / 2;
+		navKit->geom->m_meshBMax[1] = bBoxPos[1] + bBoxSize[1] / 2;
+		navKit->geom->m_meshBMax[2] = bBoxPos[2] + bBoxSize[2] / 2;
+	}
 }
 
 void Obj::renderObj(InputGeom* m_geom, DebugDrawGL* m_dd) {

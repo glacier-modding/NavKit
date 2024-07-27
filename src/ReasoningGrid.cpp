@@ -239,7 +239,7 @@ int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy)
 void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 	ctx->log(RC_LOG_PROGRESS, "Started building Airg.");
 	double spacing = 2;
-	// Grid = Z[Y[X[]]]
+	// grid is set up in this order: Z[Y[X[]]]
 	std::vector<std::vector<std::vector<int>>> grid;
 	Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
 	min.X += spacing / 2;
