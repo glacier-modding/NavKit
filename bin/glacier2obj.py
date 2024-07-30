@@ -2058,23 +2058,11 @@ def load_scenario(context, collection, path_to_prims_json, path_to_pf_boxes_json
         if prim_hash not in transforms:
             continue
         prim_path = os.path.join(path_to_prim_dir, prim_filename)
-        print("", flush=True)
-        print(f"Loading prim: {prim_hash}", flush=True)
-        objects = load_prim(
-            None, context, collection, prim_path, False, None
-        )
-        if not objects:
-            print("Error Loading prim:", flush=True)
-            print(prim_hash, flush=True)
-            return 1
-        highest_lod = -1
-        for obj in objects:
-            for j in range(0, 8):
-                if obj.data['prim_properties']['lod'][j] == 1 and highest_lod < j:
-                    highest_lod = j
+        objects = None
 
         t = transforms[prim_hash]
         t_size = len(t)
+        skip_prim = True
         for i in range(0, t_size):
             transform = transforms[prim_hash][i]
             p = transform["position"]
@@ -2088,6 +2076,25 @@ def load_scenario(context, collection, path_to_prims_json, path_to_pf_boxes_json
                 ):
                 print("[" + str(cur_prim) + "/" + str(total_prims) + "] Outside of Pathfinding Include box. Skipping prim:" + prim_hash + " #" + str(i), flush=True)
                 continue
+            else:
+                skip_prim = False
+            if not skip_prim:
+                if objects == None:
+                    print("", flush=True)
+                    print(f"Loading prim: {prim_hash}", flush=True)
+                    objects = load_prim(
+                        None, context, collection, prim_path, False, None
+                    )
+                    if not objects:
+                        print("Error Loading prim:", flush=True)
+                        print(prim_hash, flush=True)
+                        return 1
+                    highest_lod = -1
+                    for obj in objects:
+                        for j in range(0, 8):
+                            if obj.data['prim_properties']['lod'][j] == 1 and highest_lod < j:
+                                highest_lod = j
+
             r = transform["rotate"]
             s = transform["scale"]
             r["roll"] = math.pi * 2 - r["roll"]
