@@ -2089,7 +2089,7 @@ def load_scenario(context, collection, path_to_prims_json, path_to_pf_boxes_json
                         print("Error Loading prim:", flush=True)
                         print(prim_hash, flush=True)
                         return 1
-                    lowest_lod = 9
+                    lowest_lod = 7
                     for obj in objects:
                         for j in range(0, 8):
                             if obj.data['prim_properties']['lod'][j] == 1 and lowest_lod > j:

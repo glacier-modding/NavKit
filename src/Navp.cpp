@@ -160,8 +160,14 @@ void Navp::buildNavp(Navp* navp) {
 }
 	
 void Navp::drawMenu() {
-	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 1140 - 10, 250, 1140, &navpScroll))
-		navKit->gui->mouseOverMenu = true;
+	if (navKit->renderer->height > 1080) {
+		if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 1140 - 10, 250, 1140, &navpScroll))
+			navKit->gui->mouseOverMenu = true;
+	}
+	else {
+		if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 950 - 10, 250, 950, &navpScroll))
+			navKit->gui->mouseOverMenu = true;
+	}
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;
 	imguiLabel("Load Navp from file");

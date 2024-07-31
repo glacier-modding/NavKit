@@ -78,7 +78,7 @@ bool Renderer::initWindowAndRenderer() {
 	}
 
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-	std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR;
+	std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
 	std::string title = "NavKit v";
 	title += navKitVersion;
 	SDL_SetWindowTitle(window, title.data());
