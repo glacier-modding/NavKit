@@ -16,8 +16,6 @@ SceneExtract::SceneExtract(NavKit* navKit): navKit(navKit) {
 }
 
 void SceneExtract::drawMenu() {
-	//	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 15 - 200, 250, 205, &objScroll))
-
 	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 205 - 225 - 15, 250, 225, &extractScroll);
 	imguiLabel("Set Hitman Directory");
 	if (imguiButton(hitmanFolderName.c_str())) {
@@ -88,12 +86,6 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	retailFolder += hitmanFolder;
 	retailFolder += "\\Retail\"";
 	std::string gameVersion = "HM3";
-	std::string hashList = "\"";
-	hashList += hitmanFolder;
-	hashList += "\\rpkg\\hash_list.txt\"";
-	std::string toFind = "\"";
-	toFind += outputFolder;
-	toFind += "\\toFind.json\"";
 	std::string prims = "\"";
 	prims += outputFolder;
 	prims += "\\prims.json\"";
@@ -123,10 +115,6 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	command += retailFolder;
 	command += " ";
 	command += gameVersion;
-	command += " ";
-	command += hashList;
-	command += " ";
-	command += toFind;
 	command += " ";
 	command += prims;	
 	command += " ";
