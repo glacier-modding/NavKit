@@ -239,7 +239,10 @@ void Navp::drawMenu() {
 	snprintf(selectedNavpText, 64, selectedNavpAreaIndex != -1 ? "Area Index: %d" : "Area Index: None", selectedNavpAreaIndex);
 	imguiValue(selectedNavpText);
 	
-	if (imguiCheck("Stairs", selectedNavpAreaIndex == -1 ? false : areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex]), selectedNavpAreaIndex != -1)) {
+	if (imguiCheck("Stairs", 
+		selectedNavpAreaIndex == -1 ? false : 
+			(selectedNavpAreaIndex < navMesh->m_areas.size() ? areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex]) : false),
+		selectedNavpAreaIndex != -1)) {
 		if (selectedNavpAreaIndex != -1) {
 			NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) ? NavPower::AreaUsageFlags::AREA_FLAT : NavPower::AreaUsageFlags::AREA_STEPS;
 			navKit->ctx.log(RC_LOG_PROGRESS, "Setting area type to: %d", newType);

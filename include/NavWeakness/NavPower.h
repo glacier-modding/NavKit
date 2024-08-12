@@ -255,6 +255,7 @@ namespace NavPower
             void writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap);
             void readJson(simdjson::ondemand::object p_Json);
             void writeBinary(std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap);
+            void updateAdjacentDistances(Binary::Area* m_pParentArea);
             bool operator==(Edge const& other) const;
         };
 
@@ -378,6 +379,7 @@ namespace NavPower
 
         BBox CalculateBBox();
         Vec3 CalculateCentroid();
+        void updateAdjacentDistances();
     };
 
     // Helps with outputting the k-d tree as Bounding Boxes
