@@ -7,9 +7,10 @@ void PfBoxes::Vec3::readJson(simdjson::ondemand::object json) {
 }
 
 void PfBoxes::Rotation::readJson(simdjson::ondemand::object json) {
-    yaw = double(json["yaw"]);
-    pitch = double(json["pitch"]);
-    roll = double(json["roll"]);
+    x = double(json["x"]);
+    y = double(json["y"]);
+    z = double(json["z"]);
+    w = double(json["w"]);
 }
 
 void PfBoxes::PfBoxType::readJson(simdjson::ondemand::object json) {

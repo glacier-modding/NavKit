@@ -178,10 +178,10 @@ void Sample::collectSettings(BuildSettings& settings)
 
 void Sample::resetCommonSettings()
 {
-	m_cellSize = 0.3f;
+	m_cellSize = 0.1f;
 	m_cellHeight = 0.1f;
 	m_agentHeight = 2.0f;
-	m_agentRadius = 0.1f;
+	m_agentRadius = 0.0f;
 	m_agentMaxClimb = 0.4f;
 	m_agentMaxSlope = 45.0f;
 	m_regionMinSize = 0;
@@ -202,9 +202,9 @@ void Sample::handleCommonSettings()
 	
 	imguiSeparator();
 	imguiLabel("Agent");
-	imguiSlider("Height", &m_agentHeight, 0.1f, 5.0f, 0.1f);
+	imguiSlider("Height", &m_agentHeight, 0.01f, 5.0f, 0.1f);
 	imguiSlider("Radius", &m_agentRadius, 0.0f, 5.0f, 0.1f);
-	imguiSlider("Max Climb", &m_agentMaxClimb, 0.1f, 5.0f, 0.1f);
+	imguiSlider("Max Climb", &m_agentMaxClimb, 0.01f, 5.0f, 0.1f);
 	imguiSlider("Max Slope", &m_agentMaxSlope, 0.0f, 90.0f, 1.0f);
 	
 	imguiSeparator();
@@ -232,14 +232,14 @@ void Sample::handleCommonSettings()
 
 	imguiSeparator();
 	imguiLabel("Polygonization");
-	imguiSlider("Max Edge Length", &m_edgeMaxLen, 0.0f, 50.0f, 1.0f);
-	imguiSlider("Max Edge Error", &m_edgeMaxError, 0.1f, 3.0f, 0.1f);
+	imguiSlider("Max Edge Length", &m_edgeMaxLen, 0.1f, 50.0f, 0.1f);
+	imguiSlider("Max Edge Error", &m_edgeMaxError, 0.01f, 3.0f, 0.01f);
 	imguiSlider("Verts Per Poly", &m_vertsPerPoly, 3.0f, 12.0f, 1.0f);		
 
 	imguiSeparator();
 	imguiLabel("Detail Mesh");
-	imguiSlider("Sample Distance", &m_detailSampleDist, 0.0f, 16.0f, 1.0f);
-	imguiSlider("Max Sample Error", &m_detailSampleMaxError, 0.0f, 16.0f, 1.0f);
+	imguiSlider("Sample Distance", &m_detailSampleDist, 0.9f, 16.0f, 0.1f);
+	imguiSlider("Max Sample Error", &m_detailSampleMaxError, 0.01f, 16.0f, 0.01f);
 	
 	imguiSeparator();
 }

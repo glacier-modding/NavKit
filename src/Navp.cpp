@@ -14,9 +14,9 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 	bBoxPosX = 0.0;
 	bBoxPosY = 0.0;
 	bBoxPosZ = 0.0;
-	bBoxSizeX = 20.0;
-	bBoxSizeY = 20.0;
-	bBoxSizeZ = 20.0;
+	bBoxSizeX = 100.0;
+	bBoxSizeY = 100.0;
+	bBoxSizeZ = 100.0;
 
 	stairsCheckboxValue = false;
 	loading = false;
@@ -153,6 +153,7 @@ void Navp::buildNavp(Navp* navp) {
 		msg += std::to_string(duration.count());
 		msg += " seconds";
 		navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+		navp->setSelectedNavpAreaIndex(-1);
 	}
 	else {
 		navp->navKit->ctx.log(RC_LOG_ERROR, "Error building Navp");

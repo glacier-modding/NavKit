@@ -18,9 +18,10 @@ namespace PfBoxes {
     };
     class Rotation {
     public:
-        float yaw;
-        float pitch;
-        float roll;
+        float x;
+        float y;
+        float z;
+        float w;
         void readJson(simdjson::ondemand::object json);
     };
     class PfBoxType {

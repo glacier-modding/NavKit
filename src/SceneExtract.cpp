@@ -71,12 +71,12 @@ void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command) {
 	fclose(result);
 
 	if (sceneExtract->extractionDone.size() == 0) {
-		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, "Finished extracting scene from game to prims.json.");
+		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
 		sceneExtract->extractionDone.push_back(true);
 	}
 	else {
 		sceneExtract->extractionDone.push_back(true);
-		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, "Finished generating obj from prims.json.");
+		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, "Finished generating obj from alocs.json.");
 	}
 }
 
@@ -86,25 +86,25 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	retailFolder += hitmanFolder;
 	retailFolder += "\\Retail\"";
 	std::string gameVersion = "HM3";
-	std::string prims = "\"";
-	prims += outputFolder;
-	prims += "\\prims.json\"";
+	std::string alocs = "\"";
+	alocs += outputFolder;
+	alocs += "\\alocs.json\"";
 	std::string pfBoxes = "\"";
 	pfBoxes += outputFolder;
 	pfBoxes += "\\pfBoxes.json\"";
 	std::string runtimeFolder = "\"";
 	runtimeFolder += hitmanFolder;
 	runtimeFolder += "\\Runtime\"";
-	std::string primFolder = "";
-	primFolder += outputFolder;
-	primFolder += "\\prim";
+	std::string alocFolder = "";
+	alocFolder += outputFolder;
+	alocFolder += "\\aloc";
 
 	struct stat folderExists;
-	int statRC = stat(primFolder.data(), &folderExists);
+	int statRC = stat(alocFolder.data(), &folderExists);
 	if (statRC != 0)
 	{
 		if (errno == ENOENT) {
-			int status = mkdir(primFolder.c_str());
+			int status = mkdir(alocFolder.c_str());
 			if (status != 0) {
 				navKit->ctx.log(RC_LOG_ERROR, "Error creating prim folder");
 			}
@@ -116,27 +116,27 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	command += " ";
 	command += gameVersion;
 	command += " ";
-	command += prims;	
+	command += alocs;	
 	command += " ";
 	command += pfBoxes;
 	command += " ";
 	command += runtimeFolder;
 	command += " \"";
-	command += primFolder;
+	command += alocFolder;
 	command += "\" 2>&1";
 	std::thread commandThread(runCommand, this, command);
 	commandThread.detach();
 }
 
 void SceneExtract::generateObj(char* blenderPath, char* outputFolder) {
-	navKit->ctx.log(RC_LOG_PROGRESS, "Generating obj from prims.json.");
+	navKit->ctx.log(RC_LOG_PROGRESS, "Generating obj from alocs.json.");
 	std::string command = "\"\"";
 	command += blenderPath;
 	command += "\" -b -P glacier2obj.py -- ";
-	std::string prims = "\"";
-	prims += outputFolder;
-	prims += "\\prims.json\"";
-	command += prims;
+	std::string alocs = "\"";
+	alocs += outputFolder;
+	alocs += "\\alocs.json\"";
+	command += alocs;
 	std::string pfBoxes = " \"";
 	pfBoxes += outputFolder;
 	pfBoxes += "\\pfBoxes.json\"";

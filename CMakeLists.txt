@@ -12,14 +12,14 @@ endif()
 
 project(
   NavKit 
-  VERSION 0.7.1
+  VERSION 0.8.0
   DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman"
   LANGUAGES CXX)
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   set(CMAKE_CXX_EXTENSIONS OFF)
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-endif()
+endif() 
 include("${PROJECT_SOURCE_DIR}/extern/vcpkg/scripts/buildsystems/vcpkg.cmake")
 find_package(recastnavigation CONFIG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
