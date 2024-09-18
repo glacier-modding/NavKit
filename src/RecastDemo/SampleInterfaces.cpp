@@ -34,12 +34,14 @@ void BuildContext::doLog(const rcLogCategory category, const char* msg, const in
 {
 	if (!len) return;
 	if (m_messageCount >= MAX_MESSAGES) {
+		//dumpLog("%s");
 		resetLog();
 		return;
 	}
 	char* dst = &m_textPool[m_textPoolSize];
 	int n = TEXT_POOL_SIZE - m_textPoolSize;
 	if (n < 2) {
+		//dumpLog("%s");
 		resetLog();
 		dst = &m_textPool[m_textPoolSize];
 		n = TEXT_POOL_SIZE - m_textPoolSize;

@@ -1,4 +1,5 @@
 #include "..\include\NavKit\GameConnection.h"
+#include "..\include\NavKit\NavKit.h"
 
 // 46735 is a phoneword for HMSDK
 constinit const char* c_EditorHost = "127.0.0.1";
@@ -6,8 +7,7 @@ constinit const uint16_t c_EditorPort = 46735;
 
 using easywsclient::WebSocket;
 
-GameConnection::GameConnection(BuildContext* ctx) {
-    m_Ctx = ctx;
+GameConnection::GameConnection(NavKit* navKit) : navKit(navKit) {
     ConnectToGame();
 }
 
@@ -18,12 +18,12 @@ GameConnection::~GameConnection() {
 int GameConnection::ConnectToGame() {
     rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (rc) {
-        m_Ctx->log(RC_LOG_ERROR, "GameConnection: WSAStartup Failed.");
+        navKit->log(RC_LOG_ERROR, "GameConnection: WSAStartup Failed.");
         return 1;
     }
     ws.reset(WebSocket::from_url("ws://localhost:46735/socket"));
     if (!ws) {
-        m_Ctx->log(RC_LOG_ERROR, "GameConnection: Could not connect to game. Is the game running?");
+        navKit->log(RC_LOG_ERROR, "GameConnection: Could not connect to game. Is the game running?");
         return 0;
     }
     SendHelloMessage();
@@ -32,19 +32,19 @@ int GameConnection::ConnectToGame() {
 }
 void GameConnection::HandleMessages() {
     if (!ws) {
-        m_Ctx->log(RC_LOG_ERROR, "GameConnection: HandleMessages failed because the socket is not open.");
+        navKit->log(RC_LOG_ERROR, "GameConnection: HandleMessages failed because the socket is not open.");
         return;
     }
     while (ws->getReadyState() != WebSocket::CLOSED) {
         WebSocket::pointer wsp = &*ws;
         ws->poll();
         ws->dispatch([&](const std::string& message) {
-            m_Ctx->log(RC_LOG_PROGRESS, "Received message: %s", message.c_str());
+            navKit->log(RC_LOG_PROGRESS, "Received message: %s", message.c_str());
             if (message == "Done loading Navp.") { 
                 wsp->close();
             }
             if (message.find("Unknown editor message type: loadNavp") != -1) {
-                m_Ctx->log(RC_LOG_ERROR, "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
+                navKit->log(RC_LOG_ERROR, "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
                 wsp->close();
             }
         });
@@ -57,7 +57,7 @@ void GameConnection::SendHelloMessage() {
 
 void GameConnection::SendNavp(NavPower::NavMesh* navMesh) {
     if (!ws) {
-        m_Ctx->log(RC_LOG_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
+        navKit->log(RC_LOG_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
         return;
     }
     int chunkSize = 30;

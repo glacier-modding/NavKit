@@ -15,36 +15,49 @@ SceneExtract::SceneExtract(NavKit* navKit): navKit(navKit) {
 	extractScroll = 0;
 }
 
+void SceneExtract::setHitmanFolder(const char* folderName) {
+	hitmanSet = true;
+	lastHitmanFolder = folderName;
+	hitmanFolderName = folderName;
+	hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
+
+}
+
+void SceneExtract::setOutputFolder(const char* folderName) {
+	outputSet = true;
+	lastOutputFolder = folderName;
+	outputFolderName = folderName;
+	outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
+}
+
+void SceneExtract::setBlenderFile(const char* filename) {
+	blenderSet = true;
+	lastBlenderFile = filename;
+	blenderName = filename;
+	blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
+}
+
 void SceneExtract::drawMenu() {
 	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 205 - 225 - 15, 250, 225, &extractScroll);
 	imguiLabel("Set Hitman Directory");
 	if (imguiButton(hitmanFolderName.c_str())) {
 		char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
 		if (folderName) {
-			hitmanSet = true;
-			lastHitmanFolder = folderName;
-			hitmanFolderName = folderName;
-			hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
+			setHitmanFolder(folderName);
 		}
 	}
 	imguiLabel("Set Output Directory");
 	if (imguiButton(outputFolderName.c_str())) {
 		char* folderName = openOutputFolderDialog(lastOutputFolder.data());
 		if (folderName) {
-			outputSet = true;
-			lastOutputFolder = folderName;
-			outputFolderName = folderName;
-			outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
+			setOutputFolder(folderName);
 		}
 	}
 	imguiLabel("Set Blender Executable");
 	if (imguiButton(blenderName.c_str())) {
 		char* blenderFileName = openSetBlenderFileDialog(lastBlenderFile.data());
 		if (blenderFileName) {
-			blenderSet = true;
-			lastBlenderFile = blenderFileName;
-			blenderName = blenderFileName;
-			blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
+			setBlenderFile(blenderFileName);
 		}
 	}
 	imguiLabel("Extract from game");
@@ -56,14 +69,14 @@ void SceneExtract::drawMenu() {
 }
 
 void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command) {
-	char buffer[100];
+	char buffer[400];
 
 	FILE* glacier2Obj = _popen(command.data(), "r");
 	FILE* result = fopen("Glacier2Obj.log", "w");
 
 	while (fgets(buffer, sizeof(buffer), glacier2Obj) != NULL)
 	{
-		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, buffer);
+		sceneExtract->navKit->log(RC_LOG_PROGRESS, buffer);
 		fputs(buffer, result);
 
 	}
@@ -71,17 +84,17 @@ void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command) {
 	fclose(result);
 
 	if (sceneExtract->extractionDone.size() == 0) {
-		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
+		sceneExtract->navKit->log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
 		sceneExtract->extractionDone.push_back(true);
 	}
 	else {
 		sceneExtract->extractionDone.push_back(true);
-		sceneExtract->navKit->ctx.log(RC_LOG_PROGRESS, "Finished generating obj from alocs.json.");
+		sceneExtract->navKit->log(RC_LOG_PROGRESS, "Finished generating obj from alocs.json.");
 	}
 }
 
 void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
-	navKit->ctx.log(RC_LOG_PROGRESS, "Extracting scene from game.");
+	navKit->log(RC_LOG_PROGRESS, "Extracting scene from game.");
 	std::string retailFolder = "\"";
 	retailFolder += hitmanFolder;
 	retailFolder += "\\Retail\"";
@@ -106,7 +119,7 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 		if (errno == ENOENT) {
 			int status = mkdir(alocFolder.c_str());
 			if (status != 0) {
-				navKit->ctx.log(RC_LOG_ERROR, "Error creating prim folder");
+				navKit->log(RC_LOG_ERROR, "Error creating prim folder");
 			}
 		}
 	}
@@ -129,10 +142,10 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 }
 
 void SceneExtract::generateObj(char* blenderPath, char* outputFolder) {
-	navKit->ctx.log(RC_LOG_PROGRESS, "Generating obj from alocs.json.");
+	navKit->log(RC_LOG_PROGRESS, "Generating obj from alocs.json.");
 	std::string command = "\"\"";
 	command += blenderPath;
-	command += "\" -b -P glacier2obj.py -- ";
+	command += "\" -b --factory-startup -P glacier2obj.py -- ";
 	std::string alocs = "\"";
 	alocs += outputFolder;
 	alocs += "\\alocs.json\"";
@@ -173,14 +186,14 @@ void SceneExtract::finalizeExtract() {
 }
 
 char* SceneExtract::openHitmanFolderDialog(char* lastHitmanFolder) {
-	return FileUtil::openNfdFolderDialog();
+	return FileUtil::openNfdFolderDialog(lastHitmanFolder);
 }
 
 char* SceneExtract::openOutputFolderDialog(char* lastOutputFolder) {
-	return FileUtil::openNfdFolderDialog();
+	return FileUtil::openNfdFolderDialog(lastOutputFolder);
 }
 
 char* SceneExtract::openSetBlenderFileDialog(char* lastBlenderFile) {
 	nfdu8filteritem_t filters[1] = { { "Exe files", "exe" } };
-	return FileUtil::openNfdLoadDialog(filters, 1);
+	return FileUtil::openNfdLoadDialog(filters, 1, lastBlenderFile);
 }

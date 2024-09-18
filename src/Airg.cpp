@@ -40,7 +40,7 @@ void Airg::drawMenu() {
 				std::string msg = "Loading Airg.Json file: '";
 				msg += fileName;
 				msg += "'...";
-				navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+				navKit->log(RC_LOG_PROGRESS, msg.data());
 				std::thread loadAirgThread(&Airg::loadAirg, this, lastLoadAirgFile.data(), true);
 				loadAirgThread.detach();
 			}
@@ -50,7 +50,7 @@ void Airg::drawMenu() {
 				std::string msg = "Loading Airg file: '";
 				msg += fileName;
 				msg += "'...";
-				navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+				navKit->log(RC_LOG_PROGRESS, msg.data());
 				std::thread loadAirgThread(&Airg::loadAirg, this, lastLoadAirgFile.data(), false);
 				loadAirgThread.detach();
 			}
@@ -73,7 +73,7 @@ void Airg::drawMenu() {
 			msg += " file: '";
 			msg += fileName;
 			msg += "'...";
-			navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+			navKit->log(RC_LOG_PROGRESS, msg.data());
 			if (extension == "JSON") {
 				saveAirg(lastSaveAirgFile.data());
 			}
@@ -92,7 +92,7 @@ void Airg::drawMenu() {
 		delete reasoningGrid;
 		reasoningGrid = new ReasoningGrid();
 		std::string msg = "Building Airg from Navp";
-		navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+		navKit->log(RC_LOG_PROGRESS, msg.data());
 		reasoningGrid->build(navKit->navp->navMesh, &navKit->ctx);
 		airgLoaded = true;
 	}
@@ -157,7 +157,7 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Loading Airg from file at ";
 	msg += std::ctime(&start_time);
-	airg->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	airg->navKit->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
 
 	std::string jsonFileName = fileName;
@@ -174,5 +174,5 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 	msg = "Finished loading Airg in ";
 	msg += std::to_string(duration.count());
 	msg += " seconds";
-	airg->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	airg->navKit->log(RC_LOG_PROGRESS, msg.data());
 }

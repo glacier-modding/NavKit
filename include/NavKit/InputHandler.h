@@ -13,6 +13,7 @@ public:
 	int mousePos[2];
 	int origMousePos[2];
 	int mouseScroll;
+	bool resized;
 	unsigned char mouseButtonMask;
 
 private:

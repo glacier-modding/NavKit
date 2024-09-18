@@ -64,11 +64,12 @@ bool Renderer::initWindowAndRenderer() {
 
 	SDL_DisplayMode displayMode;
 	SDL_GetCurrentDisplayMode(0, &displayMode);
-	Uint32 flags = SDL_WINDOW_OPENGL;
+	Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
 	float aspect = 16.0f / 9.0f;
-	width = rcMin(displayMode.w, (int)(displayMode.h * aspect)) - 80;
-	height = displayMode.h - 80;
+	width = rcMin(displayMode.w, (int)(displayMode.h * aspect)) - 120;
+	height = displayMode.h - 120;
 	int errorCode = SDL_CreateWindowAndRenderer(width, height, flags, &window, &sdlRenderer);
+	SDL_SetWindowMinimumSize(window, 1024, 768);
 	initFrameBuffer(width, height);
 
 	if (errorCode != 0 || !window || !sdlRenderer)
@@ -105,6 +106,12 @@ bool Renderer::initWindowAndRenderer() {
 	glEnable(GL_BLEND);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	prevFrameTime = SDL_GetTicks();
+}
+
+void Renderer::handleResize() {
+	width = SDL_GetWindowSurface(window)->w;
+	height = SDL_GetWindowSurface(window)->h;
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
 }
 
 void Renderer::renderFrame() {
@@ -195,7 +202,7 @@ int Renderer::hitTestRender(int mx, int my) {
 
 		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (status != GL_FRAMEBUFFER_COMPLETE) {
-			navKit->ctx.log(RC_LOG_ERROR, "FB error, status: 0x%x", status);
+			navKit->log(RC_LOG_ERROR, "FB error, status: 0x%x", status);
 
 			printf("FB error, status: 0x%x\n", status);
 			return -1;
@@ -208,9 +215,9 @@ int Renderer::hitTestRender(int mx, int my) {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		int selectedArea = int(pixel[1]) * 255 + int(pixel[2]);
 		if (selectedArea == 65280) {
-			navKit->ctx.log(RC_LOG_PROGRESS, "Deselected area.");
+			navKit->log(RC_LOG_PROGRESS, "Deselected area.");
 			return -1;
 		}
-		navKit->ctx.log(RC_LOG_PROGRESS, "Selected area: %d", selectedArea);
+		navKit->log(RC_LOG_PROGRESS, "Selected area: %d", selectedArea);
 		return selectedArea;
 	}

@@ -10,6 +10,7 @@ public:
 	
 	void initFrameBuffer(int width, int height);
 	bool initWindowAndRenderer();
+	void handleResize();
 	void renderFrame();
 	void finalizeFrame();
 	int hitTestRender(int mx, int my);

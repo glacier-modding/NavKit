@@ -29,7 +29,7 @@ namespace FileUtil {
 		args.filterList = filters;
 		args.filterCount = filterCount;
 		args.defaultName = defaultName;
-		//args.defaultPath = defaultPath;
+		args.defaultPath = defaultPath;
 		nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);
 		if (result == NFD_OKAY)
 		{
@@ -49,7 +49,7 @@ namespace FileUtil {
 	char* openNfdFolderDialog(char* defaultPath) {
 		nfdu8char_t* outPath;
 		nfdpickfolderu8args_t args = { 0 };
-		//args.defaultPath = defaultPath;
+		args.defaultPath = defaultPath;
 		nfdresult_t result = NFD_PickFolderU8_With(&outPath, &args);
 		if (result == NFD_OKAY)
 		{

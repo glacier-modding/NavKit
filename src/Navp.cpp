@@ -79,7 +79,7 @@ void Navp::setSelectedNavpAreaIndex(int index) {
 	if (index != -1 && index < navMesh->m_areas.size()) {
 		int edgeIndex = 0;
 		for (auto edge : navMesh->m_areas[index].m_edges) {
-			navKit->ctx.log(RC_LOG_PROGRESS, "Vertex / Edge: %d Flags: %d", edgeIndex, edge->m_flags2);
+			navKit->log(RC_LOG_PROGRESS, "Vertex / Edge: %d Flags: %d", edgeIndex, edge->m_flags2);
 			edgeIndex++;
 		}
 	}
@@ -114,7 +114,7 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Loading Navp from file at ";
 	msg += std::ctime(&start_time);
-	navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	navp->navKit->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
 	navp->loading = true;
 	try {
@@ -125,7 +125,7 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 		msg = "Invalid Navp file: '";
 		msg += fileName;
 		msg += "'...";
-		navp->navKit->ctx.log(RC_LOG_ERROR, msg.data());
+		navp->navKit->log(RC_LOG_ERROR, msg.data());
 		return;
 	}
 
@@ -134,7 +134,7 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	msg = "Finished loading Navp in ";
 	msg += std::to_string(duration.count());
 	msg += " seconds";
-	navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	navp->navKit->log(RC_LOG_PROGRESS, msg.data());
 	navp->setSelectedNavpAreaIndex(-1);
 	navp->loading = false;
 }
@@ -143,7 +143,7 @@ void Navp::buildNavp(Navp* navp) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Building Navp at ";
 	msg += std::ctime(&start_time);
-	navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	navp->navKit->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
 	if (navp->navKit->sample->handleBuild()) {
 		auto end = std::chrono::high_resolution_clock::now();
@@ -152,23 +152,18 @@ void Navp::buildNavp(Navp* navp) {
 		msg = "Finished building Navp in ";
 		msg += std::to_string(duration.count());
 		msg += " seconds";
-		navp->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+		navp->navKit->log(RC_LOG_PROGRESS, msg.data());
 		navp->setSelectedNavpAreaIndex(-1);
 	}
 	else {
-		navp->navKit->ctx.log(RC_LOG_ERROR, "Error building Navp");
+		navp->navKit->log(RC_LOG_ERROR, "Error building Navp");
 	}
 }
 	
 void Navp::drawMenu() {
-	if (navKit->renderer->height > 1080) {
-		if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 1140 - 10, 250, 1140, &navpScroll))
-			navKit->gui->mouseOverMenu = true;
-	}
-	else {
-		if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - 950 - 10, 250, 950, &navpScroll))
-			navKit->gui->mouseOverMenu = true;
-	}
+	int navpMenuHeight = std::min(1140, navKit->renderer->height - 20);
+	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - navpMenuHeight - 10, 250, navpMenuHeight, &navpScroll))
+		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;
 	imguiLabel("Load Navp from file");
@@ -187,7 +182,7 @@ void Navp::drawMenu() {
 				std::string msg = "Loading Navp.json file: '";
 				msg += fileName;
 				msg += "'...";
-				navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+				navKit->log(RC_LOG_PROGRESS, msg.data());
 				std::thread loadNavMeshThread(&Navp::loadNavMesh, this, lastLoadNavpFile.data(), true);
 				loadNavMeshThread.detach();
 			}
@@ -196,7 +191,7 @@ void Navp::drawMenu() {
 				std::string msg = "Loading Navp file: '";
 				msg += fileName;
 				msg += "'...";
-				navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+				navKit->log(RC_LOG_PROGRESS, msg.data());
 				std::thread loadNavMeshThread(&Navp::loadNavMesh, this, lastLoadNavpFile.data(), false);
 				loadNavMeshThread.detach();
 			}
@@ -219,7 +214,7 @@ void Navp::drawMenu() {
 			msg += " file: '";
 			msg += fileName;
 			msg += "'...";
-			navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+			navKit->log(RC_LOG_PROGRESS, msg.data());
 			if (extension == "JSON") {
 				OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
 			}
@@ -230,7 +225,7 @@ void Navp::drawMenu() {
 	}
 	imguiLabel("Send Navp to game");
 	if (imguiButton("Send NAVP", navpLoaded)) {
-		navKit->gameConnection = new GameConnection(&navKit->ctx);
+		navKit->gameConnection = new GameConnection(navKit);
 		navKit->gameConnection->SendNavp(navMesh);
 		navKit->gameConnection->HandleMessages();
 	}
@@ -246,7 +241,7 @@ void Navp::drawMenu() {
 		selectedNavpAreaIndex != -1)) {
 		if (selectedNavpAreaIndex != -1) {
 			NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) ? NavPower::AreaUsageFlags::AREA_FLAT : NavPower::AreaUsageFlags::AREA_STEPS;
-			navKit->ctx.log(RC_LOG_PROGRESS, "Setting area type to: %d", newType);
+			navKit->log(RC_LOG_PROGRESS, "Setting area type to: %d", newType);
 			navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
 		}
 	}

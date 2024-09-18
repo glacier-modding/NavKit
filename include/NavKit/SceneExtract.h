@@ -11,21 +11,24 @@ public:
 
 	void drawMenu();
 	void finalizeExtract();
+	std::string lastBlenderFile;
+	std::string lastHitmanFolder;
+	std::string lastOutputFolder;
+	void setHitmanFolder(const char* folderName);
+	void setOutputFolder(const char* folderName);
+	void setBlenderFile(const char* fileName);
 
 private:
 	NavKit* navKit;
 
-	std::string lastBlenderFile;
 	std::string blenderName;
 	bool blenderSet;
 	int extractScroll;
 	bool startedObjGeneration;
 	std::vector<bool> extractionDone;
 	std::string hitmanFolderName;
-	std::string lastHitmanFolder;
 	bool hitmanSet;
 	std::string outputFolderName;
-	std::string lastOutputFolder;
 	bool outputSet;
 
 	static void runCommand(SceneExtract* sceneExtract, std::string command);

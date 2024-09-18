@@ -34,10 +34,14 @@ int NavKit::runProgram(int argc, char** argv) {
 	// TODO: Add mutex for tbuffer to keep processing messages in the background.
 	// std::thread handleMessagesThread([=] { HandleMessages(); });
 	// handleMessagesThread.detach();
-
+	log(RC_LOG_PROGRESS, "NavKit initialized.");
 	while (!done)
 	{
 		inputHandler->handleInput();
+		if (inputHandler->resized) {
+			renderer->handleResize();
+			inputHandler->resized = false;
+		}
 		renderer->renderFrame();
 		inputHandler->hitTest();
 		gui->drawGui();
@@ -51,6 +55,32 @@ int NavKit::runProgram(int argc, char** argv) {
 	}
 
 	return 0;
+}
+
+void NavKit::log(rcLogCategory category, const char* message, ...) {
+	std::pair<rcLogCategory, std::string> logMessage = {category, message};
+	logQueue.push(logMessage);
+}
+
+void NavKit::logRunner(NavKit* navKit) {
+	std::optional<std::pair<rcLogCategory, std::string>> message;
+	while (true) {
+		while (!navKit->logQueue.empty()) {
+			message = navKit->logQueue.try_pop();
+			if (message.has_value()) {
+				navKit->ctx.log(message.value().first, message.value().second.c_str());
+			}
+		}
+	}
+}
+
+void NavKit::loadSettings() {
+	sceneExtract->setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
+	log(rcLogCategory::RC_LOG_PROGRESS, sceneExtract->lastHitmanFolder.c_str());
+	sceneExtract->setOutputFolder(ini.GetValue("Paths", "output", "default"));
+	log(rcLogCategory::RC_LOG_PROGRESS, sceneExtract->lastOutputFolder.c_str());
+	sceneExtract->setBlenderFile(ini.GetValue("Paths", "blender", "default"));
+	log(rcLogCategory::RC_LOG_PROGRESS, sceneExtract->lastBlenderFile.c_str());
 }
 
 NavKit::NavKit() {
@@ -72,6 +102,20 @@ NavKit::NavKit() {
 	rotate = false;
 	movedDuringRotate = false;
 
+	ini.SetUnicode();
+	
+	std::thread logThread(NavKit::logRunner, this);
+	logThread.detach();
+	logQueue = rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>>();
+
+	SI_Error rc = ini.LoadFile("NavKit.ini");
+	if (rc < 0) {
+		log(rcLogCategory::RC_LOG_ERROR, "Error loading settings from NavKit.ini");
+	}
+	else {
+		log(rcLogCategory::RC_LOG_PROGRESS, "Loading settings from NavKit.ini...");
+		loadSettings();
+	}
 	done = false;
 }
 

@@ -24,9 +24,11 @@
 #include <memory>
 using easywsclient::WebSocket;
 
+class NavKit;
+
 class GameConnection {
 public:
-	GameConnection(BuildContext* ctx);
+	GameConnection(NavKit* nKit);
 	~GameConnection();
 	void SendNavp(NavPower::NavMesh* navMesh);
 	void SendChunk(std::vector<NavPower::Area> areas, int chunkIndex, int chunkCount);
@@ -34,7 +36,7 @@ public:
 private:
 	void SendHelloMessage();
 	int ConnectToGame();
-	BuildContext* m_Ctx;
+	NavKit* navKit;
 	int rc;
 	WSADATA wsaData;
 	std::unique_ptr<WebSocket> ws;

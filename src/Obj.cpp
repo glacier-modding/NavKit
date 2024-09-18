@@ -16,7 +16,7 @@ Obj::Obj(NavKit* navKit): navKit(navKit) {
 	bBoxSize[0] = 600;
 	bBoxSize[1] = 600;
 	bBoxSize[2] = 600;
-	navKit->ctx.log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", bBoxPos[0], bBoxPos[1], bBoxPos[2], bBoxSize[0], bBoxSize[1], bBoxSize[2]);
+	navKit->log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", bBoxPos[0], bBoxPos[1], bBoxPos[2], bBoxSize[0], bBoxSize[1], bBoxSize[2]);
 
 }
 
@@ -53,7 +53,7 @@ void Obj::loadObjMesh(Obj* obj) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Loading Obj from file at ";
 	msg += std::ctime(&start_time);
-	obj->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+	obj->navKit->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
 
 	if (obj->navKit->geom->load(&obj->navKit->ctx, obj->objToLoad)) {
@@ -65,7 +65,7 @@ void Obj::loadObjMesh(Obj* obj) {
 			obj->navKit->geom->m_meshBMax[0] = obj->bBoxPos[0] + obj->bBoxSize[0] / 2;
 			obj->navKit->geom->m_meshBMax[1] = obj->bBoxPos[1] + obj->bBoxSize[1] / 2;
 			obj->navKit->geom->m_meshBMax[2] = obj->bBoxPos[2] + obj->bBoxSize[2] / 2;
-			obj->navKit->ctx.log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", obj->bBoxPos[0], obj->bBoxPos[1], obj->bBoxPos[2], obj->bBoxSize[0], obj->bBoxSize[1], obj->bBoxSize[2]);
+			obj->navKit->log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", obj->bBoxPos[0], obj->bBoxPos[1], obj->bBoxPos[2], obj->bBoxSize[0], obj->bBoxSize[1], obj->bBoxSize[2]);
 
 			obj->objLoadDone.push_back(true);
 			auto end = std::chrono::high_resolution_clock::now();
@@ -73,11 +73,11 @@ void Obj::loadObjMesh(Obj* obj) {
 			msg = "Finished loading Obj in ";
 			msg += std::to_string(duration.count());
 			msg += " seconds";
-			obj->navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+			obj->navKit->log(RC_LOG_PROGRESS, msg.data());
 		}
 	}
 	else {
-		obj->navKit->ctx.log(RC_LOG_ERROR, "Error loading obj.");
+		obj->navKit->log(RC_LOG_ERROR, "Error loading obj.");
 	}
 	obj->objToLoad.clear();
 }
@@ -179,7 +179,7 @@ void Obj::finalizeLoad() {
 		std::string msg = "Loading Obj file: '";
 		msg += objToLoad;
 		msg += "'...";
-		navKit->ctx.log(RC_LOG_PROGRESS, msg.data());
+		navKit->log(RC_LOG_PROGRESS, msg.data());
 		std::thread loadObjThread(&Obj::loadObjMesh, this);
 		loadObjThread.detach();
 		loadObj = false;

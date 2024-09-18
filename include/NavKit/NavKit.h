@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <queue>
 #include <time.h>
 #include <stdlib.h>
 #include <chrono>
@@ -12,6 +13,8 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include <nfd.h>
+
+#include <SimpleIni.h>
 
 #include <Recast.h>
 #include <RecastDebugDraw.h>
@@ -34,6 +37,8 @@
 #include "..\ResourceLib_HM3\ResourceLib_HM3.h"
 #include "..\ResourceLib_HM3\Generated\ZHMGen.h"
 
+#include "..\ConcurrentQueue\ConcurrentQueue.h"
+
 #include "NavKitConfig.h"
 #include "GameConnection.h"
 #include "ReasoningGrid.h"
@@ -53,6 +58,7 @@ class Airg;
 class SceneExtract;
 class Renderer;
 class InputHandler;
+class GameConnection;
 class Gui;
 
 class NavKit {
@@ -83,7 +89,14 @@ public:
 	DebugDrawGL m_dd;
 
 	int runProgram(int argc, char** argv);
+	void log(rcLogCategory category, const char* message, ...);
 private:
 	int hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
+	rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>> logQueue;
+	void loadSettings();
+
+	static void logRunner(NavKit* navKit);
+	
+	CSimpleIniA ini;
 };
 

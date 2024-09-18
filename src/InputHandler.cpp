@@ -16,6 +16,12 @@ void InputHandler::handleInput() {
 	{
 		switch (event.type)
 		{
+		case SDL_WINDOWEVENT:
+			if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+				resized = true;
+			}
+			break;
+
 		case SDL_KEYDOWN:
 			// Handle any key presses here.
 			if (event.key.keysym.sym == SDLK_ESCAPE)

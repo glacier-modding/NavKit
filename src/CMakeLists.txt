@@ -11,6 +11,7 @@ configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit
 
 add_executable (NavKit "NavKit.cpp" "RecastDemo/imgui.cpp" "RecastDemo/imguiRenderGL.cpp" "RecastDemo/MeshLoaderObj.cpp" "RecastDemo/InputGeom.cpp" "RecastDemo/ChunkyTriMesh.cpp" "RecastDemo/SampleInterfaces.cpp" "RecastDemo/PerfTimer.cpp" "ReasoningGrid.cpp"   "RecastDemo/Sample.cpp" "RecastDemo/Sample_SoloMesh.cpp" "GameConnection.cpp" "easywsclient/easywsclient.cpp" "easywsclient/easywsclient.cpp" "easywsclient/easywsclient.cpp" "Navp.cpp" "Obj.cpp" "FileUtil.cpp" "Airg.cpp" "SceneExtract.cpp" "Renderer.cpp" "InputHandler.cpp" "Gui.cpp" "PfBoxes.cpp")
 target_include_directories(NavKit PUBLIC "${PROJECT_BINARY_DIR}")
+target_include_directories(NavKit PRIVATE ${SIMPLEINI_INCLUDE_DIRS})
 target_link_libraries(NavKit PRIVATE ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} )
 target_link_libraries(NavKit PRIVATE OpenGL::GLU)
 target_link_libraries(NavKit PRIVATE OpenGL::GL)
@@ -37,6 +38,7 @@ file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.exe" DESTINATION "${CMAKE_CURREN
 file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.py" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/Editor.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/alocgen.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/bin/NavKit.ini" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 set_target_properties(NavWeakness PROPERTIES
   IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
