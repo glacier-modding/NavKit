@@ -179,13 +179,13 @@ void Sample::collectSettings(BuildSettings& settings)
 void Sample::resetCommonSettings()
 {
 	m_cellSize = 0.1f;
-	m_cellHeight = 0.2f;
-	m_agentHeight = 2.0f;
-	m_agentRadius = 0.01f;
+	m_cellHeight = 0.1f;
+	m_agentHeight = 1.8f;
+	m_agentRadius = 0.2f;
 	m_agentMaxClimb = 0.3f;
 	m_agentMaxSlope = 45.0f;
-	m_regionMinSize = 0;
-	m_regionMergeSize = 0;
+	m_regionMinSize = 30;
+	m_regionMergeSize = 30;
 	m_edgeMaxLen = 500.0f;
 	m_edgeMaxError = 1.4f;
 	m_vertsPerPoly = 6.0f;
@@ -198,7 +198,7 @@ void Sample::handleCommonSettings()
 {
 	imguiLabel("Rasterization");
 	imguiSlider("Cell Size", &m_cellSize, 0.1f, 1.0f, 0.01f);
-	imguiSlider("Cell Height", &m_cellHeight, 0.1f, 1.0f, 0.01f);
+	imguiSlider("Cell Height", &m_cellHeight, 0.01f, 1.0f, 0.01f);
 	
 	imguiSeparator();
 	imguiLabel("Agent");

@@ -16,7 +16,7 @@ Obj::Obj(NavKit* navKit): navKit(navKit) {
 	bBoxSize[0] = 600;
 	bBoxSize[1] = 600;
 	bBoxSize[2] = 600;
-	navKit->log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", bBoxPos[0], bBoxPos[1], bBoxPos[2], bBoxSize[0], bBoxSize[1], bBoxSize[2]);
+	navKit->log(RC_LOG_PROGRESS, ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " + std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxSize[0]) + ", " + std::to_string(bBoxSize[1]) + ", " + std::to_string(bBoxSize[2]) + ")").c_str());
 
 }
 
@@ -65,7 +65,7 @@ void Obj::loadObjMesh(Obj* obj) {
 			obj->navKit->geom->m_meshBMax[0] = obj->bBoxPos[0] + obj->bBoxSize[0] / 2;
 			obj->navKit->geom->m_meshBMax[1] = obj->bBoxPos[1] + obj->bBoxSize[1] / 2;
 			obj->navKit->geom->m_meshBMax[2] = obj->bBoxPos[2] + obj->bBoxSize[2] / 2;
-			obj->navKit->log(RC_LOG_PROGRESS, "Setting bbox to (%f, %f, %f) (%f, %f, %f)", obj->bBoxPos[0], obj->bBoxPos[1], obj->bBoxPos[2], obj->bBoxSize[0], obj->bBoxSize[1], obj->bBoxSize[2]);
+			obj->navKit->log(RC_LOG_PROGRESS, ("Setting bbox to (" + std::to_string(obj->bBoxPos[0]) + ", " + std::to_string(obj->bBoxPos[1]) + ", " + std::to_string(obj->bBoxPos[2]) + ") (" + std::to_string(obj->bBoxSize[0]) + ", " + std::to_string(obj->bBoxSize[1]) + ", " + std::to_string(obj->bBoxSize[2]) + ")").c_str());
 
 			obj->objLoadDone.push_back(true);
 			auto end = std::chrono::high_resolution_clock::now();

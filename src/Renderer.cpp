@@ -202,7 +202,7 @@ int Renderer::hitTestRender(int mx, int my) {
 
 		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (status != GL_FRAMEBUFFER_COMPLETE) {
-			navKit->log(RC_LOG_ERROR, "FB error, status: 0x%x", status);
+			navKit->log(RC_LOG_ERROR, ("FB error, status: 0x" + std::to_string((int)status)).c_str());
 
 			printf("FB error, status: 0x%x\n", status);
 			return -1;
@@ -218,6 +218,6 @@ int Renderer::hitTestRender(int mx, int my) {
 			navKit->log(RC_LOG_PROGRESS, "Deselected area.");
 			return -1;
 		}
-		navKit->log(RC_LOG_PROGRESS, "Selected area: %d", selectedArea);
+		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(selectedArea)).c_str());
 		return selectedArea;
 	}

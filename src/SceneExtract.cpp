@@ -16,25 +16,45 @@ SceneExtract::SceneExtract(NavKit* navKit): navKit(navKit) {
 }
 
 void SceneExtract::setHitmanFolder(const char* folderName) {
-	hitmanSet = true;
-	lastHitmanFolder = folderName;
-	hitmanFolderName = folderName;
-	hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
-
+	if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
+		hitmanSet = true;
+		lastHitmanFolder = folderName;
+		hitmanFolderName = folderName;
+		hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting Hitman folder to: " + lastHitmanFolder).c_str());
+		navKit->ini.SetValue("Paths", "hitman", folderName);
+		navKit->ini.SaveFile("NavKit.ini");
+	} else {
+		navKit->log(rcLogCategory::RC_LOG_WARNING, ("Could not find Hitman folder: " + lastHitmanFolder).c_str());
+	}
 }
 
 void SceneExtract::setOutputFolder(const char* folderName) {
-	outputSet = true;
-	lastOutputFolder = folderName;
-	outputFolderName = folderName;
-	outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
+	if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
+		outputSet = true;
+		lastOutputFolder = folderName;
+		outputFolderName = folderName;
+		outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting output folder to: " + lastOutputFolder).c_str());
+		navKit->ini.SetValue("Paths", "output", folderName);
+		navKit->ini.SaveFile("NavKit.ini");
+	} else {
+		navKit->log(rcLogCategory::RC_LOG_WARNING, ("Could not find output folder: " + lastOutputFolder).c_str());
+	}
 }
 
 void SceneExtract::setBlenderFile(const char* filename) {
-	blenderSet = true;
-	lastBlenderFile = filename;
-	blenderName = filename;
-	blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
+	if (std::filesystem::exists(filename) && !std::filesystem::is_directory(filename)) {
+		blenderSet = true;
+		lastBlenderFile = filename;
+		blenderName = filename;
+		blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting Blender exe to: " + lastBlenderFile).c_str());
+		navKit->ini.SetValue("Paths", "blender", filename);
+		navKit->ini.SaveFile("NavKit.ini");
+	} else {
+		navKit->log(rcLogCategory::RC_LOG_WARNING, ("Could not find Blender exe: " + lastBlenderFile).c_str());
+	}
 }
 
 void SceneExtract::drawMenu() {

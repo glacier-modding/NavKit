@@ -88,15 +88,13 @@ public:
 	InputGeom* geom;
 	DebugDrawGL m_dd;
 
+	CSimpleIniA ini;
+
 	int runProgram(int argc, char** argv);
 	void log(rcLogCategory category, const char* message, ...);
 private:
-	int hitTest(BuildContext* ctx, NavPower::NavMesh* navMesh, int mx, int my, int width, int height);
-	rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>> logQueue;
-	void loadSettings();
+		rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>> logQueue;
+		void loadSettings();
 
-	static void logRunner(NavKit* navKit);
-	
-	CSimpleIniA ini;
+		static void logRunner(NavKit* navKit);
 };
-

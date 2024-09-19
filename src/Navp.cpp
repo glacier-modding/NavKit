@@ -79,7 +79,7 @@ void Navp::setSelectedNavpAreaIndex(int index) {
 	if (index != -1 && index < navMesh->m_areas.size()) {
 		int edgeIndex = 0;
 		for (auto edge : navMesh->m_areas[index].m_edges) {
-			navKit->log(RC_LOG_PROGRESS, "Vertex / Edge: %d Flags: %d", edgeIndex, edge->m_flags2);
+			navKit->log(RC_LOG_PROGRESS, ("Vertex / Edge: " + std::to_string(edgeIndex) + " Flags: " + std::to_string(edge->m_flags2)).c_str());
 			edgeIndex++;
 		}
 	}
@@ -221,6 +221,7 @@ void Navp::drawMenu() {
 			else if (extension == "NAVP") {
 				OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
 			}
+			navKit->log(RC_LOG_PROGRESS, "Done saving Navp.");
 		}
 	}
 	imguiLabel("Send Navp to game");
@@ -241,7 +242,8 @@ void Navp::drawMenu() {
 		selectedNavpAreaIndex != -1)) {
 		if (selectedNavpAreaIndex != -1) {
 			NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) ? NavPower::AreaUsageFlags::AREA_FLAT : NavPower::AreaUsageFlags::AREA_STEPS;
-			navKit->log(RC_LOG_PROGRESS, "Setting area type to: %d", newType);
+			std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) ? "AREA_FLAT" : "AREA_STEPS";
+			navKit->log(RC_LOG_PROGRESS, ("Setting area type to: " + newTypeString).c_str());
 			navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
 		}
 	}

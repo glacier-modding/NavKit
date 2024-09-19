@@ -65,22 +65,17 @@ void NavKit::log(rcLogCategory category, const char* message, ...) {
 void NavKit::logRunner(NavKit* navKit) {
 	std::optional<std::pair<rcLogCategory, std::string>> message;
 	while (true) {
-		while (!navKit->logQueue.empty()) {
-			message = navKit->logQueue.try_pop();
-			if (message.has_value()) {
-				navKit->ctx.log(message.value().first, message.value().second.c_str());
-			}
+		message = navKit->logQueue.try_pop();
+		if (message.has_value()) {
+			navKit->ctx.log(message.value().first, message.value().second.c_str());
 		}
 	}
 }
 
 void NavKit::loadSettings() {
 	sceneExtract->setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
-	log(rcLogCategory::RC_LOG_PROGRESS, sceneExtract->lastHitmanFolder.c_str());
 	sceneExtract->setOutputFolder(ini.GetValue("Paths", "output", "default"));
-	log(rcLogCategory::RC_LOG_PROGRESS, sceneExtract->lastOutputFolder.c_str());
 	sceneExtract->setBlenderFile(ini.GetValue("Paths", "blender", "default"));
-	log(rcLogCategory::RC_LOG_PROGRESS, sceneExtract->lastBlenderFile.c_str());
 }
 
 NavKit::NavKit() {

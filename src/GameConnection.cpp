@@ -39,7 +39,7 @@ void GameConnection::HandleMessages() {
         WebSocket::pointer wsp = &*ws;
         ws->poll();
         ws->dispatch([&](const std::string& message) {
-            navKit->log(RC_LOG_PROGRESS, "Received message: %s", message.c_str());
+            navKit->log(RC_LOG_PROGRESS, ("Received message: " + message).c_str());
             if (message == "Done loading Navp.") { 
                 wsp->close();
             }

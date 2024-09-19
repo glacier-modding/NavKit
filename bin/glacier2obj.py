@@ -1283,65 +1283,65 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
                 cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
                 cur.select_set(False)
 
-        
-    print("Creating PF Box")
-    mesh = bpy.data.meshes.new("PF_BOX")
-    pb_box_obj = bpy.data.objects.new("PF_BOX", mesh)
-    bm = bmesh.new()
-    bmv = []
-    x = 0
-    y = 0
-    z = 0
-    sx = .5
-    sy = .5
-    sz = .5
-    vertices = [
-        [x + sx, y + sy, z - sz],
-        [x + sx, y - sy, z - sz],
-        [x - sx, y - sy, z - sz],
-        [x - sx, y + sy, z - sz],
-        [x + sx, y + sy, z + sz],
-        [x + sx, y - sy, z + sz],
-        [x - sx, y - sy, z + sz],
-        [x - sx, y + sy, z + sz]
-    ]
-    for v in vertices:
-        bmv.append(bm.verts.new(v))
-    bm.faces.new((bmv[0], bmv[1], bmv[2], bmv[3]))  # bottom
-    bm.faces.new((bmv[4], bmv[5], bmv[6], bmv[7]))  # top
-    bm.faces.new((bmv[0], bmv[1], bmv[5], bmv[4]))  # right
-    bm.faces.new((bmv[2], bmv[3], bmv[7], bmv[6]))
-    bm.faces.new((bmv[0], bmv[3], bmv[7], bmv[4]))
-    bm.faces.new((bmv[1], bmv[2], bmv[6], bmv[5]))
-    mesh = pb_box_obj.data
-    bm.to_mesh(mesh)
-    pb_box_obj.data = mesh
-    bm.free()
-    t_size = len(pf_transforms)
-    for i in range(0, t_size):
-        transform = pf_transforms[i]
-        p = transform["position"]
-        r = transform["rotate"]
-        s = transform["scale"]
-        # print("Transforming pf box:" + " #" + str(i))
+    if len(pf_transforms) > 0:
+        print("Creating PF Box")
+        mesh = bpy.data.meshes.new("PF_BOX")
+        pb_box_obj = bpy.data.objects.new("PF_BOX", mesh)
+        bm = bmesh.new()
+        bmv = []
+        x = 0
+        y = 0
+        z = 0
+        sx = .5
+        sy = .5
+        sz = .5
+        vertices = [
+            [x + sx, y + sy, z - sz],
+            [x + sx, y - sy, z - sz],
+            [x - sx, y - sy, z - sz],
+            [x - sx, y + sy, z - sz],
+            [x + sx, y + sy, z + sz],
+            [x + sx, y - sy, z + sz],
+            [x - sx, y - sy, z + sz],
+            [x - sx, y + sy, z + sz]
+        ]
+        for v in vertices:
+            bmv.append(bm.verts.new(v))
+        bm.faces.new((bmv[0], bmv[1], bmv[2], bmv[3]))  # bottom
+        bm.faces.new((bmv[4], bmv[5], bmv[6], bmv[7]))  # top
+        bm.faces.new((bmv[0], bmv[1], bmv[5], bmv[4]))  # right
+        bm.faces.new((bmv[2], bmv[3], bmv[7], bmv[6]))
+        bm.faces.new((bmv[0], bmv[3], bmv[7], bmv[4]))
+        bm.faces.new((bmv[1], bmv[2], bmv[6], bmv[5]))
+        mesh = pb_box_obj.data
+        bm.to_mesh(mesh)
+        pb_box_obj.data = mesh
+        bm.free()
+        t_size = len(pf_transforms)
+        for i in range(0, t_size):
+            transform = pf_transforms[i]
+            p = transform["position"]
+            r = transform["rotate"]
+            s = transform["scale"]
+            # print("Transforming pf box:" + " #" + str(i))
 
-        if i != 0:
-            cur = pb_box_obj.copy()
-        else:
-            cur = pb_box_obj
-        collection.objects.link(cur)
-        cur.select_set(True)
-        cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
-        cur.rotation_mode = 'QUATERNION'
-        cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
-        cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
-        cur.select_set(False)
+            if i != 0:
+                cur = pb_box_obj.copy()
+            else:
+                cur = pb_box_obj
+            collection.objects.link(cur)
+            cur.select_set(True)
+            cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
+            cur.rotation_mode = 'QUATERNION'
+            cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
+            cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
+            cur.select_set(False)
+        # print("PfBox Exclusion entity ids:")
+        # print("[")
+        # for pf_box in pf_transforms:
+        #     print("   \"" + pf_box["id"] + "\",")
+        # print("]")
     end = timer()
-    # print("PfBox Exclusion entity ids:")
-    # print("[")
-    # for pf_box in pf_transforms:
-    #     print("   \"" + pf_box["id"] + "\",")
-    # print("]")
     print("Finished loading scenario in " + str(end - start) + " seconds.")
     return 0
 
@@ -1354,6 +1354,9 @@ def main():
     alocs_path = argv[0]
     pf_boxes_path = argv[1]
     output_path = argv[2]
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete()
+
     collection = bpy.data.collections.new(
         bpy.path.display_name_from_filepath(alocs_path)
     )
