@@ -11,6 +11,8 @@
 namespace PfBoxes {
     class Vec3 {
     public:
+        Vec3() {};
+        Vec3(float x, float y, float z) : x(x), y(y), z(z) {}
         float x;
         float y;
         float z;
@@ -18,6 +20,7 @@ namespace PfBoxes {
     };
     class Rotation {
     public:
+        Rotation() {};
         float x;
         float y;
         float z;
@@ -26,18 +29,21 @@ namespace PfBoxes {
     };
     class PfBoxType {
     public:
+        PfBoxType() {};
         std::string type;
         std::string data;
         void readJson(simdjson::ondemand::object json);
     };
     class Size {
     public:
+        Size() {};
         std::string type;
         Vec3 data;
         void readJson(simdjson::ondemand::object json);
     };
     class Entity {
     public:
+        Entity() {};
         std::string id;
         std::string name;
         Vec3 position;
@@ -48,15 +54,24 @@ namespace PfBoxes {
     };
     class HashAndEntity {
     public:
+        HashAndEntity() {};
         std::string hash;
         Entity entity;
         void readJson(simdjson::ondemand::object json);
+    };
+    class PfBox {
+    public:
+        PfBox() {};
+        PfBox(Vec3 pos, Vec3 size) : pos(pos), size(size) {}
+        Vec3 pos;
+        Vec3 size;
     };
     class PfBoxes {
     public:
         static inline const std::string INCLUDE_TYPE = "PFBT_INCLUDE_MESH_COLLISION";
         PfBoxes(char* fileName);
-        std::pair<float*, float*> getPathfindingBBox();
+        PfBox getPathfindingBBox();
         std::vector<HashAndEntity> hashesAndEntities;
     };
+    
 }

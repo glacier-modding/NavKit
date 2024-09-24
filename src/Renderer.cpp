@@ -7,10 +7,9 @@ Renderer::Renderer(NavKit* navKit) : navKit(navKit) {
 	height = 0;
 	width = 0;
 	window = 0;
-	sdlRenderer = 0;
 
-	cameraEulers[0] = 45.0, cameraEulers[1] = 0.0;
-	cameraPos[0] = 0, cameraPos[1] = 20, cameraPos[2] = 20;
+	cameraEulers[0] = 45.0, cameraEulers[1] = 45.0;
+	cameraPos[0] = -15, cameraPos[1] = 18, cameraPos[2] = 15;
 	camr = 1000;
 	origCameraEulers[0] = 0, origCameraEulers[1] = 0; // Used to compute rotational changes across frames.
 	prevFrameTime = 0;
@@ -50,29 +49,31 @@ bool Renderer::initWindowAndRenderer() {
 
 	// Enable depth buffer.
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 12);
 
 	// Set color channel depth.
-	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 2);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 2);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 2);
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 2);
 
 	// 4x MSAA.
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
 
 	SDL_DisplayMode displayMode;
 	SDL_GetCurrentDisplayMode(0, &displayMode);
-	Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+	Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
 	float aspect = 16.0f / 9.0f;
 	width = rcMin(displayMode.w, (int)(displayMode.h * aspect)) - 120;
 	height = displayMode.h - 120;
-	int errorCode = SDL_CreateWindowAndRenderer(width, height, flags, &window, &sdlRenderer);
+	window = SDL_CreateWindow("", 0, 0, width, height, flags);
+	auto context = SDL_GL_CreateContext(window);
+
 	SDL_SetWindowMinimumSize(window, 1024, 768);
 	initFrameBuffer(width, height);
 
-	if (errorCode != 0 || !window || !sdlRenderer)
+	if (!window)
 	{
 		printf("Could not initialise SDL opengl\nError: %s\n", SDL_GetError());
 		return false;
@@ -188,11 +189,72 @@ void Renderer::renderFrame() {
 	if (navKit->obj->objLoaded && navKit->obj->showObj) {
 		navKit->obj->renderObj(navKit->geom, &navKit->m_dd);
 	}
+	glClear(GL_DEPTH_BUFFER_BIT);
+	drawBounds();
+	drawAxes();
 }
 
 void Renderer::finalizeFrame() {
 	glEnable(GL_DEPTH_TEST);
 	SDL_GL_SwapWindow(window);
+}
+
+void drawLine(float* s, float* e) {
+	glDepthMask(GL_FALSE);
+	glBegin(GL_LINES);
+	glVertex3f(s[0], s[1], s[2]);
+	glVertex3f(e[0], e[1], e[2]);
+	glEnd();
+	glDepthMask(GL_TRUE);
+}
+
+void Renderer::drawBounds() {
+	glDepthMask(GL_FALSE);
+	float* p = navKit->obj->bBoxPos;
+	float* s = navKit->obj->bBoxSize;
+	float l = p[0] - s[0] / 2;
+	float r = p[0] + s[0] / 2;
+	float u = p[2] + s[2] / 2;
+	float d = p[2] - s[2] / 2;
+	float f = p[1] - s[1] / 2;
+	float b = p[1] + s[1] / 2;
+	float lfu[3] = { l, f, u };
+	float rfu[3] = { r, f, u };
+	float lbu[3] = { l, b, u };
+	float rbu[3] = { r, b, u };
+	float lfd[3] = { l, f, d };
+	float rfd[3] = { r, f, d };
+	float lbd[3] = { l, b, d };
+	float rbd[3] = { r, b, d };
+	glColor3f(0.0, 1.0, 1.0);
+	drawLine(lfu, rfu);
+	drawLine(lfu, lbu);
+	drawLine(lfu, lfd);
+	drawLine(rfu, rbu);
+	drawLine(rfu, rfd);
+	drawLine(lbu, rbu);
+	drawLine(lbu, lbd);
+	drawLine(rbu, rbd);
+	drawLine(lfd, rfd);
+	drawLine(lfd, lbd);
+	drawLine(rfd, rbd);
+	drawLine(lbd, rbd);
+	glDepthMask(GL_TRUE);
+
+}
+
+void Renderer::drawAxes() {
+	float o[3] = { 0, 0, 0 };
+	float x[3] = { 1, 0, 0 };
+	float y[3] = { 0, 1, 0 };
+	float z[3] = { 0, 0, 1 };
+	glColor3f(1.0, 0.0, 0.0);
+	drawLine(o, x);
+	glColor3f(0.0, 1.0, 0.0);
+	drawLine(o, y);
+	glColor3f(0.0, 0.0, 1.0);
+	drawLine(o, z);
+
 }
 
 int Renderer::hitTestRender(int mx, int my) {

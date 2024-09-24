@@ -191,9 +191,16 @@ void SceneExtract::finalizeExtract() {
 		std::string pfBoxesFile = lastOutputFolder.data();
 		pfBoxesFile += "\\pfBoxes.json";
 		PfBoxes::PfBoxes pfBoxes = PfBoxes::PfBoxes(pfBoxesFile.data());
-		std::pair<float*, float*> bBox = pfBoxes.getPathfindingBBox();
-		navKit->geom = new InputGeom;
-		navKit->obj->setBBox(bBox.first, bBox.second);
+		PfBoxes::PfBox bBox = pfBoxes.getPathfindingBBox();
+		if (bBox.size.x != -1 ) {
+			navKit->geom = new InputGeom;
+
+			// Swap Y and Z to go from Hitman's Z+ = Up coordinates to Recast's Y+ = Up coordinates
+			// Negate Y position to go from Hitman's Z+ = North to Recast's Y- = North
+			float pos[3] = { bBox.pos.x, bBox.pos.z, -bBox.pos.y };
+			float size[3] = { bBox.size.x, bBox.size.z, bBox.size.y };
+			navKit->obj->setBBox(pos, size);
+		}
 		startedObjGeneration = false;
 		extractionDone.clear();
 		navKit->obj->objToLoad = lastOutputFolder;

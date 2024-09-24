@@ -248,6 +248,17 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 	int gridXSize = std::ceil((max.X - min.X) / spacing);
 	int gridYSize = std::ceil((max.Y - min.Y) / spacing);
 	int gridZSize = 1;
+	m_Properties.fGridSpacing = spacing;
+	m_Properties.nGridWidth = gridYSize;
+	m_Properties.vMin.x = min.X;
+	m_Properties.vMin.y = min.Y;
+	m_Properties.vMin.z = min.Z;
+	m_Properties.vMin.w = 1;
+	m_Properties.vMax.x = max.X;
+	m_Properties.vMax.y = max.Y;
+	m_Properties.vMax.z = max.Z;
+	m_Properties.vMax.w = 1;
+
 	int wayPointIndex = 0;
 	for (int zi = 0; zi < gridZSize; zi++) {
 		std::vector<std::vector<int>> yRow;
@@ -287,7 +298,9 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 		}
 		grid.push_back(yRow);
 	}
-	
+
+	m_nNodeCount = m_WaypointList.size();
+	m_deadEndData.m_nSize = m_nNodeCount;
 	// Neighbors: South is 0, increases CCW
 	std::pair<int, int> gridIndexDiff[8]{
 		std::pair(0, -1),
@@ -319,4 +332,6 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 			}
 		}
 	}
+	std::vector<uint32_t> visibilityData(m_nNodeCount * 1001);
+	m_pVisibilityData = visibilityData;
 }

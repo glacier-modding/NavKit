@@ -180,14 +180,6 @@ void Sample_SoloMesh::handleRender()
 	
 	glDisable(GL_FOG);
 	glDepthMask(GL_FALSE);
-
-	// Draw bounds
-	const float* bmin = m_geom->getNavMeshBoundsMin();
-	const float* bmax = m_geom->getNavMeshBoundsMax();
-	duDebugDrawBoxWire(&m_dd, bmin[0],bmin[1],bmin[2], bmax[0],bmax[1],bmax[2], duRGBA(255,255,255,128), 1.0f);
-	m_dd.begin(DU_DRAW_POINTS, 5.0f);
-	m_dd.vertex(bmin[0],bmin[1],bmin[2],duRGBA(255,255,255,128));
-	m_dd.end();
 	
 	if (m_navMesh && m_navQuery &&
 		(m_drawMode == DRAWMODE_NAVMESH ||

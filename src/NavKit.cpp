@@ -76,6 +76,23 @@ void NavKit::loadSettings() {
 	sceneExtract->setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
 	sceneExtract->setOutputFolder(ini.GetValue("Paths", "output", "default"));
 	sceneExtract->setBlenderFile(ini.GetValue("Paths", "blender", "default"));
+	float bBoxPos[3] = {
+		(float)atof(ini.GetValue("BBox", "x", "0.0f")),
+		(float)atof(ini.GetValue("BBox", "y", "0.0f")),
+		(float)atof(ini.GetValue("BBox", "z", "0.0f"))
+	};
+	float bBoxSize[3] = {
+		(float)atof(ini.GetValue("BBox", "sx", "100.0f")),
+		(float)atof(ini.GetValue("BBox", "sy", "100.0f")),
+		(float)atof(ini.GetValue("BBox", "sz", "100.0f"))
+	};
+	obj->setBBox(bBoxPos, bBoxSize);
+	navp->setLastLoadFileName(ini.GetValue("Paths", "loadnavp", "default"));
+	navp->setLastSaveFileName(ini.GetValue("Paths", "savenavp", "default"));
+	airg->setLastLoadFileName(ini.GetValue("Paths", "loadairg", "default"));
+	airg->setLastSaveFileName(ini.GetValue("Paths", "saveairg", "default"));
+	obj->setLastLoadFileName(ini.GetValue("Paths", "loadobj", "default"));
+	obj->setLastSaveFileName(ini.GetValue("Paths", "saveobj", "default"));
 }
 
 NavKit::NavKit() {

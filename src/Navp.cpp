@@ -27,12 +27,12 @@ Navp::~Navp() {
 
 char* Navp::openLoadNavpFileDialog(char* lastNavpFolder) {
 	nfdu8filteritem_t filters[2] = { { "Navp files", "navp" }, { "Navp.json files", "navp.json" } };
-	return FileUtil::openNfdLoadDialog(filters, 2);
+	return FileUtil::openNfdLoadDialog(filters, 2, lastNavpFolder);
 }
 
 char* Navp::openSaveNavpFileDialog(char* lastNavpFolder) {
 	nfdu8filteritem_t filters[2] = { { "Navp files", "navp" }, { "Navp.json files", "navp.json" } };
-	return FileUtil::openNfdSaveDialog(filters, 2, "output");
+	return FileUtil::openNfdSaveDialog(filters, 2, "output", lastNavpFolder);
 }
 
 bool Navp::areaIsStairs(NavPower::Area area) {
@@ -159,6 +159,26 @@ void Navp::buildNavp(Navp* navp) {
 		navp->navKit->log(RC_LOG_ERROR, "Error building Navp");
 	}
 }
+
+void Navp::setLastLoadFileName(const char* fileName) {
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		loadNavpName = fileName;
+		lastLoadNavpFile = loadNavpName.data();
+		loadNavpName = loadNavpName.substr(loadNavpName.find_last_of("/\\") + 1);
+		navKit->ini.SetValue("Paths", "loadnavp", fileName);
+		navKit->ini.SaveFile("NavKit.ini");
+	}
+}
+	
+void Navp::setLastSaveFileName(const char* fileName) {
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		saveNavpName = fileName;
+		lastSaveNavpFile = saveNavpName.data();
+		saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
+		navKit->ini.SetValue("Paths", "savenavp", fileName);
+		navKit->ini.SaveFile("NavKit.ini");
+	}
+}
 	
 void Navp::drawMenu() {
 	int navpMenuHeight = std::min(1140, navKit->renderer->height - 20);
@@ -169,11 +189,8 @@ void Navp::drawMenu() {
 	imguiLabel("Load Navp from file");
 	if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
 		char* fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
-		if (fileName)
-		{
-			loadNavpName = fileName;
-			lastLoadNavpFile = loadNavpName.data();
-			loadNavpName = loadNavpName.substr(loadNavpName.find_last_of("/\\") + 1);
+		if (fileName){
+			setLastLoadFileName(fileName);
 			std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
@@ -200,11 +217,8 @@ void Navp::drawMenu() {
 	imguiLabel("Save Navp to file");
 	if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
 		char* fileName = openSaveNavpFileDialog(lastLoadNavpFile.data());
-		if (fileName)
-		{
-			saveNavpName = fileName;
-			lastSaveNavpFile = saveNavpName.data();
-			saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
+		if (fileName){
+			setLastSaveFileName(fileName);
 			std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 			std::string msg = "Saving Navp";
@@ -252,16 +266,20 @@ void Navp::drawMenu() {
 
 	navKit->sample->handleCommonSettings();
 
-	imguiSlider("Bounding Box Origin X", &bBoxPosX, -300.0f, 300.0f, 1.0f);
-	imguiSlider("Bounding Box Origin Y", &bBoxPosZ, -300.0f, 300.0f, 1.0f);
-	imguiSlider("Bounding Box Origin Z", &bBoxPosY, -300.0f, 300.0f, 1.0f);
-	imguiSlider("Bounding Box Size X", &bBoxSizeX, 1.0f, 600.0f, 1.0f);
-	imguiSlider("Bounding Box Size Y", &bBoxSizeZ, 1.0f, 600.0f, 1.0f);
-	imguiSlider("Bounding Box Size Z", &bBoxSizeY, 1.0f, 600.0f, 1.0f);
+	bool bboxChanged = false;
+	bboxChanged |= imguiSlider("Bounding Box Origin X", &bBoxPosX, -300.0f, 300.0f, 1.0f);
+	bboxChanged |= imguiSlider("Bounding Box Origin Y", &bBoxPosY, -300.0f, 300.0f, 1.0f);
+	bboxChanged |= imguiSlider("Bounding Box Origin Z", &bBoxPosZ, -300.0f, 300.0f, 1.0f);
+	bboxChanged |= imguiSlider("Bounding Box Size X", &bBoxSizeX, 1.0f, 600.0f, 1.0f);
+	bboxChanged |= imguiSlider("Bounding Box Size Y", &bBoxSizeY, 1.0f, 600.0f, 1.0f);
+	bboxChanged |= imguiSlider("Bounding Box Size Z", &bBoxSizeZ, 1.0f, 600.0f, 1.0f);
 
-	float bBoxPos[3] = { bBoxPosX, bBoxPosY, bBoxPosZ };
-	float bBoxSize[3] = { bBoxSizeX, bBoxSizeY, bBoxSizeZ };
-	navKit->obj->setBBox(bBoxPos, bBoxSize);
+	if (bboxChanged) 
+	{
+		float bBoxPos[3] = { bBoxPosX, bBoxPosY, bBoxPosZ };
+		float bBoxSize[3] = { bBoxSizeX, bBoxSizeY, bBoxSizeZ };
+		navKit->obj->setBBox(bBoxPos, bBoxSize);
+	}
 	if (imguiButton("Build Navp", navpBuildDone.empty() && navKit->geom && navKit->obj->objLoaded))
 	{
 		std::thread buildNavpThread(&Navp::buildNavp, this);

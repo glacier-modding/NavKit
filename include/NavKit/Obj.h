@@ -31,6 +31,8 @@ public:
 	void setBBox(float* pos, float* size);
 	char* openLoadObjFileDialog(char* lastObjFolder);
 	char* openSaveObjFileDialog(char* lastObjFolder);
+	void setLastLoadFileName(const char* fileName);
+	void setLastSaveFileName(const char* fileName);
 	void drawMenu();
 	void finalizeLoad();
 };

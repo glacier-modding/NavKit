@@ -28,7 +28,7 @@ find_package(GLUT REQUIRED)
 find_package(GLU REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(simdjson REQUIRED)
-find_package(nfd REQUIRED)
+#find_package(nfd REQUIRED)
 find_path(SIMPLEINI_INCLUDE_DIRS "ConvertUTF.c")
 
 add_subdirectory(src)

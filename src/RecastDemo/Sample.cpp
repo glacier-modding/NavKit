@@ -202,15 +202,15 @@ void Sample::handleCommonSettings()
 	
 	imguiSeparator();
 	imguiLabel("Agent");
-	imguiSlider("Height", &m_agentHeight, 0.01f, 5.0f, 0.01f);
-	imguiSlider("Radius", &m_agentRadius, 0.01f, 5.0f, 0.01f);
-	imguiSlider("Max Climb", &m_agentMaxClimb, 0.01f, 5.0f, 0.01f);
+	imguiSlider("Height", &m_agentHeight, 0.01f, 3.0f, 0.01f);
+	imguiSlider("Radius", &m_agentRadius, 0.00f, 1.0f, 0.01f);
+	imguiSlider("Max Climb", &m_agentMaxClimb, 0.01f, 1.0f, 0.01f);
 	imguiSlider("Max Slope", &m_agentMaxSlope, 0.0f, 90.0f, 1.0f);
 	
 	imguiSeparator();
 	imguiLabel("Region");
-	imguiSlider("Min Region Size", &m_regionMinSize, 0.0f, 150.0f, 1.0f);
-	imguiSlider("Merged Region Size", &m_regionMergeSize, 0.0f, 150.0f, 1.0f);
+	imguiSlider("Min Region Size", &m_regionMinSize, 0.0f, 50.0f, 1.0f);
+	imguiSlider("Merged Region Size", &m_regionMergeSize, 0.0f, 550.0f, 1.0f);
 
 	imguiSeparator();
 	imguiLabel("Partitioning");

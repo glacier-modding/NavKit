@@ -28,10 +28,13 @@ public:
 	void finalizeLoad();
 	void renderAirg();
 
+	void setLastLoadFileName(const char* fileName);
+	void setLastSaveFileName(const char* fileName);
+
 private:
 	NavKit* navKit;
 	char* openSaveAirgFileDialog(char* lastAirgFolder);
 	char* openAirgFileDialog(char* lastAirgFolder);
-	void saveAirg(char* fileName);
+	void saveAirg(std::string fileName);
 	static void loadAirg(Airg* airg, char* fileName, bool isFromJson);
 };

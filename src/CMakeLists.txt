@@ -1,10 +1,7 @@
 file(GLOB INCLUDES include/*.h)
 file(GLOB INCLUDES extern/*.h)
 include_directories(SYSTEM ${OPENGL_INCLUDE_DIR})
-include_directories(SYSTEM extern/fastlz)
-include_directories(SYSTEM extern/tinyfiledialogs)
 include_directories(SYSTEM extern)
-include_directories(SYSTEM include/RecastDemo)
 include_directories(SYSTEM include)
 
 configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h")
@@ -18,7 +15,6 @@ target_link_libraries(NavKit PRIVATE OpenGL::GL)
 target_link_libraries(NavKit PRIVATE GLUT::GLUT)
 target_link_libraries(NavKit PRIVATE GLEW::GLEW)
 target_link_libraries(NavKit PRIVATE simdjson::simdjson)
-target_link_libraries(NavKit PRIVATE nfd::nfd)
 target_link_libraries(NavKit PRIVATE RecastNavigation::Recast)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DebugUtils)
 target_link_libraries(NavKit PRIVATE RecastNavigation::Detour)
@@ -26,8 +22,10 @@ target_link_libraries(NavKit PRIVATE RecastNavigation::DetourCrowd)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourTileCache)
 target_link_libraries(NavKit PRIVATE ResourceLib_HM3)
 
+add_library(nfd::nfd SHARED IMPORTED)
 add_library(NavWeakness SHARED IMPORTED)
 add_library(ResourceLib_HM3 SHARED IMPORTED)
+target_link_libraries(NavKit PRIVATE nfd::nfd)
 target_link_libraries(NavKit PRIVATE NavWeakness)
 target_link_libraries(NavKit PRIVATE ResourceLib_HM3)
 
@@ -38,6 +36,7 @@ file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.exe" DESTINATION "${CMAKE_CURREN
 file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.py" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/Editor.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/alocgen.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/bin/nfd.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/NavKit.ini" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 set_target_properties(NavWeakness PROPERTIES
@@ -45,6 +44,13 @@ set_target_properties(NavWeakness PROPERTIES
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/NavWeakness.dll"
   IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/NavWeakness/NavWeakness.lib"
   IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll"
+)
+set_target_properties(nfd::nfd PROPERTIES
+  NFD_OVERRIDE_RECENT_WITH_DEFAULT ON
+  IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
+  IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/nfd.dll"
+  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/nativefiledialog-extended/nfd.lib"
+  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/nfd.dll"
 )
 set_target_properties(ResourceLib_HM3 PROPERTIES
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/ResourceLib_HM3.dll"

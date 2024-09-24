@@ -17,6 +17,23 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 Airg::~Airg() {
 }
 
+void Airg::setLastLoadFileName(const char* fileName) {
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		airgName = fileName;
+		lastLoadAirgFile = airgName.data();
+		airgLoaded = false;
+		airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
+	}
+}
+
+void Airg::setLastSaveFileName(const char* fileName) {
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		saveAirgName = fileName;
+		lastSaveAirgFile = saveAirgName.data();
+		saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
+	}
+}
+
 void Airg::drawMenu() {
 	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 200 - 10, 250, 200, &airgScroll))
 		navKit->gui->mouseOverMenu = true;
@@ -27,10 +44,7 @@ void Airg::drawMenu() {
 		char* fileName = openAirgFileDialog(lastLoadAirgFile.data());
 		if (fileName)
 		{
-			airgName = fileName;
-			lastLoadAirgFile = airgName.data();
-			airgLoaded = false;
-			airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
+			setLastLoadFileName(fileName);
 			std::string extension = airgName.substr(airgName.length() - 4, airgName.length());
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
@@ -41,7 +55,7 @@ void Airg::drawMenu() {
 				msg += fileName;
 				msg += "'...";
 				navKit->log(RC_LOG_PROGRESS, msg.data());
-				std::thread loadAirgThread(&Airg::loadAirg, this, lastLoadAirgFile.data(), true);
+				std::thread loadAirgThread(&Airg::loadAirg, this, fileName, true);
 				loadAirgThread.detach();
 			}
 			else if (extension == "AIRG") {
@@ -51,7 +65,7 @@ void Airg::drawMenu() {
 				msg += fileName;
 				msg += "'...";
 				navKit->log(RC_LOG_PROGRESS, msg.data());
-				std::thread loadAirgThread(&Airg::loadAirg, this, lastLoadAirgFile.data(), false);
+				std::thread loadAirgThread(&Airg::loadAirg, this, fileName, false);
 				loadAirgThread.detach();
 			}
 		}
@@ -61,27 +75,26 @@ void Airg::drawMenu() {
 		char* fileName = openSaveAirgFileDialog(lastLoadAirgFile.data());
 		if (fileName)
 		{
-			saveAirgName = fileName;
-			lastSaveAirgFile = saveAirgName.data();
-			saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
-			std::string extension = saveAirgName.substr(saveAirgName.length() - 4, saveAirgName.length());
+			setLastSaveFileName(fileName);
+			std::string fileNameString = std::string{ fileName };
+			std::string extension = fileNameString.substr(fileNameString.length() - 4, fileNameString.length());
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 			std::string msg = "Saving Airg";
 			if (extension == "JSON") {
-				msg += ".Json";
+				msg += ".json";
 			}
 			msg += " file: '";
 			msg += fileName;
 			msg += "'...";
 			navKit->log(RC_LOG_PROGRESS, msg.data());
 			if (extension == "JSON") {
-				saveAirg(lastSaveAirgFile.data());
+				saveAirg(fileName);
 			}
 			else if (extension == "AIRG") {
-				std::string tempJsonFile = lastSaveAirgFile.data();
+				std::string tempJsonFile = fileName;
 				tempJsonFile += ".temp.json";
-				saveAirg(tempJsonFile.data());
-				airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), lastSaveAirgFile.data(), false);
+				saveAirg(tempJsonFile);
+				airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), fileName, false);
 				std::filesystem::remove(tempJsonFile);
 			}
 		}
@@ -108,12 +121,12 @@ void Airg::finalizeLoad() {
 
 char* Airg::openAirgFileDialog(char* lastAirgFolder) {
 	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
-	return FileUtil::openNfdLoadDialog(filters, 2);
+	return FileUtil::openNfdLoadDialog(filters, 2, lastAirgFolder);
 }
 
 char* Airg::openSaveAirgFileDialog(char* lastAirgFolder) {
 	nfdu8filteritem_t filters[2] = { { "Airg files", "airg" }, { "Airg.json files", "airg.json" } };
-	return FileUtil::openNfdSaveDialog(filters, 2, "output");
+	return FileUtil::openNfdSaveDialog(filters, 2, "output", lastAirgFolder);
 }
 
 void Airg::renderAirg() {
@@ -143,7 +156,7 @@ void Airg::renderAirg() {
 	}
 }
 
-void Airg::saveAirg(char* fileName) {
+void Airg::saveAirg(std::string fileName) {
 	const std::string s_OutputFileName = std::filesystem::path(fileName).string();
 	std::filesystem::remove(s_OutputFileName);
 
@@ -151,6 +164,7 @@ void Airg::saveAirg(char* fileName) {
 	std::ofstream fileOutputStream(s_OutputFileName);
 	reasoningGrid->writeJson(fileOutputStream);
 	fileOutputStream.close();
+	navKit->log(RC_LOG_PROGRESS, ("Finished saving Airg to " + std::string{fileName} + ".").c_str());
 }
 
 void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
@@ -162,12 +176,17 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 
 	std::string jsonFileName = fileName;
 	if (!isFromJson) {
-		jsonFileName += ".Json";
+		std::string nameWithoutExtension = jsonFileName.substr(0, jsonFileName.length() - 5);
+
+		jsonFileName = nameWithoutExtension + ".temp.airg.json";
 		airg->airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
 	}
 	airg->reasoningGrid->readJson(jsonFileName.data());
 	if (airg->airgLoadDone.empty()) {
 		airg->airgLoadDone.push_back(true);
+	}
+	if (!isFromJson) {
+		std::filesystem::remove(jsonFileName);
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);

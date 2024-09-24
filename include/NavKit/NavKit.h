@@ -12,12 +12,14 @@
 #include <SDL_opengl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
-#include <nfd.h>
 
 #include <SimpleIni.h>
 
 #include <Recast.h>
 #include <RecastDebugDraw.h>
+
+#include "..\nativefiledialog-extended\nfd.h"
+
 #include "..\..\extern\vcpkg\packages\recastnavigation_x64-windows\include\recastnavigation\RecastAlloc.h"
 #include "..\RecastDemo\ChunkyTriMesh.h"
 #include "..\RecastDemo\imgui.h"

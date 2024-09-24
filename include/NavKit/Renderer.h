@@ -13,6 +13,8 @@ public:
 	void handleResize();
 	void renderFrame();
 	void finalizeFrame();
+	void drawBounds();
+	void drawAxes();
 	int hitTestRender(int mx, int my);
 
 	GLuint framebuffer;
@@ -32,7 +34,6 @@ public:
 	float moveUp;
 	float moveDown;
 	SDL_Window* window;
-	SDL_Renderer* sdlRenderer;
 	Uint32 prevFrameTime;
 
 private:

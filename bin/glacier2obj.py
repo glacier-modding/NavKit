@@ -1236,7 +1236,15 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
     excluded_aloc_hashes = [
         # "00C47B7553348F32"
     ]
-    for aloc_filename in aloc_list:
+    aloc_count = len(aloc_list)
+    mesh_count = 0
+    for aloc_hash in aloc_list:
+        if aloc_hash in transforms:
+            mesh_count += len(transforms[aloc_hash])
+
+    mesh_i = 0
+    for aloc_i in range(0, aloc_count):
+        aloc_filename = aloc_list[aloc_i]
         aloc_hash = aloc_filename[:-5]
         if aloc_hash not in transforms:
             continue
@@ -1269,7 +1277,8 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
             p = transform["position"]
             r = transform["rotate"]
             s = transform["scale"]
-            print("Transforming aloc:" + aloc_hash + " #" + str(i))
+            print("Transforming aloc [" + str(aloc_i + 1) + "/" + str(aloc_count) + "]: " + aloc_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "]")
+            mesh_i += 1
             for obj in objects:
                 if i != 0:
                     cur = obj.copy()

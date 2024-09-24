@@ -32,6 +32,9 @@ public:
 
 	bool stairsCheckboxValue;
 
+	void setLastLoadFileName(const char* fileName);
+	void setLastSaveFileName(const char* fileName);
+
 private:
 	NavKit* navKit;
 	static void buildNavp(Navp* navp);
