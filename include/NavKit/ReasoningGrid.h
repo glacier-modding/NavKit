@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -9,7 +10,9 @@
 #include "..\NavWeakness\NavPower.h"
 #include "..\RecastDemo\SampleInterfaces.h"
 #include "..\..\extern\simdjson\simdjson.h"
+#include "NavKit.h"
 
+class NavKit;
 class Vec4 {
 public:
 	float x;
@@ -65,5 +68,5 @@ public:
 
 	const void writeJson(std::ostream& f);
 	void readJson(const char* p_AirgPath);
-	void build(NavPower::NavMesh* navMesh, BuildContext* ctx);
+	static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* ctx);
 };

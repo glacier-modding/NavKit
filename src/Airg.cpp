@@ -89,12 +89,14 @@ void Airg::drawMenu() {
 			navKit->log(RC_LOG_PROGRESS, msg.data());
 			if (extension == "JSON") {
 				saveAirg(fileName);
+				navKit->log(RC_LOG_PROGRESS, ("Finished saving Airg to " + std::string{ fileName } + ".").c_str());
 			}
 			else if (extension == "AIRG") {
 				std::string tempJsonFile = fileName;
 				tempJsonFile += ".temp.json";
 				saveAirg(tempJsonFile);
 				airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), fileName, false);
+				navKit->log(RC_LOG_PROGRESS, ("Finished saving Airg to " + std::string{ fileName } + ".").c_str());
 				std::filesystem::remove(tempJsonFile);
 			}
 		}
@@ -106,8 +108,8 @@ void Airg::drawMenu() {
 		reasoningGrid = new ReasoningGrid();
 		std::string msg = "Building Airg from Navp";
 		navKit->log(RC_LOG_PROGRESS, msg.data());
-		reasoningGrid->build(navKit->navp->navMesh, &navKit->ctx);
-		airgLoaded = true;
+		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit);
+		buildAirgThread.detach();
 	}
 	imguiEndScrollArea();
 }
@@ -164,7 +166,6 @@ void Airg::saveAirg(std::string fileName) {
 	std::ofstream fileOutputStream(s_OutputFileName);
 	reasoningGrid->writeJson(fileOutputStream);
 	fileOutputStream.close();
-	navKit->log(RC_LOG_PROGRESS, ("Finished saving Airg to " + std::string{fileName} + ".").c_str());
 }
 
 void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {

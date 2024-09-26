@@ -30,6 +30,13 @@ public:
 	float bBoxSizeY;
 	float bBoxSizeZ;
 
+	float lastBBoxPosX;
+	float lastBBoxPosY;
+	float lastBBoxPosZ;
+	float lastBBoxSizeX;
+	float lastBBoxSizeY;
+	float lastBBoxSizeZ;
+
 	bool stairsCheckboxValue;
 
 	void setLastLoadFileName(const char* fileName);

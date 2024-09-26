@@ -236,9 +236,20 @@ int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy)
 	return c;
 }
 
-void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
-	ctx->log(RC_LOG_PROGRESS, "Started building Airg.");
+float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
+	float dx1 = x - p1.X;
+	float dy1 = y - p1.Y;
+	float dx2 = p2.X - p1.X;
+	float dy2 = p2.Y - p1.Y;
+	float dx3 = p3.X - p1.X;
+	float dy3 = p3.Y - p1.Y;
+	return p1.Z + ((dy1 * dx3 - dx1 * dy3) * (p2.Z - p1.Z) + (dx1 * dy2 - dy1 * dx2) * (p3.Z - p1.Z)) / (dx3 * dy2 - dx2 * dy3);
+}
+
+void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit) {
+	navKit->log(RC_LOG_PROGRESS, "Started building Airg.");
 	double spacing = 2;
+	double zSpacing = 1;
 	// grid is set up in this order: Z[Y[X[]]]
 	std::vector<std::vector<std::vector<int>>> grid;
 	Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
@@ -247,39 +258,78 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 	Vec3 max = navMesh->m_graphHdr->m_bbox.m_max;
 	int gridXSize = std::ceil((max.X - min.X) / spacing);
 	int gridYSize = std::ceil((max.Y - min.Y) / spacing);
-	int gridZSize = 1;
-	m_Properties.fGridSpacing = spacing;
-	m_Properties.nGridWidth = gridYSize;
-	m_Properties.vMin.x = min.X;
-	m_Properties.vMin.y = min.Y;
-	m_Properties.vMin.z = min.Z;
-	m_Properties.vMin.w = 1;
-	m_Properties.vMax.x = max.X;
-	m_Properties.vMax.y = max.Y;
-	m_Properties.vMax.z = max.Z;
-	m_Properties.vMax.w = 1;
+	int gridZSize = std::ceil((max.Z - min.Z) / zSpacing);
+	gridZSize = gridZSize > 0 ? gridZSize : 1;
+	airg->m_Properties.fGridSpacing = spacing;
+	airg->m_Properties.nGridWidth = gridYSize;
+	airg->m_Properties.vMin.x = min.X;
+	airg->m_Properties.vMin.y = min.Y;
+	airg->m_Properties.vMin.z = min.Z;
+	airg->m_Properties.vMin.w = 1;
+	airg->m_Properties.vMax.x = max.X;
+	airg->m_Properties.vMax.y = max.Y;
+	airg->m_Properties.vMax.z = max.Z;
+	airg->m_Properties.vMax.w = 1;
+
+	std::vector<double> areaZMins;
+	std::vector<double> areaZMaxes;
+
+	for (auto area : navMesh->m_areas) {
+		const int areaPointCount = area.m_edges.size();
+		double areaMinZ = 1000;
+		double areaMaxZ = -1000;
+		double pointZ = 0;
+		for (int i = 0; i < areaPointCount; i++) {
+			pointZ = area.m_edges[i]->m_pos.Z;
+			areaMinZ = areaMinZ < pointZ ? areaMinZ : pointZ;
+			areaMaxZ = areaMaxZ > pointZ ? areaMaxZ : pointZ;
+		}
+		areaZMins.push_back(areaMinZ);
+		areaZMaxes.push_back(areaMaxZ);
+	}
+	std::vector<std::vector<int>> areasByZLevel;
+	for (int zi = 0; zi < gridZSize; zi++) {
+		std::vector<int> areasForZLevel;
+		for (int areaIndex = 0; areaIndex < navMesh->m_areas.size(); areaIndex++) {
+			double minZ = min.Z + zi * zSpacing;
+			double maxZ = min.Z + (zi + 1) * zSpacing;
+			if ((areaZMins[areaIndex] >= minZ && areaZMins[areaIndex] <= maxZ) ||
+				(areaZMaxes[areaIndex] >= minZ && areaZMaxes[areaIndex] <= maxZ) ||
+				(areaZMins[areaIndex] <= minZ && areaZMaxes[areaIndex] >= maxZ)) {
+				areasForZLevel.push_back(areaIndex);
+			}
+		}
+		areasByZLevel.push_back(areasForZLevel);
+	}
 
 	int wayPointIndex = 0;
 	for (int zi = 0; zi < gridZSize; zi++) {
 		std::vector<std::vector<int>> yRow;
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Adding waypoints for Z level: " + std::to_string(zi) + " at Z: " + std::to_string(min.Z + zi * zSpacing)).c_str());
+		double minZ = min.Z + zi * zSpacing;
+		double maxZ = min.Z + (zi + 1) * zSpacing;
 		for (int yi = 0; yi < gridYSize; yi++) {
 			std::vector<int> xRow;
 			for (int xi = 0; xi < gridXSize; xi++) {
-				bool pointInArea = false;
 				double x = min.X + xi * spacing;
 				double y = min.Y + yi * spacing;
-				double z = min.Z + zi * spacing;
-				for (auto area : navMesh->m_areas) {
+				double z = min.Z + zi * zSpacing;
+				bool pointInArea = false;
+				for (int areaIndex : areasByZLevel[zi]) {
+					auto area = navMesh->m_areas[areaIndex];
 					const int areaPointCount = area.m_edges.size();
-					float areaXCoords[10];
-					float areaYCoords[10];
-					for (int i = 0; i < areaPointCount; i++) {
-						areaXCoords[i] = area.m_edges[i]->m_pos.X;
-						areaYCoords[i] = area.m_edges[i]->m_pos.Y;
-					}
-					pointInArea = pnpoly(areaPointCount, areaXCoords, areaYCoords, x, y);
-					if (pointInArea) {
-						break;
+					z = calcZ(area.m_edges[0]->m_pos, area.m_edges[1]->m_pos, area.m_edges[2]->m_pos, x, y) + 0.1;
+					if (z > (minZ - zSpacing * .8) && z < (maxZ + zSpacing * .8)) {
+						float areaXCoords[10];
+						float areaYCoords[10];
+						for (int i = 0; i < areaPointCount; i++) {
+							areaXCoords[i] = area.m_edges[i]->m_pos.X;
+							areaYCoords[i] = area.m_edges[i]->m_pos.Y;
+						}
+						pointInArea = pnpoly(areaPointCount, areaXCoords, areaYCoords, x, y);
+						if (pointInArea) {
+							break;
+						}
 					}
 				}
 				xRow.push_back(pointInArea ? wayPointIndex++ : 65535);
@@ -291,7 +341,7 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 					waypoint.vPos.w = 1.0;
 					waypoint.nVisionDataOffset = 0;
 					waypoint.nLayerIndex = 0;
-					m_WaypointList.push_back(waypoint);
+					airg->m_WaypointList.push_back(waypoint);
 				}
 			}
 			yRow.push_back(xRow);
@@ -299,8 +349,8 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 		grid.push_back(yRow);
 	}
 
-	m_nNodeCount = m_WaypointList.size();
-	m_deadEndData.m_nSize = m_nNodeCount;
+	airg->m_nNodeCount = airg->m_WaypointList.size();
+	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
 	// Neighbors: South is 0, increases CCW
 	std::pair<int, int> gridIndexDiff[8]{
 		std::pair(0, -1),
@@ -326,12 +376,14 @@ void ReasoningGrid::build(NavPower::NavMesh* navMesh, BuildContext* ctx) {
 							nyi >= 0 && nyi < gridYSize) {
 							neighborWaypointIndex = grid[zi][nyi][nxi];
 						}
-						m_WaypointList[waypointIndex].nNeighbors.push_back(neighborWaypointIndex);
+						airg->m_WaypointList[waypointIndex].nNeighbors.push_back(neighborWaypointIndex);
 					}
 				}
 			}
 		}
 	}
-	std::vector<uint32_t> visibilityData(m_nNodeCount * 1001);
-	m_pVisibilityData = visibilityData;
+	std::vector<uint32_t> visibilityData(airg->m_nNodeCount * 1001);
+	airg->m_pVisibilityData = visibilityData;
+	navKit->log(RC_LOG_PROGRESS, "Done building Airg.");
+	navKit->airg->airgLoaded = true;
 }

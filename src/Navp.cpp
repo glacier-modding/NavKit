@@ -17,6 +17,12 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 	bBoxSizeX = 100.0;
 	bBoxSizeY = 100.0;
 	bBoxSizeZ = 100.0;
+	lastBBoxPosX = 0.0;
+	lastBBoxPosY = 0.0;
+	lastBBoxPosZ = 0.0;
+	lastBBoxSizeX = 100.0;
+	lastBBoxSizeY = 100.0;
+	lastBBoxSizeZ = 100.0;
 
 	stairsCheckboxValue = false;
 	loading = false;
@@ -267,12 +273,42 @@ void Navp::drawMenu() {
 	navKit->sample->handleCommonSettings();
 
 	bool bboxChanged = false;
-	bboxChanged |= imguiSlider("Bounding Box Origin X", &bBoxPosX, -300.0f, 300.0f, 1.0f);
-	bboxChanged |= imguiSlider("Bounding Box Origin Y", &bBoxPosY, -300.0f, 300.0f, 1.0f);
-	bboxChanged |= imguiSlider("Bounding Box Origin Z", &bBoxPosZ, -300.0f, 300.0f, 1.0f);
-	bboxChanged |= imguiSlider("Bounding Box Size X", &bBoxSizeX, 1.0f, 600.0f, 1.0f);
-	bboxChanged |= imguiSlider("Bounding Box Size Y", &bBoxSizeY, 1.0f, 600.0f, 1.0f);
-	bboxChanged |= imguiSlider("Bounding Box Size Z", &bBoxSizeZ, 1.0f, 600.0f, 1.0f);
+	if (imguiSlider("Bounding Box Origin X", &bBoxPosX, -300.0f, 300.0f, 1.0f)) {
+		if (lastBBoxPosX != bBoxPosX) {
+			bboxChanged = true;
+			lastBBoxPosX = bBoxPosX;
+		}
+	}
+	if (imguiSlider("Bounding Box Origin Y", &bBoxPosY, -300.0f, 300.0f, 1.0f)) {
+		if (lastBBoxPosY != bBoxPosY) {
+			bboxChanged = true;
+			lastBBoxPosY = bBoxPosY;
+		}
+	}
+	if (imguiSlider("Bounding Box Origin Z", &bBoxPosZ, -300.0f, 300.0f, 1.0f)) {
+		if (lastBBoxPosZ != bBoxPosZ) {
+			bboxChanged = true;
+			lastBBoxPosZ = bBoxPosZ;
+		}
+	}
+	if (imguiSlider("Bounding Box Size X", &bBoxSizeX, 1.0f, 600.0f, 1.0f)) {
+		if (lastBBoxSizeX != bBoxSizeX) {
+			bboxChanged = true;
+			lastBBoxSizeX = bBoxSizeX;
+		}
+	}
+	if (imguiSlider("Bounding Box Size Y", &bBoxSizeY, 1.0f, 600.0f, 1.0f)) {
+		if (lastBBoxSizeY != bBoxSizeY) {
+			bboxChanged = true;
+			lastBBoxSizeY = bBoxSizeY;
+		}
+	}
+	if (imguiSlider("Bounding Box Size Z", &bBoxSizeZ, 1.0f, 600.0f, 1.0f)) {
+		if (lastBBoxSizeZ != bBoxSizeZ) {
+			bboxChanged = true;
+			lastBBoxSizeZ = bBoxSizeZ;
+		}
+	}
 
 	if (bboxChanged) 
 	{

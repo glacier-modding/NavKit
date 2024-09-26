@@ -188,7 +188,7 @@ void Sample::resetCommonSettings()
 	m_regionMergeSize = 30;
 	m_edgeMaxLen = 500.0f;
 	m_edgeMaxError = 1.4f;
-	m_vertsPerPoly = 6.0f;
+	m_vertsPerPoly = 3.0f;
 	m_detailSampleDist = 1.5f;
 	m_detailSampleMaxError = 1.4f;
 	m_partitionType = SAMPLE_PARTITION_WATERSHED;
