@@ -27,11 +27,9 @@ void Airg::setLastLoadFileName(const char* fileName) {
 }
 
 void Airg::setLastSaveFileName(const char* fileName) {
-	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-		saveAirgName = fileName;
-		lastSaveAirgFile = saveAirgName.data();
-		saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
-	}
+	saveAirgName = fileName;
+	lastSaveAirgFile = saveAirgName.data();
+	saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
 }
 
 void Airg::drawMenu() {

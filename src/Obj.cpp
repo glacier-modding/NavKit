@@ -198,13 +198,11 @@ void Obj::setLastLoadFileName(const char* fileName) {
 }
 
 void Obj::setLastSaveFileName(const char* fileName) {
-	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-		lastSaveObjFileName = fileName;
-		saveObjMesh(lastObjFileName.data(), &navKit->ctx, lastSaveObjFileName.data());
-		loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
-		navKit->ini.SetValue("Paths", "saveobj", fileName);
-		navKit->ini.SaveFile("NavKit.ini");
-	}
+	lastSaveObjFileName = fileName;
+	saveObjMesh(lastObjFileName.data(), &navKit->ctx, lastSaveObjFileName.data());
+	loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
+	navKit->ini.SetValue("Paths", "saveobj", fileName);
+	navKit->ini.SaveFile("NavKit.ini");
 }
 
 void Obj::drawMenu() {

@@ -88,11 +88,20 @@ void NavKit::loadSettings() {
 	};
 	obj->setBBox(bBoxPos, bBoxSize);
 	navp->setLastLoadFileName(ini.GetValue("Paths", "loadnavp", "default"));
-	navp->setLastSaveFileName(ini.GetValue("Paths", "savenavp", "default"));
+	const char* fileName = ini.GetValue("Paths", "savenavp", "default");
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		navp->setLastSaveFileName(fileName);
+	}
 	airg->setLastLoadFileName(ini.GetValue("Paths", "loadairg", "default"));
-	airg->setLastSaveFileName(ini.GetValue("Paths", "saveairg", "default"));
+	fileName = ini.GetValue("Paths", "saveairg", "default");
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		airg->setLastSaveFileName(fileName);
+	}
 	obj->setLastLoadFileName(ini.GetValue("Paths", "loadobj", "default"));
-	obj->setLastSaveFileName(ini.GetValue("Paths", "saveobj", "default"));
+	fileName = ini.GetValue("Paths", "saveobj", "default");
+	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+		obj->setLastSaveFileName(fileName);
+	}
 }
 
 NavKit::NavKit() {

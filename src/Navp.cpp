@@ -177,13 +177,11 @@ void Navp::setLastLoadFileName(const char* fileName) {
 }
 	
 void Navp::setLastSaveFileName(const char* fileName) {
-	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-		saveNavpName = fileName;
-		lastSaveNavpFile = saveNavpName.data();
-		saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
-		navKit->ini.SetValue("Paths", "savenavp", fileName);
-		navKit->ini.SaveFile("NavKit.ini");
-	}
+	saveNavpName = fileName;
+	lastSaveNavpFile = saveNavpName.data();
+	saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
+	navKit->ini.SetValue("Paths", "savenavp", fileName);
+	navKit->ini.SaveFile("NavKit.ini");
 }
 	
 void Navp::drawMenu() {
