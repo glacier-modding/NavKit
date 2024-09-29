@@ -102,6 +102,8 @@ void NavKit::loadSettings() {
 	if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
 		obj->setLastSaveFileName(fileName);
 	}
+	airg->saveSpacing((float)atof(ini.GetValue("Airg", "spacing", "2.0f")));
+	airg->saveZSpacing((float)atof(ini.GetValue("Airg", "ySpacing", "1.0f")));
 }
 
 NavKit::NavKit() {

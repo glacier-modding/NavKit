@@ -58,7 +58,7 @@ void SceneExtract::setBlenderFile(const char* filename) {
 }
 
 void SceneExtract::drawMenu() {
-	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 205 - 225 - 15, 250, 225, &extractScroll);
+	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 275 - 195 - 15, 250, 195, &extractScroll);
 	imguiLabel("Set Hitman Directory");
 	if (imguiButton(hitmanFolderName.c_str())) {
 		char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
@@ -80,10 +80,9 @@ void SceneExtract::drawMenu() {
 			setBlenderFile(blenderFileName);
 		}
 	}
-	imguiLabel("Extract from game");
-	if (imguiButton("Extract", hitmanSet && outputSet && blenderSet && extractionDone.empty())) {
+	if (imguiButton("Extract from game", hitmanSet && outputSet && blenderSet && extractionDone.empty())) {
 		navKit->gui->showLog = true;
-		extractScene(lastHitmanFolder.data(), lastOutputFolder.data());// , & pfBoxes);
+		extractScene(lastHitmanFolder.data(), lastOutputFolder.data());
 	}
 	imguiEndScrollArea();
 }

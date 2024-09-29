@@ -225,13 +225,15 @@ void ReasoningGrid::readJson(const char* p_AirgPath) {
 }
 
 // From https://wrfranklin.org/Research/Short_Notes/pnpoly.html
-int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy)
-{
+int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy, float originx, float originy, float scale) {
 	int i, j, c = 0;
 	for (i = 0, j = nvert - 1; i < nvert; j = i++) {
-		if (((verty[i] > testy) != (verty[j] > testy)) &&
-			(testx < (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]))
+		float pi[2]{ (vertx[i] - originx) * scale + originx, (verty[i] - originy) * scale + originy};
+		float pj[2]{ (vertx[j] - originx) * scale + originx, (verty[j] - originy) * scale + originy};
+		if (((pi[1] > testy) != (pj[1] > testy)) &&
+			(testx < (pj[0] - pi[0]) * (testy - pi[1]) / (pj[1] - pi[1]) + pi[0]))
 			c = !c;
+
 	}
 	return c;
 }
@@ -246,10 +248,9 @@ float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 	return p1.Z + ((dy1 * dx3 - dx1 * dy3) * (p2.Z - p1.Z) + (dx1 * dy2 - dy1 * dx2) * (p3.Z - p1.Z)) / (dx3 * dy2 - dx2 * dy3);
 }
 
-void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit) {
+void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, float spacing, float zSpacing, float tolerance) {
+	// Initialize airg properties
 	navKit->log(RC_LOG_PROGRESS, "Started building Airg.");
-	double spacing = 2;
-	double zSpacing = 1;
 	// grid is set up in this order: Z[Y[X[]]]
 	std::vector<std::vector<std::vector<int>>> grid;
 	Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
@@ -260,6 +261,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	int gridYSize = std::ceil((max.Y - min.Y) / spacing);
 	int gridZSize = std::ceil((max.Z - min.Z) / zSpacing);
 	gridZSize = gridZSize > 0 ? gridZSize : 1;
+	float zTolerance = 0.8f;
 	airg->m_Properties.fGridSpacing = spacing;
 	airg->m_Properties.nGridWidth = gridYSize;
 	airg->m_Properties.vMin.x = min.X;
@@ -273,7 +275,9 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 
 	std::vector<double> areaZMins;
 	std::vector<double> areaZMaxes;
+	std::vector<int> waypointZLevels;
 
+	// Get Z-level for each area
 	for (auto area : navMesh->m_areas) {
 		const int areaPointCount = area.m_edges.size();
 		double areaMinZ = 1000;
@@ -287,6 +291,8 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 		areaZMins.push_back(areaMinZ);
 		areaZMaxes.push_back(areaMaxZ);
 	}
+	
+	// Build map of Z-level to area list
 	std::vector<std::vector<int>> areasByZLevel;
 	for (int zi = 0; zi < gridZSize; zi++) {
 		std::vector<int> areasForZLevel;
@@ -302,6 +308,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 		areasByZLevel.push_back(areasForZLevel);
 	}
 
+	// Fill in waypoints for grid points
 	int wayPointIndex = 0;
 	for (int zi = 0; zi < gridZSize; zi++) {
 		std::vector<std::vector<int>> yRow;
@@ -318,15 +325,15 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 				for (int areaIndex : areasByZLevel[zi]) {
 					auto area = navMesh->m_areas[areaIndex];
 					const int areaPointCount = area.m_edges.size();
-					z = calcZ(area.m_edges[0]->m_pos, area.m_edges[1]->m_pos, area.m_edges[2]->m_pos, x, y) + 0.1;
-					if (z > (minZ - zSpacing * .8) && z < (maxZ + zSpacing * .8)) {
-						float areaXCoords[10];
-						float areaYCoords[10];
+					z = calcZ(area.m_edges[0]->m_pos, area.m_edges[1]->m_pos, area.m_edges[2]->m_pos, x, y);
+					if (z > (minZ - zSpacing * zTolerance) && z < (maxZ + zSpacing * zTolerance)) {
+						float areaXCoords[20];
+						float areaYCoords[20];
 						for (int i = 0; i < areaPointCount; i++) {
 							areaXCoords[i] = area.m_edges[i]->m_pos.X;
 							areaYCoords[i] = area.m_edges[i]->m_pos.Y;
 						}
-						pointInArea = pnpoly(areaPointCount, areaXCoords, areaYCoords, x, y);
+						pointInArea = pnpoly(areaPointCount, areaXCoords, areaYCoords, x, y, area.m_area->m_pos.X, area.m_area->m_pos.Y, tolerance);
 						if (pointInArea) {
 							break;
 						}
@@ -342,6 +349,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 					waypoint.nVisionDataOffset = 0;
 					waypoint.nLayerIndex = 0;
 					airg->m_WaypointList.push_back(waypoint);
+					waypointZLevels.push_back(zi);
 				}
 			}
 			yRow.push_back(xRow);
@@ -351,7 +359,8 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 
 	airg->m_nNodeCount = airg->m_WaypointList.size();
 	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
-	// Neighbors: South is 0, increases CCW
+
+	// Build neighbor differences helper: South is 0, increases CCW
 	std::pair<int, int> gridIndexDiff[8]{
 		std::pair(0, -1),
 		std::pair(1, -1),
@@ -362,7 +371,8 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 		std::pair(-1, 0),
 		std::pair(-1, -1)
 	};
-
+	
+	// Fill in neighbor values from grid points with waypoints
 	for (int zi = 0; zi < gridZSize; zi++) {
 		for (int yi = 0; yi < gridYSize; yi++) {
 			for (int xi = 0; xi < gridXSize; xi++) {
@@ -373,7 +383,8 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 						int nxi = xi + gridIndexDiff[neighborNum].first;
 						int nyi = yi + gridIndexDiff[neighborNum].second;
 						if (nxi >= 0 && nxi < gridXSize &&
-							nyi >= 0 && nyi < gridYSize) {
+							nyi >= 0 && nyi < gridYSize &&
+							(grid[zi][nyi][nxi] == 65535 || abs(waypointZLevels[waypointIndex] - waypointZLevels[grid[zi][nyi][nxi]]) <= 1)) {
 							neighborWaypointIndex = grid[zi][nyi][nxi];
 						}
 						airg->m_WaypointList[waypointIndex].nNeighbors.push_back(neighborWaypointIndex);
@@ -382,8 +393,11 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 			}
 		}
 	}
+
+	// Add visibility data
 	std::vector<uint32_t> visibilityData(airg->m_nNodeCount * 1001);
 	airg->m_pVisibilityData = visibilityData;
+
 	navKit->log(RC_LOG_PROGRESS, "Done building Airg.");
 	navKit->airg->airgLoaded = true;
 }

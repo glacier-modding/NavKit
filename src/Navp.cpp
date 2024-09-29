@@ -31,6 +31,21 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 Navp::~Navp() {
 }
 
+void Navp::resetDefaults() {
+	bBoxPosX = 0.0;
+	bBoxPosY = 0.0;
+	bBoxPosZ = 0.0;
+	bBoxSizeX = 100.0;
+	bBoxSizeY = 100.0;
+	bBoxSizeZ = 100.0;
+	lastBBoxPosX = 0.0;
+	lastBBoxPosY = 0.0;
+	lastBBoxPosZ = 0.0;
+	lastBBoxSizeX = 100.0;
+	lastBBoxSizeY = 100.0;
+	lastBBoxSizeZ = 100.0;
+}
+
 char* Navp::openLoadNavpFileDialog(char* lastNavpFolder) {
 	nfdu8filteritem_t filters[2] = { { "Navp files", "navp" }, { "Navp.json files", "navp.json" } };
 	return FileUtil::openNfdLoadDialog(filters, 2, lastNavpFolder);
@@ -242,8 +257,7 @@ void Navp::drawMenu() {
 			navKit->log(RC_LOG_PROGRESS, "Done saving Navp.");
 		}
 	}
-	imguiLabel("Send Navp to game");
-	if (imguiButton("Send NAVP", navpLoaded)) {
+	if (imguiButton("Send Navp to game", navpLoaded)) {
 		navKit->gameConnection = new GameConnection(navKit);
 		navKit->gameConnection->SendNavp(navMesh);
 		navKit->gameConnection->HandleMessages();
@@ -307,6 +321,13 @@ void Navp::drawMenu() {
 			lastBBoxSizeZ = bBoxSizeZ;
 		}
 	}
+	if (imguiButton("Reset Defaults")) {
+		resetDefaults();
+		navKit->sample->resetCommonSettings();
+		float bBoxPos[3] = { bBoxPosX, bBoxPosY, bBoxPosZ };
+		float bBoxSize[3] = { bBoxSizeX, bBoxSizeY, bBoxSizeZ };
+		navKit->obj->setBBox(bBoxPos, bBoxSize);
+	}
 
 	if (bboxChanged) 
 	{
@@ -314,7 +335,7 @@ void Navp::drawMenu() {
 		float bBoxSize[3] = { bBoxSizeX, bBoxSizeY, bBoxSizeZ };
 		navKit->obj->setBBox(bBoxPos, bBoxSize);
 	}
-	if (imguiButton("Build Navp", navpBuildDone.empty() && navKit->geom && navKit->obj->objLoaded))
+	if (imguiButton("Build Navp from Obj", navpBuildDone.empty() && navKit->geom && navKit->obj->objLoaded))
 	{
 		std::thread buildNavpThread(&Navp::buildNavp, this);
 		buildNavpThread.detach();

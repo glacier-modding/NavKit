@@ -12,9 +12,18 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 	airgResourceConverter = HM3_GetConverterForResource("AIRG");;
 	airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
 	reasoningGrid = new ReasoningGrid();
+	spacing = 2.25;
+	zSpacing = 1;
+	tolerance = 1.3;
 }
 
 Airg::~Airg() {
+}
+
+void Airg::resetDefaults() {
+	spacing = 2.25;
+	zSpacing = 1;
+	tolerance = 1.3;
 }
 
 void Airg::setLastLoadFileName(const char* fileName) {
@@ -33,7 +42,7 @@ void Airg::setLastSaveFileName(const char* fileName) {
 }
 
 void Airg::drawMenu() {
-	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 200 - 10, 250, 200, &airgScroll))
+	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 270 - 10, 250, 270, &airgScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Airg", showAirg))
 		showAirg = !showAirg;
@@ -99,14 +108,41 @@ void Airg::drawMenu() {
 			}
 		}
 	}
-	imguiLabel("Build Airg from Navp");
-	if (imguiButton("Build Airg", navKit->navp->navpLoaded)) {
+	float lastTolerance = tolerance;
+	if (imguiSlider("Tolerance", &tolerance, 1.0f, 4.0f, 0.05f)) {
+		if (lastTolerance != tolerance) {
+			saveTolerance(tolerance);
+			lastTolerance = tolerance;
+			navKit->log(RC_LOG_PROGRESS, ("Setting tolerance to: " + std::to_string(tolerance)).c_str());
+		}
+	}
+	float lastSpacing = spacing;
+	if (imguiSlider("Spacing", &spacing, 1.0f, 4.0f, 0.05f)) {
+		if (lastSpacing != spacing) {
+			saveSpacing(spacing);
+			lastSpacing = spacing;
+			navKit->log(RC_LOG_PROGRESS, ("Setting spacing to: " + std::to_string(spacing)).c_str());
+		}
+	}
+	float lastZSpacing = zSpacing;
+	if (imguiSlider("Y Spacing", &zSpacing, 1.0f, 4.0f, 0.05f)) {
+		if (lastZSpacing != zSpacing) {
+			saveZSpacing(zSpacing);
+			lastZSpacing = zSpacing;
+			navKit->log(RC_LOG_PROGRESS, ("Setting Y spacing to: " + std::to_string(zSpacing)).c_str());
+		}
+	}
+	if (imguiButton("Reset Defaults")) {
+		navKit->log(RC_LOG_PROGRESS, "Resetting Airg Default settings");
+		resetDefaults();
+	}
+	if (imguiButton("Build Airg from Navp", navKit->navp->navpLoaded)) {
 		airgLoaded = false;
 		delete reasoningGrid;
 		reasoningGrid = new ReasoningGrid();
 		std::string msg = "Building Airg from Navp";
 		navKit->log(RC_LOG_PROGRESS, msg.data());
-		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit);
+		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit, spacing, zSpacing, tolerance);
 		buildAirgThread.detach();
 	}
 	imguiEndScrollArea();
@@ -117,6 +153,21 @@ void Airg::finalizeLoad() {
 		airgLoadDone.clear();
 		airgLoaded = true;
 	}
+}
+
+void Airg::saveTolerance(float newTolerance) {
+	navKit->ini.SetValue("Airg", "tolerance", std::to_string(newTolerance).c_str());
+	tolerance = newTolerance;
+}
+
+void Airg::saveSpacing(float newSpacing) {
+	navKit->ini.SetValue("Airg", "spacing", std::to_string(newSpacing).c_str());
+	spacing = newSpacing;
+}
+
+void Airg::saveZSpacing(float newZSpacing) {
+	navKit->ini.SetValue("Airg", "ySpacing", std::to_string(newZSpacing).c_str());
+	zSpacing = newZSpacing;
 }
 
 char* Airg::openAirgFileDialog(char* lastAirgFolder) {
@@ -181,6 +232,7 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 		airg->airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
 	}
 	airg->reasoningGrid->readJson(jsonFileName.data());
+	airg->saveSpacing(airg->reasoningGrid->m_Properties.fGridSpacing);
 	if (airg->airgLoadDone.empty()) {
 		airg->airgLoadDone.push_back(true);
 	}

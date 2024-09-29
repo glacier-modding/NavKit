@@ -9,6 +9,7 @@ public:
 	Navp(NavKit* navKit);
 	~Navp();
 
+	void resetDefaults();
 	void renderNavMesh();
 	void renderNavMeshForHitTest();
 	void drawMenu();

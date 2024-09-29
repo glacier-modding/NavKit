@@ -24,9 +24,13 @@ public:
 	ReasoningGrid* reasoningGrid;
 	int airgScroll;
 
+	void resetDefaults();
 	void drawMenu();
 	void finalizeLoad();
 	void renderAirg();
+	void saveTolerance(float tolerance);
+	void saveSpacing(float spacing);
+	void saveZSpacing(float zSpacing);
 
 	void setLastLoadFileName(const char* fileName);
 	void setLastSaveFileName(const char* fileName);
@@ -37,4 +41,7 @@ private:
 	char* openAirgFileDialog(char* lastAirgFolder);
 	void saveAirg(std::string fileName);
 	static void loadAirg(Airg* airg, char* fileName, bool isFromJson);
+	float tolerance;
+	float spacing;
+	float zSpacing;
 };

@@ -68,5 +68,5 @@ public:
 
 	const void writeJson(std::ostream& f);
 	void readJson(const char* p_AirgPath);
-	static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* ctx);
+	static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* ctx, float spacing, float zSpacing, float tolerance);
 };
