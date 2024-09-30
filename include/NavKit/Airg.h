@@ -17,7 +17,8 @@ public:
 	std::string saveAirgName;
 	std::string lastSaveAirgFile;
 	bool airgLoaded;
-	std::vector<bool> airgLoadDone;
+	std::vector<bool> airgLoadState;
+	std::vector<bool> airgSaveState;
 	bool showAirg;
 	ResourceConverter* airgResourceConverter;
 	ResourceGenerator* airgResourceGenerator;
@@ -27,6 +28,7 @@ public:
 	void resetDefaults();
 	void drawMenu();
 	void finalizeLoad();
+	void finalizeSave();
 	void renderAirg();
 	void saveTolerance(float tolerance);
 	void saveSpacing(float spacing);
@@ -39,7 +41,7 @@ private:
 	NavKit* navKit;
 	char* openSaveAirgFileDialog(char* lastAirgFolder);
 	char* openAirgFileDialog(char* lastAirgFolder);
-	void saveAirg(std::string fileName);
+	static void saveAirg(Airg* airg, std::string fileName, bool isJson);
 	static void loadAirg(Airg* airg, char* fileName, bool isFromJson);
 	float tolerance;
 	float spacing;

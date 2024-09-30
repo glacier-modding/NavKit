@@ -47,7 +47,7 @@ void Airg::drawMenu() {
 	if (imguiCheck("Show Airg", showAirg))
 		showAirg = !showAirg;
 	imguiLabel("Load Airg from file");
-	if (imguiButton(airgName.c_str(), airgLoadDone.empty())) {
+	if (imguiButton(airgName.c_str(), (airgLoadState.empty() && airgSaveState.empty()))) {
 		char* fileName = openAirgFileDialog(lastLoadAirgFile.data());
 		if (fileName)
 		{
@@ -78,7 +78,7 @@ void Airg::drawMenu() {
 		}
 	}
 	imguiLabel("Save Airg to file");
-	if (imguiButton(saveAirgName.c_str(), airgLoaded)) {
+	if (imguiButton(saveAirgName.c_str(), (airgLoaded && airgSaveState.empty()))) {
 		char* fileName = openSaveAirgFileDialog(lastLoadAirgFile.data());
 		if (fileName)
 		{
@@ -94,18 +94,8 @@ void Airg::drawMenu() {
 			msg += fileName;
 			msg += "'...";
 			navKit->log(RC_LOG_PROGRESS, msg.data());
-			if (extension == "JSON") {
-				saveAirg(fileName);
-				navKit->log(RC_LOG_PROGRESS, ("Finished saving Airg to " + std::string{ fileName } + ".").c_str());
-			}
-			else if (extension == "AIRG") {
-				std::string tempJsonFile = fileName;
-				tempJsonFile += ".temp.json";
-				saveAirg(tempJsonFile);
-				airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), fileName, false);
-				navKit->log(RC_LOG_PROGRESS, ("Finished saving Airg to " + std::string{ fileName } + ".").c_str());
-				std::filesystem::remove(tempJsonFile);
-			}
+			std::thread saveAirgThread(&Airg::saveAirg, this, fileName, extension == "JSON");
+			saveAirgThread.detach();
 		}
 	}
 	float lastTolerance = tolerance;
@@ -125,7 +115,7 @@ void Airg::drawMenu() {
 		}
 	}
 	float lastZSpacing = zSpacing;
-	if (imguiSlider("Y Spacing", &zSpacing, 1.0f, 4.0f, 0.05f)) {
+	if (imguiSlider("Y Spacing", &zSpacing, 0.5f, 4.0f, 0.05f)) {
 		if (lastZSpacing != zSpacing) {
 			saveZSpacing(zSpacing);
 			lastZSpacing = zSpacing;
@@ -149,9 +139,15 @@ void Airg::drawMenu() {
 }
 
 void Airg::finalizeLoad() {
-	if (airgLoadDone.size() == 1) {
-		airgLoadDone.clear();
+	if (airgLoadState.size() == 2) {
+		airgLoadState.clear();
 		airgLoaded = true;
+	}
+}
+
+void Airg::finalizeSave() {
+	if (airgSaveState.size() == 2) {
+		airgSaveState.clear();
 	}
 }
 
@@ -207,17 +203,41 @@ void Airg::renderAirg() {
 	}
 }
 
-void Airg::saveAirg(std::string fileName) {
-	const std::string s_OutputFileName = std::filesystem::path(fileName).string();
-	std::filesystem::remove(s_OutputFileName);
+void Airg::saveAirg(Airg* airg, std::string fileName, bool isJson) {
+	airg->airgSaveState.push_back(true);
+	std::string s_OutputFileName = std::filesystem::path(fileName).string();
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	std::string msg = "Saving Airg to file at ";
+	msg += std::ctime(&start_time);
+	airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+	auto start = std::chrono::high_resolution_clock::now();
 
+	std::string tempJsonFile = fileName;
+	tempJsonFile += ".temp.json";
+	if (!isJson) {
+		s_OutputFileName = std::filesystem::path(tempJsonFile).string();
+	}
+	std::filesystem::remove(s_OutputFileName);
 	// Write the airg to JSON file
 	std::ofstream fileOutputStream(s_OutputFileName);
-	reasoningGrid->writeJson(fileOutputStream);
+	airg->reasoningGrid->writeJson(fileOutputStream);
 	fileOutputStream.close();
+
+	if (!isJson) {
+		airg->airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), std::string{ fileName }.c_str(), false);
+		std::filesystem::remove(tempJsonFile);
+	}
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	msg = "Finished saving Airg to " + std::string{ fileName } + " in ";
+	msg += std::to_string(duration.count());
+	msg += " seconds";
+	airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+	airg->airgSaveState.push_back(true);
 }
 
 void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
+	airg->airgLoadState.push_back(true);
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Loading Airg from file at ";
 	msg += std::ctime(&start_time);
@@ -233,9 +253,6 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 	}
 	airg->reasoningGrid->readJson(jsonFileName.data());
 	airg->saveSpacing(airg->reasoningGrid->m_Properties.fGridSpacing);
-	if (airg->airgLoadDone.empty()) {
-		airg->airgLoadDone.push_back(true);
-	}
 	if (!isFromJson) {
 		std::filesystem::remove(jsonFileName);
 	}
@@ -245,4 +262,5 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 	msg += std::to_string(duration.count());
 	msg += " seconds";
 	airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+	airg->airgLoadState.push_back(true);
 }

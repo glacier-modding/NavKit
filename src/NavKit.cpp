@@ -50,6 +50,7 @@ int NavKit::runProgram(int argc, char** argv) {
 		navp->finalizeLoad();
 		obj->finalizeLoad();
 		airg->finalizeLoad();
+		airg->finalizeSave();
 
 		renderer->finalizeFrame();
 	}
