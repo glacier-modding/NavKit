@@ -14,7 +14,8 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 	reasoningGrid = new ReasoningGrid();
 	spacing = 2.25;
 	zSpacing = 1;
-	tolerance = 1.3;
+	tolerance = 0.3;
+	selectedWaypointIndex = -1;
 }
 
 Airg::~Airg() {
@@ -23,7 +24,7 @@ Airg::~Airg() {
 void Airg::resetDefaults() {
 	spacing = 2.25;
 	zSpacing = 1;
-	tolerance = 1.3;
+	tolerance = 0.3;
 }
 
 void Airg::setLastLoadFileName(const char* fileName) {
@@ -99,7 +100,7 @@ void Airg::drawMenu() {
 		}
 	}
 	float lastTolerance = tolerance;
-	if (imguiSlider("Tolerance", &tolerance, 1.0f, 4.0f, 0.05f)) {
+	if (imguiSlider("Tolerance", &tolerance, 0.0f, 4.0f, 0.05f)) {
 		if (lastTolerance != tolerance) {
 			saveTolerance(tolerance);
 			lastTolerance = tolerance;
@@ -126,7 +127,7 @@ void Airg::drawMenu() {
 		navKit->log(RC_LOG_PROGRESS, "Resetting Airg Default settings");
 		resetDefaults();
 	}
-	if (imguiButton("Build Airg from Navp", navKit->navp->navpLoaded)) {
+	if (imguiButton("Build Airg from Navp", (navKit->navp->navpLoaded && airgLoadState.empty() && airgSaveState.empty()))) {
 		airgLoaded = false;
 		delete reasoningGrid;
 		reasoningGrid = new ReasoningGrid();
@@ -176,21 +177,39 @@ char* Airg::openSaveAirgFileDialog(char* lastAirgFolder) {
 	return FileUtil::openNfdSaveDialog(filters, 2, "output", lastAirgFolder);
 }
 
+void renderWaypoint(const Waypoint& waypoint, bool fan) {
+	if (fan) {
+		glBegin(GL_TRIANGLE_FAN);
+		glVertex3f(waypoint.vPos.x, waypoint.vPos.z, -waypoint.vPos.y);
+	}
+	else {
+		glBegin(GL_LINE_LOOP);
+	}
+
+	const float r = 0.1f;
+	for (int i = 0; i < 8; i++) {
+		const float a = (float)i / 8.0f * RC_PI * 2;
+		const float fx = (float)waypoint.vPos.x + cosf(a) * r;
+		const float fy = (float)waypoint.vPos.y + sinf(a) * r;
+		const float fz = (float)waypoint.vPos.z;
+		glVertex3f(fx, fz, -fy);
+	}
+	if (fan) {
+		const float fx = (float)waypoint.vPos.x + cosf(0) * r;
+		const float fy = (float)waypoint.vPos.y + sinf(0) * r;
+		const float fz = (float)waypoint.vPos.z;
+		glVertex3f(fx, fz, -fy);
+	}
+	glEnd();
+}
+
 void Airg::renderAirg() {
 	int numWaypoints = reasoningGrid->m_WaypointList.size();
 	for (size_t i = 0; i < numWaypoints; i++) {
 		const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
 		glColor4f(1.0, 0.0, 0, 0.6);
-		glBegin(GL_LINE_LOOP);
-		const float r = 0.1f;
-		for (int i = 0; i < 8; i++) {
-			const float a = (float)i / 8.0f * RC_PI * 2;
-			const float fx = (float)waypoint.vPos.x + cosf(a) * r;
-			const float fy = (float)waypoint.vPos.y + sinf(a) * r;
-			const float fz = (float)waypoint.vPos.z;
-			glVertex3f(fx, fz, -fy);
-		}
-		glEnd();
+		renderWaypoint(waypoint, selectedWaypointIndex == i);
+
 		for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
 			if (waypoint.nNeighbors[neighborIndex] != 65535) {
 				const Waypoint& neighbor = reasoningGrid->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
@@ -200,6 +219,25 @@ void Airg::renderAirg() {
 				glEnd();
 			}
 		}
+	}
+}
+
+void Airg::renderAirgForHitTest() {
+	int numWaypoints = reasoningGrid->m_WaypointList.size();
+	for (size_t i = 0; i < numWaypoints; i++) {
+		const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
+		glColor3ub(61, i / 255, i % 255);
+		renderWaypoint(waypoint, true);
+	}
+}
+
+void Airg::setSelectedAirgWaypointIndex(int index) {
+	if (index == -1 && selectedWaypointIndex != -1) {
+		navKit->log(RC_LOG_PROGRESS, ("Deselected waypoint: " + std::to_string(selectedWaypointIndex)).c_str());
+	}
+	selectedWaypointIndex = index;
+	if (index != -1 && index < reasoningGrid->m_WaypointList.size()) {
+		navKit->log(RC_LOG_PROGRESS, ("Airg Waypoint Index: " + std::to_string(index)).c_str());
 	}
 }
 
@@ -262,5 +300,7 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 	msg += std::to_string(duration.count());
 	msg += " seconds";
 	airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+	airg->navKit->log(RC_LOG_PROGRESS, ("Waypoint count: " + std::to_string(airg->reasoningGrid->m_WaypointList.size()) + ", Visibility Data size: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) + ", Visibility Data points per waypoint: " + std::to_string(static_cast<double>(airg->reasoningGrid->m_pVisibilityData.size()) / static_cast<double>(airg->reasoningGrid->m_WaypointList.size()))).c_str());
+
 	airg->airgLoadState.push_back(true);
 }

@@ -225,17 +225,26 @@ void ReasoningGrid::readJson(const char* p_AirgPath) {
 }
 
 // From https://wrfranklin.org/Research/Short_Notes/pnpoly.html
-int pnpoly(int nvert, float* vertx, float* verty, float testx, float testy, float originx, float originy, float scale) {
+std::pair<int, float> pnpolyTriangle(int nvert, float* vertx, float* verty, float testx, float testy, float originx, float originy, float tolerance) {
 	int i, j, c = 0;
+	int edge = -1;
 	for (i = 0, j = nvert - 1; i < nvert; j = i++) {
-		float pi[2]{ (vertx[i] - originx) * scale + originx, (verty[i] - originy) * scale + originy};
-		float pj[2]{ (vertx[j] - originx) * scale + originx, (verty[j] - originy) * scale + originy};
-		if (((pi[1] > testy) != (pj[1] > testy)) &&
-			(testx < (pj[0] - pi[0]) * (testy - pi[1]) / (pj[1] - pi[1]) + pi[0]))
+		float iToleranceX = vertx[i] > originx ? tolerance : -tolerance;
+		float iToleranceY = verty[i] > originy ? tolerance : -tolerance;
+		float jToleranceX = vertx[j] > originx ? tolerance : -tolerance;
+		float jToleranceY = verty[j] > originy ? tolerance : -tolerance;
+		float ix = vertx[i] + iToleranceX;
+		float iy = verty[i] + iToleranceY;
+		float jx = vertx[j] + jToleranceX;
+		float jy = verty[j] + jToleranceY;
+		if (((iy > testy) != (jy > testy)) &&
+			(testx < (jx - ix) * (testy - iy) / (jy - iy) + ix)) {
 			c = !c;
-
+			edge = i;
+		}
 	}
-	return c;
+	std::pair<int, float> ret{ c ? edge : -1, tolerance };
+	return ret;
 }
 
 float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
@@ -248,11 +257,95 @@ float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 	return p1.Z + ((dy1 * dx3 - dx1 * dy3) * (p2.Z - p1.Z) + (dx1 * dy2 - dy1 * dx2) * (p3.Z - p1.Z)) / (dx3 * dy2 - dx2 * dy3);
 }
 
+void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, ReasoningGridBuilderHelper h) {
+	int wayPointIndex = 0;
+	for (int zi = 0; zi < h.gridZSize; zi++) {
+		if ((*h.grid).size() == zi) {
+			std::vector<std::vector<int>*>* yRow = new std::vector<std::vector<int>*>();
+			h.grid->push_back(yRow);
+		}
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Adding waypoints for Z level: " + std::to_string(zi) + " at Z: " + std::to_string(h.min->Z + zi * h.zSpacing)).c_str());
+		double minZ = h.min->Z + zi * h.zSpacing;
+		double maxZ = h.min->Z + (zi + 1) * h.zSpacing;
+		for (int yi = 0; yi < h.gridYSize; yi++) {
+			
+			if ((*h.grid)[zi]->size() == yi) {
+				std::vector<int>* xRow = new std::vector<int>();
+				(*h.grid)[zi]->push_back(xRow);
+			}
+			for (int xi = 0; xi < h.gridXSize; xi++) {
+				if ((*(*h.grid)[zi])[yi]->size() > xi && (*(*(*h.grid)[zi])[yi])[xi] != 65535) {
+					continue;
+				}
+				double x = h.min->X + xi * h.spacing;
+				double y = h.min->Y + yi * h.spacing;
+				double z = h.min->Z + zi * h.zSpacing;
+				bool pointInArea = false;
+				std::pair<float, float> waypointAdjustment{ 0, 0 };
+				for (int areaIndex : (*h.areasByZLevel)[zi]) {
+					auto area = navMesh->m_areas[areaIndex];
+					const int areaPointCount = area.m_edges.size();
+					z = calcZ(area.m_edges[0]->m_pos, area.m_edges[1]->m_pos, area.m_edges[2]->m_pos, x, y);
+					if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
+						float areaXCoords[20];
+						float areaYCoords[20];
+						for (int i = 0; i < areaPointCount; i++) {
+							areaXCoords[i] = area.m_edges[i]->m_pos.X;
+							areaYCoords[i] = area.m_edges[i]->m_pos.Y;
+						}
+						std::pair<int, float> pnpResult = pnpolyTriangle(areaPointCount, areaXCoords, areaYCoords, x, y, area.m_area->m_pos.X, area.m_area->m_pos.Y, h.tolerance);
+						int edge = pnpResult.first;
+						if (edge != -1) {
+							pointInArea = true;
+							NavPower::Binary::Edge* edge0 = area.m_edges[edge];
+							NavPower::Binary::Edge* edge1 = area.m_edges[(edge + 1) % area.m_edges.size()];
+							float dy = (edge1->m_pos.Y - edge0->m_pos.Y);
+							float dx = (edge1->m_pos.X - edge0->m_pos.X);
+							float ax = 0, ay = 0;
+							//if (dx != 0) {
+							//	ax = h.tolerance;
+							//}
+							//else {
+							//	ax = -dx * h.tolerance;
+							//	ay = -dy * h.tolerance;
+							//}
+							std::pair<float, float> curWaypointAdjustment{ ax, ay };
+
+							waypointAdjustment = curWaypointAdjustment;
+							break;
+						}
+					}
+				}
+				if ((*(*h.grid)[zi])[yi]->size() == xi) {
+					(*(*h.grid)[zi])[yi]->push_back(pointInArea ? wayPointIndex++ : 65535);
+				}
+				else {
+					if ((*(*(*h.grid)[zi])[yi])[xi] == 65535 && pointInArea) {
+						(*(*(*h.grid)[zi])[yi])[xi] = wayPointIndex++;
+					}
+				}
+				if (pointInArea) {
+					Waypoint waypoint;
+					waypoint.vPos.x = x + waypointAdjustment.first;
+					waypoint.vPos.y = y + waypointAdjustment.second;
+					waypoint.vPos.z = z + 0.001;
+					waypoint.vPos.w = 1.0;
+					waypoint.nVisionDataOffset = 0;
+					waypoint.nLayerIndex = 0;
+					airg->m_WaypointList.push_back(waypoint);
+					h.waypointZLevels->push_back(zi);
+				}
+			}
+		}
+	}
+}
+
 void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, float spacing, float zSpacing, float tolerance) {
 	// Initialize airg properties
 	navKit->log(RC_LOG_PROGRESS, "Started building Airg.");
+	navKit->airg->airgLoadState.push_back(true);
 	// grid is set up in this order: Z[Y[X[]]]
-	std::vector<std::vector<std::vector<int>>> grid;
+	std::vector<std::vector<std::vector<int>*>*> grid;
 	Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
 	min.X += spacing / 2;
 	min.Y += spacing / 2;
@@ -276,6 +369,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	std::vector<double> areaZMins;
 	std::vector<double> areaZMaxes;
 	std::vector<int> waypointZLevels;
+	std::vector<std::pair<float, float>> waypointPositionAdjustments;
 
 	// Get Z-level for each area
 	for (auto area : navMesh->m_areas) {
@@ -309,53 +403,21 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	}
 
 	// Fill in waypoints for grid points
-	int wayPointIndex = 0;
-	for (int zi = 0; zi < gridZSize; zi++) {
-		std::vector<std::vector<int>> yRow;
-		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Adding waypoints for Z level: " + std::to_string(zi) + " at Z: " + std::to_string(min.Z + zi * zSpacing)).c_str());
-		double minZ = min.Z + zi * zSpacing;
-		double maxZ = min.Z + (zi + 1) * zSpacing;
-		for (int yi = 0; yi < gridYSize; yi++) {
-			std::vector<int> xRow;
-			for (int xi = 0; xi < gridXSize; xi++) {
-				double x = min.X + xi * spacing;
-				double y = min.Y + yi * spacing;
-				double z = min.Z + zi * zSpacing;
-				bool pointInArea = false;
-				for (int areaIndex : areasByZLevel[zi]) {
-					auto area = navMesh->m_areas[areaIndex];
-					const int areaPointCount = area.m_edges.size();
-					z = calcZ(area.m_edges[0]->m_pos, area.m_edges[1]->m_pos, area.m_edges[2]->m_pos, x, y);
-					if (z > (minZ - zSpacing * zTolerance) && z < (maxZ + zSpacing * zTolerance)) {
-						float areaXCoords[20];
-						float areaYCoords[20];
-						for (int i = 0; i < areaPointCount; i++) {
-							areaXCoords[i] = area.m_edges[i]->m_pos.X;
-							areaYCoords[i] = area.m_edges[i]->m_pos.Y;
-						}
-						pointInArea = pnpoly(areaPointCount, areaXCoords, areaYCoords, x, y, area.m_area->m_pos.X, area.m_area->m_pos.Y, tolerance);
-						if (pointInArea) {
-							break;
-						}
-					}
-				}
-				xRow.push_back(pointInArea ? wayPointIndex++ : 65535);
-				if (pointInArea) {
-					Waypoint waypoint;
-					waypoint.vPos.x = x;
-					waypoint.vPos.y = y;
-					waypoint.vPos.z = z;
-					waypoint.vPos.w = 1.0;
-					waypoint.nVisionDataOffset = 0;
-					waypoint.nLayerIndex = 0;
-					airg->m_WaypointList.push_back(waypoint);
-					waypointZLevels.push_back(zi);
-				}
-			}
-			yRow.push_back(xRow);
-		}
-		grid.push_back(yRow);
-	}
+	ReasoningGridBuilderHelper helper;
+	helper.areasByZLevel = &areasByZLevel;
+	helper.grid = &grid;
+	helper.gridXSize = gridXSize;
+	helper.gridYSize = gridYSize;
+	helper.gridZSize = gridZSize;
+	helper.min = &min;
+	helper.spacing = spacing;
+	helper.tolerance = 0;
+	helper.waypointZLevels = &waypointZLevels;
+	helper.zSpacing = zSpacing;
+	helper.zTolerance = zTolerance;
+	addWaypointsForGrid(airg, navMesh, navKit, helper);
+	helper.tolerance = tolerance;
+	//addWaypointsForGrid(airg, navMesh, navKit, helper);
 
 	airg->m_nNodeCount = airg->m_WaypointList.size();
 	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
@@ -376,7 +438,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	for (int zi = 0; zi < gridZSize; zi++) {
 		for (int yi = 0; yi < gridYSize; yi++) {
 			for (int xi = 0; xi < gridXSize; xi++) {
-				int waypointIndex = grid[zi][yi][xi];
+				int waypointIndex = (*(*grid[zi])[yi])[xi];
 				if (waypointIndex != 65535) {
 					for (int neighborNum = 0; neighborNum < 8; neighborNum++) {
 						int neighborWaypointIndex = 65535;
@@ -384,8 +446,8 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 						int nyi = yi + gridIndexDiff[neighborNum].second;
 						if (nxi >= 0 && nxi < gridXSize &&
 							nyi >= 0 && nyi < gridYSize &&
-							(grid[zi][nyi][nxi] == 65535 || abs(waypointZLevels[waypointIndex] - waypointZLevels[grid[zi][nyi][nxi]]) <= 1)) {
-							neighborWaypointIndex = grid[zi][nyi][nxi];
+							((*(*grid[zi])[nyi])[nxi] == 65535 || abs(waypointZLevels[waypointIndex] - waypointZLevels[(*(*grid[zi])[nyi])[nxi]]) <= 1)) {
+							neighborWaypointIndex = (*(*grid[zi])[nyi])[nxi];
 						}
 						airg->m_WaypointList[waypointIndex].nNeighbors.push_back(neighborWaypointIndex);
 					}
@@ -399,5 +461,6 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	airg->m_pVisibilityData = visibilityData;
 
 	navKit->log(RC_LOG_PROGRESS, "Done building Airg.");
+	navKit->airg->airgLoadState.push_back(true);
 	navKit->airg->airgLoaded = true;
 }

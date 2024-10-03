@@ -14,6 +14,7 @@ public:
 	bool showMenu;
 	bool showLog;
 	int logScroll;
+	int collapsedLogScroll;
 	int lastLogCount;
 private:
 	NavKit* navKit;

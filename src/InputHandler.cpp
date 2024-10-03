@@ -86,6 +86,7 @@ void InputHandler::handleInput() {
 				if (!navKit->gui->mouseOverMenu)
 				{
 					navKit->navp->doNavpHitTest = true;
+					navKit->airg->doAirgHitTest = true;
 				}
 			}
 
@@ -135,15 +136,31 @@ void InputHandler::handleInput() {
 
 void InputHandler::hitTest() {
 	if (!navKit->gui->mouseOverMenu) {
-		if (navKit->navp->doNavpHitTest && navKit->navp->navpLoaded && navKit->navp->showNavp) {
-			int newSelectedNavpAreaIndex = navKit->renderer->hitTestRender(mousePos[0], mousePos[1]);
-			if (newSelectedNavpAreaIndex == navKit->navp->selectedNavpAreaIndex) {
-				navKit->navp->selectedNavpAreaIndex = -1;
+		if ((navKit->navp->doNavpHitTest && navKit->navp->navpLoaded && navKit->navp->showNavp) ||
+			(navKit->airg->doAirgHitTest && navKit->airg->airgLoaded && navKit->airg->showAirg)) {
+			HitTestResult hitTestResult = navKit->renderer->hitTestRender(mousePos[0], mousePos[1]);
+			if (hitTestResult.type == HitTestType::NAVMESH_AREA) {
+				if (hitTestResult.selectedIndex == navKit->navp->selectedNavpAreaIndex) {
+					navKit->navp->setSelectedNavpAreaIndex(-1);
+				}
+				else {
+					navKit->navp->setSelectedNavpAreaIndex(hitTestResult.selectedIndex);
+				}
+			}
+			else if (hitTestResult.type == HitTestType::AIRG_WAYPOINT) {
+				if (hitTestResult.selectedIndex == navKit->airg->selectedWaypointIndex) {
+					navKit->airg->setSelectedAirgWaypointIndex(-1);
+				}
+				else {
+					navKit->airg->setSelectedAirgWaypointIndex(hitTestResult.selectedIndex);
+				}
 			}
 			else {
-				navKit->navp->setSelectedNavpAreaIndex(newSelectedNavpAreaIndex);
+				navKit->navp->setSelectedNavpAreaIndex(-1);
+				navKit->airg->setSelectedAirgWaypointIndex(-1);
 			}
 			navKit->navp->doNavpHitTest = false;
+			navKit->airg->doAirgHitTest = false;
 		}
 	}
 }

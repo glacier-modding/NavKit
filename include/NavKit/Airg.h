@@ -24,12 +24,16 @@ public:
 	ResourceGenerator* airgResourceGenerator;
 	ReasoningGrid* reasoningGrid;
 	int airgScroll;
+	int selectedWaypointIndex;
+	bool doAirgHitTest;
 
 	void resetDefaults();
 	void drawMenu();
 	void finalizeLoad();
 	void finalizeSave();
 	void renderAirg();
+	void renderAirgForHitTest();
+	void setSelectedAirgWaypointIndex(int index);
 	void saveTolerance(float tolerance);
 	void saveSpacing(float spacing);
 	void saveZSpacing(float zSpacing);

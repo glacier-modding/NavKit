@@ -4,6 +4,19 @@
 
 class NavKit;
 
+enum HitTestType {
+	NAVMESH_AREA,
+	AIRG_WAYPOINT,
+	NONE
+}; 
+
+class HitTestResult {
+public:
+	HitTestResult(HitTestType type, int selectedIndex): type(type), selectedIndex(selectedIndex) {}
+	HitTestType type;
+	int selectedIndex;
+};
+
 class Renderer {
 public:
 	Renderer(NavKit* navKit);
@@ -15,7 +28,7 @@ public:
 	void finalizeFrame();
 	void drawBounds();
 	void drawAxes();
-	int hitTestRender(int mx, int my);
+	HitTestResult hitTestRender(int mx, int my);
 
 	GLuint framebuffer;
 	GLuint color_rb;

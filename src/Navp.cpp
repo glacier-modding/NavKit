@@ -96,9 +96,13 @@ void Navp::renderArea(NavPower::Area area, bool selected) {
 }
 
 void Navp::setSelectedNavpAreaIndex(int index) {
+	if (index == -1 && selectedNavpAreaIndex != -1) {
+		navKit->log(RC_LOG_PROGRESS, ("Deselected area: " + std::to_string(selectedNavpAreaIndex)).c_str());
+	}
 	selectedNavpAreaIndex = index;
 	if (index != -1 && index < navMesh->m_areas.size()) {
 		int edgeIndex = 0;
+		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(index)).c_str());
 		for (auto edge : navMesh->m_areas[index].m_edges) {
 			navKit->log(RC_LOG_PROGRESS, ("Vertex / Edge: " + std::to_string(edgeIndex) + " Flags: " + std::to_string(edge->m_flags2)).c_str());
 			edgeIndex++;

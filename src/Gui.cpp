@@ -35,7 +35,8 @@ void Gui::drawGui() {
 		navKit->obj->drawMenu();
 
 		int consoleHeight = showLog ? 220 : 60;
-		if (imguiBeginScrollArea("Log", 250 + 20, 20, navKit->renderer->width - 300 - 250, consoleHeight, &logScroll))
+		int consoleWidth = showLog ? navKit->renderer->width - 300 - 250 : 100;
+		if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
 			mouseOverMenu = true;
 		if (showLog) {
 			for (int i = 0; i < navKit->ctx.getLogCount(); ++i)
@@ -45,8 +46,18 @@ void Gui::drawGui() {
 				lastLogCount = navKit->ctx.getLogCount();
 			}
 		}
-		if (imguiCheck("Show Log", showLog))
-			showLog = !showLog;
+		if (imguiCheck("Show Log", showLog)) {
+			if (showLog) {
+				showLog = false;
+				collapsedLogScroll = logScroll;
+				logScroll = 0;
+			}
+			else {
+				showLog = true;
+				logScroll = collapsedLogScroll;
+			}
+		}
+
 		imguiEndScrollArea();
 	}
 

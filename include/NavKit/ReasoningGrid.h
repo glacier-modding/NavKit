@@ -56,6 +56,21 @@ public:
 	void readJson(simdjson::ondemand::object p_Json);
 };
 
+class ReasoningGridBuilderHelper {
+public:
+	float spacing;
+	float zSpacing;
+	Vec3* min;
+	float gridXSize;
+	float gridYSize;
+	float gridZSize;
+	float tolerance;
+	float zTolerance;
+	std::vector<std::vector<int>>* areasByZLevel;
+	std::vector<int>* waypointZLevels;
+	std::vector<std::vector<std::vector<int>*>*>* grid;
+};
+
 class ReasoningGrid {
 public:
 	Properties m_Properties;

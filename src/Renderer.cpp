@@ -257,7 +257,7 @@ void Renderer::drawAxes() {
 
 }
 
-int Renderer::hitTestRender(int mx, int my) {
+HitTestResult Renderer::hitTestRender(int mx, int my) {
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glClearColor(1.0, 1.0, 1.0, 0.0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -267,19 +267,19 @@ int Renderer::hitTestRender(int mx, int my) {
 			navKit->log(RC_LOG_ERROR, ("FB error, status: 0x" + std::to_string((int)status)).c_str());
 
 			printf("FB error, status: 0x%x\n", status);
-			return -1;
+			return HitTestResult(NONE, -1);
 		}
 		navKit->navp->renderNavMeshForHitTest();
-
+		navKit->airg->renderAirgForHitTest();
 		GLubyte pixel[4];
 		glReadBuffer(GL_COLOR_ATTACHMENT0);
 		glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		int selectedArea = int(pixel[1]) * 255 + int(pixel[2]);
-		if (selectedArea == 65280) {
-			navKit->log(RC_LOG_PROGRESS, "Deselected area.");
-			return -1;
+		int selectedIndex = int(pixel[1]) * 255 + int(pixel[2]);
+
+		if (selectedIndex == 65280) {
+			return HitTestResult(NONE, - 1);
 		}
-		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(selectedArea)).c_str());
-		return selectedArea;
-	}
+		
+		return HitTestResult(int(pixel[0]) == 60 ? HitTestType::NAVMESH_AREA : HitTestType::AIRG_WAYPOINT, selectedIndex);
+}
