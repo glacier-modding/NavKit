@@ -58,7 +58,7 @@ void SceneExtract::setBlenderFile(const char* filename) {
 }
 
 void SceneExtract::drawMenu() {
-	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 275 - 195 - 15, 250, 195, &extractScroll);
+	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 322 - 195 - 10, 250, 195, &extractScroll);
 	imguiLabel("Set Hitman Directory");
 	if (imguiButton(hitmanFolderName.c_str())) {
 		char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());

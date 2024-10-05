@@ -35,7 +35,7 @@ void Gui::drawGui() {
 		navKit->obj->drawMenu();
 
 		int consoleHeight = showLog ? 220 : 60;
-		int consoleWidth = showLog ? navKit->renderer->width - 300 - 250 : 100;
+		int consoleWidth = showLog ? navKit->renderer->width - 310 - 250 : 100;
 		if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
 			mouseOverMenu = true;
 		if (showLog) {

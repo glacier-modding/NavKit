@@ -28,36 +28,44 @@ void BuildContext::doResetLog()
 {
 	m_messageCount = 0;
 	m_textPoolSize = 0;
+	m_logBuffer.clear();
 }
 
 void BuildContext::doLog(const rcLogCategory category, const char* msg, const int len)
 {
 	if (!len) return;
-	if (m_messageCount >= MAX_MESSAGES) {
-		//dumpLog("%s");
-		resetLog();
-		return;
-	}
-	char* dst = &m_textPool[m_textPoolSize];
-	int n = TEXT_POOL_SIZE - m_textPoolSize;
-	if (n < 2) {
-		//dumpLog("%s");
-		resetLog();
-		dst = &m_textPool[m_textPoolSize];
-		n = TEXT_POOL_SIZE - m_textPoolSize;
-	}
 
-	char* cat = dst;
-	char* text = dst+1;
-	const int maxtext = n-1;
-	// Store category
-	*cat = (char)category;
-	// Store message
-	const int count = rcMin(len+1, maxtext);
-	memcpy(text, msg, count);
-	text[count-1] = '\0';
-	m_textPoolSize += 1 + count;
-	m_messages[m_messageCount++] = dst;
+	m_logBuffer.push_back(msg);
+	m_messageCount++;
+	if (m_logBuffer.size() > MAX_MESSAGES) {
+		m_logBuffer.erase(m_logBuffer.begin());
+		m_messageCount--;
+	}
+	//if (m_messageCount >= MAX_MESSAGES) {
+	//	//dumpLog("%s");
+	//	resetLog();
+	//	return;
+	//}
+	//char* dst = &m_textPool[m_textPoolSize];
+	//int n = TEXT_POOL_SIZE - m_textPoolSize;
+	//if (n < 2) {
+	//	//dumpLog("%s");
+	//	resetLog();
+	//	dst = &m_textPool[m_textPoolSize];
+	//	n = TEXT_POOL_SIZE - m_textPoolSize;
+	//}
+
+	//char* cat = dst;
+	//char* text = dst+1;
+	//const int maxtext = n-1;
+	//// Store category
+	//*cat = (char)category;
+	//// Store message
+	//const int count = rcMin(len+1, maxtext);
+	//memcpy(text, msg, count);
+	//text[count-1] = '\0';
+	//m_textPoolSize += 1 + count;
+	//m_messages[m_messageCount++] = dst;
 }
 
 void BuildContext::doResetTimers()
@@ -138,7 +146,7 @@ int BuildContext::getLogCount() const
 
 const char* BuildContext::getLogText(const int i) const
 {
-	return m_messages[i]+1;
+	return m_logBuffer[i].c_str();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

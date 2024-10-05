@@ -32,16 +32,16 @@ class BuildContext : public rcContext
 	TimeVal m_startTime[RC_MAX_TIMERS];
 	TimeVal m_accTime[RC_MAX_TIMERS];
 
-	static const int MAX_MESSAGES = 1000;
+	static const int MAX_MESSAGES = 250;
 	const char* m_messages[MAX_MESSAGES];
 	int m_messageCount;
 	static const int TEXT_POOL_SIZE = 8000;
 	char m_textPool[TEXT_POOL_SIZE];
 	int m_textPoolSize;
-	
+
 public:
 	BuildContext();
-	
+
 	/// Dumps the log to stdout.
 	void dumpLog(const char* format, ...);
 	/// Returns number of log messages.

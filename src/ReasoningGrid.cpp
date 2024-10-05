@@ -258,7 +258,7 @@ float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 }
 
 void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, ReasoningGridBuilderHelper h) {
-	int wayPointIndex = 0;
+	int wayPointIndex = airg->m_WaypointList.size();
 	for (int zi = 0; zi < h.gridZSize; zi++) {
 		if ((*h.grid).size() == zi) {
 			std::vector<std::vector<int>*>* yRow = new std::vector<std::vector<int>*>();
@@ -302,13 +302,13 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 							float dy = (edge1->m_pos.Y - edge0->m_pos.Y);
 							float dx = (edge1->m_pos.X - edge0->m_pos.X);
 							float ax = 0, ay = 0;
-							//if (dx != 0) {
-							//	ax = h.tolerance;
-							//}
-							//else {
-							//	ax = -dx * h.tolerance;
-							//	ay = -dy * h.tolerance;
-							//}
+							if (dx != 0) {
+								ax = h.tolerance;
+							}
+							else {
+								ax = -dx * h.tolerance;
+								ay = -dy * h.tolerance;
+							}
 							std::pair<float, float> curWaypointAdjustment{ ax, ay };
 
 							waypointAdjustment = curWaypointAdjustment;
@@ -354,7 +354,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	int gridYSize = std::ceil((max.Y - min.Y) / spacing);
 	int gridZSize = std::ceil((max.Z - min.Z) / zSpacing);
 	gridZSize = gridZSize > 0 ? gridZSize : 1;
-	float zTolerance = 0.8f;
+	float zTolerance = 1.0f;
 	airg->m_Properties.fGridSpacing = spacing;
 	airg->m_Properties.nGridWidth = gridYSize;
 	airg->m_Properties.vMin.x = min.X;
@@ -417,7 +417,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	helper.zTolerance = zTolerance;
 	addWaypointsForGrid(airg, navMesh, navKit, helper);
 	helper.tolerance = tolerance;
-	//addWaypointsForGrid(airg, navMesh, navKit, helper);
+	addWaypointsForGrid(airg, navMesh, navKit, helper);
 
 	airg->m_nNodeCount = airg->m_WaypointList.size();
 	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;

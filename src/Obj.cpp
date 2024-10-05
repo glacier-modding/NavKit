@@ -206,7 +206,7 @@ void Obj::setLastSaveFileName(const char* fileName) {
 }
 
 void Obj::drawMenu() {
-	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 15 - 270, 250, 205, &objScroll))
+	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 5 - 322, 250, 205, &objScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Obj", showObj))
 		showObj = !showObj;
