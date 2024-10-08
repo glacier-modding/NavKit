@@ -245,8 +245,11 @@ void Airg::renderAirg() {
 			case 3326:
 				glColor4f(0.0, 1.0, 1.0, 0.6);
 				break;
-			default:
+			case 3880:
 				glColor4f(1.0, 1.0, 1.0, 0.6);
+				break;
+			default:
+				glColor4f(0.0, 0.0, 0.0, 0.6);
 				break;
 		}
 		renderWaypoint(waypoint, selectedWaypointIndex == i);
@@ -288,7 +291,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 		}
 		navKit->log(RC_LOG_PROGRESS, ("  Vision Data Offset: " + std::to_string(waypoint.nVisionDataOffset)).c_str());
 		navKit->log(RC_LOG_PROGRESS, ("  Layer Index: " + std::to_string(waypoint.nLayerIndex)).c_str());
-		int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size() ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset : reasoningGrid->m_WaypointList.size();
+		int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size() ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset : reasoningGrid->m_pVisibilityData.size();
 		int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
 		navKit->log(RC_LOG_PROGRESS, ("  Visibility Data size: " + std::to_string(visibilityDataSize)).c_str());
 		std::vector<unsigned int>::const_iterator first = reasoningGrid->m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
@@ -299,26 +302,28 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 
 		std::string waypointVisibilityDataString;
 
+		char numHex[3];
+		navKit->log(RC_LOG_PROGRESS, ("  Visibility Data Type: " + std::to_string(waypointVisibilityData[0])).c_str());
 		navKit->log(RC_LOG_PROGRESS, "  Visibility data:");
-		int count = 0;
-		for (int num : waypointVisibilityData) {
-			char numHex[3];
+
+		for (int count = 2; count < waypointVisibilityData.size(); count++) {
+			int num = waypointVisibilityData[count];
 			sprintf(numHex, "%02X", num);
 			if (numHex[0] == '0' && numHex[1] == '0') {
-				numHex[0] = '.';
-				numHex[1] = '.';
+				numHex[0] = '~';
+				numHex[1] = '~';
 			}
 			waypointVisibilityDataString += std::string{ numHex };
-			if (count % 8) {
+			waypointVisibilityDataString += " ";
+			if ((count - 1) % 8 == 0) {
 				waypointVisibilityDataString += " ";
 			}
-			count++;
-			if (count == 128) {
+			if ((count - 1) % 64 == 0) {
 				navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
 				waypointVisibilityDataString = "";
-				count = 0;
 			}
 		}
+		navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
 	}
 }
 
@@ -433,8 +438,11 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 		case 3326:
 			color = "teal";
 			break;
-		default:
+		case 3880:
 			color = "white";
+			break;
+		default:
+			color = "black";
 			break;
 		}
 		airg->navKit->log(RC_LOG_PROGRESS, ("Offset difference: " + std::to_string(pair.first) + " Color: " + color + " Count: " + std::to_string(pair.second)).c_str());

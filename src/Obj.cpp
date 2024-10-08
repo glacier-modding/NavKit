@@ -269,7 +269,7 @@ void Obj::finalizeLoad() {
 	if (!objLoadDone.empty()) {
 		navKit->gui->showLog = true;
 		navKit->gui->logScroll = 0;
-		navKit->ctx.dumpLog("Geom load log %s:", loadObjName.c_str());
+		//navKit->ctx.dumpLog("Geom load log %s:", loadObjName.c_str());
 
 		if (navKit->geom)
 		{

@@ -302,13 +302,13 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 							float dy = (edge1->m_pos.Y - edge0->m_pos.Y);
 							float dx = (edge1->m_pos.X - edge0->m_pos.X);
 							float ax = 0, ay = 0;
-							if (dx != 0) {
-								ax = h.tolerance;
-							}
-							else {
-								ax = -dx * h.tolerance;
-								ay = -dy * h.tolerance;
-							}
+							//if (dx != 0) {
+							//	ax = h.tolerance;
+							//}
+							//else {
+							//	ax = -dx * h.tolerance;
+							//	ay = -dy * h.tolerance;
+							//}
 							std::pair<float, float> curWaypointAdjustment{ ax, ay };
 
 							waypointAdjustment = curWaypointAdjustment;
@@ -330,7 +330,7 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 					waypoint.vPos.y = y + waypointAdjustment.second;
 					waypoint.vPos.z = z + 0.001;
 					waypoint.vPos.w = 1.0;
-					waypoint.nVisionDataOffset = 0;
+					waypoint.nVisionDataOffset = 556 * airg->m_WaypointList.size();
 					waypoint.nLayerIndex = 0;
 					airg->m_WaypointList.push_back(waypoint);
 					h.waypointZLevels->push_back(zi);
@@ -342,7 +342,12 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 
 void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, float spacing, float zSpacing, float tolerance) {
 	// Initialize airg properties
-	navKit->log(RC_LOG_PROGRESS, "Started building Airg.");
+	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	std::string msg = "Started building Airg at ";
+	msg += std::ctime(&start_time);
+	navKit->log(RC_LOG_PROGRESS, msg.data());
+	auto start = std::chrono::high_resolution_clock::now();
+
 	navKit->airg->airgLoadState.push_back(true);
 	// grid is set up in this order: Z[Y[X[]]]
 	std::vector<std::vector<std::vector<int>*>*> grid;
@@ -457,10 +462,18 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	}
 
 	// Add visibility data
-	std::vector<uint32_t> visibilityData(airg->m_nNodeCount * 1001);
+	std::vector<uint32_t> visibilityData(airg->m_nNodeCount * 556);
+	for (int i = 0; i < airg->m_nNodeCount * 556; i++) {
+		visibilityData[i] = 0;
+	}
 	airg->m_pVisibilityData = visibilityData;
 
-	navKit->log(RC_LOG_PROGRESS, "Done building Airg.");
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	msg = "Finished building Airg in ";
+	msg += std::to_string(duration.count());
+	msg += " seconds";
+	navKit->log(RC_LOG_PROGRESS, msg.data());
 	navKit->airg->airgLoadState.push_back(true);
 	navKit->airg->airgLoaded = true;
 }
