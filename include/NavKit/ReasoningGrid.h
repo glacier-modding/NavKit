@@ -38,7 +38,7 @@ public:
 
 class SizedArray {
 public:
-	std::vector<uint32_t> m_aBytes;
+	std::vector<uint8_t> m_aBytes;
 	uint32_t m_nSize;
 
 	const void writeJson(std::ostream& f);
@@ -79,9 +79,10 @@ public:
 	SizedArray m_deadEndData;
 	uint32_t m_nNodeCount;
 	std::vector<Waypoint> m_WaypointList;
-	std::vector<uint32_t> m_pVisibilityData;
+	std::vector<uint8_t> m_pVisibilityData;
 
 	const void writeJson(std::ostream& f);
 	void readJson(const char* p_AirgPath);
+	bool HasVisibility(unsigned int nFromNode, unsigned int nToNode, uint8_t nLow);
 	static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* ctx, float spacing, float zSpacing, float tolerance, float zTolerance);
 };

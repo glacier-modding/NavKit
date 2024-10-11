@@ -101,12 +101,9 @@ void Navp::setSelectedNavpAreaIndex(int index) {
 	}
 	selectedNavpAreaIndex = index;
 	if (index != -1 && index < navMesh->m_areas.size()) {
-		int edgeIndex = 0;
 		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(index)).c_str());
-		for (auto edge : navMesh->m_areas[index].m_edges) {
-			navKit->log(RC_LOG_PROGRESS, ("Vertex / Edge: " + std::to_string(edgeIndex) + " Flags: " + std::to_string(edge->m_flags2)).c_str());
-			edgeIndex++;
-		}
+		Vec3 pos = navMesh->m_areas[index].m_area->m_pos;
+		navKit->log(RC_LOG_PROGRESS, ("Area center: X: " + std::to_string(pos.X) + "Y: " + std::to_string(pos.Y) + "Z: " + std::to_string(pos.Z)).c_str());
 	}
 }
 

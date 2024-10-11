@@ -297,7 +297,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 	selectedWaypointIndex = index;
 	if (index != -1 && index < reasoningGrid->m_WaypointList.size()) {
 		navKit->log(RC_LOG_PROGRESS, ("Airg Waypoint Index: " + std::to_string(index)).c_str());
-			Waypoint waypoint = reasoningGrid->m_WaypointList[selectedWaypointIndex];
+		Waypoint waypoint = reasoningGrid->m_WaypointList[selectedWaypointIndex];
 		for (int i = 0; i < 8; i++) {
 			int neighborIndex = waypoint.nNeighbors[i];
 			if (neighborIndex != 65535) {
@@ -309,11 +309,11 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 		int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size() ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset : reasoningGrid->m_pVisibilityData.size();
 		int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
 		navKit->log(RC_LOG_PROGRESS, ("  Visibility Data size: " + std::to_string(visibilityDataSize)).c_str());
-		std::vector<unsigned int>::const_iterator first = reasoningGrid->m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
-		std::vector<unsigned int>::const_iterator last = (index + 1) < reasoningGrid->m_WaypointList.size() ? 
+		std::vector<uint8_t>::const_iterator first = reasoningGrid->m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
+		std::vector<uint8_t>::const_iterator last = (index + 1) < reasoningGrid->m_WaypointList.size() ?
 			reasoningGrid->m_pVisibilityData.begin() + reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset :
 			reasoningGrid->m_pVisibilityData.end();
-		std::vector<int> waypointVisibilityData(first, last);
+		std::vector<uint8_t> waypointVisibilityData(first, last);
 
 		std::string waypointVisibilityDataString;
 
@@ -322,7 +322,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 		navKit->log(RC_LOG_PROGRESS, "  Visibility data:");
 
 		for (int count = 2; count < waypointVisibilityData.size(); count++) {
-			int num = waypointVisibilityData[count];
+			uint8_t num = waypointVisibilityData[count];
 			sprintf(numHex, "%02X", num);
 			if (numHex[0] == '0' && numHex[1] == '0') {
 				numHex[0] = '~';
@@ -339,6 +339,8 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 			}
 		}
 		navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+
+		navKit->log(RC_LOG_PROGRESS, ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + "Y: " + std::to_string(waypoint.vPos.y) + "Z: " + std::to_string(waypoint.vPos.z)).c_str());
 	}
 }
 

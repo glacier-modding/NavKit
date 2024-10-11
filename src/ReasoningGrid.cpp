@@ -71,7 +71,7 @@ const void SizedArray::writeJson(std::ostream& f) {
 	f << "[";
 	for (size_t i = 0; i < m_aBytes.size(); i++)
 	{
-		f << m_aBytes[i];
+		f << (uint64_t)m_aBytes[i];
 		if (i < m_aBytes.size() - 1) {
 			f << ",";
 		}
@@ -182,7 +182,7 @@ const void ReasoningGrid::writeJson(std::ostream& f) {
 	f << "[";
 	for (size_t i = 0; i < m_pVisibilityData.size(); i++)
 	{
-		f << m_pVisibilityData[i];
+		f << (uint64_t)m_pVisibilityData[i];
 		if (i < m_pVisibilityData.size() - 1) {
 			f << ",";
 		}
@@ -242,7 +242,7 @@ Vec3 reflect(Vec3 p, float x1, float y1, float x2, float y2) {
 	float x, y;
 
 	dx = x2 - x1;
-	dy = y2 - y2;
+	dy = y2 - y1;
 
 	a = (dx * dx - dy * dy) / (dx * dx + dy * dy);
 	b = 2 * dx * dy / (dx * dx + dy * dy);
@@ -380,6 +380,7 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 				float y = h.min->Y + yi * h.spacing;
 				float z = h.min->Z + zi * h.zSpacing;
 				bool pointInArea = false;
+				bool neededTolerance = false;
 				Vec3 reflected;
 
 				for (int areaIndex : (*h.areasByZLevel)[zi]) {
@@ -399,7 +400,7 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 							break;
 						} else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
 							navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
-
+							neededTolerance = true;
 							pointInArea = true;
 							NavPower::Binary::Edge* edge0 = area.m_edges[edge];
 							NavPower::Binary::Edge* edge1 = area.m_edges[(edge + 1) % area.m_edges.size()];
@@ -432,11 +433,111 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 					waypoint.nVisionDataOffset = 556 * airg->m_WaypointList.size();
 					waypoint.nLayerIndex = 0;
 					airg->m_WaypointList.push_back(waypoint);
+					if (neededTolerance) {
+						navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Waypoint index: " + std::to_string(airg->m_WaypointList.size() - 1) + " X:" + std::to_string(x) + " Y: " + std::to_string(y) + " Z: " + std::to_string(z)).c_str());
+					}
+
 					h.waypointZLevels->push_back(zi);
 				}
 			}
 		}
 	}
+}
+
+
+bool ReasoningGrid::HasVisibility(
+	unsigned int nFromNode,
+	unsigned int nToNode,
+	uint8_t nLow)
+{
+	//Waypoint* m_pStart; // rbx
+	//Waypoint* v6; // r11
+	//Waypoint* v7; // r8
+	//int nVisibilityRange; // edi
+	//Vec4 v9; // xmm2 __m128
+	//Vec4 v10; // xmm1 __m128
+	//int v11; // r9d
+	//int v12; // r15d
+	//Vec4 v13; // xmm0 __m128
+	//int v14; // esi
+	//int v15; // r12d
+	//int v16; // ebp
+	//uint8_t* v17; // rax
+	//uint8_t* v18; // rdx
+	//__int64 v19; // rax
+	//__int16 nLayerIndex; // r9
+	//uint8_t* v21; // rbx
+	//uint16_t v22; // cx
+	//uint16_t v23; // cx
+	//int v25; // eax
+	//int v26; // edx
+
+	//m_pStart = &m_WaypointList.front();
+	//v6 = &(&m_WaypointList.front())[nFromNode];
+	//if (v6 < &m_WaypointList.front() || v6 >= &m_WaypointList.back())
+	//	__debugbreak(); // ERROR
+	//v7 = &m_pStart[nToNode];
+	//if (v7 < m_pStart || v7 >= &m_WaypointList.back())
+	//	__debugbreak(); // ERROR
+	//nVisibilityRange = m_Properties.nVisibilityRange;
+	//v9 = Vec4{
+	//	m_Properties.fGridSpacing,
+	//	m_Properties.fGridSpacing,
+	//	0,
+	//	0};
+	//float result[4];
+	//for (int i = 0; i < 4; i++) {
+	//	float reciprocal = 1.0f / v9[i];
+	//	float difference = v6->vPos.m[i] - m_Properties.vMin.m[i];
+	//	result[i] = reciprocal * difference;
+	//};
+	//v10 = result;
+	//v11 = (int)_mm_shuffle_ps(v10, v10, 85).m128_f32[0];
+	//v12 = (__int16)(int)v10.m128_f32[0];
+	//v13 = _mm_mul_ps(_mm_rcp_ps(v9), _mm_sub_ps(v7->vPos.m, m_Properties.vMin.m));
+	//v14 = (int)_mm_shuffle_ps(v13, v13, 85).m128_f32[0];
+	//v15 = (__int16)(int)v13.m128_f32[0];
+	//if ((int)abs(v12 - v15) > nVisibilityRange)
+	//	return 0;
+	//v16 = (__int16)v11;
+	//if ((int)abs((__int16)v11 - (__int16)v14) > nVisibilityRange)
+	//	return 0;
+	//if (v6 < m_pStart || v6 >= m_WaypointList.m_pEnd)
+	//	__debugbreak();
+	//v17 = m_pVisibilityData.m_pStart;
+	//v18 = &v17[v6->nVisionDataOffset];
+	//if (v18 < v17 || v18 >= m_pVisibilityData.m_pEnd)
+	//	__debugbreak();
+	//v19 = *(unsigned __int16*)v18;
+	//nLayerIndex = v7->nLayerIndex;
+	//v21 = &v18[2 * v19];
+	//v22 = 0;
+	//if (nLayerIndex != v6->nLayerIndex)
+	//{
+	//	v23 = 0;
+	//	if (!*(WORD*)v18)
+	//		return 0;
+	//	while (*(WORD*)&v18[2 * v23 + 2] != nLayerIndex)
+	//	{
+	//		if (++v23 >= (int)v19)
+	//			return 0;
+	//	}
+	//	v22 = v23 + 1;
+	//	if (!v22)
+	//		return 0;
+	//}
+	//v26 = (nVisibilityRange
+	//	+ v15
+	//	+ (2 * nVisibilityRange + 1)
+	//	* (nVisibilityRange + (__int16)v14 + (2 * nVisibilityRange + 1) * (nLow + 2 * v22) - v16)
+	//	- v12) >> 31;
+	//v25 = nVisibilityRange
+	//	+ v15
+	//	+ (2 * nVisibilityRange + 1)
+	//	* (nVisibilityRange + (__int16)v14 + (2 * nVisibilityRange + 1) * (nLow + 2 * v22) - v16)
+	//	- v12;
+	//return ((uint8_t)(1 << ((((v26 & 7) + v25) & 7) - (v26 & 7))) & v21[(((v26 & 7) + v25) >> 3) + 2]) != 0;
+	return true;
 }
 
 void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, float spacing, float zSpacing, float tolerance, float zTolerance) {
@@ -525,7 +626,6 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	addWaypointsForGrid(airg, navMesh, navKit, helper);
 
 	airg->m_nNodeCount = airg->m_WaypointList.size();
-	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
 
 	// Build neighbor differences helper: South is 0, increases CCW
 	std::pair<int, int> gridIndexDiff[8]{
@@ -562,7 +662,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	}
 
 	// Add visibility data
-	std::vector<uint32_t> visibilityData(airg->m_nNodeCount * 556);
+	std::vector<uint8_t> visibilityData(airg->m_nNodeCount * 556);
 	for (int i = 0; i < airg->m_nNodeCount * 556; i++) {
 		visibilityData[i] = 0;
 	}
@@ -570,7 +670,12 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	airg->m_HighVisibilityBits.m_nSize = 0;
 	airg->m_LowVisibilityBits.m_nSize = 0;
 	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
-	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
+	std::vector<uint8_t> deadEndData(airg->m_nNodeCount);
+	for (int i = 0; i < airg->m_nNodeCount; i++) {
+		deadEndData[i] = 0;
+	}
+	airg->m_deadEndData.m_aBytes = deadEndData;
+
 
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
