@@ -15,6 +15,8 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 	spacing = 2.25;
 	zSpacing = 1;
 	tolerance = 0.3;
+	zTolerance = 1.0;
+	doAirgHitTest = false;
 	selectedWaypointIndex = -1;
 }
 
@@ -43,7 +45,7 @@ void Airg::setLastSaveFileName(const char* fileName) {
 }
 
 void Airg::drawMenu() {
-	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 322, 250, 322, &airgScroll))
+	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 347, 250, 347, &airgScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Airg", showAirg))
 		showAirg = !showAirg;
@@ -123,6 +125,14 @@ void Airg::drawMenu() {
 			navKit->log(RC_LOG_PROGRESS, ("Setting Y spacing to: " + std::to_string(zSpacing)).c_str());
 		}
 	}
+	float lastZTolerance= zTolerance;
+	if (imguiSlider("Y Tolerance", &zTolerance, 0.5f, 4.0f, 0.05f)) {
+		if (lastZTolerance != zTolerance) {
+			saveZTolerance(zTolerance);
+			lastZTolerance = zTolerance;
+			navKit->log(RC_LOG_PROGRESS, ("Setting Y tolerance to: " + std::to_string(zTolerance)).c_str());
+		}
+	}
 	if (imguiButton("Reset Defaults")) {
 		navKit->log(RC_LOG_PROGRESS, "Resetting Airg Default settings");
 		resetDefaults();
@@ -133,7 +143,7 @@ void Airg::drawMenu() {
 		reasoningGrid = new ReasoningGrid();
 		std::string msg = "Building Airg from Navp";
 		navKit->log(RC_LOG_PROGRESS, msg.data());
-		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit, spacing, zSpacing, tolerance);
+		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit, spacing, zSpacing, tolerance, zTolerance);
 		buildAirgThread.detach();
 	}
 	imguiSeparatorLine();
@@ -171,6 +181,11 @@ void Airg::saveSpacing(float newSpacing) {
 void Airg::saveZSpacing(float newZSpacing) {
 	navKit->ini.SetValue("Airg", "ySpacing", std::to_string(newZSpacing).c_str());
 	zSpacing = newZSpacing;
+}
+
+void Airg::saveZTolerance(float newZTolerance) {
+	navKit->ini.SetValue("Airg", "yTolerance", std::to_string(newZTolerance).c_str());
+	zTolerance = newZTolerance;
 }
 
 char* Airg::openAirgFileDialog(char* lastAirgFolder) {

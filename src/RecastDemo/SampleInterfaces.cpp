@@ -146,7 +146,12 @@ int BuildContext::getLogCount() const
 
 const char* BuildContext::getLogText(const int i) const
 {
-	return m_logBuffer[i].c_str();
+	if (i < m_logBuffer.size()) {
+		return m_logBuffer[i].c_str();
+	}
+	else {
+		return "";
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

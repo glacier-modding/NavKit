@@ -104,7 +104,9 @@ void NavKit::loadSettings() {
 		obj->setLastSaveFileName(fileName);
 	}
 	airg->saveSpacing((float)atof(ini.GetValue("Airg", "spacing", "2.0f")));
+	airg->saveTolerance((float)atof(ini.GetValue("Airg", "tolerance", "0.2f")));
 	airg->saveZSpacing((float)atof(ini.GetValue("Airg", "ySpacing", "1.0f")));
+	airg->saveZTolerance((float)atof(ini.GetValue("Airg", "zTolerance", "1.0f")));
 }
 
 NavKit::NavKit() {

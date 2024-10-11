@@ -37,6 +37,7 @@ public:
 	void saveTolerance(float tolerance);
 	void saveSpacing(float spacing);
 	void saveZSpacing(float zSpacing);
+	void saveZTolerance(float zTolerance);
 
 	void setLastLoadFileName(const char* fileName);
 	void setLastSaveFileName(const char* fileName);
@@ -50,4 +51,5 @@ private:
 	float tolerance;
 	float spacing;
 	float zSpacing;
+	float zTolerance;
 };

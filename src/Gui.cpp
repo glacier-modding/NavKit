@@ -40,7 +40,7 @@ void Gui::drawGui() {
 			mouseOverMenu = true;
 		if (showLog) {
 			for (int i = 0; i < navKit->ctx.getLogCount(); ++i)
-				imguiLabel(navKit->ctx.getLogText(i));
+				imguiLabel(std::string{ navKit->ctx.getLogText(i) }.c_str());
 			if (lastLogCount != navKit->ctx.getLogCount()) {
 				logScroll = std::max(0, navKit->ctx.getLogCount() * 20 - 160);
 				lastLogCount = navKit->ctx.getLogCount();
