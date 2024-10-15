@@ -159,6 +159,8 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	navp->navKit->log(RC_LOG_PROGRESS, msg.data());
 	navp->setSelectedNavpAreaIndex(-1);
 	navp->loading = false;
+	navp->navpLoaded = true;
+	navp->buildBinaryAreaToAreaMap();
 }
 
 void Navp::buildNavp(Navp* navp) {
@@ -344,16 +346,20 @@ void Navp::drawMenu() {
 	imguiEndScrollArea();
 }
 
-void Navp::finalizeLoad() {
-	if (navpLoadDone.size() == 1) {
-		navpLoadDone.clear();
-		navpLoaded = true;
+void Navp::buildBinaryAreaToAreaMap() {
+	binaryAreaToAreaMap.clear();
+	for (NavPower::Area& area : navMesh->m_areas) {
+		binaryAreaToAreaMap.emplace(area.m_area, &area);
 	}
+}
+
+void Navp::finalizeLoad() {
 	if (!navpBuildDone.empty()) {
 		navpLoaded = true;
 		navKit->sample->saveAll("output.navp.json");
 		NavPower::NavMesh newNavMesh = LoadNavMeshFromJson("output.navp.json");
 		std::swap(*navMesh, newNavMesh);
 		navpBuildDone.clear();
+		buildBinaryAreaToAreaMap();
 	}
 }

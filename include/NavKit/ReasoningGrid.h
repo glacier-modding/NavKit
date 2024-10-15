@@ -68,7 +68,9 @@ public:
 	float zTolerance;
 	std::vector<std::vector<int>>* areasByZLevel;
 	std::vector<int>* waypointZLevels;
+	std::vector<NavPower::Area*> waypointAreas;
 	std::vector<std::vector<std::vector<int>*>*>* grid;
+	int result = 0;
 };
 
 class ReasoningGrid {

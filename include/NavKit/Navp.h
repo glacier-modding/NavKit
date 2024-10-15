@@ -14,9 +14,11 @@ public:
 	void renderNavMeshForHitTest();
 	void drawMenu();
 	void finalizeLoad();
+	void buildBinaryAreaToAreaMap();
 	void setSelectedNavpAreaIndex(int index);
 
 	NavPower::NavMesh* navMesh;
+	std::map<NavPower::Binary::Area*, NavPower::Area*> binaryAreaToAreaMap;
 	int selectedNavpAreaIndex;
 	bool navpLoaded;
 	bool showNavp;

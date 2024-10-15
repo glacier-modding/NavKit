@@ -110,7 +110,7 @@ void Airg::drawMenu() {
 		}
 	}
 	float lastSpacing = spacing;
-	if (imguiSlider("Spacing", &spacing, 1.0f, 4.0f, 0.05f)) {
+	if (imguiSlider("Spacing", &spacing, 0.1f, 4.0f, 0.05f)) {
 		if (lastSpacing != spacing) {
 			saveSpacing(spacing);
 			lastSpacing = spacing;
@@ -118,7 +118,7 @@ void Airg::drawMenu() {
 		}
 	}
 	float lastZSpacing = zSpacing;
-	if (imguiSlider("Y Spacing", &zSpacing, 0.5f, 4.0f, 0.05f)) {
+	if (imguiSlider("Y Spacing", &zSpacing, 0.1f, 4.0f, 0.05f)) {
 		if (lastZSpacing != zSpacing) {
 			saveZSpacing(zSpacing);
 			lastZSpacing = zSpacing;
@@ -126,7 +126,7 @@ void Airg::drawMenu() {
 		}
 	}
 	float lastZTolerance= zTolerance;
-	if (imguiSlider("Y Tolerance", &zTolerance, 0.5f, 4.0f, 0.05f)) {
+	if (imguiSlider("Y Tolerance", &zTolerance, 0.1f, 4.0f, 0.05f)) {
 		if (lastZTolerance != zTolerance) {
 			saveZTolerance(zTolerance);
 			lastZTolerance = zTolerance;
@@ -158,7 +158,6 @@ void Airg::drawMenu() {
 void Airg::finalizeLoad() {
 	if (airgLoadState.size() == 2) {
 		airgLoadState.clear();
-		airgLoaded = true;
 	}
 }
 
@@ -296,19 +295,22 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 	}
 	selectedWaypointIndex = index;
 	if (index != -1 && index < reasoningGrid->m_WaypointList.size()) {
-		navKit->log(RC_LOG_PROGRESS, ("Airg Waypoint Index: " + std::to_string(index)).c_str());
 		Waypoint waypoint = reasoningGrid->m_WaypointList[selectedWaypointIndex];
+		std::string msg = "Airg Waypoint Index: " + std::to_string(index);
 		for (int i = 0; i < 8; i++) {
 			int neighborIndex = waypoint.nNeighbors[i];
 			if (neighborIndex != 65535) {
-				navKit->log(RC_LOG_PROGRESS, ("  Neighbor " + std::to_string(i) + " Waypoint Index : " + std::to_string(neighborIndex)).c_str());
+				msg += "  Neighbor " + std::to_string(i) + " Waypoint Index : " + std::to_string(neighborIndex);
 			}
 		}
-		navKit->log(RC_LOG_PROGRESS, ("  Vision Data Offset: " + std::to_string(waypoint.nVisionDataOffset)).c_str());
-		navKit->log(RC_LOG_PROGRESS, ("  Layer Index: " + std::to_string(waypoint.nLayerIndex)).c_str());
+		navKit->log(RC_LOG_PROGRESS, msg.c_str());
+		navKit->log(RC_LOG_PROGRESS, ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + "Y: " + std::to_string(waypoint.vPos.y) + "Z: " + std::to_string(waypoint.vPos.z)).c_str());
+		msg = "  Vision Data Offset: " + std::to_string(waypoint.nVisionDataOffset);
+		msg += "  Layer Index: " + std::to_string(waypoint.nLayerIndex);
 		int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size() ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset : reasoningGrid->m_pVisibilityData.size();
 		int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
-		navKit->log(RC_LOG_PROGRESS, ("  Visibility Data size: " + std::to_string(visibilityDataSize)).c_str());
+		msg += "  Visibility Data size: " + std::to_string(visibilityDataSize);
+
 		std::vector<uint8_t>::const_iterator first = reasoningGrid->m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
 		std::vector<uint8_t>::const_iterator last = (index + 1) < reasoningGrid->m_WaypointList.size() ?
 			reasoningGrid->m_pVisibilityData.begin() + reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset :
@@ -318,9 +320,8 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 		std::string waypointVisibilityDataString;
 
 		char numHex[3];
-		navKit->log(RC_LOG_PROGRESS, ("  Visibility Data Type: " + std::to_string(waypointVisibilityData[0])).c_str());
-		navKit->log(RC_LOG_PROGRESS, "  Visibility data:");
-
+		msg += "  Visibility Data Type: " + std::to_string(waypointVisibilityData[0]) + " Visibility data:";
+		navKit->log(RC_LOG_PROGRESS, msg.c_str());
 		for (int count = 2; count < waypointVisibilityData.size(); count++) {
 			uint8_t num = waypointVisibilityData[count];
 			sprintf(numHex, "%02X", num);
@@ -333,14 +334,12 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 			if ((count - 1) % 8 == 0) {
 				waypointVisibilityDataString += " ";
 			}
-			if ((count - 1) % 64 == 0) {
+			if ((count - 1) % 96 == 0) {
 				navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
 				waypointVisibilityDataString = "";
 			}
 		}
 		navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
-
-		navKit->log(RC_LOG_PROGRESS, ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + "Y: " + std::to_string(waypoint.vPos.y) + "Z: " + std::to_string(waypoint.vPos.z)).c_str());
 	}
 }
 

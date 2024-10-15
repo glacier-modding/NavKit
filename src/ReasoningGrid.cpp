@@ -346,6 +346,42 @@ int closestEdge(int nvert, float* vertx, float* verty, float testx, float testy,
 	//return closestEdge;
 }
 
+// Function to check if point q lies on segment pr
+bool onSegment(Vec3 p, Vec3 q, Vec3 r) {
+	if (q.X <= std::max(p.X, r.X) && q.X >= std::min(p.X, r.X) &&
+		q.Y <= std::max(p.Y, r.Y) && q.Y >= std::min(p.Y, r.Y))
+		return true;
+
+	return false;
+}
+
+bool doIntersect(Vec3 p1, Vec3 q1, Vec3 p2, Vec3 q2) {
+	// Find the four orientations needed for general and special cases
+	int o1 = orientation(p1, q1, p2);
+	int o2 = orientation(p1, q1, q2);
+	int o3 = orientation(p2, q2, p1);
+	int o4 = orientation(p2, q2, q1);
+
+	// General case
+	if (o1 != o2 && o3 != o4)
+		return true;
+
+	// Special Cases
+	// p1, q1 and p2 are collinear and p2 lies on segment p1q1
+	if (o1 == 0 && onSegment(p1, p2, q1)) return true;
+
+	// p1, q1 and q2 are collinear and q2 lies on segment p1q1
+	if (o2 == 0 && onSegment(p1, q2, q1)) return true;
+
+	// p2, q2 and p1 are collinear and p1 lies on segment p2q2
+	if (o3 == 0 && onSegment(p2, p1, q2)) return true;
+
+	// p2, q2 and q1 are collinear and q1 lies on segment p2q2
+	if (o4 == 0 && onSegment(p2, q1, q2)) return true;
+
+	return false; // Doesn't fall in any case
+}
+
 float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 	float dx1 = x - p1.X;
 	float dy1 = y - p1.Y;
@@ -356,7 +392,7 @@ float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 	return p1.Z + ((dy1 * dx3 - dx1 * dy3) * (p2.Z - p1.Z) + (dx1 * dy2 - dy1 * dx2) * (p3.Z - p1.Z)) / (dx3 * dy2 - dx2 * dy3);
 }
 
-void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, ReasoningGridBuilderHelper h) {
+void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, ReasoningGridBuilderHelper& h) {
 	int wayPointIndex = airg->m_WaypointList.size();
 	for (int zi = 0; zi < h.gridZSize; zi++) {
 		if ((*h.grid).size() == zi) {
@@ -384,26 +420,28 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 				Vec3 reflected;
 
 				for (int areaIndex : (*h.areasByZLevel)[zi]) {
-					auto area = navMesh->m_areas[areaIndex];
-					const int areaPointCount = area.m_edges.size();
-					z = calcZ(area.m_edges[0]->m_pos, area.m_edges[1]->m_pos, area.m_edges[2]->m_pos, x, y);
+					NavPower::Area* area = &navMesh->m_areas[areaIndex];
+					const int areaPointCount = area->m_edges.size();
+					z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
 					if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
 						float areaXCoords[20];
 						float areaYCoords[20];
 						for (int i = 0; i < areaPointCount; i++) {
-							areaXCoords[i] = area.m_edges[i]->m_pos.X;
-							areaYCoords[i] = area.m_edges[i]->m_pos.Y;
+							areaXCoords[i] = area->m_edges[i]->m_pos.X;
+							areaYCoords[i] = area->m_edges[i]->m_pos.Y;
 						}
-						int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area.m_area->m_pos.X, area.m_area->m_pos.Y, h.tolerance, navKit);
+						int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
 						if (edge == -1) { // In polygon with no adjustment needed
+							h.waypointAreas.push_back(area);
 							pointInArea = true;
 							break;
 						} else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
 							navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
 							neededTolerance = true;
 							pointInArea = true;
-							NavPower::Binary::Edge* edge0 = area.m_edges[edge];
-							NavPower::Binary::Edge* edge1 = area.m_edges[(edge + 1) % area.m_edges.size()];
+							h.waypointAreas.push_back(area);
+							NavPower::Binary::Edge* edge0 = area->m_edges[edge];
+							NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
 							float y1 = edge0->m_pos.Y;
 							float y2 = edge1->m_pos.Y;
 							float x1 = edge0->m_pos.X;
@@ -424,6 +462,11 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 						(*(*(*h.grid)[zi])[yi])[xi] = wayPointIndex++;
 					}
 				}
+				if (wayPointIndex >= 65535) {
+					navKit->log(RC_LOG_ERROR, "Error building airg: Reached the maximum number of waypoints (65535)");
+					h.result = -1;
+					return;
+				}
 				if (pointInArea) {
 					Waypoint waypoint;
 					waypoint.vPos.x = x;
@@ -438,10 +481,14 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 					}
 
 					h.waypointZLevels->push_back(zi);
+					if (airg->m_WaypointList.size() % 1000 == 0) {
+						navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Processing... Current waypoint count: " + std::to_string(airg->m_WaypointList.size())).c_str());
+					}
 				}
 			}
 		}
 	}
+	return;
 }
 
 
@@ -450,94 +497,62 @@ bool ReasoningGrid::HasVisibility(
 	unsigned int nToNode,
 	uint8_t nLow)
 {
-	//Waypoint* m_pStart; // rbx
-	//Waypoint* v6; // r11
-	//Waypoint* v7; // r8
-	//int nVisibilityRange; // edi
-	//Vec4 v9; // xmm2 __m128
-	//Vec4 v10; // xmm1 __m128
-	//int v11; // r9d
-	//int v12; // r15d
-	//Vec4 v13; // xmm0 __m128
-	//int v14; // esi
-	//int v15; // r12d
-	//int v16; // ebp
-	//uint8_t* v17; // rax
-	//uint8_t* v18; // rdx
-	//__int64 v19; // rax
-	//__int16 nLayerIndex; // r9
-	//uint8_t* v21; // rbx
-	//uint16_t v22; // cx
-	//uint16_t v23; // cx
-	//int v25; // eax
-	//int v26; // edx
-
-	//m_pStart = &m_WaypointList.front();
-	//v6 = &(&m_WaypointList.front())[nFromNode];
-	//if (v6 < &m_WaypointList.front() || v6 >= &m_WaypointList.back())
-	//	__debugbreak(); // ERROR
-	//v7 = &m_pStart[nToNode];
-	//if (v7 < m_pStart || v7 >= &m_WaypointList.back())
-	//	__debugbreak(); // ERROR
-	//nVisibilityRange = m_Properties.nVisibilityRange;
-	//v9 = Vec4{
-	//	m_Properties.fGridSpacing,
-	//	m_Properties.fGridSpacing,
-	//	0,
-	//	0};
-	//float result[4];
-	//for (int i = 0; i < 4; i++) {
-	//	float reciprocal = 1.0f / v9[i];
-	//	float difference = v6->vPos.m[i] - m_Properties.vMin.m[i];
-	//	result[i] = reciprocal * difference;
-	//};
-	//v10 = result;
-	//v11 = (int)_mm_shuffle_ps(v10, v10, 85).m128_f32[0];
-	//v12 = (__int16)(int)v10.m128_f32[0];
-	//v13 = _mm_mul_ps(_mm_rcp_ps(v9), _mm_sub_ps(v7->vPos.m, m_Properties.vMin.m));
-	//v14 = (int)_mm_shuffle_ps(v13, v13, 85).m128_f32[0];
-	//v15 = (__int16)(int)v13.m128_f32[0];
-	//if ((int)abs(v12 - v15) > nVisibilityRange)
-	//	return 0;
-	//v16 = (__int16)v11;
-	//if ((int)abs((__int16)v11 - (__int16)v14) > nVisibilityRange)
-	//	return 0;
-	//if (v6 < m_pStart || v6 >= m_WaypointList.m_pEnd)
-	//	__debugbreak();
-	//v17 = m_pVisibilityData.m_pStart;
-	//v18 = &v17[v6->nVisionDataOffset];
-	//if (v18 < v17 || v18 >= m_pVisibilityData.m_pEnd)
-	//	__debugbreak();
-	//v19 = *(unsigned __int16*)v18;
-	//nLayerIndex = v7->nLayerIndex;
-	//v21 = &v18[2 * v19];
-	//v22 = 0;
-	//if (nLayerIndex != v6->nLayerIndex)
-	//{
-	//	v23 = 0;
-	//	if (!*(WORD*)v18)
-	//		return 0;
-	//	while (*(WORD*)&v18[2 * v23 + 2] != nLayerIndex)
-	//	{
-	//		if (++v23 >= (int)v19)
-	//			return 0;
-	//	}
-	//	v22 = v23 + 1;
-	//	if (!v22)
-	//		return 0;
-	//}
-	//v26 = (nVisibilityRange
-	//	+ v15
-	//	+ (2 * nVisibilityRange + 1)
-	//	* (nVisibilityRange + (__int16)v14 + (2 * nVisibilityRange + 1) * (nLow + 2 * v22) - v16)
-	//	- v12) >> 31;
-	//v25 = nVisibilityRange
-	//	+ v15
-	//	+ (2 * nVisibilityRange + 1)
-	//	* (nVisibilityRange + (__int16)v14 + (2 * nVisibilityRange + 1) * (nLow + 2 * v22) - v16)
-	//	- v12;
-	//return ((uint8_t)(1 << ((((v26 & 7) + v25) & 7) - (v26 & 7))) & v21[(((v26 & 7) + v25) >> 3) + 2]) != 0;
 	return true;
+}
+
+bool waypointsAreConnected(NavKit* navKit, ReasoningGridBuilderHelper& h, ReasoningGrid* airg, Vec3 waypointPos, NavPower::Area* area, int waypoint2Index) {
+	NavPower::Area* curArea = area;
+	NavPower::Area* waypoint2Area = h.waypointAreas[waypoint2Index];
+	if (area == waypoint2Area) {
+		return true;
+	}
+	Waypoint* waypoint2 = &airg->m_WaypointList[waypoint2Index];
+	Vec3 waypoint2Pos{ waypoint2->vPos.x, waypoint2->vPos.y, waypoint2->vPos.z };
+	std::set<NavPower::Area*> visitedAreas{ curArea };
+	while (curArea != 0) {
+		visitedAreas.insert(curArea);
+		NavPower::Binary::Edge* curEdge = curArea->m_edges[0];
+		NavPower::Binary::Edge* prevEdge = curArea->m_edges[curArea->m_edges.size() - 1];
+
+		if (doIntersect(waypointPos, waypoint2Pos, prevEdge->m_pos, curEdge->m_pos)) {
+			if (prevEdge->m_pAdjArea == waypoint2Area->m_area) {
+				return true;
+			}
+			if (prevEdge->m_pAdjArea == 0) {
+				return false;
+			}				
+			if (!visitedAreas.contains(navKit->navp->binaryAreaToAreaMap.at(prevEdge->m_pAdjArea))) {
+				curArea = navKit->navp->binaryAreaToAreaMap.at(prevEdge->m_pAdjArea);
+				continue;
+			}
+		}
+		bool hasNextArea = false;
+
+		for (int curEdgeIndex = 1, prevEdgeIndex = 0; curEdgeIndex < curArea->m_edges.size(); prevEdgeIndex = curEdgeIndex++) {
+			curEdge = curArea->m_edges[curEdgeIndex];
+			prevEdge = curArea->m_edges[prevEdgeIndex];
+			if (doIntersect(waypointPos, waypoint2Pos, prevEdge->m_pos, curEdge->m_pos)) {
+				if (prevEdge->m_pAdjArea == waypoint2Area->m_area) {
+					return true;
+				}
+				if (prevEdge->m_pAdjArea == 0) {
+					return false;
+				}
+				if (!visitedAreas.contains(navKit->navp->binaryAreaToAreaMap.at(prevEdge->m_pAdjArea))) {
+					curArea = navKit->navp->binaryAreaToAreaMap.at(prevEdge->m_pAdjArea);
+					hasNextArea = true;
+					break;
+				}
+				//navKit->log(rcLogCategory::RC_LOG_PROGRESS, (": " + std::to_string(airg->m_WaypointList.size())).c_str());
+				//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Waypoint 1 -> 2 line goes through final edge, connects to area: " + std::to_string(prevEdge->m_pAdjArea)).c_str());
+			}
+		}
+		if (hasNextArea) {
+			continue;
+		}
+		return false;
+	}
+	return false;
 }
 
 void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, float spacing, float zSpacing, float tolerance, float zTolerance) {
@@ -622,8 +637,16 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	helper.zSpacing = zSpacing;
 	helper.zTolerance = zTolerance;
 	addWaypointsForGrid(airg, navMesh, navKit, helper);
+	if (helper.result == -1) {
+		navKit->airg->airgLoadState.push_back(true);
+		return;
+	}
 	helper.tolerance = tolerance;
 	addWaypointsForGrid(airg, navMesh, navKit, helper);
+	if (helper.result == -1) {
+		navKit->airg->airgLoadState.push_back(true);
+		return;
+	}
 
 	airg->m_nNodeCount = airg->m_WaypointList.size();
 
@@ -645,16 +668,25 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 			for (int xi = 0; xi < gridXSize; xi++) {
 				int waypointIndex = (*(*grid[zi])[yi])[xi];
 				if (waypointIndex != 65535) {
+					Waypoint* waypoint = &airg->m_WaypointList[waypointIndex];
+					Vec3 waypointPos{ waypoint->vPos.x, waypoint->vPos.y, waypoint->vPos.z };
+					NavPower::Area* area = helper.waypointAreas[waypointIndex];
 					for (int neighborNum = 0; neighborNum < 8; neighborNum++) {
 						int neighborWaypointIndex = 65535;
 						int nxi = xi + gridIndexDiff[neighborNum].first;
 						int nyi = yi + gridIndexDiff[neighborNum].second;
 						if (nxi >= 0 && nxi < gridXSize &&
 							nyi >= 0 && nyi < gridYSize &&
-							((*(*grid[zi])[nyi])[nxi] == 65535 || abs(waypointZLevels[waypointIndex] - waypointZLevels[(*(*grid[zi])[nyi])[nxi]]) <= 1)) {
-							neighborWaypointIndex = (*(*grid[zi])[nyi])[nxi];
+							(*(*grid[zi])[nyi])[nxi] != 65535 &&
+							(abs(waypointZLevels[waypointIndex] - waypointZLevels[(*(*grid[zi])[nyi])[nxi]]) <= 1)) {
+							int potentialNeighborWaypointIndex = (*(*grid[zi])[nyi])[nxi];
+							//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Checking if waypoints are connected: Waypoint Index: " + std::to_string(waypointIndex) + " PotentialNeighbor Index: " + std::to_string(potentialNeighborWaypointIndex)).c_str());
+
+							if (waypointsAreConnected(navKit, helper, airg, waypointPos, area, potentialNeighborWaypointIndex)) {
+								neighborWaypointIndex = potentialNeighborWaypointIndex;
+							}
 						}
-						airg->m_WaypointList[waypointIndex].nNeighbors.push_back(neighborWaypointIndex);
+						waypoint->nNeighbors.push_back(neighborWaypointIndex);
 					}
 				}
 			}
