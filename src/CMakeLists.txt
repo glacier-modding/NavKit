@@ -21,6 +21,7 @@ target_link_libraries(NavKit PRIVATE RecastNavigation::Detour)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourCrowd)
 target_link_libraries(NavKit PRIVATE RecastNavigation::DetourTileCache)
 target_link_libraries(NavKit PRIVATE ResourceLib_HM3)
+target_link_libraries(NavKit PRIVATE ftgl)
 
 add_library(nfd::nfd SHARED IMPORTED)
 add_library(NavWeakness SHARED IMPORTED)

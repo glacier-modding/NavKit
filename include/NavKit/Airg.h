@@ -20,6 +20,7 @@ public:
 	std::vector<bool> airgLoadState;
 	std::vector<bool> airgSaveState;
 	bool showAirg;
+	bool showAirgIndices;
 	ResourceConverter* airgResourceConverter;
 	ResourceGenerator* airgResourceGenerator;
 	ReasoningGrid* reasoningGrid;

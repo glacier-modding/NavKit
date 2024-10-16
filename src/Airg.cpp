@@ -8,6 +8,7 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 	lastSaveAirgFile = saveAirgName;
 	airgLoaded = false;
 	showAirg = true;
+	showAirgIndices = false;
 	airgScroll = 0;
 	airgResourceConverter = HM3_GetConverterForResource("AIRG");;
 	airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
@@ -45,10 +46,12 @@ void Airg::setLastSaveFileName(const char* fileName) {
 }
 
 void Airg::drawMenu() {
-	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 347, 250, 347, &airgScroll))
+	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 372, 250, 372, &airgScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Airg", showAirg))
 		showAirg = !showAirg;
+	if (imguiCheck("Show Airg Indices", showAirgIndices))
+		showAirgIndices = !showAirgIndices;
 	imguiLabel("Load Airg from file");
 	if (imguiButton(airgName.c_str(), (airgLoadState.empty() && airgSaveState.empty()))) {
 		char* fileName = openAirgFileDialog(lastLoadAirgFile.data());
@@ -158,6 +161,7 @@ void Airg::drawMenu() {
 void Airg::finalizeLoad() {
 	if (airgLoadState.size() == 2) {
 		airgLoadState.clear();
+		airgLoaded = true;
 	}
 }
 
@@ -276,6 +280,12 @@ void Airg::renderAirg() {
 				glVertex3f(neighbor.vPos.x, neighbor.vPos.z, -neighbor.vPos.y);
 				glEnd();
 			}
+		}
+	}
+	if (showAirgIndices) {
+		for (size_t i = 0; i < numWaypoints; i++) {
+			const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
+			navKit->renderer->drawText(std::to_string(i), { waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y }, { 1, .7f, .7f });
 		}
 	}
 }

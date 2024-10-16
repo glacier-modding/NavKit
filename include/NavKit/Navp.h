@@ -22,6 +22,7 @@ public:
 	int selectedNavpAreaIndex;
 	bool navpLoaded;
 	bool showNavp;
+	bool showNavpIndices;
 	bool doNavpHitTest;
 	int navpScroll;
 	bool loading;
@@ -48,7 +49,7 @@ public:
 private:
 	NavKit* navKit;
 	static void buildNavp(Navp* navp);
-	void renderArea(NavPower::Area area, bool selected);
+	void renderArea(NavPower::Area area, bool selected, int areaIndex);
 
 	static bool areaIsStairs(NavPower::Area area);
 	static void loadNavMesh(Navp* navp, char* fileName, bool isFromJson);

@@ -23,6 +23,10 @@
     {
       "name": "simpleini",
       "version>=": "4.22"
+    },
+    {
+      "name": "ftgl",
+      "version>=": "2022-05-18#1"
     }
   ]
 }

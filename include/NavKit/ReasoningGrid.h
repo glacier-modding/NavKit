@@ -61,9 +61,9 @@ public:
 	float spacing;
 	float zSpacing;
 	Vec3* min;
-	float gridXSize;
-	float gridYSize;
-	float gridZSize;
+	int gridXSize;
+	int gridYSize;
+	int gridZSize;
 	float tolerance;
 	float zTolerance;
 	std::vector<std::vector<int>>* areasByZLevel;

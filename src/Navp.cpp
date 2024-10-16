@@ -7,6 +7,7 @@ Navp::Navp(NavKit* navKit): navKit(navKit) {
 	lastSaveNavpFile = saveNavpName;
 	navpLoaded = false;
 	showNavp = true;
+	showNavpIndices = false;
 	doNavpHitTest = false;
 	navMesh = new NavPower::NavMesh();
 	selectedNavpAreaIndex = -1;
@@ -60,7 +61,7 @@ bool Navp::areaIsStairs(NavPower::Area area) {
 	return area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
 }
 
-void Navp::renderArea(NavPower::Area area, bool selected) {
+void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 	if (areaIsStairs(area)) {
 		if (!selected) {
 			glColor4f(0.5, 0.0, 0.5, 0.6);
@@ -111,8 +112,14 @@ void Navp::renderNavMesh() {
 	if (!loading) {
 		int areaIndex = 0;
 		for (const NavPower::Area& area : navMesh->m_areas) {
-			renderArea(area, areaIndex == selectedNavpAreaIndex);
+			renderArea(area, areaIndex == selectedNavpAreaIndex, areaIndex);
 			areaIndex++;
+		}
+		if (showNavpIndices) {
+			for (const NavPower::Area& area : navMesh->m_areas) {
+				navKit->renderer->drawText(std::to_string(areaIndex), { area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y }, { .7f, .7f, 1 });
+				areaIndex++;
+			}
 		}
 	}
 }
@@ -203,11 +210,13 @@ void Navp::setLastSaveFileName(const char* fileName) {
 }
 	
 void Navp::drawMenu() {
-	int navpMenuHeight = std::min(1140, navKit->renderer->height - 20);
+	int navpMenuHeight = std::min(1165, navKit->renderer->height - 20);
 	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - navpMenuHeight - 10, 250, navpMenuHeight, &navpScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
 		showNavp = !showNavp;
+	if (imguiCheck("Show Navp Indices", showNavpIndices))
+		showNavpIndices = !showNavpIndices;
 	imguiLabel("Load Navp from file");
 	if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
 		char* fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "NavKit.h"
+#include <FTGL/ftgl.h>
 
 class NavKit;
 
@@ -22,6 +23,7 @@ public:
 	Renderer(NavKit* navKit);
 	
 	void initFrameBuffer(int width, int height);
+	void drawText(std::string text, Vec3 pos, Vec3 color = { 0.0, 0.0, 0.0 }, double size = 32.0);
 	bool initWindowAndRenderer();
 	void handleResize();
 	void renderFrame();
@@ -33,6 +35,7 @@ public:
 	GLuint framebuffer;
 	GLuint color_rb;
 	GLuint depth_rb;
+	FTGLPixmapFont* font;
 	int width;
 	int height;
 	float cameraEulers[2];

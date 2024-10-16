@@ -409,48 +409,55 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 				(*h.grid)[zi]->push_back(xRow);
 			}
 			for (int xi = 0; xi < h.gridXSize; xi++) {
-				if ((*(*h.grid)[zi])[yi]->size() > xi && (*(*(*h.grid)[zi])[yi])[xi] != 65535) {
-					continue;
+				float z = h.min->Z + zi * h.zSpacing;
+				int minZLevelMatch = (z - 2 * h.zTolerance - h.min->Z) / h.zSpacing;
+				int maxZLevelMatch = (z + 2 * h.zTolerance - h.min->Z) / h.zSpacing;
+				bool zLevelMatches = false;
+				for (int i = std::max(0, minZLevelMatch); i < std::min(h.gridZSize, maxZLevelMatch); i++) {
+					if ((*(*h.grid)[i])[yi]->size() > xi && (*(*(*h.grid)[i])[yi])[xi] != 65535) {
+						zLevelMatches = true;
+					}
 				}
 				float x = h.min->X + xi * h.spacing;
 				float y = h.min->Y + yi * h.spacing;
-				float z = h.min->Z + zi * h.zSpacing;
 				bool pointInArea = false;
 				bool neededTolerance = false;
 				Vec3 reflected;
-
-				for (int areaIndex : (*h.areasByZLevel)[zi]) {
-					NavPower::Area* area = &navMesh->m_areas[areaIndex];
-					const int areaPointCount = area->m_edges.size();
-					z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
-					if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
-						float areaXCoords[20];
-						float areaYCoords[20];
-						for (int i = 0; i < areaPointCount; i++) {
-							areaXCoords[i] = area->m_edges[i]->m_pos.X;
-							areaYCoords[i] = area->m_edges[i]->m_pos.Y;
-						}
-						int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
-						if (edge == -1) { // In polygon with no adjustment needed
-							h.waypointAreas.push_back(area);
-							pointInArea = true;
-							break;
-						} else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
-							navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
-							neededTolerance = true;
-							pointInArea = true;
-							h.waypointAreas.push_back(area);
-							NavPower::Binary::Edge* edge0 = area->m_edges[edge];
-							NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
-							float y1 = edge0->m_pos.Y;
-							float y2 = edge1->m_pos.Y;
-							float x1 = edge0->m_pos.X;
-							float x2 = edge1->m_pos.X;
-							Vec3 p{ x, y, z };
-							reflected = reflect(p, x1, y1, x2, y2);
-							x = reflected.X;
-							y = reflected.Y;
-							break;
+				if (!zLevelMatches) {
+					for (int areaIndex : (*h.areasByZLevel)[zi]) {
+						NavPower::Area* area = &navMesh->m_areas[areaIndex];
+						const int areaPointCount = area->m_edges.size();
+						z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
+						if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
+							float areaXCoords[20];
+							float areaYCoords[20];
+							for (int i = 0; i < areaPointCount; i++) {
+								areaXCoords[i] = area->m_edges[i]->m_pos.X;
+								areaYCoords[i] = area->m_edges[i]->m_pos.Y;
+							}
+							int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
+							if (edge == -1) { // In polygon with no adjustment needed
+								h.waypointAreas.push_back(area);
+								pointInArea = true;
+								break;
+							}
+							else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
+								navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
+								neededTolerance = true;
+								pointInArea = true;
+								h.waypointAreas.push_back(area);
+								NavPower::Binary::Edge* edge0 = area->m_edges[edge];
+								NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
+								float y1 = edge0->m_pos.Y;
+								float y2 = edge1->m_pos.Y;
+								float x1 = edge0->m_pos.X;
+								float x2 = edge1->m_pos.X;
+								Vec3 p{ x, y, z };
+								reflected = reflect(p, x1, y1, x2, y2);
+								x = reflected.X;
+								y = reflected.Y;
+								break;
+							}
 						}
 					}
 				}

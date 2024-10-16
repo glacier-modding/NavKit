@@ -13,6 +13,7 @@ Renderer::Renderer(NavKit* navKit) : navKit(navKit) {
 	camr = 1000;
 	origCameraEulers[0] = 0, origCameraEulers[1] = 0; // Used to compute rotational changes across frames.
 	prevFrameTime = 0;
+	font = new FTGLPixmapFont("DroidSans.ttf");
 
 	moveFront = 0.0f, moveBack = 0.0f, moveLeft = 0.0f, moveRight = 0.0f, moveUp = 0.0f, moveDown = 0.0f;
 }
@@ -34,6 +35,24 @@ void Renderer::initFrameBuffer(int width, int height) {
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rb);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::drawText(std::string text, Vec3 pos, Vec3 color, double size)
+{
+	if (font->Error())
+		return;
+
+	Vec3 camPos{ cameraPos[0], cameraPos[1], cameraPos[2] };
+	float distance = camPos.DistanceTo(pos);
+	float fontSize = 10 * size / (distance != 0 ? distance : 0.001);
+	if (fontSize < 15) {
+		return;
+	}
+	glColor3f(color.X, color.Y, color.Z);
+
+	font->FaceSize(fontSize);
+	glRasterPos3f(pos.X, pos.Y, pos.Z);
+	font->Render(text.c_str());
 }
 
 bool Renderer::initWindowAndRenderer() {
@@ -199,11 +218,14 @@ void Renderer::finalizeFrame() {
 	SDL_GL_SwapWindow(window);
 }
 
-void drawLine(float* s, float* e) {
+void drawLine(Vec3 s, Vec3 e, Vec3 color = { -1, -1, -1 }) {
+	if (color.X != -1) {
+		glColor3f(color.X, color.Y, color.Z);
+	}
 	glDepthMask(GL_FALSE);
 	glBegin(GL_LINES);
-	glVertex3f(s[0], s[1], s[2]);
-	glVertex3f(e[0], e[1], e[2]);
+	glVertex3f(s.X, s.Y, s.Z);
+	glVertex3f(e.X, e.Y, e.Z);
 	glEnd();
 	glDepthMask(GL_TRUE);
 }
@@ -218,14 +240,14 @@ void Renderer::drawBounds() {
 	float d = p[2] - s[2] / 2;
 	float f = p[1] - s[1] / 2;
 	float b = p[1] + s[1] / 2;
-	float lfu[3] = { l, f, u };
-	float rfu[3] = { r, f, u };
-	float lbu[3] = { l, b, u };
-	float rbu[3] = { r, b, u };
-	float lfd[3] = { l, f, d };
-	float rfd[3] = { r, f, d };
-	float lbd[3] = { l, b, d };
-	float rbd[3] = { r, b, d };
+	Vec3 lfu = { l, f, u };
+	Vec3 rfu = { r, f, u };
+	Vec3 lbu = { l, b, u };
+	Vec3 rbu = { r, b, u };
+	Vec3 lfd = { l, f, d };
+	Vec3 rfd = { r, f, d };
+	Vec3 lbd = { l, b, d };
+	Vec3 rbd = { r, b, d };
 	glColor3f(0.0, 1.0, 1.0);
 	drawLine(lfu, rfu);
 	drawLine(lfu, lbu);
@@ -244,17 +266,19 @@ void Renderer::drawBounds() {
 }
 
 void Renderer::drawAxes() {
-	float o[3] = { 0, 0, 0 };
-	float x[3] = { 1, 0, 0 };
-	float y[3] = { 0, 1, 0 };
-	float z[3] = { 0, 0, 1 };
-	glColor3f(1.0, 0.0, 0.0);
-	drawLine(o, x);
-	glColor3f(0.0, 1.0, 0.0);
-	drawLine(o, y);
-	glColor3f(0.0, 0.0, 1.0);
-	drawLine(o, z);
+	Vec3 o = { 0, 0, 0 };
+	Vec3 x = { 1, 0, 0 };
+	Vec3 y = { 0, 1, 0 };
+	Vec3 z = { 0, 0, 1 };
 
+	drawLine(o, x, x);
+	drawText("X", x, x);
+
+	drawLine(o, y, y);
+	drawText("Y", y, y);
+
+	drawLine(o, z, z);
+	drawText("Z", z, z);
 }
 
 HitTestResult Renderer::hitTestRender(int mx, int my) {
