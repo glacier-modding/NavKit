@@ -28,6 +28,7 @@ void Airg::resetDefaults() {
 	spacing = 2.25;
 	zSpacing = 1;
 	tolerance = 0.3;
+	zTolerance = 1.0;
 }
 
 void Airg::setLastLoadFileName(const char* fileName) {
@@ -314,7 +315,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 			}
 		}
 		navKit->log(RC_LOG_PROGRESS, msg.c_str());
-		navKit->log(RC_LOG_PROGRESS, ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + "Y: " + std::to_string(waypoint.vPos.y) + "Z: " + std::to_string(waypoint.vPos.z)).c_str());
+		navKit->log(RC_LOG_PROGRESS, ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + " Y: " + std::to_string(waypoint.vPos.y) + " Z: " + std::to_string(waypoint.vPos.z) + "   XI: " + std::to_string(waypoint.xi) + " YI: " + std::to_string(waypoint.yi) + " ZI: " + std::to_string(waypoint.zi)).c_str());
 		msg = "  Vision Data Offset: " + std::to_string(waypoint.nVisionDataOffset);
 		msg += "  Layer Index: " + std::to_string(waypoint.nLayerIndex);
 		int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size() ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset : reasoningGrid->m_pVisibilityData.size();
@@ -330,7 +331,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 		std::string waypointVisibilityDataString;
 
 		char numHex[3];
-		msg += "  Visibility Data Type: " + std::to_string(waypointVisibilityData[0]) + " Visibility data:";
+		msg += "  Visibility Data Type: " + std::to_string(waypointVisibilityData[0]);// +" Visibility data:";
 		navKit->log(RC_LOG_PROGRESS, msg.c_str());
 		for (int count = 2; count < waypointVisibilityData.size(); count++) {
 			uint8_t num = waypointVisibilityData[count];
@@ -345,11 +346,11 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 				waypointVisibilityDataString += " ";
 			}
 			if ((count - 1) % 96 == 0) {
-				navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+				//navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
 				waypointVisibilityDataString = "";
 			}
 		}
-		navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+		//navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
 	}
 }
 

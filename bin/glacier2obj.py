@@ -1199,7 +1199,7 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
         aloc_hash = hash_and_entity['hash']
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
-                     "scale": entity["scale"]["data"]}
+                     "scale": entity["scale"]["data"], "id": entity["id"]}
 
         if aloc_hash not in transforms:
             transforms[aloc_hash] = []
@@ -1240,7 +1240,7 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
     mesh_count = 0
     for aloc_hash in aloc_list:
         if aloc_hash in transforms:
-            mesh_count += len(transforms[aloc_hash])
+            mesh_count += len(transforms[aloc_hash[:-5]])
 
     mesh_i = 0
     for aloc_i in range(0, aloc_count):
@@ -1286,6 +1286,7 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
                     cur = obj
                 collection.objects.link(cur)
                 cur.select_set(True)
+                cur.name = aloc_hash + " " + transform["id"]
                 cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
                 cur.rotation_mode = 'QUATERNION'
                 cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
@@ -1340,6 +1341,7 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
                 cur = pb_box_obj
             collection.objects.link(cur)
             cur.select_set(True)
+            cur.name = "PF_BOX " + transform["id"]
             cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
             cur.rotation_mode = 'QUATERNION'
             cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])

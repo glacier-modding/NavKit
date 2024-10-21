@@ -230,13 +230,6 @@ int orientation(Vec3 p, Vec3 q, Vec3 r) {
 	return (val > 0) ? 1 : 2; // Clockwise or counterclockwise
 }
 
-Vec3 expandedPoint(Vec3 origin, Vec3 vert, float tolerance) {
-	float toleranceX = vert.X > origin.X ? tolerance : -tolerance;
-	float toleranceY = vert.Y > origin.Y ? tolerance : -tolerance;
-	Vec3 expanded { vert.X + toleranceX, vert.Y + toleranceY, 0 };
-	return expanded;
-}
-
 Vec3 reflect(Vec3 p, float x1, float y1, float x2, float y2) {
 	float dx, dy, a, b;
 	float x, y;
@@ -253,30 +246,26 @@ Vec3 reflect(Vec3 p, float x1, float y1, float x2, float y2) {
 }
 
 float distanceFromEdge(Vec3 p, Vec3 v, Vec3 w) {
-	const float l2 = v.DistanceSquaredTo(w);  // i.e. |w-v|^2 -  avoid a sqrt
-	if (l2 == 0.0) return p.DistanceTo(v);   // v == w case
-	// Consider the line extending the segment, parameterized as v + t (w - v).
-	// We find projection of point p onto the line. 
-	// It falls where t = [(p-v) . (w-v)] / |w-v|^2
-	// We clamp t from [0,1] to handle points outside the segment vw.
+	const float l2 = v.DistanceSquaredTo(w);
+	if (l2 == 0.0) return p.DistanceTo(v); 
 	const float t = std::max(0.0f, std::min(1.0f, (p - v).Dot(w - v) / l2));
-	const Vec3 projection = v + (w - v) * t;  // Projection falls on the segment
+	const Vec3 projection = v + (w - v) * t;
 	return p.DistanceTo(projection);
 }
+
 // From https://wrfranklin.org/Research/Short_Notes/pnpoly.html
 int closestEdge(int nvert, float* vertx, float* verty, float testx, float testy, float originx, float originy, float tolerance, NavKit* navKit) {
 	
-	///////////// Ray method
 	int cur, prev;
 	bool c = false;
 	int closestEdge = -2;
 	float minDist = 10000;
 	Vec3 testVert{ testx, testy, 0 };
 	for (cur = 0, prev = nvert - 1; cur < nvert; prev = cur++) {
-		float curToleranceX = 0; //vertx[i] > originx ? tolerance : -tolerance;
-		float curToleranceY = 0; //verty[i] > originy ? tolerance : -tolerance;
-		float prevToleranceX = 0; //vertx[j] > originx ? tolerance : -tolerance;
-		float prevToleranceY = 0; //verty[j] > originy ? tolerance : -tolerance;
+		float curToleranceX = 0; 
+		float curToleranceY = 0; 
+		float prevToleranceX = 0;
+		float prevToleranceY = 0;
 		float curX = vertx[cur] + curToleranceX;
 		float curY = verty[cur] + curToleranceY;
 		float prevX = vertx[prev] + prevToleranceX;
@@ -300,53 +289,11 @@ int closestEdge(int nvert, float* vertx, float* verty, float testx, float testy,
 	if (minDist > tolerance) {
 		return -2;
 	}
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Within tolerance: " + std::to_string(minDist) + " at Test X: " + std::to_string(testx) + " Test Y: " + std::to_string(testy) + " with Origin X: " + std::to_string(originx) + " Origin Y: " + std::to_string(originy) + " Point 1 X: " + std::to_string(vertx[closestEdge]) + " Point 1 Y: " + std::to_string(verty[closestEdge]) + " Point 2 X: " + std::to_string(vertx[(closestEdge + 1) % nvert]) + " Point 2 Y: " + std::to_string(verty[(closestEdge + 1) % nvert])).c_str());
+
 
 	return closestEdge;
-
-	/////////////// Orientation method
-	//int i, j;
-	//Vec3 prevVert{ vertx[nvert - 1], verty[nvert - 1], 0 };
-	//Vec3 curVert{ vertx[0], verty[0], 0 };
-	//Vec3 origin{ originx, originy, 0 };
-	//if (tolerance != 0) {
-	//	//prevVert = expandedPoint(origin, prevVert, tolerance);
-	//	//curVert = expandedPoint(origin, curVert, tolerance);
-	//}
-	//Vec3 testVert{ testx, testy, 0 };
-	//int prev = orientation(prevVert, curVert, testVert);
-	//int closestEdge = -2;
-	//float minDist = 10000;
-	//bool inside = true;
-	//for (i = 1; i < nvert; i++) {
-	//	prevVert.X = vertx[i - 1];
-	//	prevVert.Y = verty[i - 1];
-	//	curVert.X = vertx[i];
-	//	curVert.Y = verty[i];
-	//	if (tolerance != 0) {
-	//		//prevVert = expandedPoint(origin, prevVert, tolerance);
-	//		//curVert = expandedPoint(origin, curVert, tolerance);
-	//	}
-	//	float curDist = distanceFromEdge(testVert, prevVert.X, prevVert.Y, curVert.X, curVert.Y);
-	//	if (minDist > curDist) {
-	//		minDist = curDist;
-	//		closestEdge = i - 1;
-	//	}
-	//	int cur = orientation(prevVert, curVert, testVert);
-	//	if (cur != prev) {
-	//		inside = false;
-	//	}
-	//}
-	//if (inside) {
-	//	return -1;
-	//}
-	//if (minDist > tolerance) {
-	//	return -2;
-	//}
-	//return closestEdge;
 }
 
-// Function to check if point q lies on segment pr
 bool onSegment(Vec3 p, Vec3 q, Vec3 r) {
 	if (q.X <= std::max(p.X, r.X) && q.X >= std::min(p.X, r.X) &&
 		q.Y <= std::max(p.Y, r.Y) && q.Y >= std::min(p.Y, r.Y))
@@ -356,30 +303,20 @@ bool onSegment(Vec3 p, Vec3 q, Vec3 r) {
 }
 
 bool doIntersect(Vec3 p1, Vec3 q1, Vec3 p2, Vec3 q2) {
-	// Find the four orientations needed for general and special cases
 	int o1 = orientation(p1, q1, p2);
 	int o2 = orientation(p1, q1, q2);
 	int o3 = orientation(p2, q2, p1);
 	int o4 = orientation(p2, q2, q1);
 
-	// General case
 	if (o1 != o2 && o3 != o4)
 		return true;
 
-	// Special Cases
-	// p1, q1 and p2 are collinear and p2 lies on segment p1q1
 	if (o1 == 0 && onSegment(p1, p2, q1)) return true;
-
-	// p1, q1 and q2 are collinear and q2 lies on segment p1q1
 	if (o2 == 0 && onSegment(p1, q2, q1)) return true;
-
-	// p2, q2 and p1 are collinear and p1 lies on segment p2q2
 	if (o3 == 0 && onSegment(p2, p1, q2)) return true;
-
-	// p2, q2 and q1 are collinear and q1 lies on segment p2q2
 	if (o4 == 0 && onSegment(p2, q1, q2)) return true;
 
-	return false; // Doesn't fall in any case
+	return false;
 }
 
 float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
@@ -409,57 +346,67 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 				(*h.grid)[zi]->push_back(xRow);
 			}
 			for (int xi = 0; xi < h.gridXSize; xi++) {
-				float z = h.min->Z + zi * h.zSpacing;
-				int minZLevelMatch = (z - 2 * h.zTolerance - h.min->Z) / h.zSpacing;
-				int maxZLevelMatch = (z + 2 * h.zTolerance - h.min->Z) / h.zSpacing;
-				bool zLevelMatches = false;
-				for (int i = std::max(0, minZLevelMatch); i < std::min(h.gridZSize, maxZLevelMatch); i++) {
-					if ((*(*h.grid)[i])[yi]->size() > xi && (*(*(*h.grid)[i])[yi])[xi] != 65535) {
-						zLevelMatches = true;
-					}
+				if ((*(*h.grid)[zi])[yi]->size() > xi && (*(*(*h.grid)[zi])[yi])[xi] != 65535) {
+					continue;
 				}
 				float x = h.min->X + xi * h.spacing;
 				float y = h.min->Y + yi * h.spacing;
+				float z = h.min->Z + zi * h.zSpacing;
 				bool pointInArea = false;
 				bool neededTolerance = false;
 				Vec3 reflected;
-				if (!zLevelMatches) {
-					for (int areaIndex : (*h.areasByZLevel)[zi]) {
-						NavPower::Area* area = &navMesh->m_areas[areaIndex];
-						const int areaPointCount = area->m_edges.size();
-						z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
+				NavPower::Area* area;
+				for (int areaIndex : (*h.areasByZLevel)[zi]) {
+					area = &navMesh->m_areas[areaIndex];
+					const int areaPointCount = area->m_edges.size();
+					z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
 						if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
-							float areaXCoords[20];
-							float areaYCoords[20];
-							for (int i = 0; i < areaPointCount; i++) {
-								areaXCoords[i] = area->m_edges[i]->m_pos.X;
-								areaYCoords[i] = area->m_edges[i]->m_pos.Y;
-							}
-							int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
-							if (edge == -1) { // In polygon with no adjustment needed
-								h.waypointAreas.push_back(area);
-								pointInArea = true;
-								break;
-							}
-							else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
-								navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
-								neededTolerance = true;
-								pointInArea = true;
-								h.waypointAreas.push_back(area);
-								NavPower::Binary::Edge* edge0 = area->m_edges[edge];
-								NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
-								float y1 = edge0->m_pos.Y;
-								float y2 = edge1->m_pos.Y;
-								float x1 = edge0->m_pos.X;
-								float x2 = edge1->m_pos.X;
-								Vec3 p{ x, y, z };
-								reflected = reflect(p, x1, y1, x2, y2);
-								x = reflected.X;
-								y = reflected.Y;
-								break;
-							}
+						float areaXCoords[20];
+						float areaYCoords[20];
+						for (int i = 0; i < areaPointCount; i++) {
+							areaXCoords[i] = area->m_edges[i]->m_pos.X;
+							areaYCoords[i] = area->m_edges[i]->m_pos.Y;
+						}
+						int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
+						if (edge == -1) { // In polygon with no adjustment needed
+							pointInArea = true;
+							break;
+						}
+						else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
+							//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
+							neededTolerance = true;
+							pointInArea = true;
+							NavPower::Binary::Edge* edge0 = area->m_edges[edge];
+							NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
+							float y1 = edge0->m_pos.Y;
+							float y2 = edge1->m_pos.Y;
+							float x1 = edge0->m_pos.X;
+							float x2 = edge1->m_pos.X;
+							Vec3 p{ x, y, z };
+							reflected = reflect(p, x1, y1, x2, y2);
+							x = reflected.X;
+							y = reflected.Y;
+							break;
 						}
 					}
+				}
+
+				int cxi = std::round((x - h.min->X) / h.spacing);
+				int cyi = std::round((y - h.min->Y) / h.spacing);
+				int czi = zi;
+				if (((*(*h.grid)[czi]).size() > cyi && (*(*h.grid)[czi])[cyi]->size() > cxi) &&
+					((*h.grid).size() > czi && ((*(*(*h.grid)[czi])[cyi])[cxi] != 65535))) {//||
+					//((*h.grid).size() > czi - 1 && czi > 0 && (*(*(*h.grid)[czi - 1])[cyi])[cxi] != 65535) ||
+					//((*h.grid).size() > czi - 2 && czi > 1 && (*(*(*h.grid)[czi - 2])[cyi])[cxi] != 65535)) {
+					navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Skipping duplicate waypoint : " + std::to_string(wayPointIndex) + " XI: " + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi) + " CXI: " + std::to_string(cxi) + " CYI: " + std::to_string(cyi) + " CZI: " + std::to_string(czi)).c_str());
+
+					pointInArea = false;
+				}
+				//x = h.min->X + xi * h.spacing;  // REMOVE
+				//y = h.min->Y + yi * h.spacing; // REMOVE
+				//z = h.min->Z + zi * h.zSpacing; // REMOVE
+				if (pointInArea) {
+					h.waypointAreas.push_back(area);
 				}
 				if ((*(*h.grid)[zi])[yi]->size() == xi) {
 					(*(*h.grid)[zi])[yi]->push_back(pointInArea ? wayPointIndex++ : 65535);
@@ -482,9 +429,12 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 					waypoint.vPos.w = 1.0;
 					waypoint.nVisionDataOffset = 556 * airg->m_WaypointList.size();
 					waypoint.nLayerIndex = 0;
+					waypoint.xi = xi;
+					waypoint.yi = yi;
+					waypoint.zi = zi;
 					airg->m_WaypointList.push_back(waypoint);
 					if (neededTolerance) {
-						navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Waypoint index: " + std::to_string(airg->m_WaypointList.size() - 1) + " X:" + std::to_string(x) + " Y: " + std::to_string(y) + " Z: " + std::to_string(z)).c_str());
+						//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Waypoint index: " + std::to_string(airg->m_WaypointList.size() - 1) + " X:" + std::to_string(x) + " Y: " + std::to_string(y) + " Z: " + std::to_string(z)).c_str());
 					}
 
 					h.waypointZLevels->push_back(zi);
@@ -497,7 +447,6 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 	}
 	return;
 }
-
 
 bool ReasoningGrid::HasVisibility(
 	unsigned int nFromNode,
@@ -643,12 +592,17 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	helper.waypointZLevels = &waypointZLevels;
 	helper.zSpacing = zSpacing;
 	helper.zTolerance = zTolerance;
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within areas...");
+
 	addWaypointsForGrid(airg, navMesh, navKit, helper);
 	if (helper.result == -1) {
 		navKit->airg->airgLoadState.push_back(true);
 		return;
 	}
 	helper.tolerance = tolerance;
+	int waypointsWithinAreas = airg->m_WaypointList.size();
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(waypointsWithinAreas) + " waypoints within areas.").c_str());
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within tolerance around areas...");
 	addWaypointsForGrid(airg, navMesh, navKit, helper);
 	if (helper.result == -1) {
 		navKit->airg->airgLoadState.push_back(true);
@@ -714,6 +668,9 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 		deadEndData[i] = 0;
 	}
 	airg->m_deadEndData.m_aBytes = deadEndData;
+	int waypointsWithinTolerance = airg->m_WaypointList.size() - waypointsWithinAreas;
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(waypointsWithinTolerance) + " waypoints within tolerance around areas.").c_str());
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(airg->m_WaypointList.size()) + " waypoints total.").c_str());
 
 
 	auto end = std::chrono::high_resolution_clock::now();

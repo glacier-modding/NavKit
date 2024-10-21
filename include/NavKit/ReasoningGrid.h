@@ -47,10 +47,19 @@ public:
 
 class Waypoint {
 public:
+	Waypoint() {
+		xi = -1;
+		yi = -1;
+		zi = -1;
+	}
 	std::vector<int> nNeighbors;
 	Vec4 vPos;
 	uint32_t nVisionDataOffset;
 	uint32_t nLayerIndex;
+
+	int xi;
+	int yi;
+	int zi;
 
 	const void writeJson(std::ostream& f);
 	void readJson(simdjson::ondemand::object p_Json);

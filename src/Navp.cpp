@@ -104,7 +104,26 @@ void Navp::setSelectedNavpAreaIndex(int index) {
 	if (index != -1 && index < navMesh->m_areas.size()) {
 		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(index)).c_str());
 		Vec3 pos = navMesh->m_areas[index].m_area->m_pos;
-		navKit->log(RC_LOG_PROGRESS, ("Area center: X: " + std::to_string(pos.X) + "Y: " + std::to_string(pos.Y) + "Z: " + std::to_string(pos.Z)).c_str());
+		char v[16];
+		snprintf(v, sizeof(v), "%.2f", pos.X);
+		std::string msg = "Area center:";
+		msg += " X: " + std::string{ v };
+		snprintf(v, sizeof(v), "%.2f", pos.Y);
+		msg += " Y: " + std::string{ v };
+		snprintf(v, sizeof(v), "%.2f", pos.Z);
+		msg += " Z: " + std::string{ v };
+		int edgeIndex = 0;
+		for (auto vertex : navMesh->m_areas[index].m_edges) {
+			msg += " Edge " + std::to_string(edgeIndex) + " pos:";
+			snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
+			msg += " X: " + std::string{ v };
+			snprintf(v, sizeof(v), "%.2f", vertex->m_pos.Y);
+			msg += " Y: " + std::string{ v };
+			snprintf(v, sizeof(v), "%.2f", vertex->m_pos.Z);
+			msg += " Z: " + std::string{ v };
+			edgeIndex++;
+		}
+		navKit->log(RC_LOG_PROGRESS, (msg).c_str());
 	}
 }
 
@@ -116,8 +135,16 @@ void Navp::renderNavMesh() {
 			areaIndex++;
 		}
 		if (showNavpIndices) {
+			areaIndex = 0;
 			for (const NavPower::Area& area : navMesh->m_areas) {
 				navKit->renderer->drawText(std::to_string(areaIndex), { area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y }, { .7f, .7f, 1 });
+				if (selectedNavpAreaIndex == areaIndex) {
+					int edgeIndex = 0;
+					for (auto vertex : area.m_edges) {
+						navKit->renderer->drawText(std::to_string(edgeIndex), { vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y }, { .7f, 1, .7f });
+						edgeIndex++;
+					}
+				}
 				areaIndex++;
 			}
 		}
