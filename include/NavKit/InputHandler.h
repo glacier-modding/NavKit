@@ -14,6 +14,7 @@ public:
 	int origMousePos[2];
 	int mouseScroll;
 	bool resized;
+	bool moved;
 	unsigned char mouseButtonMask;
 
 private:

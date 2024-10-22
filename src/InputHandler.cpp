@@ -5,6 +5,8 @@ InputHandler::InputHandler(NavKit* navKit) : navKit(navKit) {
 	mousePos[0] = 0, mousePos[1] = 0;
 	origMousePos[0] = 0, origMousePos[1] = 0;
 	mouseScroll = 0;
+	resized = false;
+	moved = false;
 }
 
 void InputHandler::handleInput() {
@@ -19,6 +21,9 @@ void InputHandler::handleInput() {
 		case SDL_WINDOWEVENT:
 			if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
 				resized = true;
+			}
+			if (event.window.event == SDL_WINDOWEVENT_MOVED) {
+				moved = true;
 			}
 			break;
 

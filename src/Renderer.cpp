@@ -6,6 +6,8 @@ Renderer::Renderer(NavKit* navKit) : navKit(navKit) {
 	depth_rb = 0;
 	height = 0;
 	width = 0;
+	initialFrameRate = 60.0f;
+	frameRate = 60.0f;
 	window = 0;
 
 	cameraEulers[0] = 45.0, cameraEulers[1] = 45.0;
@@ -35,6 +37,25 @@ void Renderer::initFrameBuffer(int width, int height) {
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rb);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	updateFrameRate();
+}
+
+void Renderer::initFrameRate(float frameRateValue) {
+	initialFrameRate = frameRateValue;
+}
+
+void Renderer::updateFrameRate() {
+	if (initialFrameRate == -1.00000000) {
+		int displayIndex = SDL_GetWindowDisplayIndex(window);
+		SDL_DisplayMode* displayMode = new SDL_DisplayMode();
+		if (!SDL_GetCurrentDisplayMode(displayIndex, displayMode)) {
+			frameRate = (float)displayMode->refresh_rate;
+		}
+		else {
+			frameRate = 60.0f;
+		}
+	}
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting framerate to " + std::to_string(frameRate)).c_str());
 }
 
 void Renderer::drawText(std::string text, Vec3 pos, Vec3 color, double size)
@@ -168,7 +189,7 @@ void Renderer::renderFrame() {
 	prevFrameTime = time;
 
 	// Clamp the framerate so that we do not hog all the CPU.
-	const float MIN_FRAME_TIME = 1.0f / 40.0f;
+	const float MIN_FRAME_TIME = 1.0f / frameRate;
 	if (dt < MIN_FRAME_TIME)
 	{
 		int ms = (int)((MIN_FRAME_TIME - dt) * 1000.0f);

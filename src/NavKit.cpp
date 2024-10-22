@@ -42,6 +42,10 @@ int NavKit::runProgram(int argc, char** argv) {
 			renderer->handleResize();
 			inputHandler->resized = false;
 		}
+		if (inputHandler->moved) {
+			renderer->updateFrameRate();
+			inputHandler->moved = false;
+		}
 		renderer->renderFrame();
 		inputHandler->hitTest();
 		gui->drawGui();
@@ -107,6 +111,7 @@ void NavKit::loadSettings() {
 	airg->saveTolerance((float)atof(ini.GetValue("Airg", "tolerance", "0.2f")));
 	airg->saveZSpacing((float)atof(ini.GetValue("Airg", "ySpacing", "1.0f")));
 	airg->saveZTolerance((float)atof(ini.GetValue("Airg", "zTolerance", "1.0f")));
+	renderer->initFrameRate((float)atof(ini.GetValue("Renderer", "frameRate", "-1.0f")));
 }
 
 NavKit::NavKit() {

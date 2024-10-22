@@ -25,6 +25,8 @@ public:
 	void initFrameBuffer(int width, int height);
 	void drawText(std::string text, Vec3 pos, Vec3 color = { 0.0, 0.0, 0.0 }, double size = 32.0);
 	bool initWindowAndRenderer();
+	void initFrameRate(float frameRateValue);
+	void updateFrameRate();
 	void handleResize();
 	void renderFrame();
 	void finalizeFrame();
@@ -38,6 +40,8 @@ public:
 	FTGLPixmapFont* font;
 	int width;
 	int height;
+	float frameRate;
+	float initialFrameRate;
 	float cameraEulers[2];
 	float cameraPos[3];
 	float camr;
