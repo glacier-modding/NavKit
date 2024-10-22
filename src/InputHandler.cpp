@@ -3,7 +3,7 @@
 InputHandler::InputHandler(NavKit* navKit) : navKit(navKit) {
 	mouseButtonMask = 0;
 	mousePos[0] = 0, mousePos[1] = 0;
-	origMousePos[0] = 0, origMousePos[1] = 0; // Used to compute mouse movement totals across frames.}
+	origMousePos[0] = 0, origMousePos[1] = 0;
 	mouseScroll = 0;
 }
 
@@ -24,11 +24,7 @@ void InputHandler::handleInput() {
 
 		case SDL_KEYDOWN:
 			// Handle any key presses here.
-			if (event.key.keysym.sym == SDLK_ESCAPE)
-			{
-				navKit->done = true;
-			}
-			else if (event.key.keysym.sym == SDLK_TAB)
+			if (event.key.keysym.sym == SDLK_TAB)
 			{
 				navKit->gui->showMenu = !navKit->gui->showMenu;
 			}
