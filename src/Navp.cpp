@@ -64,15 +64,15 @@ bool Navp::areaIsStairs(NavPower::Area area) {
 void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 	if (areaIsStairs(area)) {
 		if (!selected) {
-			glColor4f(0.5, 0.0, 0.5, 0.6);
+			glColor4f(0.5, 0.5, 0.0, 0.6);
 		}
 		else {
-			glColor4f(1.0, 0.0, 1.0, 0.3);
+			glColor4f(1.0, 1.0, 0.5, 0.6);
 		}
 	}
 	else {
 		if (!selected) {
-			glColor4f(0.0, 0.0, 0.5, 0.6);
+			glColor4f(0.0, 0.5, 0.0, 0.6);
 		}
 		else {
 			glColor4f(0.0, 0.5, 0.5, 0.6);
@@ -84,7 +84,7 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 	}
 	glEnd();
 	if (!selected) {
-		glColor3f(0.0, 0.0, 1.0);
+		glColor3f(0.0, 1.0, 0.0);
 	}
 	else {
 		glColor3f(0.0, 1.0, 1.0);
@@ -237,7 +237,7 @@ void Navp::setLastSaveFileName(const char* fileName) {
 }
 	
 void Navp::drawMenu() {
-	int navpMenuHeight = std::min(1165, navKit->renderer->height - 20);
+	int navpMenuHeight = std::min(1200, navKit->renderer->height - 20);
 	if (imguiBeginScrollArea("Navp menu", 10, navKit->renderer->height - navpMenuHeight - 10, 250, navpMenuHeight, &navpScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Navp", showNavp))
@@ -301,6 +301,11 @@ void Navp::drawMenu() {
 		navKit->gameConnection->SendNavp(navMesh);
 		navKit->gameConnection->HandleMessages();
 	}
+	if (imguiButton("Build Navp from Obj", navpBuildDone.empty() && navKit->geom && navKit->obj->objLoaded))
+	{
+		std::thread buildNavpThread(&Navp::buildNavp, this);
+		buildNavpThread.detach();
+	}
 	imguiSeparatorLine();
 	imguiLabel("Selected Area");
 	char selectedNavpText[64];
@@ -322,6 +327,9 @@ void Navp::drawMenu() {
 	imguiSeparatorLine();
 
 	navKit->sample->handleCommonSettings();
+	
+	imguiSeparatorLine();
+	imguiLabel("Bounding Box");
 
 	bool bboxChanged = false;
 	if (imguiSlider("Bounding Box Origin X", &bBoxPosX, -500.0f, 500.0f, 1.0f)) {
@@ -373,11 +381,6 @@ void Navp::drawMenu() {
 		float bBoxPos[3] = { bBoxPosX, bBoxPosY, bBoxPosZ };
 		float bBoxSize[3] = { bBoxSizeX, bBoxSizeY, bBoxSizeZ };
 		navKit->obj->setBBox(bBoxPos, bBoxSize);
-	}
-	if (imguiButton("Build Navp from Obj", navpBuildDone.empty() && navKit->geom && navKit->obj->objLoaded))
-	{
-		std::thread buildNavpThread(&Navp::buildNavp, this);
-		buildNavpThread.detach();
 	}
 	imguiEndScrollArea();
 }

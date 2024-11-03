@@ -20,7 +20,7 @@ void Gui::drawGui() {
 	imguiBeginFrame(navKit->inputHandler->mousePos[0], navKit->inputHandler->mousePos[1], navKit->inputHandler->mouseButtonMask, navKit->inputHandler->mouseScroll);
 	if (showMenu)
 	{
-		const char msg[] = "W/S/A/D: Move  RMB: Rotate";
+		const char msg[] = "W/S/A/D/Q/E: Move  LMB: Select / Deselect RMB: Rotate  Tab: Show / Hide UI  Ctrl: Slow camera movement  Shift: Fast camera movement";
 		imguiDrawText(280, navKit->renderer->height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
 		char cameraPosMessage[128];
 		snprintf(cameraPosMessage, sizeof cameraPosMessage, "Camera position: %f, %f, %f", navKit->renderer->cameraPos[0], navKit->renderer->cameraPos[1], navKit->renderer->cameraPos[2]);

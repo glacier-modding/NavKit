@@ -3,9 +3,9 @@
 std::string VisionData::getName() {
 	switch (visionDataType) {
 	case SIZE_556:
-		return "red";
+		return "blue";
 	case SIZE_1110:
-		return "green";
+		return "red";
 	case SIZE_1664:
 		return "indigo";
 	case SIZE_2218:
@@ -43,11 +43,12 @@ VisionData VisionData::GetVisionDataType(int size) {
 }
 
 Vec4 VisionData::getColor() {
+	return Vec4(0.0, 0.0, 1.0, 0.6);
 	switch (visionDataType) {
 	case SIZE_556:
-		return Vec4(1.0, 0.0, 0.0, 0.6);
+		return Vec4(0.0, 0.0, 1.0, 0.6);
 	case SIZE_1110:
-		return Vec4(0.0, 1.0, 0.0, 0.6);
+		return Vec4(1.0, 0.0, 0.0, 0.6);
 	case SIZE_1664:
 		return Vec4(0.5, 0.0, 1.0, 0.6);
 	case SIZE_2218:
