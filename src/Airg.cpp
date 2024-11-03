@@ -245,32 +245,9 @@ void Airg::renderAirg() {
 	for (size_t i = 0; i < numWaypoints; i++) {
 		const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
 		int size = visibilityDataSize(reasoningGrid, i);
-		switch (size) {
-			case 556:
-				glColor4f(1.0, 0.0, 0.0, 0.6);
-				break;
-			case 1110:
-				glColor4f(0.0, 1.0, 0.0, 0.6);
-				break;
-			case 1664:
-				glColor4f(0.0, 0.0, 1.0, 0.6);
-				break;
-			case 2218:
-				glColor4f(1.0, 1.0, 0.0, 0.6);
-				break;
-			case 2772:
-				glColor4f(1.0, 0.0, 1.0, 0.6);
-				break;
-			case 3326:
-				glColor4f(0.0, 1.0, 1.0, 0.6);
-				break;
-			case 3880:
-				glColor4f(1.0, 1.0, 1.0, 0.6);
-				break;
-			default:
-				glColor4f(0.0, 0.0, 0.0, 0.6);
-				break;
-		}
+		VisionData visionData = VisionData::GetVisionDataType(size);
+		Vec4 color = visionData.getColor();
+		glColor4f(color.x, color.y, color.z, color.w);
 		renderWaypoint(waypoint, selectedWaypointIndex == i);
 
 		for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
@@ -445,34 +422,8 @@ void Airg::loadAirg(Airg* airg, char* fileName, bool isFromJson) {
 	airg->navKit->log(RC_LOG_PROGRESS, ("Total: " + std::to_string(total) + " Max Visibility: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size())).c_str());
 	airg->navKit->log(RC_LOG_PROGRESS, "Visibility data offset map:");
 	for (auto& pair : visionDataOffsetCounts) {
-		std::string color;
-		switch (pair.first) {
-		case 556:
-			color = "red";
-			break;
-		case 1110:
-			color = "green";
-			break;
-		case 1664:
-			color = "blue";
-			break;
-		case 2218:
-			color = "yellow";
-			break;
-		case 2772:
-			color = "purple";
-			break;
-		case 3326:
-			color = "teal";
-			break;
-		case 3880:
-			color = "white";
-			break;
-		default:
-			color = "black";
-			break;
-		}
-		airg->navKit->log(RC_LOG_PROGRESS, ("Offset difference: " + std::to_string(pair.first) + " Color: " + color + " Count: " + std::to_string(pair.second)).c_str());
+		VisionData visionData = VisionData::GetVisionDataType(pair.first);
+		airg->navKit->log(RC_LOG_PROGRESS, ("Offset difference: " + std::to_string(pair.first) + " Color: " + visionData.getName() + " Count: " + std::to_string(pair.second)).c_str());
 	}
 
 	airg->airgLoadState.push_back(true);

@@ -329,82 +329,111 @@ float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 	return p1.Z + ((dy1 * dx3 - dx1 * dy3) * (p2.Z - p1.Z) + (dx1 * dy2 - dy1 * dx2) * (p3.Z - p1.Z)) / (dx3 * dy2 - dx2 * dy3);
 }
 
+void initializeGrid(NavKit* navKit, ReasoningGridBuilderHelper& h) {
+	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Initializing Reasoning Grid");
+
+	for (int zi = 0; zi < h.gridZSize; zi++) {
+		std::vector<std::vector<int>*>* yRow = new std::vector<std::vector<int>*>();
+		h.grid->push_back(yRow);
+		for (int yi = 0; yi < h.gridYSize; yi++) {
+			std::vector<int>* xRow = new std::vector<int>();
+			yRow->push_back(xRow);
+			for (int xi = 0; xi < h.gridXSize; xi++) {
+				xRow->push_back(65535);
+			}
+		}
+	}
+}
+
+NavPower::BBox calculateBBox(NavPower::Area* area)
+{
+	float s_minFloat = -300000000000;
+	float s_maxFloat = 300000000000;
+	NavPower::BBox bbox;
+	bbox.m_min.X = s_maxFloat;
+	bbox.m_min.Y = s_maxFloat;
+	bbox.m_min.Z = s_maxFloat;
+	bbox.m_max.X = s_minFloat;
+	bbox.m_max.Y = s_minFloat;
+	bbox.m_max.Z = s_minFloat;
+	for (auto& edge : area->m_edges)
+	{
+		bbox.m_max.X = std::max(bbox.m_max.X, edge->m_pos.X);
+		bbox.m_max.Y = std::max(bbox.m_max.Y, edge->m_pos.Y);
+		bbox.m_max.Z = std::max(bbox.m_max.Z, edge->m_pos.Z);
+		bbox.m_min.X = std::min(bbox.m_min.X, edge->m_pos.X);
+		bbox.m_min.Y = std::min(bbox.m_min.Y, edge->m_pos.Y);
+		bbox.m_min.Z = std::min(bbox.m_min.Z, edge->m_pos.Z);
+	}
+	return bbox;
+}
+
 void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, ReasoningGridBuilderHelper& h) {
 	int wayPointIndex = airg->m_WaypointList.size();
-	for (int zi = 0; zi < h.gridZSize; zi++) {
-		if ((*h.grid).size() == zi) {
-			std::vector<std::vector<int>*>* yRow = new std::vector<std::vector<int>*>();
-			h.grid->push_back(yRow);
-		}
-		//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Adding waypoints for Z level: " + std::to_string(zi) + " at Z: " + std::to_string(h.min->Z + zi * h.zSpacing)).c_str());
-		float minZ = h.min->Z + zi * h.zSpacing;
-		float maxZ = h.min->Z + (zi + 1) * h.zSpacing;
+
+	NavPower::Area* area;
+	for (int areaIndex = 0; areaIndex < navMesh->m_areas.size(); areaIndex++) {
+		area = &navMesh->m_areas[areaIndex];
+		const int areaPointCount = area->m_edges.size();
+		NavPower::BBox bbox = calculateBBox(area);
+
 		for (int yi = 0; yi < h.gridYSize; yi++) {
-			
-			if ((*h.grid)[zi]->size() == yi) {
-				std::vector<int>* xRow = new std::vector<int>();
-				(*h.grid)[zi]->push_back(xRow);
+			float y = h.min->Y + yi * h.spacing;
+			if (y < bbox.m_min.Y - h.tolerance) {
+				continue;
+			}
+			if (y > bbox.m_max.Y + h.tolerance) {
+				break;
 			}
 			for (int xi = 0; xi < h.gridXSize; xi++) {
+				float x = h.min->X + xi * h.spacing;
+				if (x < bbox.m_min.X - h.tolerance) {
+					continue;
+				}
+				if (x > bbox.m_max.X + h.tolerance) {
+					break;
+				}
+				float z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
+				int zi = -1;
+				for (zi = 0; zi < h.gridZSize; zi++) {
+					float cz = h.min->Z + zi * h.spacing;
+					if (cz < bbox.m_min.Z) {
+						continue;
+					}
+					break;
+				}
 				if ((*(*h.grid)[zi])[yi]->size() > xi && (*(*(*h.grid)[zi])[yi])[xi] != 65535) {
 					continue;
 				}
-				float x = h.min->X + xi * h.spacing;
-				float y = h.min->Y + yi * h.spacing;
-				float z = h.min->Z + zi * h.zSpacing;
 				bool pointInArea = false;
 				bool neededTolerance = false;
 				Vec3 reflected;
-				NavPower::Area* area;
-				for (int areaIndex : (*h.areasByZLevel)[zi]) {
-					area = &navMesh->m_areas[areaIndex];
-					const int areaPointCount = area->m_edges.size();
-					z = calcZ(area->m_edges[0]->m_pos, area->m_edges[1]->m_pos, area->m_edges[2]->m_pos, x, y);
-						if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
-						float areaXCoords[20];
-						float areaYCoords[20];
-						for (int i = 0; i < areaPointCount; i++) {
-							areaXCoords[i] = area->m_edges[i]->m_pos.X;
-							areaYCoords[i] = area->m_edges[i]->m_pos.Y;
-						}
-						int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
-						if (edge == -1) { // In polygon with no adjustment needed
-							pointInArea = true;
-							break;
-						}
-						else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
-							//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
-							neededTolerance = true;
-							pointInArea = true;
-							NavPower::Binary::Edge* edge0 = area->m_edges[edge];
-							NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
-							float y1 = edge0->m_pos.Y;
-							float y2 = edge1->m_pos.Y;
-							float x1 = edge0->m_pos.X;
-							float x2 = edge1->m_pos.X;
-							Vec3 p{ x, y, z };
-							reflected = reflect(p, x1, y1, x2, y2);
-							x = reflected.X;
-							y = reflected.Y;
-							break;
-						}
-					}
+				//if (z > (minZ - h.zSpacing * h.zTolerance) && z < (maxZ + h.zSpacing * h.zTolerance)) {
+				float areaXCoords[20];
+				float areaYCoords[20];
+				for (int i = 0; i < areaPointCount; i++) {
+					areaXCoords[i] = area->m_edges[i]->m_pos.X;
+					areaYCoords[i] = area->m_edges[i]->m_pos.Y;
 				}
-
-				int cxi = std::round((x - h.min->X) / h.spacing);
-				int cyi = std::round((y - h.min->Y) / h.spacing);
-				int czi = zi;
-				if (((*(*h.grid)[czi]).size() > cyi && (*(*h.grid)[czi])[cyi]->size() > cxi) &&
-					((*h.grid).size() > czi && ((*(*(*h.grid)[czi])[cyi])[cxi] != 65535))) {//||
-					//((*h.grid).size() > czi - 1 && czi > 0 && (*(*(*h.grid)[czi - 1])[cyi])[cxi] != 65535) ||
-					//((*h.grid).size() > czi - 2 && czi > 1 && (*(*(*h.grid)[czi - 2])[cyi])[cxi] != 65535)) {
-					navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Skipping duplicate waypoint : " + std::to_string(wayPointIndex) + " XI: " + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi) + " CXI: " + std::to_string(cxi) + " CYI: " + std::to_string(cyi) + " CZI: " + std::to_string(czi)).c_str());
-
-					pointInArea = false;
+				int edge = closestEdge(areaPointCount, areaXCoords, areaYCoords, x, y, area->m_area->m_pos.X, area->m_area->m_pos.Y, h.tolerance, navKit);
+				if (edge == -1) { // In polygon with no adjustment needed
+					pointInArea = true;
 				}
-				//x = h.min->X + xi * h.spacing;  // REMOVE
-				//y = h.min->Y + yi * h.spacing; // REMOVE
-				//z = h.min->Z + zi * h.zSpacing; // REMOVE
+				else if (edge > -1) { // Outside polygon but within tolerance, reflect across closest edge
+					//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
+					neededTolerance = true;
+					pointInArea = true;
+					NavPower::Binary::Edge* edge0 = area->m_edges[edge];
+					NavPower::Binary::Edge* edge1 = area->m_edges[(edge + 1) % area->m_edges.size()];
+					float y1 = edge0->m_pos.Y;
+					float y2 = edge1->m_pos.Y;
+					float x1 = edge0->m_pos.X;
+					float x2 = edge1->m_pos.X;
+					Vec3 p{ x, y, z };
+					reflected = reflect(p, x1, y1, x2, y2);
+					x = reflected.X;
+					y = reflected.Y;
+				}
 				if (pointInArea) {
 					h.waypointAreas.push_back(area);
 				}
@@ -443,9 +472,24 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 					}
 				}
 			}
+			//}
+
+			//int cxi = std::round((x - h.min->X) / h.spacing);
+			//int cyi = std::round((y - h.min->Y) / h.spacing);
+			//int czi = zi;
+			//if (((*(*h.grid)[czi]).size() > cyi && (*(*h.grid)[czi])[cyi]->size() > cxi) &&
+			//	((*h.grid).size() > czi && ((*(*(*h.grid)[czi])[cyi])[cxi] != 65535))) {//||
+			//	//((*h.grid).size() > czi - 1 && czi > 0 && (*(*(*h.grid)[czi - 1])[cyi])[cxi] != 65535) ||
+			//	//((*h.grid).size() > czi - 2 && czi > 1 && (*(*(*h.grid)[czi - 2])[cyi])[cxi] != 65535)) {
+			//	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Skipping duplicate waypoint : " + std::to_string(wayPointIndex) + " XI: " + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi) + " CXI: " + std::to_string(cxi) + " CYI: " + std::to_string(cyi) + " CZI: " + std::to_string(czi)).c_str());
+
+			//	pointInArea = false;
+			//}
+			//x = h.min->X + xi * h.spacing;  // REMOVE
+			//y = h.min->Y + yi * h.spacing; // REMOVE
+			//z = h.min->Z + zi * h.zSpacing; // REMOVE
 		}
 	}
-	return;
 }
 
 bool ReasoningGrid::HasVisibility(
@@ -592,6 +636,7 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	helper.waypointZLevels = &waypointZLevels;
 	helper.zSpacing = zSpacing;
 	helper.zTolerance = zTolerance;
+	initializeGrid(navKit, helper);
 	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within areas...");
 
 	addWaypointsForGrid(airg, navMesh, navKit, helper);

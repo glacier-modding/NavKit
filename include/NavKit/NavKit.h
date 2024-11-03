@@ -49,6 +49,7 @@
 #include "Obj.h"
 #include "Airg.h"
 #include "FileUtil.h"
+#include "VisionData.h"
 #include "Renderer.h"
 #include "InputHandler.h"
 #include "Gui.h"
