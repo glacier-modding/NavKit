@@ -43,7 +43,7 @@ VisionData VisionData::GetVisionDataType(int size) {
 }
 
 Vec4 VisionData::getColor() {
-	return Vec4(0.0, 0.0, 1.0, 0.6);
+	//return Vec4(0.0, 0.0, 1.0, 0.6);
 	switch (visionDataType) {
 	case SIZE_556:
 		return Vec4(0.0, 0.0, 1.0, 0.6);

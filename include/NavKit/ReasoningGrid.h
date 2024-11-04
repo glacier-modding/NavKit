@@ -94,6 +94,7 @@ public:
 
 	const void writeJson(std::ostream& f);
 	void readJson(const char* p_AirgPath);
+	std::vector<uint8_t> getWaypointVisionData(int waypointIndex);
 	bool HasVisibility(unsigned int nFromNode, unsigned int nToNode, uint8_t nLow);
 	static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* ctx, float spacing, float zSpacing, float tolerance, float zTolerance);
 };

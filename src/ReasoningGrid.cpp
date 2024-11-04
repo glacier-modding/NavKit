@@ -224,6 +224,19 @@ void ReasoningGrid::readJson(const char* p_AirgPath) {
 	}
 }
 
+std::vector<uint8_t> ReasoningGrid::getWaypointVisionData(int waypointIndex) {
+	Waypoint& waypoint = m_WaypointList[waypointIndex];
+	int nextWaypointOffset = (waypointIndex + 1) < m_WaypointList.size() ? m_WaypointList[waypointIndex + 1].nVisionDataOffset : m_pVisibilityData.size();
+	int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
+
+	std::vector<uint8_t>::const_iterator first = m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
+	std::vector<uint8_t>::const_iterator last = (waypointIndex + 1) < m_WaypointList.size() ?
+		m_pVisibilityData.begin() + m_WaypointList[waypointIndex + 1].nVisionDataOffset :
+		m_pVisibilityData.end();
+	std::vector<uint8_t> waypointVisibilityData(first, last);
+	return waypointVisibilityData;
+}
+
 int orientation(Vec3 p, Vec3 q, Vec3 r) {
 	int val = (q.Y - p.Y) * (r.X - q.X) - (q.X - p.X) * (r.Y - q.Y);
 	if (val == 0) return 0; // Collinear

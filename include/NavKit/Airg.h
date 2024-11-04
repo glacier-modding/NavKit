@@ -21,6 +21,7 @@ public:
 	std::vector<bool> airgSaveState;
 	bool showAirg;
 	bool showAirgIndices;
+	bool showVisionData;
 	ResourceConverter* airgResourceConverter;
 	ResourceGenerator* airgResourceGenerator;
 	ReasoningGrid* reasoningGrid;
@@ -32,6 +33,7 @@ public:
 	void drawMenu();
 	void finalizeLoad();
 	void finalizeSave();
+	void renderVisionData(int waypointIndex, bool selected);
 	void renderAirg();
 	void renderAirgForHitTest();
 	void setSelectedAirgWaypointIndex(int index);
