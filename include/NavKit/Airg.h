@@ -17,8 +17,10 @@ public:
 	std::string saveAirgName;
 	std::string lastSaveAirgFile;
 	bool airgLoaded;
+	bool buildingVisionAndDeadEndData;
 	std::vector<bool> airgLoadState;
 	std::vector<bool> airgSaveState;
+	std::vector<bool> visionDataBuildState;
 	bool showAirg;
 	bool showAirgIndices;
 	bool showVisionData;
@@ -33,6 +35,7 @@ public:
 	void drawMenu();
 	void finalizeLoad();
 	void finalizeSave();
+	void finalizeBuildVisionAndDeadEndData();
 	void renderVisionData(int waypointIndex, bool selected);
 	void renderAirg();
 	void renderAirgForHitTest();

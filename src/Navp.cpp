@@ -83,17 +83,46 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
 	}
 	glEnd();
-	if (!selected) {
-		glColor3f(0.0, 1.0, 0.0);
-	}
-	else {
-		glColor3f(0.0, 1.0, 1.0);
-	}
 	glBegin(GL_LINES);
+	bool previousWasPortal = false;
 	for (auto vertex : area.m_edges) {
+		if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL || previousWasPortal) {
+			glColor3f(1.0, 1.0, 1.0);
+			if (!previousWasPortal) {
+				previousWasPortal = true;
+			}
+			else {
+				previousWasPortal = false;
+			}
+		}
+		else {
+			if (!selected) {
+				glColor3f(0.0, 1.0, 0.0);
+			}
+			else {
+				glColor3f(0.0, 1.0, 1.0);
+			}
+		}
 		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
 	}
 	glEnd();
+
+	// Render Portal vertices as line loop
+	glColor3f(1.0, 1.0, 1.0);
+	for (auto vertex : area.m_edges) {
+		const float r = 0.05f;
+		if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
+			glBegin(GL_LINE_LOOP);
+			for (int i = 0; i < 8; i++) {
+				const float a = (float)i / 8.0f * RC_PI * 2;
+				const float fx = (float)vertex->m_pos.X + cosf(a) * r;
+				const float fy = (float)vertex->m_pos.Y + sinf(a) * r;
+				const float fz = (float)vertex->m_pos.Z;
+				glVertex3f(fx, fz, -fy);
+			}
+			glEnd();
+		}
+	}
 }
 
 void Navp::setSelectedNavpAreaIndex(int index) {
@@ -134,14 +163,17 @@ void Navp::renderNavMesh() {
 			renderArea(area, areaIndex == selectedNavpAreaIndex, areaIndex);
 			areaIndex++;
 		}
+		Vec3 colorRed = { 1.0f, 0.4, 0.4f };
+		Vec3 colorGreen = { .7f, 1, .7f };
+		Vec3 colorBlue = { .7f, .7f, 1.0 };
 		if (showNavpIndices) {
 			areaIndex = 0;
 			for (const NavPower::Area& area : navMesh->m_areas) {
-				navKit->renderer->drawText(std::to_string(areaIndex), { area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y }, { .7f, .7f, 1 });
+				navKit->renderer->drawText(std::to_string(areaIndex), { area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y }, colorBlue);
 				if (selectedNavpAreaIndex == areaIndex) {
 					int edgeIndex = 0;
 					for (auto vertex : area.m_edges) {
-						navKit->renderer->drawText(std::to_string(edgeIndex), { vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y }, { .7f, 1, .7f });
+						navKit->renderer->drawText(std::to_string(edgeIndex), { vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y }, vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL ? colorRed : colorGreen);
 						edgeIndex++;
 					}
 				}

@@ -97,4 +97,5 @@ public:
 	std::vector<uint8_t> getWaypointVisionData(int waypointIndex);
 	bool HasVisibility(unsigned int nFromNode, unsigned int nToNode, uint8_t nLow);
 	static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* ctx, float spacing, float zSpacing, float tolerance, float zTolerance);
+	static void buildVisionAndDeadEndData(ReasoningGrid* airg, NavKit* navKit);
 };

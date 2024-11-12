@@ -7,6 +7,7 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 	saveAirgName = "Save Airg";
 	lastSaveAirgFile = saveAirgName;
 	airgLoaded = false;
+	buildingVisionAndDeadEndData = false;
 	showAirg = true;
 	showAirgIndices = false;
 	showVisionData = false;
@@ -48,7 +49,7 @@ void Airg::setLastSaveFileName(const char* fileName) {
 }
 
 void Airg::drawMenu() {
-	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 397, 250, 397, &airgScroll))
+	if (imguiBeginScrollArea("Airg menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 422, 250, 422, &airgScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Airg", showAirg))
 		showAirg = !showAirg;
@@ -153,6 +154,13 @@ void Airg::drawMenu() {
 		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit, spacing, zSpacing, tolerance, zTolerance);
 		buildAirgThread.detach();
 	}
+	if (imguiButton("Build Vision and Dead End Data", (airgLoaded && !buildingVisionAndDeadEndData && visionDataBuildState.empty()))) {
+		buildingVisionAndDeadEndData = true;
+		std::string msg = "Building Vision and Dead End data from Airg";
+		navKit->log(RC_LOG_PROGRESS, msg.data());
+		std::thread buildVisionAndDeadEndDataThread(&ReasoningGrid::buildVisionAndDeadEndData, reasoningGrid, navKit);
+		buildVisionAndDeadEndDataThread.detach();
+	}
 	imguiSeparatorLine();
 	imguiLabel("Selected Waypoint");
 	char selectedWaypointText[64];
@@ -172,6 +180,12 @@ void Airg::finalizeLoad() {
 void Airg::finalizeSave() {
 	if (airgSaveState.size() == 2) {
 		airgSaveState.clear();
+	}
+}
+
+void Airg::finalizeBuildVisionAndDeadEndData() {
+	if (visionDataBuildState.size() == 2) {
+		visionDataBuildState.clear();
 	}
 }
 
@@ -294,7 +308,7 @@ void Airg::renderAirg() {
 	for (size_t i = 0; i < numWaypoints; i++) {
 		const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
 		int size = visibilityDataSize(reasoningGrid, i);
-		if (showVisionData) {
+		if (showVisionData && !buildingVisionAndDeadEndData) {
 			renderVisionData(i, i == selectedWaypointIndex);
 		}
 		VisionData visionData = VisionData::GetVisionDataType(size);
