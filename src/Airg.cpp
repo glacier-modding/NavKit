@@ -311,8 +311,34 @@ void Airg::renderAirg() {
 		if (showVisionData && !buildingVisionAndDeadEndData) {
 			renderVisionData(i, i == selectedWaypointIndex);
 		}
-		VisionData visionData = VisionData::GetVisionDataType(size);
-		Vec4 color = visionData.getColor();
+		//VisionData visionData = VisionData::GetVisionDataType(size);
+		//Vec4 color = visionData.getColor();
+		Vec4 color;
+		switch (waypoint.nLayerIndex) {
+		case 0:
+			color = Vec4(0.0, 0.0, 1.0, 0.6);
+			break;
+		case 1:
+			color = Vec4(1.0, 0.0, 0.0, 0.6);
+			break;
+		case 2:
+			color = Vec4(0.5, 0.0, 1.0, 0.6);
+			break;
+		case 3:
+			color = Vec4(1.0, 1.0, 0.0, 0.6);
+			break;
+		case 4:
+			color = Vec4(1.0, 0.0, 1.0, 0.6);
+			break;
+		case 5:
+			color = Vec4(0.0, 1.0, 1.0, 0.6);
+			break;
+		case 6:
+			color = Vec4(1.0, 1.0, 1.0, 0.6);
+			break;
+		default:
+			color = Vec4(0.0, 0.0, 0.0, 0.6);
+		}
 		glColor4f(color.x, color.y, color.z, color.w);
 		renderWaypoint(waypoint, selectedWaypointIndex == i);
 
