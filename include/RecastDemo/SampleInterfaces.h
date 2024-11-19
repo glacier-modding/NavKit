@@ -23,6 +23,8 @@
 #include "Recast.h"
 #include "RecastDump.h"
 #include "PerfTimer.h"
+#include <vector>
+#include <string>
 
 // These are example implementations of various interfaces used in Recast and Detour.
 
@@ -38,6 +40,7 @@ class BuildContext : public rcContext
 	static const int TEXT_POOL_SIZE = 8000;
 	char m_textPool[TEXT_POOL_SIZE];
 	int m_textPoolSize;
+	std::vector<std::string> m_logBuffer;
 
 public:
 	BuildContext();
