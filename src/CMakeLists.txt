@@ -5,8 +5,8 @@ include_directories(SYSTEM extern)
 include_directories(SYSTEM include)
 
 configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h")
-
-add_executable (NavKit "NavKit.cpp" "RecastDemo/imgui.cpp" "RecastDemo/imguiRenderGL.cpp" "RecastDemo/MeshLoaderObj.cpp" "RecastDemo/InputGeom.cpp" "RecastDemo/ChunkyTriMesh.cpp" "RecastDemo/SampleInterfaces.cpp" "RecastDemo/PerfTimer.cpp" "ReasoningGrid.cpp"   "RecastDemo/Sample.cpp" "RecastDemo/Sample_SoloMesh.cpp" "GameConnection.cpp" "easywsclient/easywsclient.cpp" "easywsclient/easywsclient.cpp" "easywsclient/easywsclient.cpp" "Navp.cpp" "Obj.cpp" "FileUtil.cpp" "Airg.cpp" "SceneExtract.cpp" "Renderer.cpp" "InputHandler.cpp" "Gui.cpp" "PfBoxes.cpp" "VisionData.cpp")
+set(RC_FILE "NavKit.rc")
+add_executable (NavKit "NavKit.cpp" "RecastDemo/imgui.cpp" "RecastDemo/imguiRenderGL.cpp" "RecastDemo/MeshLoaderObj.cpp" "RecastDemo/InputGeom.cpp" "RecastDemo/ChunkyTriMesh.cpp" "RecastDemo/SampleInterfaces.cpp" "RecastDemo/PerfTimer.cpp" "ReasoningGrid.cpp"   "RecastDemo/Sample.cpp" "RecastDemo/Sample_SoloMesh.cpp" "GameConnection.cpp" "easywsclient/easywsclient.cpp" "easywsclient/easywsclient.cpp" "easywsclient/easywsclient.cpp" "Navp.cpp" "Obj.cpp" "FileUtil.cpp" "Airg.cpp" "SceneExtract.cpp" "Renderer.cpp" "InputHandler.cpp" "Gui.cpp" "PfBoxes.cpp" "VisionData.cpp" ${RC_FILE})
 target_include_directories(NavKit PUBLIC "${PROJECT_BINARY_DIR}")
 target_include_directories(NavKit PRIVATE ${SIMPLEINI_INCLUDE_DIRS})
 target_link_libraries(NavKit PRIVATE ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} )
