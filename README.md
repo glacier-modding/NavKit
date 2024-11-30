@@ -10,16 +10,16 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Click the `Send Navp` button in NavKit.
 # Full generation of Navp and Airg (Scene Extraction, Navp generation, Airg generation)
 1. Download the lastest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and extract it to any folder (e.g. C:\NavKit)
-1. Install ZHMModSDK
+1. Install ZHMModSDK (https://github.com/OrfeasZ/ZHMModSDK/releases/latest)
 1. Backup the "HITMAN 3\Retail\mods\Editor.dll" file
 1. Copy the included Editor.dll from the NavKit folder to the "HITMAN 3\Retail\mods" folder
 1. Install Blender (tested with 3.4 https://download.blender.org/release/Blender3.4/)
 1. Start Hitman and enter a mission
 1. Open NavKit
 1. On the "Extract menu" of NavKit, set your file paths:
-1.a: Hitman 3 directory (e.g. C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
-1.b: Output directory (e.g. C:\NavKit\Output)
-1.c: Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)
+    1. Hitman 3 directory (e.g. C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
+    1. Output directory (e.g. C:\NavKit\Output)
+    1. Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)
 1. On the "Extract menu" of NavKit, click "Extract from game"
 1. When the OBJ finishes generating, you can save it to an OBJ file so you can load it later if you'd like by clicking the "Save Obj" button on the "Obj menu"
 1. On the "Navp menu" click the "Build Navp from Obj" button
