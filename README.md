@@ -8,6 +8,7 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Open Hitman and launch a mission.
 1. Open NavKit and load a Navp file for that mission.
 1. Click the `Send Navp` button in NavKit.
+
 # Full generation of Navp and Airg (Scene Extraction, Navp generation, Airg generation)
 1. Download the lastest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and extract it to any folder (e.g. C:\NavKit)
 1. Install ZHMModSDK (https://github.com/OrfeasZ/ZHMModSDK/releases/latest)
@@ -20,14 +21,70 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
     1. Hitman 3 directory (e.g. C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
     1. Output directory (e.g. C:\NavKit\Output)
     1. Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)
-1. On the "Extract menu" of NavKit, click "Extract from game"
+1. On the "Extract menu" of NavKit, click "Extract from game". It may take up to around 10 minutes depending on the complexity of the mission being extracted, and whether the alocs have already been extracted from the rpkg files.  
 1. When the OBJ finishes generating, you can save it to an OBJ file so you can load it later if you'd like by clicking the "Save Obj" button on the "Obj menu"
 1. On the "Navp menu" click the "Build Navp from Obj" button
 1. On the "Navp menu" click the "Save Navp" button and choose where to save the navp file
 1. On the "Airg menu" click the "Build Airg from Navp" button
 1. On the "Airg menu" click the "Save Airg" button and choose where to save the airg file
 
-It may take anywhere from 1 minute to upwards of 30 minutes depending on the complexity of the mission being extracted, and whether the prims have already been extracted from the rpkg files.  
+# Adding navp and airg to a new scene
+1. Include the .navp and .airg files in the chunk folder for your brick
+1. Choose an IOI string for it (for instance [assembly:/_pro/scenes/missions/trapped/scene_wolverine_modified.navp].pc_navp)
+1. In GlacierKit, search the original scene file for "navp" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario_[scene name]\Global\Pathfinder\PathfinderConfiguration
+1. Copy the entity id (in this example screenshot it is 0f374e8c1e033807) and put it somewhere easily accessible
+1. Open your new brick file in GlacierKit in the Editor
+1. In the Property overrides for your new brick, add this to add the navp:
+```
+    {
+        "entities": [
+            {
+                "ref": "[pathfinder entity id]",
+                "externalScene": "[original scene file]"
+            }
+        ],
+        "properties": {
+                "m_NavpowerResourceID": {
+                    "type": "ZRuntimeResourceID",
+                    "value": {
+                        "resource": "[new navp ioi string]",
+                        "flag": "5F"
+                    }
+                }
+        }
+    }
+```
+7. Where [pathfinder entity id] is the id you copied earlier for the pathfinder,  [original scene file] is the ioi string of the original scene (e.g. [assembly:/_pro/scenes/missions/snug/mission_vanilla.brick].pc_entitytype), and [new navp ioi string] is your new ioi string for the navp.
+1. In GlacierKit, search the original scene file for "airg" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario_[scene name]\Global\Pathfinder\ReasoningGridConfig
+1. Copy the entity id (in the other example screenshot it is 6c6e6c3217bf058e) and put it somewhere easily accessible
+1. In the Property overrides for your new brick, add this to add the airg:
+```
+    {
+        "entities": [
+            {
+                "ref": "[reasoning grid entity id]",
+                "externalScene": "[original scene file]"
+            }
+        ],
+        "properties": {
+                "m_pGrid": {
+                    "type": "ZRuntimeResourceID",
+                    "value": {
+                        "resource": "[new airg ioi string]",
+                        "flag": "5F"
+                    }
+                }
+        }
+    }
+```
+11. Where [reasoning grid entity id] is the id you copied earlier for the pathfinder,  [original scene file] is the ioi string of the original scene (e.g. [assembly:/_pro/scenes/missions/snug/mission_vanilla.brick].pc_entitytype), and [new airg ioi string] is your new ioi string for the navp.
+1. Save your brick file
+1. In GlacierKit, under the Text Tools, paste your navp ioi string into the Hash Calculator
+1. Copy the Hex value, and rename your navp to [hex value].navp Where [hex value] is the Hex value you calculated
+1. Paste your airg ioi string into the Hash Calculator
+1. Copy the Hex value, and rename your airg to [hex value].airg Where [hex value] is the Hex value you calculated
+1. Deploy the mod
+
 # How NavKit generates Navp files 
 NavKit performs the following series of steps to be able to generate Navp files.
 1. Run `glacier2obj.exe` to connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's brick tblu hashes, and send them back to NavKit.
