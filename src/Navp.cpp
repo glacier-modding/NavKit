@@ -184,7 +184,7 @@ void Navp::renderNavMesh() {
 }
 
 void Navp::renderNavMeshForHitTest() {
-	if (!loading) {
+	if (!loading && showNavp) {
 		int areaIndex = 0;
 		for (const NavPower::Area& area : navMesh->m_areas) {
 			glColor3ub(60, areaIndex / 255, areaIndex % 255);

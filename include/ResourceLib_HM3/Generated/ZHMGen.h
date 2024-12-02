@@ -10367,6 +10367,8 @@ public:
 class /*alignas(16)*/ float4
 {
 public:
+	float4() : x(0), y(0), z(0), w(0) {}
+	float4(float32 x, float32 y, float32 z, float32 w) : x(x), y(y), z(z), w(w) {}
 	static ZHMTypeInfo TypeInfo;
 	static void WriteSimpleJson(void* p_Object, std::ostream& p_Stream);
 	static void FromSimpleJson(simdjson::ondemand::value p_Document, void* p_Target);
@@ -10375,6 +10377,9 @@ public:
 	static void Destroy(void* p_Object);
 
 	bool operator==(const float4& p_Other) const;
+	float4 operator+(const float4& p_Other) const {
+		return { x + p_Other.x, y + p_Other.y, z + p_Other.z, w + p_Other.w };
+	}
 	bool operator!=(const float4& p_Other) const { return !(*this == p_Other); }
 
 	float32 x; // 0x0

@@ -361,11 +361,13 @@ void Airg::renderAirg() {
 }
 
 void Airg::renderAirgForHitTest() {
-	int numWaypoints = reasoningGrid->m_WaypointList.size();
-	for (size_t i = 0; i < numWaypoints; i++) {
-		const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
-		glColor3ub(61, i / 255, i % 255);
-		renderWaypoint(waypoint, true);
+	if (showAirg) {
+		int numWaypoints = reasoningGrid->m_WaypointList.size();
+		for (size_t i = 0; i < numWaypoints; i++) {
+			const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
+			glColor3ub(61, i / 255, i % 255);
+			renderWaypoint(waypoint, true);
+		}
 	}
 }
 
