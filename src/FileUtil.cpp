@@ -10,8 +10,11 @@ namespace FileUtil {
 		nfdopendialogu8args_t args = {
 			.filterList = filters,
 			.filterCount = filterCount,
-			.defaultPath = path.c_str(),
 		};
+
+		if (std::filesystem::exists(path) && !std::filesystem::is_directory(path)) {
+			args.defaultPath = path.c_str();
+		}
 		nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
 		if (result == NFD_OKAY)
 		{
