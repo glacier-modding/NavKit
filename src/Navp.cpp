@@ -64,18 +64,18 @@ bool Navp::areaIsStairs(NavPower::Area area) {
 void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 	if (areaIsStairs(area)) {
 		if (!selected) {
-			glColor4f(0.5, 0.5, 0.0, 0.6);
+			glColor4f(0.5, 0.5, 0.0, 1.0);
 		}
 		else {
-			glColor4f(1.0, 1.0, 0.5, 0.6);
+			glColor4f(1.0, 1.0, 0.5, 1.0);
 		}
 	}
 	else {
 		if (!selected) {
-			glColor4f(0.0, 0.5, 0.0, 0.6);
+			glColor4f(0.0, 0.5, 0.0, 1.0);
 		}
 		else {
-			glColor4f(0.0, 0.5, 0.5, 0.6);
+			glColor4f(0.0, 0.5, 0.5, 1.0);
 		}
 	}
 	glBegin(GL_POLYGON);
@@ -85,15 +85,28 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 	glEnd();
 	glBegin(GL_LINES);
 	bool previousWasPortal = false;
+	bool isFirstVertex = true;
+	Vec3 firstVertex{ area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Z + 0.01f, -area.m_edges[0]->m_pos.Y };
 	for (auto vertex : area.m_edges) {
-		if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL || previousWasPortal) {
-			glColor3f(1.0, 1.0, 1.0);
-			if (!previousWasPortal) {
-				previousWasPortal = true;
+		if (!isFirstVertex) {
+			if (previousWasPortal) {
+				glColor3f(1.0, 1.0, 1.0);
 			}
 			else {
-				previousWasPortal = false;
+				if (!selected) {
+					glColor3f(0.0, 1.0, 0.0);
+				}
+				else {
+					glColor3f(0.0, 1.0, 1.0);
+				}
 			}
+			glVertex3f(vertex->m_pos.X, vertex->m_pos.Z + 0.01f, -vertex->m_pos.Y);
+		}
+		else {
+			isFirstVertex = false;
+		}
+		if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
+			glColor3f(1.0, 1.0, 1.0);
 		}
 		else {
 			if (!selected) {
@@ -103,8 +116,11 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 				glColor3f(0.0, 1.0, 1.0);
 			}
 		}
-		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
+		previousWasPortal = vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL;
+		glVertex3f(vertex->m_pos.X, vertex->m_pos.Z + 0.01f, -vertex->m_pos.Y);
+
 	}
+	glVertex3f(firstVertex.X, firstVertex.Y, firstVertex.Z);
 	glEnd();
 
 	// Render Portal vertices as line loop
@@ -127,31 +143,32 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
 
 void Navp::setSelectedNavpAreaIndex(int index) {
 	if (index == -1 && selectedNavpAreaIndex != -1) {
-		navKit->log(RC_LOG_PROGRESS, ("Deselected area: " + std::to_string(selectedNavpAreaIndex)).c_str());
+		navKit->log(RC_LOG_PROGRESS, ("Deselected area: " + std::to_string(selectedNavpAreaIndex + 1)).c_str());
 	}
 	selectedNavpAreaIndex = index;
 	if (index != -1 && index < navMesh->m_areas.size()) {
-		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(index)).c_str());
+		navKit->log(RC_LOG_PROGRESS, ("Selected area: " + std::to_string(index + 1)).c_str());
 		Vec3 pos = navMesh->m_areas[index].m_area->m_pos;
 		char v[16];
 		snprintf(v, sizeof(v), "%.2f", pos.X);
-		std::string msg = "Area center:";
-		msg += " X: " + std::string{ v };
+		std::string msg = "Area " + std::to_string(index + 1) + ": pos: (";
+		msg += std::string{ v };
 		snprintf(v, sizeof(v), "%.2f", pos.Y);
-		msg += " Y: " + std::string{ v };
+		msg += ", " + std::string{ v };
 		snprintf(v, sizeof(v), "%.2f", pos.Z);
-		msg += " Z: " + std::string{ v };
+		msg += ", " + std::string{ v } + ") Edges: [";
 		int edgeIndex = 0;
 		for (auto vertex : navMesh->m_areas[index].m_edges) {
-			msg += " Edge " + std::to_string(edgeIndex) + " pos:";
+			msg += std::to_string(edgeIndex + 1) + ": (";
 			snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
-			msg += " X: " + std::string{ v };
+			msg += std::string{ v };
 			snprintf(v, sizeof(v), "%.2f", vertex->m_pos.Y);
-			msg += " Y: " + std::string{ v };
+			msg += ", " + std::string{ v };
 			snprintf(v, sizeof(v), "%.2f", vertex->m_pos.Z);
-			msg += " Z: " + std::string{ v };
+			msg += ", " + std::string{ v } + ") ";
 			edgeIndex++;
 		}
+		msg += "]";
 		navKit->log(RC_LOG_PROGRESS, (msg).c_str());
 	}
 }
@@ -169,11 +186,11 @@ void Navp::renderNavMesh() {
 		if (showNavpIndices) {
 			areaIndex = 0;
 			for (const NavPower::Area& area : navMesh->m_areas) {
-				navKit->renderer->drawText(std::to_string(areaIndex), { area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y }, colorBlue);
+				navKit->renderer->drawText(std::to_string(areaIndex + 1), { area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y }, colorBlue);
 				if (selectedNavpAreaIndex == areaIndex) {
 					int edgeIndex = 0;
 					for (auto vertex : area.m_edges) {
-						navKit->renderer->drawText(std::to_string(edgeIndex), { vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y }, vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL ? colorRed : colorGreen);
+						navKit->renderer->drawText(std::to_string(edgeIndex + 1), { vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y }, vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL ? colorRed : colorGreen);
 						edgeIndex++;
 					}
 				}
@@ -198,6 +215,29 @@ void Navp::renderNavMeshForHitTest() {
 	}
 }
 
+void Navp::loadNavMeshFileData(Navp* navp, char* fileName) {
+	if (!std::filesystem::is_regular_file(fileName))
+		throw std::runtime_error("Input path is not a regular file.");
+
+	// Read the entire file to memory.
+	const long s_FileSize = std::filesystem::file_size(fileName);
+
+	if (s_FileSize < sizeof(NavPower::NavMesh))
+		throw std::runtime_error("Invalid NavMesh File.");
+
+	std::ifstream s_FileStream(fileName, std::ios::in | std::ios::binary);
+
+	if (!s_FileStream)
+		throw std::runtime_error("Error creating input file stream.");
+
+	void* s_FileData = malloc(s_FileSize);
+	s_FileStream.read(static_cast<char*>(s_FileData), s_FileSize);
+
+	s_FileStream.close();
+
+	navp->navMeshFileData = s_FileData;
+}
+
 void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Loading Navp from file at ";
@@ -208,6 +248,13 @@ void Navp::loadNavMesh(Navp* navp, char* fileName, bool isFromJson) {
 	try {
 		NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
 		std::swap(*navp->navMesh, newNavMesh);
+		if (isFromJson) {
+			OutputNavMesh_NAVP_Write(navp->navMesh, navp->outputNavpFilename.data());
+			loadNavMeshFileData(navp, navp->outputNavpFilename.data());
+		}
+		else {
+			loadNavMeshFileData(navp, fileName);
+		}
 	}
 	catch (...) {
 		msg = "Invalid Navp file: '";
@@ -341,7 +388,7 @@ void Navp::drawMenu() {
 	imguiSeparatorLine();
 	imguiLabel("Selected Area");
 	char selectedNavpText[64];
-	snprintf(selectedNavpText, 64, selectedNavpAreaIndex != -1 ? "Area Index: %d" : "Area Index: None", selectedNavpAreaIndex);
+	snprintf(selectedNavpText, 64, selectedNavpAreaIndex != -1 ? "Area Index: %d" : "Area Index: None", selectedNavpAreaIndex + 1);
 	imguiValue(selectedNavpText);
 	
 	if (imguiCheck("Stairs", 
@@ -427,9 +474,9 @@ void Navp::buildBinaryAreaToAreaMap() {
 void Navp::finalizeLoad() {
 	if (!navpBuildDone.empty()) {
 		navpLoaded = true;
-		navKit->sample->saveAll("output.navp.json");
-		NavPower::NavMesh newNavMesh = LoadNavMeshFromJson("output.navp.json");
-		std::swap(*navMesh, newNavMesh);
+		navKit->sample->saveAll(outputNavpFilename.data());
+		std::thread loadNavMeshThread(&Navp::loadNavMesh, this, outputNavpFilename.data(), true);
+		loadNavMeshThread.detach();
 		navpBuildDone.clear();
 		buildBinaryAreaToAreaMap();
 	}

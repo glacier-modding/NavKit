@@ -96,8 +96,8 @@ public:
 	int runProgram(int argc, char** argv);
 	void log(rcLogCategory category, const char* message, ...);
 private:
-		rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>> logQueue;
-		void loadSettings();
+	rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>> logQueue;
+	void loadSettings();
 
-		static void logRunner(NavKit* navKit);
+	static void logRunner(NavKit* navKit);
 };

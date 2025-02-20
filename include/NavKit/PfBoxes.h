@@ -68,6 +68,7 @@ namespace PfBoxes {
     };
     class PfBoxes {
     public:
+        PfBoxes() : hashesAndEntities() {}
         static inline const std::string INCLUDE_TYPE = "PFBT_INCLUDE_MESH_COLLISION";
         PfBoxes(char* fileName);
         PfBox getPathfindingBBox();

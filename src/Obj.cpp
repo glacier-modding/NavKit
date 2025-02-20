@@ -20,33 +20,72 @@ Obj::Obj(NavKit* navKit): navKit(navKit) {
 
 }
 
-void Obj::copyObjFile(const std::string& from, BuildContext* ctx, const std::string& to) {
+void Obj::copyObjFile(NavKit* navKit, const std::string& from, const std::string& to) {
+	if (from == to) {
+		navKit->log(RC_LOG_ERROR, ("Cannot overwrite current obj file: " + from).c_str());
+		return;
+	}
 	auto start = std::chrono::high_resolution_clock::now();
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-	std::ifstream is(from, std::ios::in | std::ios::binary);
-	std::ofstream os(to, std::ios::out | std::ios::binary);
+	std::string navKitObjProperties = "";
+	navKitObjProperties += "# NavKit OBJ Properties:\n";
+	navKitObjProperties += "#![BBox]\n";
+	navKitObjProperties += "#!x = " + std::to_string(navKit->obj->bBoxPos[0]) + "\n";
+	navKitObjProperties += "#!y = " + std::to_string(navKit->obj->bBoxPos[1]) + "\n";
+	navKitObjProperties += "#!z = " + std::to_string(navKit->obj->bBoxPos[2]) + "\n";
+	navKitObjProperties += "#!sx = " + std::to_string(navKit->obj->bBoxSize[0]) + "\n";
+	navKitObjProperties += "#!sy = " + std::to_string(navKit->obj->bBoxSize[1]) + "\n";
+	navKitObjProperties += "#!sz = " + std::to_string(navKit->obj->bBoxSize[2]) + "\n";
+	std::ifstream inputFile(from);
+	if (!inputFile.is_open()) {
+		navKit->log(RC_LOG_ERROR, ("Error opening obj file for reading: " + from).c_str());
+		return;
+	}
+	std::ofstream outputFile(to);
+	if (!outputFile.is_open()) {
+		navKit->log(RC_LOG_ERROR, ("Error opening file for writing: " + to).c_str());
+		return;
+	}
+	outputFile << navKitObjProperties << std::endl;
 
-	std::copy(std::istreambuf_iterator(is), std::istreambuf_iterator<char>(),
-		std::ostreambuf_iterator(os));
-	is.close();
-	os.close();
+	std::vector<std::string> lines;
+	std::string line;
+	if (std::getline(inputFile, line)) {
+		if (line.find("NavKit") != std::string::npos) {
+			// Input obj already has NavKit OBJ Properties. Override them with the latest from NavKit
+			for (int i = 0; i < 8; i++) {
+				if (!std::getline(inputFile, line)) {
+					break;
+				}
+			}
+		}
+		else {
+			outputFile << line << std::endl;
+		}
+	}
+
+	while (std::getline(inputFile, line)) {
+		outputFile << line << std::endl;
+	}
+	inputFile.close();
+	outputFile.close();
+
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 	std::string msg = "Finished saving Obj in ";
 	msg += std::to_string(duration.count());
 	msg += " seconds";
-	ctx->log(RC_LOG_PROGRESS, msg.data());
+	navKit->log(RC_LOG_PROGRESS, msg.data());
 }
 
-void Obj::saveObjMesh(char* objToCopy, BuildContext* ctx, char* newFileName) {
+void Obj::saveObjMesh(char* objToCopy, char* newFileName) {
 	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::string msg = "Saving Obj to file at ";
 	msg += std::ctime(&start_time);
-	ctx->log(RC_LOG_PROGRESS, msg.data());
-	CopyFile(objToCopy, newFileName, true);
-	//std::thread saveObjThread(copyObjFile, objToCopy, ctx, newFileName);
-	//saveObjThread.detach();
+	navKit->log(RC_LOG_PROGRESS, msg.data());
+	std::thread saveObjThread(&Obj::copyObjFile, navKit, objToCopy, newFileName);
+	saveObjThread.detach();
 }
 
 void Obj::loadObjMesh(Obj* obj) {
@@ -55,6 +94,54 @@ void Obj::loadObjMesh(Obj* obj) {
 	msg += std::ctime(&start_time);
 	obj->navKit->log(RC_LOG_PROGRESS, msg.data());
 	auto start = std::chrono::high_resolution_clock::now();
+
+	std::ifstream inputFile(obj->objToLoad);
+	if (!inputFile.is_open()) {
+		obj->navKit->log(RC_LOG_ERROR, ("Error opening obj file for reading: " + obj->objToLoad).c_str());
+		return;
+	}
+
+	std::vector<std::string> lines;
+	std::string line;
+	if (std::getline(inputFile, line)) {
+		if (line.find("NavKit") != std::string::npos) {
+			std::getline(inputFile, line); // Get the BBox line
+			float floatValues[6]{ 0, 0, 0, 100, 100, 100 };
+			bool error = false;
+			for (int i = 0; i < 6; i++) {
+				std::getline(inputFile, line);
+				std::stringstream ss(line);
+				std::string propertyName;
+				if (getline(ss, propertyName, '=')) {
+					std::string value;
+					if (getline(ss, value)) {
+						try {
+							floatValues[i] = stof(value);
+						}
+						catch (const std::invalid_argument& e) {
+							obj->navKit->log(RC_LOG_ERROR, ("Error converting value to float for property " + propertyName + ": " + e.what()).c_str());
+							error = true;
+							break;
+						}
+						catch (const std::out_of_range& e) {
+							obj->navKit->log(RC_LOG_ERROR, ("Value out of range for float for property " + propertyName + ": " + e.what()).c_str());
+							error = true;
+							break;
+						}
+					}
+				}
+			}
+			if (!error) {
+				obj->bBoxPos[0] = floatValues[0];
+				obj->bBoxPos[1] = floatValues[1];
+				obj->bBoxPos[2] = floatValues[2];
+				obj->bBoxSize[0] = floatValues[3];
+				obj->bBoxSize[1] = floatValues[4];
+				obj->bBoxSize[2] = floatValues[5];
+			}
+		}
+	}
+	inputFile.close();
 
 	if (obj->navKit->geom->load(&obj->navKit->ctx, obj->objToLoad)) {
 		if (obj->objLoadDone.empty()) {
@@ -199,14 +286,13 @@ void Obj::setLastLoadFileName(const char* fileName) {
 
 void Obj::setLastSaveFileName(const char* fileName) {
 	lastSaveObjFileName = fileName;
-	saveObjMesh(lastObjFileName.data(), &navKit->ctx, lastSaveObjFileName.data());
 	loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
 	navKit->ini.SetValue("Paths", "saveobj", fileName);
 	navKit->ini.SaveFile("NavKit.ini");
 }
 
 void Obj::drawMenu() {
-	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 5 - 422, 250, 205, &objScroll))
+	if (imguiBeginScrollArea("Obj menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 5 - 390, 250, 205, &objScroll))
 		navKit->gui->mouseOverMenu = true;
 	if (imguiCheck("Show Obj", showObj))
 		showObj = !showObj;
@@ -216,6 +302,7 @@ void Obj::drawMenu() {
 		if (fileName)
 		{
 			setLastLoadFileName(fileName);
+			objLoaded = false;
 			objToLoad = fileName;
 			loadObj = true;
 		}
@@ -227,6 +314,7 @@ void Obj::drawMenu() {
 		{
 			loadObjName = fileName;
 			setLastSaveFileName(fileName);
+			saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
 			saveObjName = loadObjName;
 		}
 	}

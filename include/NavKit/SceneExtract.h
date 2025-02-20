@@ -8,6 +8,7 @@ class NavKit;
 class SceneExtract {
 public:
 	SceneExtract(NavKit* navKit);
+	~SceneExtract();
 
 	void drawMenu();
 	void finalizeExtract();
@@ -30,8 +31,11 @@ private:
 	bool hitmanSet;
 	std::string outputFolderName;
 	bool outputSet;
+	bool errorExtracting;
+	std::vector<HANDLE> handles;
+	bool closing;
 
-	static void runCommand(SceneExtract* sceneExtract, std::string command);
+	static void runCommand(SceneExtract* sceneExtract, std::string command, std::string logFileName);
 
 	char* openSetBlenderFileDialog(char* lastBlenderFile);
 	char* openHitmanFolderDialog(char* lastHitmanFolder);

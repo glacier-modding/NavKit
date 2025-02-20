@@ -47,15 +47,12 @@ public:
 
 class Waypoint {
 public:
-	Waypoint() {
-		xi = -1;
-		yi = -1;
-		zi = -1;
-	}
-	std::vector<int> nNeighbors;
+	Waypoint() : vPos({}), nVisionDataOffset(0), nLayerIndex(0), xi(-1), yi(-1), zi(-1), cellBitmap{ false }, nNeighbors{ 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535 } {}
+	std::vector<uint16_t> nNeighbors;
 	Vec4 vPos;
 	uint32_t nVisionDataOffset;
-	uint32_t nLayerIndex;
+	int32_t nLayerIndex;
+	bool cellBitmap[25];
 
 	int xi;
 	int yi;
@@ -84,6 +81,7 @@ public:
 
 class ReasoningGrid {
 public:
+	ReasoningGrid() : m_Properties(), m_HighVisibilityBits(), m_LowVisibilityBits(), m_deadEndData(), m_nNodeCount(), m_WaypointList(), m_pVisibilityData() {}
 	Properties m_Properties;
 	SizedArray m_HighVisibilityBits;
 	SizedArray m_LowVisibilityBits;

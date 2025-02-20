@@ -13,6 +13,16 @@ SceneExtract::SceneExtract(NavKit* navKit): navKit(navKit) {
 	lastOutputFolder = outputFolderName;
 	outputSet = false;
 	extractScroll = 0;
+	errorExtracting = false;
+	closing = false;
+}
+
+SceneExtract::~SceneExtract() {
+	closing = true;
+	for (HANDLE handle : handles) {
+		TerminateProcess(handle, 0);
+		CloseHandle(handle);
+	}
 }
 
 void SceneExtract::setHitmanFolder(const char* folderName) {
@@ -58,7 +68,7 @@ void SceneExtract::setBlenderFile(const char* filename) {
 }
 
 void SceneExtract::drawMenu() {
-	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 422 - 195 - 10, 250, 195, &extractScroll);
+	imguiBeginScrollArea("Extract menu", navKit->renderer->width - 250 - 10, navKit->renderer->height - 10 - 205 - 390 - 195 - 10, 250, 195, &extractScroll);
 	imguiLabel("Set Hitman Directory");
 	if (imguiButton(hitmanFolderName.c_str())) {
 		char* folderName = openHitmanFolderDialog(lastHitmanFolder.data());
@@ -87,20 +97,99 @@ void SceneExtract::drawMenu() {
 	imguiEndScrollArea();
 }
 
-void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command) {
-	char buffer[400];
-
-	FILE* glacier2Obj = _popen(command.data(), "r");
-	FILE* result = fopen("Glacier2Obj.log", "w");
-
-	while (fgets(buffer, sizeof(buffer), glacier2Obj) != NULL)
-	{
-		sceneExtract->navKit->log(RC_LOG_PROGRESS, buffer);
-		fputs(buffer, result);
-
+void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command, std::string logFileName) {
+	SECURITY_ATTRIBUTES saAttr = { sizeof(saAttr), NULL, TRUE };
+	HANDLE hReadPipe, hWritePipe;
+	if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
+		sceneExtract->navKit->log(RC_LOG_ERROR, ("Error creating pipe to command: " + command + " while extracting scene from game.").c_str());
+		sceneExtract->errorExtracting = true;
+		return;
 	}
-	fclose(glacier2Obj);
-	fclose(result);
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+	si.hStdOutput = hWritePipe;
+	si.hStdError = hWritePipe;
+	si.wShowWindow = SW_HIDE;
+
+	ZeroMemory(&pi, sizeof(pi));
+
+	FILE* logFile = fopen(logFileName.c_str(), "w");
+	char* commandLineChar = _strdup(command.c_str());
+
+	if (!CreateProcess(NULL, commandLineChar, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+		sceneExtract->navKit->log(RC_LOG_ERROR, ("Error creating process for command: " + command + " while extracting scene from game.").c_str());
+		CloseHandle(hReadPipe);
+		CloseHandle(hWritePipe);
+		sceneExtract->errorExtracting = true;
+		return;
+	}
+
+	CloseHandle(hWritePipe);
+	std::vector<char> output;
+	char buffer[4096];
+	DWORD bytesRead;
+	sceneExtract->handles.push_back(hReadPipe);
+	sceneExtract->handles.push_back(pi.hProcess);
+	sceneExtract->handles.push_back(pi.hThread);
+
+	while (true) {
+		if (sceneExtract->closing) {
+			return;
+		}
+		if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0)) {
+			break;
+		}
+		output.insert(output.end(), buffer, buffer + bytesRead);
+
+		// Check if the output size exceeds the threshold
+		//if (output.size() >= 1024) {
+		// Process and clear the output
+		std::string outputString(output.begin(), output.end());
+		size_t start = 0;
+		size_t pos = 0;
+		while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
+			std::string line = outputString.substr(start, pos - start);
+			sceneExtract->navKit->log(RC_LOG_PROGRESS, line.c_str());
+			fputs(line.c_str(), logFile);
+			fputc('\n', logFile);
+			pos++;
+			start = pos;
+		}
+		output.clear();
+		//}
+	}
+
+	// Process any remaining output
+	if (!output.empty()) {
+		std::string outputString(output.begin(), output.end());
+		size_t start = 0;
+		size_t pos = 0;
+		while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
+			std::string line = outputString.substr(start, pos - start);
+			sceneExtract->navKit->log(RC_LOG_PROGRESS, line.c_str());
+			fputs(line.c_str(), logFile);
+			fputc('\n', logFile);
+			pos++;
+			start = pos;
+		}
+	}
+
+	if (sceneExtract->closing) {
+		return;
+	}
+
+	WaitForSingleObject(pi.hProcess, INFINITE);
+
+	CloseHandle(hReadPipe);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	sceneExtract->handles.pop_back();
+	sceneExtract->handles.pop_back();
+	sceneExtract->handles.pop_back();
 
 	if (sceneExtract->extractionDone.size() == 0) {
 		sceneExtract->navKit->log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
@@ -155,14 +244,14 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	command += runtimeFolder;
 	command += " \"";
 	command += alocFolder;
-	command += "\" 2>&1";
-	std::thread commandThread(runCommand, this, command);
+	command += "\"";
+	std::thread commandThread(runCommand, this, command, "Glacier2ObjExtract.log");
 	commandThread.detach();
 }
 
 void SceneExtract::generateObj(char* blenderPath, char* outputFolder) {
 	navKit->log(RC_LOG_PROGRESS, "Generating obj from alocs.json.");
-	std::string command = "\"\"";
+	std::string command = "\"";
 	command += blenderPath;
 	command += "\" -b --factory-startup -P glacier2obj.py -- ";
 	std::string alocs = "\"";
@@ -175,8 +264,8 @@ void SceneExtract::generateObj(char* blenderPath, char* outputFolder) {
 	command += pfBoxes;
 	command += " \"";
 	command += outputFolder;
-	command += "\\output.obj\"\"";
-	std::thread commandThread(runCommand, this, command);
+	command += "\\output.obj\"";
+	std::thread commandThread(runCommand, this, command, "Glacier2ObjBlender.log");
 	commandThread.detach();
 }
 
@@ -189,7 +278,13 @@ void SceneExtract::finalizeExtract() {
 	if (extractionDone.size() == 2) {
 		std::string pfBoxesFile = lastOutputFolder.data();
 		pfBoxesFile += "\\pfBoxes.json";
-		PfBoxes::PfBoxes pfBoxes = PfBoxes::PfBoxes(pfBoxesFile.data());
+		PfBoxes::PfBoxes pfBoxes;
+		try {
+			pfBoxes = PfBoxes::PfBoxes(pfBoxesFile.data());
+		}
+		catch (...) {
+			return;
+		}
 		PfBoxes::PfBox bBox = pfBoxes.getPathfindingBBox();
 		if (bBox.size.x != -1 ) {
 			navKit->geom = new InputGeom;
@@ -208,6 +303,11 @@ void SceneExtract::finalizeExtract() {
 		navKit->obj->lastObjFileName = lastOutputFolder.data();
 		navKit->obj->lastObjFileName += "output.obj";
 
+	}
+	if (errorExtracting) {
+		errorExtracting = false;
+		startedObjGeneration = false;
+		extractionDone.clear();
 	}
 }
 

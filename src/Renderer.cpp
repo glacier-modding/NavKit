@@ -116,6 +116,7 @@ bool Renderer::initWindowAndRenderer() {
 	if (!window)
 	{
 		printf("Could not initialise SDL opengl\nError: %s\n", SDL_GetError());
+		SDL_Quit();
 		return false;
 	}
 
@@ -147,6 +148,10 @@ bool Renderer::initWindowAndRenderer() {
 	glEnable(GL_BLEND);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	prevFrameTime = SDL_GetTicks();
+}
+
+void Renderer::closeWindow() {
+	SDL_DestroyWindow(window);
 }
 
 void Renderer::handleResize() {
@@ -298,33 +303,33 @@ void Renderer::drawAxes() {
 	drawLine(o, y, y);
 	drawText("Y", y, y);
 
-	drawLine(o, z, z);
-	drawText("Z", z, z);
+	drawLine(o, z * -1, z);
+	drawText("Z", z * -1, z);
 }
 
 HitTestResult Renderer::hitTestRender(int mx, int my) {
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glClearColor(1.0, 1.0, 1.0, 0.0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glClearColor(1.0, 1.0, 1.0, 0.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		if (status != GL_FRAMEBUFFER_COMPLETE) {
-			navKit->log(RC_LOG_ERROR, ("FB error, status: 0x" + std::to_string((int)status)).c_str());
+	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (status != GL_FRAMEBUFFER_COMPLETE) {
+		navKit->log(RC_LOG_ERROR, ("FB error, status: 0x" + std::to_string((int)status)).c_str());
 
-			printf("FB error, status: 0x%x\n", status);
-			return HitTestResult(NONE, -1);
-		}
-		navKit->navp->renderNavMeshForHitTest();
-		navKit->airg->renderAirgForHitTest();
-		GLubyte pixel[4];
-		glReadBuffer(GL_COLOR_ATTACHMENT0);
-		glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		int selectedIndex = int(pixel[1]) * 255 + int(pixel[2]);
+		printf("FB error, status: 0x%x\n", status);
+		return HitTestResult(NONE, -1);
+	}
+	navKit->navp->renderNavMeshForHitTest();
+	navKit->airg->renderAirgForHitTest();
+	GLubyte pixel[4];
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	int selectedIndex = int(pixel[1]) * 255 + int(pixel[2]);
 
-		if (selectedIndex == 65280) {
-			return HitTestResult(NONE, - 1);
-		}
+	if (selectedIndex == 65280) {
+		return HitTestResult(NONE, - 1);
+	}
 		
-		return HitTestResult(int(pixel[0]) == 60 ? HitTestType::NAVMESH_AREA : HitTestType::AIRG_WAYPOINT, selectedIndex);
+	return HitTestResult(int(pixel[0]) == 60 ? HitTestType::NAVMESH_AREA : HitTestType::AIRG_WAYPOINT, selectedIndex);
 }

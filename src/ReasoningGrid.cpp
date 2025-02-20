@@ -57,7 +57,7 @@ void Properties::readJson(simdjson::ondemand::object p_Json) {
 
 	simdjson::ondemand::object vMaxJson = p_Json["vMax"];
 	vMax.readJson(vMaxJson);
-	
+
 	nGridWidth = uint64_t(p_Json["nGridWidth"]);
 
 	fGridSpacing = double(p_Json["fGridSpacing"]);
@@ -78,7 +78,7 @@ const void SizedArray::writeJson(std::ostream& f) {
 	}
 
 	f << "]" << ",";
-	
+
 	f << "\"m_nSize\"" << ":";
 	f << m_nSize;
 
@@ -131,14 +131,15 @@ const void Waypoint::writeJson(std::ostream& f) {
 }
 
 void Waypoint::readJson(simdjson::ondemand::object p_Json) {
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor0"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor1"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor2"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor3"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor4"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor5"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor6"]));
-	nNeighbors.push_back(uint64_t(p_Json["nNeighbor7"]));
+	nNeighbors.clear();
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor0"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor1"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor2"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor3"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor4"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor5"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor6"]));
+	nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor7"]));
 
 	simdjson::ondemand::object vPosJson = p_Json["vPos"];
 	vPos.readJson(vPosJson);

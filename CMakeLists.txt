@@ -12,7 +12,7 @@ endif()
 
 project(
   NavKit 
-  VERSION 0.9.4
+  VERSION 0.9.5
   DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman"
   LANGUAGES CXX)
 
@@ -29,7 +29,7 @@ find_package(GLU REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(simdjson REQUIRED)
 find_package(ftgl REQUIRED)
-#find_package(nfd REQUIRED)
+#find_package(nfd REQUIRED) # Reenable this once there is a new release of nfd
 find_path(SIMPLEINI_INCLUDE_DIRS "ConvertUTF.c")
 
 add_subdirectory(src)

@@ -25,6 +25,7 @@ public:
 	void initFrameBuffer(int width, int height);
 	void drawText(std::string text, Vec3 pos, Vec3 color = { 0.0, 0.0, 0.0 }, double size = 32.0);
 	bool initWindowAndRenderer();
+	void closeWindow();
 	void initFrameRate(float frameRateValue);
 	void updateFrameRate();
 	void handleResize();

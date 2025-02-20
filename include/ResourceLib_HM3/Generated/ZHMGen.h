@@ -10380,6 +10380,12 @@ public:
 	float4 operator+(const float4& p_Other) const {
 		return { x + p_Other.x, y + p_Other.y, z + p_Other.z, w + p_Other.w };
 	}
+	float4 operator-(const float4& p_Other) const {
+		return { x - p_Other.x, y - p_Other.y, z - p_Other.z, w - p_Other.w };
+	}
+	float4 operator*(const float& p_Scale) const {
+		return { x * p_Scale, y * p_Scale, z * p_Scale, w * p_Scale };
+	}
 	bool operator!=(const float4& p_Other) const { return !(*this == p_Other); }
 
 	float32 x; // 0x0
@@ -10992,6 +10998,8 @@ public:
 class /*alignas(4)*/ SVector3
 {
 public:
+	SVector3() : x(0), y(0), z(0) {}
+	SVector3(float x, float y, float z) : x(x), y(y), z(z) {}
 	static ZHMTypeInfo TypeInfo;
 	static void WriteSimpleJson(void* p_Object, std::ostream& p_Stream);
 	static void FromSimpleJson(simdjson::ondemand::value p_Document, void* p_Target);
@@ -11001,6 +11009,7 @@ public:
 
 	bool operator==(const SVector3& p_Other) const;
 	bool operator!=(const SVector3& p_Other) const { return !(*this == p_Other); }
+	SVector3 operator-(const SVector3& p_Other) const { return {x - p_Other.x, y - p_Other.y, z - p_Other.z}; }
 
 	float32 x; // 0x0
 	float32 y; // 0x4

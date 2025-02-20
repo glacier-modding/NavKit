@@ -18,6 +18,7 @@ public:
 	void setSelectedNavpAreaIndex(int index);
 
 	NavPower::NavMesh* navMesh;
+	void* navMeshFileData;
 	std::map<NavPower::Binary::Area*, NavPower::Area*> binaryAreaToAreaMap;
 	int selectedNavpAreaIndex;
 	bool navpLoaded;
@@ -53,6 +54,7 @@ private:
 
 	static bool areaIsStairs(NavPower::Area area);
 	static void loadNavMesh(Navp* navp, char* fileName, bool isFromJson);
+	static void loadNavMeshFileData(Navp* navp, char* fileName);
 	static char* openLoadNavpFileDialog(char* lastNavpFolder);
 	static char* openSaveNavpFileDialog(char* lastNavpFolder);
 
@@ -60,6 +62,7 @@ private:
 	std::string lastLoadNavpFile;
 	std::string saveNavpName;
 	std::string lastSaveNavpFile;
+	std::string outputNavpFilename = "output.navp";
 	std::vector<bool> navpLoadDone;
 	std::vector<bool> navpBuildDone;
 };

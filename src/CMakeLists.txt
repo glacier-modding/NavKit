@@ -64,6 +64,7 @@ target_link_libraries(NavKit
     $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
     $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
 )
+set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)

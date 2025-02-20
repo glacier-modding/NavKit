@@ -23,7 +23,8 @@ public:
 	std::vector<bool> visionDataBuildState;
 	bool showAirg;
 	bool showAirgIndices;
-	bool showVisionData;
+	bool showGrid;
+	float cellColorSource;
 	ResourceConverter* airgResourceConverter;
 	ResourceGenerator* airgResourceGenerator;
 	ReasoningGrid* reasoningGrid;
@@ -36,6 +37,9 @@ public:
 	void finalizeLoad();
 	void finalizeSave();
 	void finalizeBuildVisionAndDeadEndData();
+	void renderGrid(float gridSpacing, Vec3 color, float zOffset);
+	void renderLayerIndices(int waypointIndex, bool selected);
+	void renderCellBitmaps(int waypointIndex, bool selected);
 	void renderVisionData(int waypointIndex, bool selected);
 	void renderAirg();
 	void renderAirgForHitTest();

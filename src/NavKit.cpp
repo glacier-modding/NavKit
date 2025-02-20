@@ -21,7 +21,7 @@
 */
 #include "..\include\NavKit\NavKit.h"
 
-int main(int argc, char** argv) {
+int SDL_main(int argc, char** argv) {
 	NavKit navKitProgram;
 	return navKitProgram.runProgram(argc, argv);
 }
@@ -59,6 +59,8 @@ int NavKit::runProgram(int argc, char** argv) {
 
 		renderer->finalizeFrame();
 	}
+
+	renderer->closeWindow();
 
 	return 0;
 }
