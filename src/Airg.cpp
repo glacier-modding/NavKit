@@ -8,6 +8,7 @@ Airg::Airg(NavKit* navKit) : navKit(navKit) {
 	lastSaveAirgFile = saveAirgName;
 	airgLoaded = false;
 	buildingVisionAndDeadEndData = false;
+	connectWaypointModeEnabled = false;
 	showAirg = true;
 	showAirgIndices = false;
 	showGrid = false;
@@ -113,36 +114,12 @@ void Airg::drawMenu() {
 			saveAirgThread.detach();
 		}
 	}
-	float lastTolerance = tolerance;
-	if (imguiSlider("Tolerance", &tolerance, 0.0f, 4.0f, 0.05f)) {
-		if (lastTolerance != tolerance) {
-			saveTolerance(tolerance);
-			lastTolerance = tolerance;
-			navKit->log(RC_LOG_PROGRESS, ("Setting tolerance to: " + std::to_string(tolerance)).c_str());
-		}
-	}
 	float lastSpacing = spacing;
 	if (imguiSlider("Spacing", &spacing, 0.1f, 4.0f, 0.05f)) {
 		if (lastSpacing != spacing) {
 			saveSpacing(spacing);
 			lastSpacing = spacing;
 			navKit->log(RC_LOG_PROGRESS, ("Setting spacing to: " + std::to_string(spacing)).c_str());
-		}
-	}
-	float lastZSpacing = zSpacing;
-	if (imguiSlider("Y Spacing", &zSpacing, 0.1f, 4.0f, 0.05f)) {
-		if (lastZSpacing != zSpacing) {
-			saveZSpacing(zSpacing);
-			lastZSpacing = zSpacing;
-			navKit->log(RC_LOG_PROGRESS, ("Setting Y spacing to: " + std::to_string(zSpacing)).c_str());
-		}
-	}
-	float lastZTolerance= zTolerance;
-	if (imguiSlider("Y Tolerance", &zTolerance, 0.1f, 4.0f, 0.05f)) {
-		if (lastZTolerance != zTolerance) {
-			saveZTolerance(zTolerance);
-			lastZTolerance = zTolerance;
-			navKit->log(RC_LOG_PROGRESS, ("Setting Y tolerance to: " + std::to_string(zTolerance)).c_str());
 		}
 	}
 	if (imguiButton("Reset Defaults")) {
@@ -158,12 +135,10 @@ void Airg::drawMenu() {
 		std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit, spacing, zSpacing, tolerance, zTolerance);
 		buildAirgThread.detach();
 	}
-	if (imguiButton("Build Vision and Dead End Data", (airgLoaded && !buildingVisionAndDeadEndData && visionDataBuildState.empty()))) {
-		buildingVisionAndDeadEndData = true;
-		std::string msg = "Building Vision and Dead End data from Airg";
+	if (imguiButton("Connect Waypoint", (airgLoaded && selectedWaypointIndex != -1 && !connectWaypointModeEnabled))) {
+		connectWaypointModeEnabled = true;
+		std::string msg = "Entering Connect Waypoint mode. Start waypoint: " + std::to_string(selectedWaypointIndex);
 		navKit->log(RC_LOG_PROGRESS, msg.data());
-		std::thread buildVisionAndDeadEndDataThread(&ReasoningGrid::buildVisionAndDeadEndData, reasoningGrid, navKit);
-		buildVisionAndDeadEndDataThread.detach();
 	}
 	imguiSeparatorLine();
 	imguiLabel("Selected Waypoint");
@@ -211,6 +186,41 @@ void Airg::saveZSpacing(float newZSpacing) {
 void Airg::saveZTolerance(float newZTolerance) {
 	navKit->ini.SetValue("Airg", "yTolerance", std::to_string(newZTolerance).c_str());
 	zTolerance = newZTolerance;
+}
+
+void Airg::connectWaypoints(int startWaypointIndex, int endWaypointIndex) {
+	Waypoint& startWaypoint = reasoningGrid->m_WaypointList[startWaypointIndex];
+	Waypoint& endWaypoint = reasoningGrid->m_WaypointList[endWaypointIndex];
+	Vec3 startPos = { startWaypoint.vPos.x, startWaypoint.vPos.y, startWaypoint.vPos.z };
+	Vec3 endPos = { endWaypoint.vPos.x, endWaypoint.vPos.y, endWaypoint.vPos.z };
+	Vec3 waypointDirectionVec = endPos - startPos;
+	Vec3 directionNormalized = waypointDirectionVec / waypointDirectionVec.GetMagnitude();
+	float maxParalellization = -2;
+	int bestDirection = -1;
+	for (int direction = 0; direction < 8; direction++) {
+		float dx = 0, dy = 0;
+		if (direction == 1 || direction == 2 || direction == 3) {
+			dx = 1;
+		}
+		else if (direction == 5 || direction == 6 || direction == 7) {
+			dx = -1;
+		}
+		if (direction == 7 || direction == 0 || direction == 1) {
+			dy = -1;
+		}
+		else if (direction == 3 || direction == 4 || direction == 5) {
+			dy = 1;
+		}
+		Vec3 directionVec = { dx, dy, 0.0f };
+		float dot = directionNormalized.Dot(directionVec);
+		if (dot > maxParalellization) {
+			maxParalellization = dot;
+			bestDirection = direction;
+		}
+	}
+	startWaypoint.nNeighbors[bestDirection] = endWaypointIndex;
+	endWaypoint.nNeighbors[(bestDirection + 4) % 8] = startWaypointIndex;
+	navKit->log(RC_LOG_PROGRESS, ("Connected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(endWaypointIndex)).c_str());
 }
 
 char* Airg::openAirgFileDialog(char* lastAirgFolder) {

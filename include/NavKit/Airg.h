@@ -18,6 +18,7 @@ public:
 	std::string lastSaveAirgFile;
 	bool airgLoaded;
 	bool buildingVisionAndDeadEndData;
+	bool connectWaypointModeEnabled;
 	std::vector<bool> airgLoadState;
 	std::vector<bool> airgSaveState;
 	std::vector<bool> visionDataBuildState;
@@ -48,6 +49,7 @@ public:
 	void saveSpacing(float spacing);
 	void saveZSpacing(float zSpacing);
 	void saveZTolerance(float zTolerance);
+	void connectWaypoints(int startWaypointIndex, int endWaypointIndex);
 
 	void setLastLoadFileName(const char* fileName);
 	void setLastSaveFileName(const char* fileName);

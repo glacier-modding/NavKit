@@ -506,14 +506,6 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 	}
 }
 
-bool ReasoningGrid::HasVisibility(
-	unsigned int nFromNode,
-	unsigned int nToNode,
-	uint8_t nLow)
-{
-	return true;
-}
-
 bool waypointsAreConnected(NavKit* navKit, ReasoningGridBuilderHelper& h, ReasoningGrid* airg, Vec3 waypointPos, NavPower::Area* area, int waypoint2Index) {
 	NavPower::Area* curArea = area;
 	NavPower::Area* waypoint2Area = h.waypointAreas[waypoint2Index];
@@ -733,34 +725,4 @@ void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKi
 	navKit->log(RC_LOG_PROGRESS, msg.data());
 	navKit->airg->airgLoadState.push_back(true);
 	navKit->airg->airgLoaded = true;
-}
-
-void ReasoningGrid::buildVisionAndDeadEndData(ReasoningGrid* airg, NavKit* navKit) {
-	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	std::string msg = "Started building Vision and Dead End data at ";
-	msg += std::ctime(&start_time);
-	navKit->log(RC_LOG_PROGRESS, msg.data());
-	auto start = std::chrono::high_resolution_clock::now();
-
-	navKit->airg->visionDataBuildState.push_back(true);
-
-	for (int waypointIndex = 0; waypointIndex < airg->m_WaypointList.size(); waypointIndex++) {
-		Waypoint& waypoint = airg->m_WaypointList[waypointIndex];
-		waypoint.nVisionDataOffset = waypointIndex * 556;
-	}
-	std::vector<uint8_t> newVisibilityData(airg->m_nNodeCount * 556, 255);
-	airg->m_pVisibilityData = newVisibilityData;
-	airg->m_deadEndData.m_aBytes.clear();
-	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
-
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Built Vision and Dead End data.");
-
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-	msg = "Finished building Vision and Dead End data in ";
-	msg += std::to_string(duration.count());
-	msg += " seconds";
-	navKit->log(RC_LOG_PROGRESS, msg.data());
-	navKit->airg->buildingVisionAndDeadEndData = false;
-	navKit->airg->visionDataBuildState.push_back(true);
 }

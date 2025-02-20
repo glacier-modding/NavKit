@@ -151,9 +151,16 @@ void InputHandler::hitTest() {
 			else if (hitTestResult.type == HitTestType::AIRG_WAYPOINT) {
 				if (hitTestResult.selectedIndex == navKit->airg->selectedWaypointIndex) {
 					navKit->airg->setSelectedAirgWaypointIndex(-1);
+					navKit->airg->connectWaypointModeEnabled = false;
 				}
 				else {
-					navKit->airg->setSelectedAirgWaypointIndex(hitTestResult.selectedIndex);
+					if (navKit->airg->connectWaypointModeEnabled) {
+						navKit->airg->connectWaypoints(navKit->airg->selectedWaypointIndex, hitTestResult.selectedIndex);
+					}
+					else {
+						navKit->airg->setSelectedAirgWaypointIndex(hitTestResult.selectedIndex);
+					}
+					navKit->airg->connectWaypointModeEnabled = false;
 				}
 			}
 			else {
