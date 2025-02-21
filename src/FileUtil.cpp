@@ -23,11 +23,11 @@ namespace FileUtil {
 		}
 		else if (result == NFD_CANCEL)
 		{
-			return NULL;
+			return nullptr;
 		}
 		else
 		{
-			return NULL;
+			return nullptr;
 		}
 	}
 
@@ -50,11 +50,11 @@ namespace FileUtil {
 		}
 		else if (result == NFD_CANCEL)
 		{
-			return NULL;
+			return nullptr;
 		}
 		else
 		{
-			return NULL;
+			return nullptr;
 		}
 	}
 
@@ -71,11 +71,11 @@ namespace FileUtil {
 		}
 		else if (result == NFD_CANCEL)
 		{
-			return NULL;
+			return nullptr;
 		}
 		else
 		{
-			return NULL;
+			return nullptr;
 		}
 	}
 

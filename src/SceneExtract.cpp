@@ -1,10 +1,9 @@
 #include "..\include\NavKit\SceneExtract.h"
 
-SceneExtract::SceneExtract(NavKit* navKit): navKit(navKit) {
+SceneExtract::SceneExtract(NavKit* navKit, const std::string &pythonScript): navKit(navKit), pythonScript(pythonScript) {
 	lastBlenderFile = "\"C:\\Program Files\\Blender Foundation\\Blender 3.4\\blender.exe\"";
 	blenderName = "Choose Blender app";
 	blenderSet = false;
-	extractionDone;
 	startedObjGeneration = false;
 	hitmanFolderName = "Choose Hitman folder";
 	lastHitmanFolder = hitmanFolderName;
@@ -98,7 +97,7 @@ void SceneExtract::drawMenu() {
 }
 
 void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command, std::string logFileName) {
-	SECURITY_ATTRIBUTES saAttr = { sizeof(saAttr), NULL, TRUE };
+	SECURITY_ATTRIBUTES saAttr = { sizeof(saAttr), nullptr, TRUE };
 	HANDLE hReadPipe, hWritePipe;
 	if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
 		sceneExtract->navKit->log(RC_LOG_ERROR, ("Error creating pipe to command: " + command + " while extracting scene from game.").c_str());
@@ -159,6 +158,30 @@ void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command, s
 			pos++;
 			start = pos;
 		}
+		if (size_t found = outputString.find("panic"); found != std::string::npos) {
+			sceneExtract->navKit->log(RC_LOG_ERROR, "Error extracting scene from game. Make sure Hitman is running with ZHMModSDK installed.");
+			sceneExtract->errorExtracting = true;
+			WaitForSingleObject(pi.hProcess, INFINITE);
+			CloseHandle(hReadPipe);
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+			sceneExtract->handles.pop_back();
+			sceneExtract->handles.pop_back();
+			sceneExtract->handles.pop_back();
+			return;
+		}
+		if (size_t found = outputString.find("Error: Python"); found != std::string::npos) {
+			sceneExtract->navKit->log(RC_LOG_ERROR, "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
+			sceneExtract->errorExtracting = true;
+			WaitForSingleObject(pi.hProcess, INFINITE);
+			CloseHandle(hReadPipe);
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+			sceneExtract->handles.pop_back();
+			sceneExtract->handles.pop_back();
+			sceneExtract->handles.pop_back();
+			return;
+		}
 		output.clear();
 		//}
 	}
@@ -191,7 +214,7 @@ void SceneExtract::runCommand(SceneExtract* sceneExtract, std::string command, s
 	sceneExtract->handles.pop_back();
 	sceneExtract->handles.pop_back();
 
-	if (sceneExtract->extractionDone.size() == 0) {
+	if (sceneExtract->extractionDone.size() == 1) {
 		sceneExtract->navKit->log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
 		sceneExtract->extractionDone.push_back(true);
 	}
@@ -245,6 +268,7 @@ void SceneExtract::extractScene(char* hitmanFolder, char* outputFolder) {
 	command += " \"";
 	command += alocFolder;
 	command += "\"";
+	extractionDone.push_back(true);
 	std::thread commandThread(runCommand, this, command, "Glacier2ObjExtract.log");
 	commandThread.detach();
 }
@@ -271,11 +295,11 @@ void SceneExtract::generateObj(char* blenderPath, char* outputFolder) {
 
 
 void SceneExtract::finalizeExtract() {
-	if (extractionDone.size() == 1 && !startedObjGeneration) {
+	if (extractionDone.size() == 2 && !startedObjGeneration) {
 		startedObjGeneration = true;
 		generateObj(lastBlenderFile.data(), lastOutputFolder.data());
 	}
-	if (extractionDone.size() == 2) {
+	if (extractionDone.size() == 3) {
 		std::string pfBoxesFile = lastOutputFolder.data();
 		pfBoxesFile += "\\pfBoxes.json";
 		PfBoxes::PfBoxes pfBoxes;

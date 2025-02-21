@@ -184,7 +184,7 @@ void Obj::setBBox(float* pos, float* size) {
 	navKit->navp->bBoxSizeY = size[1];
 	bBoxSize[2] = size[2];
 	navKit->navp->bBoxSizeZ = size[2];
-	if (navKit->geom != NULL) {
+	if (navKit->geom != nullptr) {
 		navKit->geom->m_meshBMin[0] = bBoxPos[0] - bBoxSize[0] / 2;
 		navKit->geom->m_meshBMin[1] = bBoxPos[1] - bBoxSize[1] / 2;
 		navKit->geom->m_meshBMin[2] = bBoxPos[2] - bBoxSize[2] / 2;
@@ -355,10 +355,6 @@ void Obj::finalizeLoad() {
 	}
 
 	if (!objLoadDone.empty()) {
-		navKit->gui->showLog = true;
-		navKit->gui->logScroll = 0;
-		//navKit->ctx.dumpLog("Geom load log %s:", loadObjName.c_str());
-
 		if (navKit->geom)
 		{
 			navKit->sample->handleMeshChanged(navKit->geom);

@@ -25,15 +25,15 @@ public:
 	void initFrameBuffer(int width, int height);
 	void drawText(std::string text, Vec3 pos, Vec3 color = { 0.0, 0.0, 0.0 }, double size = 32.0);
 	bool initWindowAndRenderer();
-	void closeWindow();
+	void closeWindow() const;
 	void initFrameRate(float frameRateValue);
 	void updateFrameRate();
 	void handleResize();
 	void renderFrame();
-	void finalizeFrame();
-	void drawBounds();
+	void finalizeFrame() const;
+	void drawBounds() const;
 	void drawAxes();
-	HitTestResult hitTestRender(int mx, int my);
+	HitTestResult hitTestRender(int mx, int my) const;
 
 	GLuint framebuffer;
 	GLuint color_rb;

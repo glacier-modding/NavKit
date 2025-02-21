@@ -278,8 +278,9 @@ class BinaryReader:
             self.writeFloat(val)
 
     def writeUBytesFromBitBoolArray(self, vec):
-        print(
-            "Attempted to use writeUBytesFromBitBoolArray, but this function is not implemented yet!"
+        log("ERROR",
+            "Attempted to use writeUBytesFromBitBoolArray, but this function is not implemented yet!",
+            "writeUBytesFromBitBoolArray"
         )
 
     def writeUIntVec(self, vec):
@@ -441,7 +442,7 @@ class PrimitiveSphere:
 def log(level, msg, filter_field):
     enabled = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
     if level in enabled: # and filter_field == "007573591BE1BE69":
-        print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg))
+        print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
 
         
 def read_convex_mesh(br, aloc_name):
@@ -1036,19 +1037,18 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     """Imports an ALOC mesh from the given path"""
 
     aloc_name = bpy.path.display_name_from_filepath(filepath)
-    # print("Loading ALOC " + aloc_name)
     aloc = read_aloc(filepath)
     log("DEBUG", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
     collection = context.scene.collection
     objects = []
     if aloc.collision_type == PhysicsCollisionType.RIGIDBODY:
-        # print("Skipping RigidBody ALOC " + aloc_name)
+        log("DEBUG", "Skipping RigidBody ALOC " + aloc_name, "load_aloc")
         return PhysicsCollisionType.RIGIDBODY, objects
     if aloc.data_type == PhysicsDataType.CONVEX_MESH:
-        # print("Converting Convex Mesh ALOC " + aloc_name + " to blender mesh")
+        log("DEBUG", "Converting Convex Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         for mesh_index in range(aloc.convex_mesh_count):
-            # print(" " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count))
+            log("DEBUG", " " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count), "load_aloc")
             obj = create_new_object(aloc_name, aloc.collision_type, aloc.data_type)
             bm = bmesh.new()
             m = aloc.convex_meshes[mesh_index]
@@ -1057,7 +1057,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
                     bm.verts.new(v)
             else:
                 _ = -1
-                # print("+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(m.collision_layer) + " +++++++++++++")
+                log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(m.collision_layer) + " +++++++++++++", "load_aloc")
             mesh = obj.data
             bm.from_mesh(mesh)
             convex_hull(bm)
@@ -1079,24 +1079,24 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
                         bm.faces.new(face)
                     except ValueError as err:
                         _ = -1
-                        # print("[ERROR] Could not add face to TriangleMesh: " + str(err))
+                        log("DEBUG", "[ERROR] Could not add face to TriangleMesh: " + str(err), "load_aloc")
             else:
                 _ = -1
-                # print("+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(m.collision_layer) + " +++++++++++++")
+                log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(m.collision_layer) + " +++++++++++++", "load_aloc")
 
             mesh = obj.data
             to_mesh(bm, mesh, obj, collection, context)
 
             objects.append(obj)
     elif aloc.data_type == PhysicsDataType.PRIMITIVE:
-        # print("Primitive Type")
-        # print("Primitive count: " + str(aloc.primitive_count))
-        # print("Primitive Box count: " + str(aloc.primitive_boxes_count))
-        # print("Primitive Spheres count: " + str(aloc.primitive_spheres_count))
-        # print("Primitive Capsules count: " + str(aloc.primitive_capsules_count))
+        log("DEBUG", "Primitive Type", "load_aloc")
+        log("DEBUG", "Primitive count: " + str(aloc.primitive_count), "load_aloc")
+        log("DEBUG", "Primitive Box count: " + str(aloc.primitive_boxes_count), "load_aloc")
+        log("DEBUG", "Primitive Spheres count: " + str(aloc.primitive_spheres_count), "load_aloc")
+        log("DEBUG", "Primitive Capsules count: " + str(aloc.primitive_capsules_count), "load_aloc")
         for mesh_index, box in enumerate(aloc.primitive_boxes):
             if include_non_collidable_layers or collidable_layer(box.collision_layer):
-                # print("Primitive Box")
+                log("DEBUG", "Primitive Box", "load_aloc")
                 obj = create_new_object(aloc_name, aloc.collision_type, aloc.data_type)
                 bm = bmesh.new()
                 bmv = []
@@ -1107,7 +1107,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
                 ry = box.rotation[1]
                 rz = box.rotation[2]
                 if rx != 0 or ry != 0 or rz != 0:
-                    print("Box has rotation value. Hash: " + aloc_name)
+                    log("DEBUG", "Box has rotation value. Hash: " + aloc_name, "load_aloc")
                 sx = box.half_extents[0]
                 sy = box.half_extents[1]
                 sz = box.half_extents[2]
@@ -1134,11 +1134,11 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
                 objects.append(obj)
             else:
                 _ = -1
-                # print("+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(box.collision_layer) + " +++++++++++++")
+                log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(box.collision_layer) + " +++++++++++++", "load_aloc")
 
         for mesh_index, sphere in enumerate(aloc.primitive_spheres):
             if include_non_collidable_layers or collidable_layer(sphere.collision_layer):
-                # print("Primitive Sphere")
+                log("DEBUG", "Primitive Sphere", "load_aloc")
                 bpy.ops.mesh.primitive_ico_sphere_add(
                     subdivisions=2,
                     radius=sphere.radius,
@@ -1151,10 +1151,10 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
                 objects.append(obj)
             else:
                 _ = -1
-                # print("+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(sphere.collision_layer) + " +++++++++++++")
+                log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(sphere.collision_layer) + " +++++++++++++", "load_aloc")
         for mesh_index, capsule in enumerate(aloc.primitive_capsules):
             if include_non_collidable_layers or collidable_layer(capsule.collision_layer):
-                # print("Primitive Capsule")
+                log("DEBUG", "Primitive Capsule", "load_aloc")
                 bpy.ops.mesh.primitive_ico_sphere_add(
                     subdivisions=2,
                     radius=capsule.radius,
@@ -1188,10 +1188,9 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
                 objects.append(obj)
             else:
                 _ = -1
-                # print("+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(capsule.collision_layer) + " +++++++++++++")
+                log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(mesh_index) + " and collision layer type: " + str(capsule.collision_layer) + " +++++++++++++", "load_aloc")
     log("DEBUG", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
-    # print("Done Importing ALOC")
     return aloc.collision_type, objects
 
 
@@ -1371,10 +1370,10 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
 
 
 def main():
-    print("Usage: blender -b -P glacier2obj.py -- <alocs.json path> <pfBoxes.json> <output.obj path>", flush=True)
+    log("INFO", "Usage: blender -b -P glacier2obj.py -- <alocs.json path> <pfBoxes.json> <output.obj path>", "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
-    print("blender.exe called with args: " + str(argv), flush=True)  # --> ['example', 'args', '123']
+    log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
     alocs_path = argv[0]
     pf_boxes_path = argv[1]
     output_path = argv[2]
@@ -1388,7 +1387,7 @@ def main():
 
     scenario = load_scenario(bpy.context, collection, alocs_path, pf_boxes_path)
     if scenario == 1:
-        print('Failed to import scenario "%s"' % alocs_path, "Importing error", "ERROR")
+        log("INFO", 'Failed to import scenario "%s"' % alocs_path, "main")
         return 1
     bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
 

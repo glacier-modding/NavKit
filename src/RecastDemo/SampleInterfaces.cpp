@@ -35,12 +35,14 @@ void BuildContext::doLog(const rcLogCategory category, const char* msg, const in
 {
 	if (!len) return;
 
-	m_logBuffer.push_back(msg);
-	m_messageCount++;
-	if (m_logBuffer.size() > MAX_MESSAGES) {
-		m_logBuffer.erase(m_logBuffer.begin());
-		m_messageCount--;
+	std::lock_guard lock(m_log_mutex);
+	if (m_logBuffer.size() >= MAX_MESSAGES - 1) {
+		m_logBuffer.pop_front();
 	}
+	else {
+		m_messageCount++;
+	}
+	m_logBuffer.push_back(msg);
 	//if (m_messageCount >= MAX_MESSAGES) {
 	//	//dumpLog("%s");
 	//	resetLog();

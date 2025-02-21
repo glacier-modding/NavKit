@@ -2,12 +2,13 @@
 
 #include "NavKit.h"
 #include "PfBoxes.h"
+#include <Windows.h>
 
 class NavKit;
 
 class SceneExtract {
 public:
-	SceneExtract(NavKit* navKit);
+	SceneExtract(NavKit* navKit, const std::string &pythonScript);
 	~SceneExtract();
 
 	void drawMenu();
@@ -30,6 +31,7 @@ private:
 	std::string hitmanFolderName;
 	bool hitmanSet;
 	std::string outputFolderName;
+	std::string pythonScript;
 	bool outputSet;
 	bool errorExtracting;
 	std::vector<HANDLE> handles;

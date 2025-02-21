@@ -118,7 +118,7 @@ void NavKit::loadSettings() {
 }
 
 NavKit::NavKit() {
-	sceneExtract = new SceneExtract(this);
+	sceneExtract = new SceneExtract(this, "");
 	navp = new Navp(this);
 	obj = new Obj(this);
 	airg = new Airg(this);

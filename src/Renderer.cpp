@@ -104,12 +104,14 @@ bool Renderer::initWindowAndRenderer() {
 	SDL_DisplayMode displayMode;
 	SDL_GetCurrentDisplayMode(0, &displayMode);
 	Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
-	float aspect = 16.0f / 9.0f;
-	width = rcMin(displayMode.w, (int)(displayMode.h * aspect)) - 120;
+	constexpr float aspect = 16.0f / 9.0f;
+	width = rcMin(displayMode.w, static_cast<int>(static_cast<float>(displayMode.h) * aspect)) - 120;
 	height = displayMode.h - 120;
 	window = SDL_CreateWindow("", 0, 0, width, height, flags);
-	auto context = SDL_GL_CreateContext(window);
-
+	if (const auto context = SDL_GL_CreateContext(window); context == nullptr) {
+		printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
+		return false;
+	}
 	SDL_SetWindowMinimumSize(window, 1024, 768);
 	initFrameBuffer(width, height);
 
@@ -121,7 +123,7 @@ bool Renderer::initWindowAndRenderer() {
 	}
 
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-	std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
+	const std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
 	std::string title = "NavKit v";
 	title += navKitVersion;
 	SDL_SetWindowTitle(window, title.data());
@@ -136,7 +138,7 @@ bool Renderer::initWindowAndRenderer() {
 	NFD_Init();
 
 	// Fog.
-	float fogColor[4] = { 0.32f, 0.31f, 0.30f, 1.0f };
+	const float fogColor[4] = { 0.32f, 0.31f, 0.30f, 1.0f };
 	glEnable(GL_FOG);
 	glFogi(GL_FOG_MODE, GL_LINEAR);
 	glFogf(GL_FOG_START, camr * 0.1f);
@@ -148,9 +150,10 @@ bool Renderer::initWindowAndRenderer() {
 	glEnable(GL_BLEND);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	prevFrameTime = SDL_GetTicks();
+	return true;
 }
 
-void Renderer::closeWindow() {
+void Renderer::closeWindow() const {
 	SDL_DestroyWindow(window);
 }
 
@@ -177,7 +180,7 @@ void Renderer::renderFrame() {
 	// Compute the projection matrix.
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(50.0f, (float)width / (float)height, 1.0f, camr);
+	gluPerspective(50.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
 	GLdouble projectionMatrix[16];
 	glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix);
 
@@ -189,38 +192,38 @@ void Renderer::renderFrame() {
 	glTranslatef(-cameraPos[0], -cameraPos[1], -cameraPos[2]);
 	GLdouble modelviewMatrix[16];
 	glGetDoublev(GL_MODELVIEW_MATRIX, modelviewMatrix);
-	Uint32 time = SDL_GetTicks();
-	float dt = (time - prevFrameTime) / 1000.0f;
+	const Uint32 time = SDL_GetTicks();
+	const float dt = static_cast<float>(time - prevFrameTime) / 1000.0f;
 	prevFrameTime = time;
 
 	// Clamp the framerate so that we do not hog all the CPU.
-	const float MIN_FRAME_TIME = 1.0f / frameRate;
-	if (dt < MIN_FRAME_TIME)
+	if (const float MIN_FRAME_TIME = 1.0f / frameRate; dt < MIN_FRAME_TIME)
 	{
-		int ms = (int)((MIN_FRAME_TIME - dt) * 1000.0f);
+		int ms = static_cast<int>((MIN_FRAME_TIME - dt) * 1000.0f);
 		if (ms > 10) ms = 10;
 		if (ms >= 0) SDL_Delay(ms);
 	}
 
 	// Handle keyboard movement.
-	const Uint8* keystate = SDL_GetKeyboardState(NULL);
-	moveFront = rcClamp(moveFront + dt * 4 * ((keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_UP]) ? 1 : -1), 0.0f, 1.0f);
-	moveLeft = rcClamp(moveLeft + dt * 4 * ((keystate[SDL_SCANCODE_A] || keystate[SDL_SCANCODE_LEFT]) ? 1 : -1), 0.0f, 1.0f);
-	moveBack = rcClamp(moveBack + dt * 4 * ((keystate[SDL_SCANCODE_S] || keystate[SDL_SCANCODE_DOWN]) ? 1 : -1), 0.0f, 1.0f);
-	moveRight = rcClamp(moveRight + dt * 4 * ((keystate[SDL_SCANCODE_D] || keystate[SDL_SCANCODE_RIGHT]) ? 1 : -1), 0.0f, 1.0f);
-	moveUp = rcClamp(moveUp + dt * 4 * ((keystate[SDL_SCANCODE_Q] || keystate[SDL_SCANCODE_PAGEUP]) ? 1 : -1), 0.0f, 1.0f);
-	moveDown = rcClamp(moveDown + dt * 4 * ((keystate[SDL_SCANCODE_E] || keystate[SDL_SCANCODE_PAGEDOWN]) ? 1 : -1), 0.0f, 1.0f);
+	const Uint8* keystate = SDL_GetKeyboardState(nullptr);
+	int up = ((keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_UP]) ? 1 : -1);
+	moveFront = rcClamp(moveFront + dt * 4 * static_cast<float>(keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_UP] ? 1 : -1), 0.0f, 1.0f);
+	moveLeft = rcClamp(moveLeft + dt * 4 * static_cast<float>(keystate[SDL_SCANCODE_A] || keystate[SDL_SCANCODE_LEFT] ? 1 : -1), 0.0f, 1.0f);
+	moveBack = rcClamp(moveBack + dt * 4 * static_cast<float>(keystate[SDL_SCANCODE_S] || keystate[SDL_SCANCODE_DOWN] ? 1 : -1), 0.0f, 1.0f);
+	moveRight = rcClamp(moveRight + dt * 4 * static_cast<float>(keystate[SDL_SCANCODE_D] || keystate[SDL_SCANCODE_RIGHT] ? 1 : -1), 0.0f, 1.0f);
+	moveUp = rcClamp(moveUp + dt * 4 * static_cast<float>(keystate[SDL_SCANCODE_Q] || keystate[SDL_SCANCODE_PAGEUP] ? 1 : -1), 0.0f, 1.0f);
+	moveDown = rcClamp(moveDown + dt * 4 * static_cast<float>(keystate[SDL_SCANCODE_E] || keystate[SDL_SCANCODE_PAGEDOWN] ? 1 : -1), 0.0f, 1.0f);
 	float movex = (moveRight - moveLeft) * navKit->keybSpeed * dt;
 	float movey = (moveBack - moveFront) * navKit->keybSpeed * dt + navKit->scrollZoom * 2.0f;
 	navKit->scrollZoom = 0;
 
-	cameraPos[0] += movex * (float)modelviewMatrix[0];
-	cameraPos[1] += movex * (float)modelviewMatrix[4];
-	cameraPos[2] += movex * (float)modelviewMatrix[8];
+	cameraPos[0] += movex * static_cast<float>(modelviewMatrix[0]);
+	cameraPos[1] += movex * static_cast<float>(modelviewMatrix[4]);
+	cameraPos[2] += movex * static_cast<float>(modelviewMatrix[8]);
 
-	cameraPos[0] += movey * (float)modelviewMatrix[2];
-	cameraPos[1] += movey * (float)modelviewMatrix[6];
-	cameraPos[2] += movey * (float)modelviewMatrix[10];
+	cameraPos[0] += movey * static_cast<float>(modelviewMatrix[2]);
+	cameraPos[1] += movey * static_cast<float>(modelviewMatrix[6]);
+	cameraPos[2] += movey * static_cast<float>(modelviewMatrix[10]);
 
 	cameraPos[1] += (moveUp - moveDown) * navKit->keybSpeed * dt;
 
@@ -239,12 +242,12 @@ void Renderer::renderFrame() {
 	drawAxes();
 }
 
-void Renderer::finalizeFrame() {
+void Renderer::finalizeFrame() const {
 	glEnable(GL_DEPTH_TEST);
 	SDL_GL_SwapWindow(window);
 }
 
-void drawLine(Vec3 s, Vec3 e, Vec3 color = { -1, -1, -1 }) {
+void drawLine(const Vec3 s, const Vec3 e, const Vec3 color = { -1, -1, -1 }) {
 	if (color.X != -1) {
 		glColor3f(color.X, color.Y, color.Z);
 	}
@@ -256,7 +259,7 @@ void drawLine(Vec3 s, Vec3 e, Vec3 color = { -1, -1, -1 }) {
 	glDepthMask(GL_TRUE);
 }
 
-void Renderer::drawBounds() {
+void Renderer::drawBounds() const {
 	glDepthMask(GL_FALSE);
 	float* p = navKit->obj->bBoxPos;
 	float* s = navKit->obj->bBoxSize;
@@ -292,10 +295,10 @@ void Renderer::drawBounds() {
 }
 
 void Renderer::drawAxes() {
-	Vec3 o = { 0, 0, 0 };
-	Vec3 x = { 1, 0, 0 };
-	Vec3 y = { 0, 1, 0 };
-	Vec3 z = { 0, 0, 1 };
+	const Vec3 o = { 0, 0, 0 };
+	const Vec3 x = { 1, 0, 0 };
+	const Vec3 y = { 0, 1, 0 };
+	const Vec3 z = { 0, 0, 1 };
 
 	drawLine(o, x, x);
 	drawText("X", x, x);
@@ -307,7 +310,7 @@ void Renderer::drawAxes() {
 	drawText("Z", z * -1, z);
 }
 
-HitTestResult Renderer::hitTestRender(int mx, int my) {
+HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 	glClearColor(1.0, 1.0, 1.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

@@ -39,8 +39,10 @@ void Gui::drawGui() {
 		if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
 			mouseOverMenu = true;
 		if (showLog) {
-			for (int i = 0; i < navKit->ctx.getLogCount(); ++i)
-				imguiLabel(std::string{ navKit->ctx.getLogText(i) }.c_str());
+			std::lock_guard lock(navKit->ctx.m_log_mutex);
+			for (std::deque<std::string>::const_iterator it = navKit->ctx.m_logBuffer.cbegin(); it != navKit->ctx.m_logBuffer.cend(); ++it) {
+				imguiLabel(it->c_str());
+			}
 			if (lastLogCount != navKit->ctx.getLogCount()) {
 				logScroll = std::max(0, navKit->ctx.getLogCount() * 20 - 160);
 				lastLogCount = navKit->ctx.getLogCount();
