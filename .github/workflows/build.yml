@@ -49,7 +49,7 @@ jobs:
     - name: Copy release artifacts
       run: |
         mkdir _dist-release
-        Copy-Item _install/x64-release/bin/* -Destination _dist-release/ -Recurse
+        Copy-Item _install/x64-release/src/* -Destination _dist-release/ -Recurse
 
     - name: Archive debug NavKit
       uses: actions/upload-artifact@v4
