@@ -31,37 +31,50 @@ target_link_libraries(NavKit PRIVATE NavWeakness)
 target_link_libraries(NavKit PRIVATE ResourceLib_HM3)
 
 file(COPY "${NavKit_SOURCE_DIR}/src/resource/DroidSans.ttf" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/bin/ResourceLib_HM3.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(NAV_WEAKNESS_DLL "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(NAV_WEAKNESS_DLL "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.dll")
+endif()
+add_custom_command(
+  TARGET NavKit
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NAV_WEAKNESS_DLL}" "${CMAKE_CURRENT_BINARY_DIR}/"
+  COMMENT "Copying ${NAV_WEAKNESS_DLL} to ${CMAKE_BINARY_DIR}"
+)
+
+
+file(COPY "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.exe" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/Editor.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/bin/nfd.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/src/resource/NavKit.ini" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 set_target_properties(NavWeakness PROPERTIES
   IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/NavWeakness.dll"
-  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/NavWeakness/NavWeakness.lib"
-  IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/include/NavWeakness/NavWeakness.lib"
-  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll"
-  IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/bin/NavWeakness.dll"
+  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.lib"
+  IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.lib"
+  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll"
+  IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.dll"
 )
 set_target_properties(nfd::nfd PROPERTIES
   NFD_OVERRIDE_RECENT_WITH_DEFAULT ON
   IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/nfd.dll"
-  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/nativefiledialog-extended/nfd.lib"
-  IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/include/nativefiledialog-extended/nfd.lib"
-  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/nfd.dll"
-  IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/bin/nfd.dll"
+  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.lib"
+  IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/nfd.lib"
+  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll"
+  IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll"
 )
 set_target_properties(ResourceLib_HM3 PROPERTIES
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/ResourceLib_HM3.dll"
-  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/include/ResourceLib_HM3/ResourceLib_HM3.lib"
-  IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/include/ResourceLib_HM3/ResourceLib_HM3.lib"
-  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/bin/ResourceLib_HM3.dll"
-  IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/bin/ResourceLib_HM3.dll"
+  IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
+  IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
+  IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
+  IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
 )
 
 target_link_libraries(NavKit
