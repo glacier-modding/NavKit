@@ -35,21 +35,21 @@ jobs:
         cmake --preset x64-debug .
         cmake --build build/x64-debug -j12
 
-#    - name: Build and install release
-#      run: |
-#        cmake --preset x64-Release .
-#        cmake --build build/x64-Release -j12
-#        cmake --install build/x64-Release
+    - name: Build and install release
+      run: |
+        cmake --preset x64-Release .
+        cmake --build build/x64-Release -j12
+        cmake --install build/x64-Release
 
     - name: Copy debug artifacts
       run: |
         mkdir _dist-debug
         Copy-Item build/x64-debug/src/* -Destination _dist-debug/ -Recurse
 
-#    - name: Copy release artifacts
-#      run: |
-#        mkdir _dist-release
-#        Copy-Item _install/x64-Release/bin/* -Destination _dist-release/ -Recurse
+    - name: Copy release artifacts
+      run: |
+        mkdir _dist-release
+        Copy-Item _install/x64-Release/bin/* -Destination _dist-release/ -Recurse
 
     - name: Archive debug NavKit
       uses: actions/upload-artifact@v4
@@ -57,11 +57,11 @@ jobs:
         name: NavKit-Debug
         path: _dist-debug/*
 
-#    - name: Archive release Navkit
-#      uses: actions/upload-artifact@v4
-#      with:
-#        name: NavKit-Release
-#        path: _dist-release/*
+    - name: Archive release Navkit
+      uses: actions/upload-artifact@v4
+      with:
+        name: NavKit-Release
+        path: _dist-release/*
 
   upload_release:
     name: Upload artifacts
@@ -72,7 +72,7 @@ jobs:
     strategy:
       matrix:
         artifact:
-#          - NavKit-Release
+          - NavKit-Release
           - NavKit-Debug
 
     steps:
