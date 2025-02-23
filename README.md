@@ -1,5 +1,5 @@
 # NavKit
-*A tool to generate Navp files for Hitman: World of Assassination Scenes in the Glacier 2 Engine*
+*A tool to generate Navp and Airg files for Hitman: World of Assassination Scenes in the Glacier 2 Engine*
 # Running instructions
 You can run NavKit by opening `NavKit.exe`. To use the **View Navp in game** and **Scene Extraction** features, you will need ZHMModSdk installed, and you will need to copy the included `Editor.dll` to your `Hitman 3\Retail\mods` folder. For the **Scene Extraction** feature, you will also need to have Blender installed.
 
