@@ -14,17 +14,22 @@ enum VisionDataType : uint8_t {
     SIZE_3326,
     SIZE_3880,
     SIZE_UNKNOWN
-}; 
-class VisionData
-{
+};
+
+class VisionData {
 public:
     VisionData() = default;
-    constexpr VisionData(VisionDataType type) : visionDataType(type) { }
+
+    constexpr VisionData(VisionDataType type) : visionDataType(type) {
+    }
+
     constexpr bool operator==(VisionData a) const { return visionDataType == a.visionDataType; }
     constexpr bool operator!=(VisionData a) const { return visionDataType != a.visionDataType; }
 
-	std::string getName();
+    std::string getName();
+
     Vec4 getColor();
+
     static VisionData GetVisionDataType(int size);
 
 private:

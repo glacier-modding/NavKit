@@ -8,40 +8,50 @@ class NavKit;
 
 class SceneExtract {
 public:
-	SceneExtract(NavKit* navKit, const std::string &pythonScript);
-	~SceneExtract();
+    SceneExtract(NavKit *navKit, const std::string &pythonScript);
 
-	void drawMenu();
-	void finalizeExtract();
-	std::string lastBlenderFile;
-	std::string lastHitmanFolder;
-	std::string lastOutputFolder;
-	void setHitmanFolder(const char* folderName);
-	void setOutputFolder(const char* folderName);
-	void setBlenderFile(const char* fileName);
+    ~SceneExtract();
+
+    void drawMenu();
+
+    void finalizeExtract();
+
+    std::string lastBlenderFile;
+    std::string lastHitmanFolder;
+    std::string lastOutputFolder;
+
+    void setHitmanFolder(const char *folderName);
+
+    void setOutputFolder(const char *folderName);
+
+    void setBlenderFile(const char *fileName);
 
 private:
-	NavKit* navKit;
+    NavKit *navKit;
 
-	std::string blenderName;
-	bool blenderSet;
-	int extractScroll;
-	bool startedObjGeneration;
-	std::vector<bool> extractionDone;
-	std::string hitmanFolderName;
-	bool hitmanSet;
-	std::string outputFolderName;
-	std::string pythonScript;
-	bool outputSet;
-	bool errorExtracting;
-	std::vector<HANDLE> handles;
-	bool closing;
+    std::string blenderName;
+    bool blenderSet;
+    int extractScroll;
+    bool startedObjGeneration;
+    std::vector<bool> extractionDone;
+    std::string hitmanFolderName;
+    bool hitmanSet;
+    std::string outputFolderName;
+    std::string pythonScript;
+    bool outputSet;
+    bool errorExtracting;
+    std::vector<HANDLE> handles;
+    bool closing;
 
-	static void runCommand(SceneExtract* sceneExtract, std::string command, std::string logFileName);
+    static void runCommand(SceneExtract *sceneExtract, std::string command, std::string logFileName);
 
-	char* openSetBlenderFileDialog(char* lastBlenderFile);
-	char* openHitmanFolderDialog(char* lastHitmanFolder);
-	char* openOutputFolderDialog(char* lastOutputFolder);
-	void extractScene(char* hitmanFolder, char* outputFolder);
-	void generateObj(char* blenderPath, char* outputFolder);
+    char *openSetBlenderFileDialog(char *lastBlenderFile);
+
+    char *openHitmanFolderDialog(char *lastHitmanFolder);
+
+    char *openOutputFolderDialog(char *lastOutputFolder);
+
+    void extractScene(char *hitmanFolder, char *outputFolder);
+
+    void generateObj(char *blenderPath, char *outputFolder);
 };

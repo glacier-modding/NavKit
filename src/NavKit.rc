@@ -10,4 +10,4 @@ BEGIN
     PUSHBUTTON      "Copy",IDC_COPY_BUTTON,100,80,40,14
     EDITTEXT        IDC_ERROR_TEXT,10,10,180,60,ES_MULTILINE | ES_READONLY | WS_VSCROLL
 END
-IDI_ICON1               ICON    DISCARDABLE     "NavKitLogo.ico"
+IDI_ICON1               ICON    DISCARDABLE     "resource/NavKitLogo.ico"

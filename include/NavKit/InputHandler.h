@@ -6,17 +6,19 @@ class NavKit;
 
 class InputHandler {
 public:
-	InputHandler(NavKit* navKit);
-	void handleInput();
-	void hitTest();
+    InputHandler(NavKit *navKit);
 
-	int mousePos[2];
-	int origMousePos[2];
-	int mouseScroll;
-	bool resized;
-	bool moved;
-	unsigned char mouseButtonMask;
+    void handleInput();
+
+    void hitTest();
+
+    int mousePos[2];
+    int origMousePos[2];
+    int mouseScroll;
+    bool resized;
+    bool moved;
+    unsigned char mouseButtonMask;
 
 private:
-	NavKit* navKit;
+    NavKit *navKit;
 };

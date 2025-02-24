@@ -102,7 +102,9 @@ public:
     CSimpleIniA ini;
 
     int runProgram(int argc, char **argv);
+
     static INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
     void log(rcLogCategory category, const char *message, ...);
 
     static std::string *errorMessage;

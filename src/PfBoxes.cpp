@@ -14,21 +14,21 @@ void PfBoxes::Rotation::readJson(simdjson::ondemand::object json) {
 }
 
 void PfBoxes::PfBoxType::readJson(simdjson::ondemand::object json) {
-    type = std::string{ std::string_view(json["type"]) };
-    data = std::string{ std::string_view(json["data"]) };
+    type = std::string{std::string_view(json["type"])};
+    data = std::string{std::string_view(json["data"])};
 }
 
 void PfBoxes::Size::readJson(simdjson::ondemand::object json) {
-    type = std::string{ std::string_view(json["type"]) };
+    type = std::string{std::string_view(json["type"])};
     simdjson::ondemand::object dataJson = json["data"];
     data.readJson(dataJson);
 }
 
 void PfBoxes::Entity::readJson(simdjson::ondemand::object json) {
-    id = std::string{ std::string_view(json["id"]) };
+    id = std::string{std::string_view(json["id"])};
     auto result = json["name"];
     if (result.error() == simdjson::SUCCESS) {
-        name = std::string{ std::string_view(json["name"]) };
+        name = std::string{std::string_view(json["name"])};
     }
 
     simdjson::ondemand::object positionJson = json["position"];
@@ -42,17 +42,17 @@ void PfBoxes::Entity::readJson(simdjson::ondemand::object json) {
 }
 
 void PfBoxes::HashAndEntity::readJson(simdjson::ondemand::object json) {
-    hash = std::string{ std::string_view(json["hash"]) };
+    hash = std::string{std::string_view(json["hash"])};
     simdjson::ondemand::object entityJson = json["entity"];
     entity.readJson(entityJson);
 }
 
-PfBoxes::PfBoxes::PfBoxes(char* fileName) {
+PfBoxes::PfBoxes::PfBoxes(char *fileName) {
     simdjson::ondemand::parser parser;
     simdjson::padded_string json = simdjson::padded_string::load(fileName);
     auto jsonDocument = parser.iterate(json);
     simdjson::ondemand::array entitiesJson = jsonDocument["entities"];
-    for (simdjson::ondemand::value hashAndEntityJson : entitiesJson) {
+    for (simdjson::ondemand::value hashAndEntityJson: entitiesJson) {
         HashAndEntity hashAndEntity;
         hashAndEntity.readJson(hashAndEntityJson);
         hashesAndEntities.push_back(hashAndEntity);
@@ -60,7 +60,7 @@ PfBoxes::PfBoxes::PfBoxes(char* fileName) {
 }
 
 PfBoxes::PfBox PfBoxes::PfBoxes::getPathfindingBBox() {
-    for (HashAndEntity hashAndEntity : hashesAndEntities) {
+    for (HashAndEntity hashAndEntity: hashesAndEntities) {
         if (hashAndEntity.entity.type.data == INCLUDE_TYPE) {
             Vec3 p = hashAndEntity.entity.position;
             Vec3 s = hashAndEntity.entity.size.data;

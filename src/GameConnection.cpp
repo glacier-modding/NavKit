@@ -2,12 +2,12 @@
 #include "..\include\NavKit\NavKit.h"
 
 // 46735 is a phoneword for HMSDK
-constinit const char* c_EditorHost = "127.0.0.1";
+constinit const char *c_EditorHost = "127.0.0.1";
 constinit const uint16_t c_EditorPort = 46735;
 
 using easywsclient::WebSocket;
 
-GameConnection::GameConnection(NavKit* navKit) : navKit(navKit) {
+GameConnection::GameConnection(NavKit *navKit) : navKit(navKit) {
     ConnectToGame();
 }
 
@@ -30,6 +30,7 @@ int GameConnection::ConnectToGame() {
 
     return 0;
 }
+
 void GameConnection::HandleMessages() {
     if (!ws) {
         navKit->log(RC_LOG_ERROR, "GameConnection: HandleMessages failed because the socket is not open.");
@@ -38,13 +39,14 @@ void GameConnection::HandleMessages() {
     while (ws->getReadyState() != WebSocket::CLOSED) {
         WebSocket::pointer wsp = &*ws;
         ws->poll();
-        ws->dispatch([&](const std::string& message) {
+        ws->dispatch([&](const std::string &message) {
             navKit->log(RC_LOG_PROGRESS, ("Received message: " + message).c_str());
-            if (message == "Done loading Navp.") { 
+            if (message == "Done loading Navp.") {
                 wsp->close();
             }
             if (message.find("Unknown editor message type: loadNavp") != -1) {
-                navKit->log(RC_LOG_ERROR, "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
+                navKit->log(RC_LOG_ERROR,
+                            "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
                 wsp->close();
             }
         });
@@ -55,7 +57,7 @@ void GameConnection::SendHelloMessage() {
     ws->send("{\"type\":\"hello\",\"identifier\":\"glacier2obj\"}");
 }
 
-void GameConnection::SendNavp(NavPower::NavMesh* navMesh) {
+void GameConnection::SendNavp(NavPower::NavMesh *navMesh) {
     if (!ws) {
         navKit->log(RC_LOG_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
         return;
@@ -81,12 +83,12 @@ void GameConnection::SendChunk(std::vector<NavPower::Area> areas, int chunkIndex
     m << chunkIndex;
     m << ",\"areas\":[";
     int numArea = 0;
-    
-    for (auto& navPowerArea : areas) {
+
+    for (auto &navPowerArea: areas) {
         numArea++;
         m << "[";
         int numEdge = 0;
-        for (auto& edge : navPowerArea.m_edges) {
+        for (auto &edge: navPowerArea.m_edges) {
             numEdge++;
             auto point = edge->m_pos;
             m << "[";

@@ -1,65 +1,65 @@
 #include "../include/NavKit/VisionData.h"
 
 std::string VisionData::getName() {
-	switch (visionDataType) {
-	case SIZE_556:
-		return "blue";
-	case SIZE_1110:
-		return "red";
-	case SIZE_1664:
-		return "indigo";
-	case SIZE_2218:
-		return "yellow";
-	case SIZE_2772:
-		return "purple";
-	case SIZE_3326:
-		return "teal";
-	case SIZE_3880:
-		return "white";
-	default:
-		return "black";
-	}
+    switch (visionDataType) {
+        case SIZE_556:
+            return "blue";
+        case SIZE_1110:
+            return "red";
+        case SIZE_1664:
+            return "indigo";
+        case SIZE_2218:
+            return "yellow";
+        case SIZE_2772:
+            return "purple";
+        case SIZE_3326:
+            return "teal";
+        case SIZE_3880:
+            return "white";
+        default:
+            return "black";
+    }
 }
 
 VisionData VisionData::GetVisionDataType(int size) {
-	switch (size) {
-	case 556:
-		return VisionData(VisionDataType::SIZE_556);
-	case 1110:
-		return VisionData(VisionDataType::SIZE_1110);
-	case 1664:
-		return VisionData(VisionDataType::SIZE_1664);
-	case 2218:
-		return VisionData(VisionDataType::SIZE_2218);
-	case 2772:
-		return VisionData(VisionDataType::SIZE_2772);
-	case 3326:
-		return VisionData(VisionDataType::SIZE_3326);
-	case 3880:
-		return VisionData(VisionDataType::SIZE_3880);
-	default:
-		return VisionData(VisionDataType::SIZE_UNKNOWN);
-	}
+    switch (size) {
+        case 556:
+            return VisionData(VisionDataType::SIZE_556);
+        case 1110:
+            return VisionData(VisionDataType::SIZE_1110);
+        case 1664:
+            return VisionData(VisionDataType::SIZE_1664);
+        case 2218:
+            return VisionData(VisionDataType::SIZE_2218);
+        case 2772:
+            return VisionData(VisionDataType::SIZE_2772);
+        case 3326:
+            return VisionData(VisionDataType::SIZE_3326);
+        case 3880:
+            return VisionData(VisionDataType::SIZE_3880);
+        default:
+            return VisionData(VisionDataType::SIZE_UNKNOWN);
+    }
 }
 
 Vec4 VisionData::getColor() {
-	//return Vec4(0.0, 0.0, 1.0, 0.6);
-	switch (visionDataType) {
-	case SIZE_556:
-		return Vec4(0.0, 0.0, 1.0, 0.6);
-	case SIZE_1110:
-		return Vec4(1.0, 0.0, 0.0, 0.6);
-	case SIZE_1664:
-		return Vec4(0.5, 0.0, 1.0, 0.6);
-	case SIZE_2218:
-		return Vec4(1.0, 1.0, 0.0, 0.6);
-	case SIZE_2772:
-		return Vec4(1.0, 0.0, 1.0, 0.6);
-	case SIZE_3326:
-		return Vec4(0.0, 1.0, 1.0, 0.6);
-	case SIZE_3880:
-		return Vec4(1.0, 1.0, 1.0, 0.6);
-	default:
-		return Vec4(0.0, 0.0, 0.0, 0.6);
-	}
+    //return Vec4(0.0, 0.0, 1.0, 0.6);
+    switch (visionDataType) {
+        case SIZE_556:
+            return Vec4(0.0, 0.0, 1.0, 0.6);
+        case SIZE_1110:
+            return Vec4(1.0, 0.0, 0.0, 0.6);
+        case SIZE_1664:
+            return Vec4(0.5, 0.0, 1.0, 0.6);
+        case SIZE_2218:
+            return Vec4(1.0, 1.0, 0.0, 0.6);
+        case SIZE_2772:
+            return Vec4(1.0, 0.0, 1.0, 0.6);
+        case SIZE_3326:
+            return Vec4(0.0, 1.0, 1.0, 0.6);
+        case SIZE_3880:
+            return Vec4(1.0, 1.0, 1.0, 0.6);
+        default:
+            return Vec4(0.0, 0.0, 0.0, 0.6);
+    }
 }

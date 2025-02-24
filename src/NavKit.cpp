@@ -21,7 +21,7 @@
 */
 #include "..\include\NavKit\NavKit.h"
 
-std::string* NavKit::errorMessage = nullptr;
+std::string *NavKit::errorMessage = nullptr;
 
 int SDL_main(int argc, char **argv) {
     NavKit navKitProgram;
@@ -32,42 +32,44 @@ int NavKit::runProgram(int argc, char **argv) {
     if (!renderer->initWindowAndRenderer()) {
         return -1;
     }
-    CPPTRACE_TRY {
-        // TODO: Add mutex for tbuffer to keep processing messages in the background.
-        // std::thread handleMessagesThread([=] { HandleMessages(); });
-        // handleMessagesThread.detach();
-        log(RC_LOG_PROGRESS, "NavKit initialized.");
-        while (!done) {
-            inputHandler->handleInput();
-            if (inputHandler->resized) {
-                renderer->handleResize();
-                inputHandler->resized = false;
-            }
-            if (inputHandler->moved) {
-                renderer->updateFrameRate();
-                inputHandler->moved = false;
-            }
-            renderer->renderFrame();
-            inputHandler->hitTest();
-            gui->drawGui();
+    CPPTRACE_TRY
+        {
+            // TODO: Add mutex for tbuffer to keep processing messages in the background.
+            // std::thread handleMessagesThread([=] { HandleMessages(); });
+            // handleMessagesThread.detach();
+            log(RC_LOG_PROGRESS, "NavKit initialized.");
+            while (!done) {
+                inputHandler->handleInput();
+                if (inputHandler->resized) {
+                    renderer->handleResize();
+                    inputHandler->resized = false;
+                }
+                if (inputHandler->moved) {
+                    renderer->updateFrameRate();
+                    inputHandler->moved = false;
+                }
+                renderer->renderFrame();
+                inputHandler->hitTest();
+                gui->drawGui();
 
-            sceneExtract->finalizeExtract();
-            navp->finalizeLoad();
-            obj->finalizeLoad();
-            airg->finalizeLoad();
-            airg->finalizeSave();
-            airg->finalizeBuildVisionAndDeadEndData();
+                sceneExtract->finalizeExtract();
+                navp->finalizeLoad();
+                obj->finalizeLoad();
+                airg->finalizeLoad();
+                airg->finalizeSave();
+                airg->finalizeBuildVisionAndDeadEndData();
 
-            renderer->finalizeFrame();
+                renderer->finalizeFrame();
+            }
+
+            renderer->closeWindow();
         }
-
-        renderer->closeWindow();
-    } CPPTRACE_CATCH(const std::exception& e) {
+    CPPTRACE_CATCH(const std::exception& e) {
         errorMessage = new std::string("An unexpected error occurred: " + std::string(e.what()) + "\n\nStack Trace:\n" +
                                        cpptrace::from_current_exception().to_string());
         DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, DialogProc, 0);
         return 1;
-    } catch(...) {
+    } catch (...) {
         errorMessage = new std::string("An unexpected error occurred:\n\nStack Trace:\n" +
                                        cpptrace::from_current_exception().to_string());
         DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, DialogProc, 0);
