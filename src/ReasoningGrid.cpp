@@ -416,7 +416,7 @@ void addWaypointsForGrid(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit
 					}
 					break;
 				}
-				if ((*(*h.grid)[zi])[yi]->size() > xi && (*(*(*h.grid)[zi])[yi])[xi] != 65535) {
+				if (h.grid->at(zi)->at(yi)->size() > xi && h.grid->at(zi)->at(yi)->at(xi) != 65535) {
 					continue;
 				}
 				bool pointInArea = false;
@@ -562,167 +562,177 @@ bool waypointsAreConnected(NavKit* navKit, ReasoningGridBuilderHelper& h, Reason
 }
 
 void ReasoningGrid::build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, NavKit* navKit, float spacing, float zSpacing, float tolerance, float zTolerance) {
-	// Initialize airg properties
-	std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	std::string msg = "Started building Airg at ";
-	msg += std::ctime(&start_time);
-	navKit->log(RC_LOG_PROGRESS, msg.data());
-	auto start = std::chrono::high_resolution_clock::now();
+    CPPTRACE_TRY {
+		// Initialize airg properties
+		std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		std::string msg = "Started building Airg at ";
+		msg += std::ctime(&start_time);
+		navKit->log(RC_LOG_PROGRESS, msg.data());
+		auto start = std::chrono::high_resolution_clock::now();
 
-	navKit->airg->airgLoadState.push_back(true);
-	// grid is set up in this order: Z[Y[X[]]]
-	std::vector<std::vector<std::vector<int>*>*> grid;
-	Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
-	min.X += spacing / 2;
-	min.Y += spacing / 2;
-	Vec3 max = navMesh->m_graphHdr->m_bbox.m_max;
-	int gridXSize = std::ceil((max.X - min.X) / spacing);
-	int gridYSize = std::ceil((max.Y - min.Y) / spacing);
-	int gridZSize = std::ceil((max.Z - min.Z) / zSpacing);
-	gridZSize = gridZSize > 0 ? gridZSize : 1;
-	airg->m_Properties.fGridSpacing = spacing;
-	airg->m_Properties.nGridWidth = gridYSize;
-	airg->m_Properties.vMin.x = min.X;
-	airg->m_Properties.vMin.y = min.Y;
-	airg->m_Properties.vMin.z = min.Z;
-	airg->m_Properties.vMin.w = 1;
-	airg->m_Properties.vMax.x = max.X;
-	airg->m_Properties.vMax.y = max.Y;
-	airg->m_Properties.vMax.z = max.Z;
-	airg->m_Properties.vMax.w = 1;
-	airg->m_Properties.nVisibilityRange = 23;
+		navKit->airg->airgLoadState.push_back(true);
+		// grid is set up in this order: Z[Y[X[]]]
+		std::vector<std::vector<std::vector<int>*>*> grid;
+		Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
+		min.X += spacing / 2;
+		min.Y += spacing / 2;
+		Vec3 max = navMesh->m_graphHdr->m_bbox.m_max;
+		int gridXSize = std::ceil((max.X - min.X) / spacing);
+		int gridYSize = std::ceil((max.Y - min.Y) / spacing);
+		int gridZSize = std::ceil((max.Z - min.Z) / zSpacing);
+		gridZSize = gridZSize > 0 ? gridZSize : 1;
+		airg->m_Properties.fGridSpacing = spacing;
+		airg->m_Properties.nGridWidth = gridYSize;
+		airg->m_Properties.vMin.x = min.X;
+		airg->m_Properties.vMin.y = min.Y;
+		airg->m_Properties.vMin.z = min.Z;
+		airg->m_Properties.vMin.w = 1;
+		airg->m_Properties.vMax.x = max.X;
+		airg->m_Properties.vMax.y = max.Y;
+		airg->m_Properties.vMax.z = max.Z;
+		airg->m_Properties.vMax.w = 1;
+		airg->m_Properties.nVisibilityRange = 23;
 
 
-	std::vector<double> areaZMins;
-	std::vector<double> areaZMaxes;
-	std::vector<int> waypointZLevels;
-	std::vector<std::pair<float, float>> waypointPositionAdjustments;
+		std::vector<double> areaZMins;
+		std::vector<double> areaZMaxes;
+		std::vector<int> waypointZLevels;
+		std::vector<std::pair<float, float>> waypointPositionAdjustments;
 
-	// Get Z-level for each area
-	for (auto area : navMesh->m_areas) {
-		const int areaPointCount = area.m_edges.size();
-		double areaMinZ = 1000;
-		double areaMaxZ = -1000;
-		double pointZ = 0;
-		for (int i = 0; i < areaPointCount; i++) {
-			pointZ = area.m_edges[i]->m_pos.Z;
-			areaMinZ = areaMinZ < pointZ ? areaMinZ : pointZ;
-			areaMaxZ = areaMaxZ > pointZ ? areaMaxZ : pointZ;
-		}
-		areaZMins.push_back(areaMinZ);
-		areaZMaxes.push_back(areaMaxZ);
-	}
-	
-	// Build map of Z-level to area list
-	std::vector<std::vector<int>> areasByZLevel;
-	for (int zi = 0; zi < gridZSize; zi++) {
-		std::vector<int> areasForZLevel;
-		for (int areaIndex = 0; areaIndex < navMesh->m_areas.size(); areaIndex++) {
-			double minZ = min.Z + zi * zSpacing;
-			double maxZ = min.Z + (zi + 1) * zSpacing;
-			if ((areaZMins[areaIndex] >= minZ && areaZMins[areaIndex] <= maxZ) ||
-				(areaZMaxes[areaIndex] >= minZ && areaZMaxes[areaIndex] <= maxZ) ||
-				(areaZMins[areaIndex] <= minZ && areaZMaxes[areaIndex] >= maxZ)) {
-				areasForZLevel.push_back(areaIndex);
+		// Get Z-level for each area
+		for (auto area : navMesh->m_areas) {
+			const int areaPointCount = area.m_edges.size();
+			double areaMinZ = 1000;
+			double areaMaxZ = -1000;
+			double pointZ = 0;
+			for (int i = 0; i < areaPointCount; i++) {
+				pointZ = area.m_edges[i]->m_pos.Z;
+				areaMinZ = areaMinZ < pointZ ? areaMinZ : pointZ;
+				areaMaxZ = areaMaxZ > pointZ ? areaMaxZ : pointZ;
 			}
+			areaZMins.push_back(areaMinZ);
+			areaZMaxes.push_back(areaMaxZ);
 		}
-		areasByZLevel.push_back(areasForZLevel);
-	}
 
-	// Fill in waypoints for grid points
-	ReasoningGridBuilderHelper helper;
-	helper.areasByZLevel = &areasByZLevel;
-	helper.grid = &grid;
-	helper.gridXSize = gridXSize;
-	helper.gridYSize = gridYSize;
-	helper.gridZSize = gridZSize;
-	helper.min = &min;
-	helper.spacing = spacing;
-	helper.tolerance = 0;
-	helper.waypointZLevels = &waypointZLevels;
-	helper.zSpacing = zSpacing;
-	helper.zTolerance = zTolerance;
-	initializeGrid(navKit, helper);
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within areas...");
+		// Build map of Z-level to area list
+		std::vector<std::vector<int>> areasByZLevel;
+		for (int zi = 0; zi < gridZSize; zi++) {
+			std::vector<int> areasForZLevel;
+			for (int areaIndex = 0; areaIndex < navMesh->m_areas.size(); areaIndex++) {
+				double minZ = min.Z + zi * zSpacing;
+				double maxZ = min.Z + (zi + 1) * zSpacing;
+				if ((areaZMins[areaIndex] >= minZ && areaZMins[areaIndex] <= maxZ) ||
+					(areaZMaxes[areaIndex] >= minZ && areaZMaxes[areaIndex] <= maxZ) ||
+					(areaZMins[areaIndex] <= minZ && areaZMaxes[areaIndex] >= maxZ)) {
+					areasForZLevel.push_back(areaIndex);
+				}
+			}
+			areasByZLevel.push_back(areasForZLevel);
+		}
 
-	addWaypointsForGrid(airg, navMesh, navKit, helper);
-	if (helper.result == -1) {
-		navKit->airg->airgLoadState.push_back(true);
-		return;
-	}
-	helper.tolerance = tolerance;
-	int waypointsWithinAreas = airg->m_WaypointList.size();
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(waypointsWithinAreas) + " waypoints within areas.").c_str());
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within tolerance around areas...");
-	addWaypointsForGrid(airg, navMesh, navKit, helper);
-	if (helper.result == -1) {
-		navKit->airg->airgLoadState.push_back(true);
-		return;
-	}
+		// Fill in waypoints for grid points
+		ReasoningGridBuilderHelper helper;
+		helper.areasByZLevel = &areasByZLevel;
+		helper.grid = &grid;
+		helper.gridXSize = gridXSize;
+		helper.gridYSize = gridYSize;
+		helper.gridZSize = gridZSize;
+		helper.min = &min;
+		helper.spacing = spacing;
+		helper.tolerance = 0;
+		helper.waypointZLevels = &waypointZLevels;
+		helper.zSpacing = zSpacing;
+		helper.zTolerance = zTolerance;
+		initializeGrid(navKit, helper);
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within areas...");
 
-	airg->m_nNodeCount = airg->m_WaypointList.size();
+		addWaypointsForGrid(airg, navMesh, navKit, helper);
+		if (helper.result == -1) {
+			navKit->airg->airgLoadState.push_back(true);
+			return;
+		}
+		helper.tolerance = tolerance;
+		int waypointsWithinAreas = airg->m_WaypointList.size();
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(waypointsWithinAreas) + " waypoints within areas.").c_str());
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within tolerance around areas...");
+		addWaypointsForGrid(airg, navMesh, navKit, helper);
+		if (helper.result == -1) {
+			navKit->airg->airgLoadState.push_back(true);
+			return;
+		}
 
-	// Build neighbor differences helper: South is 0, increases CCW
-	std::pair<int, int> gridIndexDiff[8]{
-		std::pair(0, -1),
-		std::pair(1, -1),
-		std::pair(1, 0),
-		std::pair(1, 1),
-		std::pair(0, 1),
-		std::pair(-1, 1),
-		std::pair(-1, 0),
-		std::pair(-1, -1)
-	};
-	
-	// Fill in neighbor values from grid points with waypoints
-	for (int zi = 0; zi < gridZSize; zi++) {
-		for (int yi = 0; yi < gridYSize; yi++) {
-			for (int xi = 0; xi < gridXSize; xi++) {
-				int waypointIndex = (*(*grid[zi])[yi])[xi];
-				if (waypointIndex != 65535) {
-					Waypoint* waypoint = &airg->m_WaypointList[waypointIndex];
-					Vec3 waypointPos{ waypoint->vPos.x, waypoint->vPos.y, waypoint->vPos.z };
-					NavPower::Area* area = helper.waypointAreas[waypointIndex];
-					for (int neighborNum = 0; neighborNum < 8; neighborNum++) {
-						int neighborWaypointIndex = 65535;
-						int nxi = xi + gridIndexDiff[neighborNum].first;
-						int nyi = yi + gridIndexDiff[neighborNum].second;
-						if (nxi >= 0 && nxi < gridXSize &&
-							nyi >= 0 && nyi < gridYSize &&
-							(*(*grid[zi])[nyi])[nxi] != 65535 &&
-							(abs(waypointZLevels[waypointIndex] - waypointZLevels[(*(*grid[zi])[nyi])[nxi]]) <= 1)) {
-							int potentialNeighborWaypointIndex = (*(*grid[zi])[nyi])[nxi];
-							//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Checking if waypoints are connected: Waypoint Index: " + std::to_string(waypointIndex) + " PotentialNeighbor Index: " + std::to_string(potentialNeighborWaypointIndex)).c_str());
+		airg->m_nNodeCount = airg->m_WaypointList.size();
 
-							if (waypointsAreConnected(navKit, helper, airg, waypointPos, area, potentialNeighborWaypointIndex)) {
-								neighborWaypointIndex = potentialNeighborWaypointIndex;
+		// Build neighbor differences helper: South is 0, increases CCW
+		std::pair<int, int> gridIndexDiff[8]{
+			std::pair(0, -1),
+			std::pair(1, -1),
+			std::pair(1, 0),
+			std::pair(1, 1),
+			std::pair(0, 1),
+			std::pair(-1, 1),
+			std::pair(-1, 0),
+			std::pair(-1, -1)
+		};
+
+		// Fill in neighbor values from grid points with waypoints
+		for (int zi = 0; zi < gridZSize; zi++) {
+			for (int yi = 0; yi < gridYSize; yi++) {
+				for (int xi = 0; xi < gridXSize; xi++) {
+					int waypointIndex = (*(*grid[zi])[yi])[xi];
+					if (waypointIndex != 65535) {
+						Waypoint* waypoint = &airg->m_WaypointList[waypointIndex];
+						Vec3 waypointPos{ waypoint->vPos.x, waypoint->vPos.y, waypoint->vPos.z };
+						NavPower::Area* area = helper.waypointAreas[waypointIndex];
+						for (int neighborNum = 0; neighborNum < 8; neighborNum++) {
+							int neighborWaypointIndex = 65535;
+							int nxi = xi + gridIndexDiff[neighborNum].first;
+							int nyi = yi + gridIndexDiff[neighborNum].second;
+							if (nxi >= 0 && nxi < gridXSize &&
+								nyi >= 0 && nyi < gridYSize &&
+								(*(*grid[zi])[nyi])[nxi] != 65535 &&
+								(abs(waypointZLevels[waypointIndex] - waypointZLevels[(*(*grid[zi])[nyi])[nxi]]) <= 1)) {
+								int potentialNeighborWaypointIndex = (*(*grid[zi])[nyi])[nxi];
+								//navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Checking if waypoints are connected: Waypoint Index: " + std::to_string(waypointIndex) + " PotentialNeighbor Index: " + std::to_string(potentialNeighborWaypointIndex)).c_str());
+
+								if (waypointsAreConnected(navKit, helper, airg, waypointPos, area, potentialNeighborWaypointIndex)) {
+									neighborWaypointIndex = potentialNeighborWaypointIndex;
+								}
 							}
+							waypoint->nNeighbors.push_back(neighborWaypointIndex);
 						}
-						waypoint->nNeighbors.push_back(neighborWaypointIndex);
 					}
 				}
 			}
 		}
+
+		// Add visibility data
+		std::vector<uint8_t> newVisibilityData(airg->m_nNodeCount * 556, 255);
+		airg->m_pVisibilityData = newVisibilityData;
+		airg->m_HighVisibilityBits.m_nSize = 0;
+		airg->m_LowVisibilityBits.m_nSize = 0;
+		airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
+		std::vector<uint8_t> deadEndData;
+		airg->m_deadEndData.m_aBytes = deadEndData;
+		int waypointsWithinTolerance = airg->m_WaypointList.size() - waypointsWithinAreas;
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(waypointsWithinTolerance) + " waypoints within tolerance around areas.").c_str());
+		navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(airg->m_WaypointList.size()) + " waypoints total.").c_str());
+
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+		msg = "Finished building Airg in ";
+		msg += std::to_string(duration.count());
+		msg += " seconds";
+		navKit->log(RC_LOG_PROGRESS, msg.data());
+		navKit->airg->airgLoadState.push_back(true);
+		navKit->airg->airgLoaded = true;
+	} CPPTRACE_CATCH(const std::exception& e) {
+		NavKit::errorMessage = new std::string("An unexpected error occurred: " + std::string(e.what()) + "\n\nStack Trace:\n" +
+									   cpptrace::from_current_exception().to_string());
+		DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, NavKit::DialogProc, 0);
+	} catch(...) {
+		NavKit::errorMessage = new std::string("An unexpected error occurred:\n\nStack Trace:\n" +
+									   cpptrace::from_current_exception().to_string());
+		DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, NavKit::DialogProc, 0);
 	}
-
-	// Add visibility data
-	std::vector<uint8_t> newVisibilityData(airg->m_nNodeCount * 556, 255);
-	airg->m_pVisibilityData = newVisibilityData;
-	airg->m_HighVisibilityBits.m_nSize = 0;
-	airg->m_LowVisibilityBits.m_nSize = 0;
-	airg->m_deadEndData.m_nSize = airg->m_nNodeCount;
-	std::vector<uint8_t> deadEndData;
-	airg->m_deadEndData.m_aBytes = deadEndData;
-	int waypointsWithinTolerance = airg->m_WaypointList.size() - waypointsWithinAreas;
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(waypointsWithinTolerance) + " waypoints within tolerance around areas.").c_str());
-	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Built " + std::to_string(airg->m_WaypointList.size()) + " waypoints total.").c_str());
-
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-	msg = "Finished building Airg in ";
-	msg += std::to_string(duration.count());
-	msg += " seconds";
-	navKit->log(RC_LOG_PROGRESS, msg.data());
-	navKit->airg->airgLoadState.push_back(true);
-	navKit->airg->airgLoaded = true;
 }

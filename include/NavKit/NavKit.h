@@ -53,6 +53,13 @@
 #include "Renderer.h"
 #include "InputHandler.h"
 #include "Gui.h"
+#include <iomanip>
+#include <dbghelp.h>
+#include "Resource.h"
+#include <SDL_syswm.h>
+#include <cpptrace/from_current.hpp>
+#include <stdexcept>
+#pragma comment(lib, "dbghelp.lib")
 #undef main
 
 class Navp;
@@ -66,38 +73,44 @@ class Gui;
 
 class NavKit {
 public:
-	NavKit();
-	~NavKit();
+    NavKit();
 
-	SceneExtract* sceneExtract;
-	Navp* navp;
-	Obj* obj;
-	Airg* airg;
-	Renderer* renderer;
-	InputHandler* inputHandler;
-	Gui* gui;
+    ~NavKit();
 
-	GameConnection* gameConnection;
-	Sample* sample;
-	BuildContext ctx;
+    SceneExtract *sceneExtract;
+    Navp *navp;
+    Obj *obj;
+    Airg *airg;
+    Renderer *renderer;
+    InputHandler *inputHandler;
+    Gui *gui;
 
-	bool done;
+    GameConnection *gameConnection;
+    Sample *sample;
+    BuildContext ctx;
 
-	float scrollZoom;
-	bool rotate;
-	bool movedDuringRotate;
-	float keybSpeed = 22.0f;
+    bool done;
 
-	InputGeom* geom;
-	DebugDrawGL m_dd;
+    float scrollZoom;
+    bool rotate;
+    bool movedDuringRotate;
+    float keybSpeed = 22.0f;
 
-	CSimpleIniA ini;
+    InputGeom *geom;
+    DebugDrawGL m_dd;
 
-	int runProgram(int argc, char** argv);
-	void log(rcLogCategory category, const char* message, ...);
+    CSimpleIniA ini;
+
+    int runProgram(int argc, char **argv);
+    static INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    void log(rcLogCategory category, const char *message, ...);
+
+    static std::string *errorMessage;
+
 private:
-	rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string>> logQueue;
-	void loadSettings();
+    rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string> > logQueue;
 
-	static void logRunner(NavKit* navKit);
+    void loadSettings();
+
+    static void logRunner(NavKit *navKit);
 };

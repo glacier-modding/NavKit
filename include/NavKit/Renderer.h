@@ -55,6 +55,7 @@ public:
 	float moveUp;
 	float moveDown;
 	SDL_Window* window;
+	static HWND hwnd;
 	Uint32 prevFrameTime;
 
 private:

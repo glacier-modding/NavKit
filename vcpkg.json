@@ -27,6 +27,10 @@
     {
       "name": "ftgl",
       "version>=": "2022-05-18#1"
+    },
+    {
+      "name": "cpptrace",
+      "version>=": "0.8.1#0"
     }
   ]
 }

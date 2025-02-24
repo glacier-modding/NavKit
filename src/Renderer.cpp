@@ -1,5 +1,7 @@
 #include "..\include\NavKit\Renderer.h"
 
+HWND Renderer::hwnd = nullptr;
+
 Renderer::Renderer(NavKit* navKit) : navKit(navKit) {
 	framebuffer = 0;
 	color_rb = 0;
@@ -150,6 +152,11 @@ bool Renderer::initWindowAndRenderer() {
 	glEnable(GL_BLEND);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	prevFrameTime = SDL_GetTicks();
+
+	SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+	SDL_GetWindowWMInfo(window, &wmInfo);
+	hwnd = wmInfo.info.win.window;
 	return true;
 }
 
