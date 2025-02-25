@@ -1,4 +1,6 @@
-#include "..\include\NavKit\Gui.h"
+#include "../include/NavKit/Gui.h"
+#include "../include/NavKit/NavKit.h"
+#include "../include/NavKit/Logger.h"
 
 Gui::Gui(NavKit *navKit) : navKit(navKit) {
     showMenu = true;

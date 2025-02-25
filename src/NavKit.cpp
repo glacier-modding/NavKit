@@ -20,7 +20,7 @@
  * SOFTWARE.
 */
 #include "..\include\NavKit\NavKit.h"
-
+#include "../include/NavKit/Logger.h"
 std::string *NavKit::errorMessage = nullptr;
 
 int SDL_main(int argc, char **argv) {
@@ -37,7 +37,7 @@ int NavKit::runProgram(int argc, char **argv) {
             // TODO: Add mutex for tbuffer to keep processing messages in the background.
             // std::thread handleMessagesThread([=] { HandleMessages(); });
             // handleMessagesThread.detach();
-            log(RC_LOG_PROGRESS, "NavKit initialized.");
+            Logger::log(RC_LOG_PROGRESS, "NavKit initialized.");
             while (!done) {
                 inputHandler->handleInput();
                 if (inputHandler->resized) {
@@ -78,21 +78,6 @@ int NavKit::runProgram(int argc, char **argv) {
     return 0;
 }
 
-void NavKit::log(rcLogCategory category, const char *message, ...) {
-    std::pair<rcLogCategory, std::string> logMessage = {category, message};
-    logQueue.push(logMessage);
-}
-
-void NavKit::logRunner(NavKit *navKit) {
-    std::optional<std::pair<rcLogCategory, std::string> > message;
-    while (true) {
-        message = navKit->logQueue.try_pop();
-        if (message.has_value()) {
-            navKit->ctx.log(message.value().first, message.value().second.c_str());
-        }
-    }
-}
-
 void NavKit::loadSettings() {
     sceneExtract->setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
     sceneExtract->setOutputFolder(ini.GetValue("Paths", "output", "default"));
@@ -131,6 +116,10 @@ void NavKit::loadSettings() {
 }
 
 NavKit::NavKit() {
+    Logger::getInstance().setBuildContext(&ctx);
+    std::thread logThread(Logger::logRunner);
+    logThread.detach();
+
     sceneExtract = new SceneExtract(this, "");
     navp = new Navp(this);
     obj = new Obj(this);
@@ -151,15 +140,11 @@ NavKit::NavKit() {
 
     ini.SetUnicode();
 
-    std::thread logThread(NavKit::logRunner, this);
-    logThread.detach();
-    logQueue = rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string> >();
-
     SI_Error rc = ini.LoadFile("NavKit.ini");
     if (rc < 0) {
-        log(rcLogCategory::RC_LOG_ERROR, "Error loading settings from NavKit.ini");
+        Logger::log(RC_LOG_ERROR, "Error loading settings from NavKit.ini");
     } else {
-        log(rcLogCategory::RC_LOG_PROGRESS, "Loading settings from NavKit.ini...");
+        Logger::log(RC_LOG_PROGRESS, "Loading settings from NavKit.ini...");
         loadSettings();
     }
     done = false;

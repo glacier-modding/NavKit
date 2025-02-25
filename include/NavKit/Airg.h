@@ -3,13 +3,13 @@
 #include "NavKit.h"
 
 class NavKit;
-class ResourceConverter;
-class ResourceGenerator;
+struct ResourceConverter;
+struct ResourceGenerator;
 class ReasoningGrid;
 
 class Airg {
 public:
-    Airg(NavKit *navKit);
+    explicit Airg(NavKit *navKit);
 
     ~Airg();
 

@@ -15,7 +15,6 @@
 
 #include <SimpleIni.h>
 
-#include <Recast.h>
 #include <RecastDebugDraw.h>
 
 #include "..\nativefiledialog-extended\nfd.h"
@@ -38,8 +37,6 @@
 #include "..\ResourceLib_HM3\ResourceLibCommon.h"
 #include "..\ResourceLib_HM3\ResourceLib_HM3.h"
 #include "..\ResourceLib_HM3\Generated\ZHMGen.h"
-
-#include "..\ConcurrentQueue\ConcurrentQueue.h"
 
 #include "NavKitConfig.h"
 #include "GameConnection.h"
@@ -105,14 +102,10 @@ public:
 
     static INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    void log(rcLogCategory category, const char *message, ...);
-
     static std::string *errorMessage;
 
 private:
-    rsj::ConcurrentQueue<std::pair<rcLogCategory, std::string> > logQueue;
 
     void loadSettings();
 
-    static void logRunner(NavKit *navKit);
 };

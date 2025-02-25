@@ -1,4 +1,8 @@
-#include "..\include\NavKit\SceneExtract.h"
+#include "../include/NavKit/SceneExtract.h"
+#include <direct.h>
+#include <string>
+#include <vector>
+#include "../include/NavKit/Logger.h"
 
 SceneExtract::SceneExtract(NavKit *navKit, const std::string &pythonScript): navKit(navKit),
                                                                              pythonScript(pythonScript) {
@@ -31,11 +35,11 @@ void SceneExtract::setHitmanFolder(const char *folderName) {
         lastHitmanFolder = folderName;
         hitmanFolderName = folderName;
         hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
-        navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting Hitman folder to: " + lastHitmanFolder).c_str());
+        Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Setting Hitman folder to: " + lastHitmanFolder).c_str());
         navKit->ini.SetValue("Paths", "hitman", folderName);
         navKit->ini.SaveFile("NavKit.ini");
     } else {
-        navKit->log(rcLogCategory::RC_LOG_WARNING, ("Could not find Hitman folder: " + lastHitmanFolder).c_str());
+        Logger::log(rcLogCategory::RC_LOG_WARNING, ("Could not find Hitman folder: " + lastHitmanFolder).c_str());
     }
 }
 
@@ -45,11 +49,11 @@ void SceneExtract::setOutputFolder(const char *folderName) {
         lastOutputFolder = folderName;
         outputFolderName = folderName;
         outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
-        navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting output folder to: " + lastOutputFolder).c_str());
+        Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Setting output folder to: " + lastOutputFolder).c_str());
         navKit->ini.SetValue("Paths", "output", folderName);
         navKit->ini.SaveFile("NavKit.ini");
     } else {
-        navKit->log(rcLogCategory::RC_LOG_WARNING, ("Could not find output folder: " + lastOutputFolder).c_str());
+        Logger::log(rcLogCategory::RC_LOG_WARNING, ("Could not find output folder: " + lastOutputFolder).c_str());
     }
 }
 
@@ -59,11 +63,11 @@ void SceneExtract::setBlenderFile(const char *filename) {
         lastBlenderFile = filename;
         blenderName = filename;
         blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
-        navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting Blender exe to: " + lastBlenderFile).c_str());
+        Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Setting Blender exe to: " + lastBlenderFile).c_str());
         navKit->ini.SetValue("Paths", "blender", filename);
         navKit->ini.SaveFile("NavKit.ini");
     } else {
-        navKit->log(rcLogCategory::RC_LOG_WARNING, ("Could not find Blender exe: " + lastBlenderFile).c_str());
+        Logger::log(rcLogCategory::RC_LOG_WARNING, ("Could not find Blender exe: " + lastBlenderFile).c_str());
     }
 }
 
@@ -102,7 +106,7 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
     SECURITY_ATTRIBUTES saAttr = {sizeof(saAttr), nullptr, TRUE};
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-        sceneExtract->navKit->log(RC_LOG_ERROR,
+        Logger::log(RC_LOG_ERROR,
                                   ("Error creating pipe to command: " + command + " while extracting scene from game.").
                                   c_str());
         sceneExtract->errorExtracting = true;
@@ -124,7 +128,7 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
     char *commandLineChar = _strdup(command.c_str());
 
     if (!CreateProcess(NULL, commandLineChar, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
-        sceneExtract->navKit->log(RC_LOG_ERROR,
+        Logger::log(RC_LOG_ERROR,
                                   ("Error creating process for command: " + command +
                                    " while extracting scene from game.").c_str());
         CloseHandle(hReadPipe);
@@ -158,14 +162,14 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
         size_t pos = 0;
         while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
             std::string line = outputString.substr(start, pos - start);
-            sceneExtract->navKit->log(RC_LOG_PROGRESS, line.c_str());
+            Logger::log(RC_LOG_PROGRESS, line.c_str());
             fputs(line.c_str(), logFile);
             fputc('\n', logFile);
             pos++;
             start = pos;
         }
         if (size_t found = outputString.find("panic"); found != std::string::npos) {
-            sceneExtract->navKit->log(RC_LOG_ERROR,
+            Logger::log(RC_LOG_ERROR,
                                       "Error extracting scene from game. Make sure Hitman is running with ZHMModSDK installed.");
             sceneExtract->errorExtracting = true;
             WaitForSingleObject(pi.hProcess, INFINITE);
@@ -178,7 +182,7 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
             return;
         }
         if (size_t found = outputString.find("Error: Python"); found != std::string::npos) {
-            sceneExtract->navKit->log(RC_LOG_ERROR,
+            Logger::log(RC_LOG_ERROR,
                                       "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
             sceneExtract->errorExtracting = true;
             WaitForSingleObject(pi.hProcess, INFINITE);
@@ -201,7 +205,7 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
         size_t pos = 0;
         while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
             std::string line = outputString.substr(start, pos - start);
-            sceneExtract->navKit->log(RC_LOG_PROGRESS, line.c_str());
+            Logger::log(RC_LOG_PROGRESS, line.c_str());
             fputs(line.c_str(), logFile);
             fputc('\n', logFile);
             pos++;
@@ -223,16 +227,16 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
     sceneExtract->handles.pop_back();
 
     if (sceneExtract->extractionDone.size() == 1) {
-        sceneExtract->navKit->log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
+        Logger::log(RC_LOG_PROGRESS, "Finished extracting scene from game to alocs.json.");
         sceneExtract->extractionDone.push_back(true);
     } else {
         sceneExtract->extractionDone.push_back(true);
-        sceneExtract->navKit->log(RC_LOG_PROGRESS, "Finished generating obj from alocs.json.");
+        Logger::log(RC_LOG_PROGRESS, "Finished generating obj from alocs.json.");
     }
 }
 
 void SceneExtract::extractScene(char *hitmanFolder, char *outputFolder) {
-    navKit->log(RC_LOG_PROGRESS, "Extracting scene from game.");
+    Logger::log(RC_LOG_PROGRESS, "Extracting scene from game.");
     std::string retailFolder = "\"";
     retailFolder += hitmanFolder;
     retailFolder += "\\Retail\"";
@@ -256,7 +260,7 @@ void SceneExtract::extractScene(char *hitmanFolder, char *outputFolder) {
         if (errno == ENOENT) {
             int status = mkdir(alocFolder.c_str());
             if (status != 0) {
-                navKit->log(RC_LOG_ERROR, "Error creating prim folder");
+                Logger::log(RC_LOG_ERROR, "Error creating prim folder");
             }
         }
     }
@@ -280,7 +284,7 @@ void SceneExtract::extractScene(char *hitmanFolder, char *outputFolder) {
 }
 
 void SceneExtract::generateObj(char *blenderPath, char *outputFolder) {
-    navKit->log(RC_LOG_PROGRESS, "Generating obj from alocs.json.");
+    Logger::log(RC_LOG_PROGRESS, "Generating obj from alocs.json.");
     std::string command = "\"";
     command += blenderPath;
     command += "\" -b --factory-startup -P glacier2obj.py -- ";

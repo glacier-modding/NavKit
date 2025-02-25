@@ -1,12 +1,10 @@
 #pragma once
 
-#include "NavKit.h"
-
 class NavKit;
 
 class Gui {
 public:
-    Gui(NavKit *navKit);
+    explicit Gui(NavKit *navKit);
 
     void drawGui();
 

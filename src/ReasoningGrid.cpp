@@ -1,4 +1,5 @@
 #include "..\include\NavKit\ReasoningGrid.h"
+#include "../include/NavKit/Logger.h"
 
 const void Vec4::writeJson(std::ostream &f) {
     f << "{";
@@ -346,7 +347,7 @@ float calcZ(Vec3 p1, Vec3 p2, Vec3 p3, float x, float y) {
 }
 
 void initializeGrid(NavKit *navKit, ReasoningGridBuilderHelper &h) {
-    navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Initializing Reasoning Grid");
+    Logger::log(rcLogCategory::RC_LOG_PROGRESS, "Initializing Reasoning Grid");
 
     for (int zi = 0; zi < h.gridZSize; zi++) {
         std::vector<std::vector<int> *> *yRow = new std::vector<std::vector<int> *>();
@@ -437,7 +438,7 @@ void addWaypointsForGrid(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKit
                     pointInArea = true;
                 } else if (edge > -1) {
                     // Outside polygon but within tolerance, reflect across closest edge
-                    //navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
+                    //Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Area: " + std::to_string(areaIndex) + " edge: " + std::to_string(edge) + " XI:" + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi)).c_str());
                     neededTolerance = true;
                     pointInArea = true;
                     NavPower::Binary::Edge *edge0 = area->m_edges[edge];
@@ -462,7 +463,7 @@ void addWaypointsForGrid(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKit
                     }
                 }
                 if (wayPointIndex >= 65535) {
-                    navKit->log(RC_LOG_ERROR, "Error building airg: Reached the maximum number of waypoints (65535)");
+                    Logger::log(RC_LOG_ERROR, "Error building airg: Reached the maximum number of waypoints (65535)");
                     h.result = -1;
                     return;
                 }
@@ -479,12 +480,12 @@ void addWaypointsForGrid(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKit
                     waypoint.zi = zi;
                     airg->m_WaypointList.push_back(waypoint);
                     if (neededTolerance) {
-                        //navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Waypoint index: " + std::to_string(airg->m_WaypointList.size() - 1) + " X:" + std::to_string(x) + " Y: " + std::to_string(y) + " Z: " + std::to_string(z)).c_str());
+                        //Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("|--->Waypoint index: " + std::to_string(airg->m_WaypointList.size() - 1) + " X:" + std::to_string(x) + " Y: " + std::to_string(y) + " Z: " + std::to_string(z)).c_str());
                     }
 
                     h.waypointZLevels->push_back(zi);
                     if (airg->m_WaypointList.size() % 1000 == 0) {
-                        navKit->log(rcLogCategory::RC_LOG_PROGRESS,
+                        Logger::log(rcLogCategory::RC_LOG_PROGRESS,
                                     ("Processing... Current waypoint count: " + std::to_string(
                                          airg->m_WaypointList.size())).c_str());
                     }
@@ -499,7 +500,7 @@ void addWaypointsForGrid(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKit
             //	((*h.grid).size() > czi && ((*(*(*h.grid)[czi])[cyi])[cxi] != 65535))) {//||
             //	//((*h.grid).size() > czi - 1 && czi > 0 && (*(*(*h.grid)[czi - 1])[cyi])[cxi] != 65535) ||
             //	//((*h.grid).size() > czi - 2 && czi > 1 && (*(*(*h.grid)[czi - 2])[cyi])[cxi] != 65535)) {
-            //	navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Skipping duplicate waypoint : " + std::to_string(wayPointIndex) + " XI: " + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi) + " CXI: " + std::to_string(cxi) + " CYI: " + std::to_string(cyi) + " CZI: " + std::to_string(czi)).c_str());
+            //	Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Skipping duplicate waypoint : " + std::to_string(wayPointIndex) + " XI: " + std::to_string(xi) + " YI: " + std::to_string(yi) + " ZI: " + std::to_string(zi) + " CXI: " + std::to_string(cxi) + " CYI: " + std::to_string(cyi) + " CZI: " + std::to_string(czi)).c_str());
 
             //	pointInArea = false;
             //}
@@ -555,8 +556,8 @@ bool waypointsAreConnected(NavKit *navKit, ReasoningGridBuilderHelper &h, Reason
                     hasNextArea = true;
                     break;
                 }
-                //navKit->log(rcLogCategory::RC_LOG_PROGRESS, (": " + std::to_string(airg->m_WaypointList.size())).c_str());
-                //navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Waypoint 1 -> 2 line goes through final edge, connects to area: " + std::to_string(prevEdge->m_pAdjArea)).c_str());
+                //Logger::log(rcLogCategory::RC_LOG_PROGRESS, (": " + std::to_string(airg->m_WaypointList.size())).c_str());
+                //Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Waypoint 1 -> 2 line goes through final edge, connects to area: " + std::to_string(prevEdge->m_pAdjArea)).c_str());
             }
         }
         if (hasNextArea) {
@@ -575,7 +576,7 @@ void ReasoningGrid::build(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKi
             std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::string msg = "Started building Airg at ";
             msg += std::ctime(&start_time);
-            navKit->log(RC_LOG_PROGRESS, msg.data());
+            Logger::log(RC_LOG_PROGRESS, msg.data());
             auto start = std::chrono::high_resolution_clock::now();
 
             navKit->airg->airgLoadState.push_back(true);
@@ -652,7 +653,7 @@ void ReasoningGrid::build(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKi
             helper.zSpacing = zSpacing;
             helper.zTolerance = zTolerance;
             initializeGrid(navKit, helper);
-            navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within areas...");
+            Logger::log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within areas...");
 
             addWaypointsForGrid(airg, navMesh, navKit, helper);
             if (helper.result == -1) {
@@ -661,9 +662,9 @@ void ReasoningGrid::build(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKi
             }
             helper.tolerance = tolerance;
             int waypointsWithinAreas = airg->m_WaypointList.size();
-            navKit->log(rcLogCategory::RC_LOG_PROGRESS,
+            Logger::log(rcLogCategory::RC_LOG_PROGRESS,
                         ("Built " + std::to_string(waypointsWithinAreas) + " waypoints within areas.").c_str());
-            navKit->log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within tolerance around areas...");
+            Logger::log(rcLogCategory::RC_LOG_PROGRESS, "Building waypoints within tolerance around areas...");
             addWaypointsForGrid(airg, navMesh, navKit, helper);
             if (helper.result == -1) {
                 navKit->airg->airgLoadState.push_back(true);
@@ -703,7 +704,7 @@ void ReasoningGrid::build(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKi
                                     (abs(waypointZLevels[waypointIndex] - waypointZLevels[(*(*grid[zi])[nyi])[nxi]]) <=
                                      1)) {
                                     int potentialNeighborWaypointIndex = (*(*grid[zi])[nyi])[nxi];
-                                    //navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Checking if waypoints are connected: Waypoint Index: " + std::to_string(waypointIndex) + " PotentialNeighbor Index: " + std::to_string(potentialNeighborWaypointIndex)).c_str());
+                                    //Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Checking if waypoints are connected: Waypoint Index: " + std::to_string(waypointIndex) + " PotentialNeighbor Index: " + std::to_string(potentialNeighborWaypointIndex)).c_str());
 
                                     if (waypointsAreConnected(navKit, helper, airg, waypointPos, area,
                                                               potentialNeighborWaypointIndex)) {
@@ -726,10 +727,10 @@ void ReasoningGrid::build(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKi
             std::vector<uint8_t> deadEndData;
             airg->m_deadEndData.m_aBytes = deadEndData;
             int waypointsWithinTolerance = airg->m_WaypointList.size() - waypointsWithinAreas;
-            navKit->log(rcLogCategory::RC_LOG_PROGRESS,
+            Logger::log(rcLogCategory::RC_LOG_PROGRESS,
                         ("Built " + std::to_string(waypointsWithinTolerance) +
                          " waypoints within tolerance around areas.").c_str());
-            navKit->log(rcLogCategory::RC_LOG_PROGRESS,
+            Logger::log(rcLogCategory::RC_LOG_PROGRESS,
                         ("Built " + std::to_string(airg->m_WaypointList.size()) + " waypoints total.").c_str());
 
             auto end = std::chrono::high_resolution_clock::now();
@@ -737,7 +738,7 @@ void ReasoningGrid::build(ReasoningGrid *airg, NavPower::NavMesh *navMesh, NavKi
             msg = "Finished building Airg in ";
             msg += std::to_string(duration.count());
             msg += " seconds";
-            navKit->log(RC_LOG_PROGRESS, msg.data());
+            Logger::log(RC_LOG_PROGRESS, msg.data());
             navKit->airg->airgLoadState.push_back(true);
             navKit->airg->airgLoaded = true;
         }

@@ -2,7 +2,6 @@
 
 #include "NavKit.h"
 #include "PfBoxes.h"
-#include <Windows.h>
 
 class NavKit;
 

@@ -1,4 +1,5 @@
 #include "..\include\NavKit\Renderer.h"
+#include "../include/NavKit/Logger.h"
 
 HWND Renderer::hwnd = nullptr;
 
@@ -56,7 +57,7 @@ void Renderer::updateFrameRate() {
             frameRate = 60.0f;
         }
     }
-    navKit->log(rcLogCategory::RC_LOG_PROGRESS, ("Setting framerate to " + std::to_string(frameRate)).c_str());
+    Logger::log(rcLogCategory::RC_LOG_PROGRESS, ("Setting framerate to " + std::to_string(frameRate)).c_str());
 }
 
 void Renderer::drawText(std::string text, Vec3 pos, Vec3 color, double size) {
@@ -162,7 +163,7 @@ void Renderer::closeWindow() const {
 void Renderer::handleResize() {
     width = SDL_GetWindowSurface(window)->w;
     height = SDL_GetWindowSurface(window)->h;
-    navKit->log(rcLogCategory::RC_LOG_PROGRESS,
+    Logger::log(rcLogCategory::RC_LOG_PROGRESS,
                 ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
 }
 
@@ -330,7 +331,7 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
 
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        navKit->log(RC_LOG_ERROR, ("FB error, status: 0x" + std::to_string((int) status)).c_str());
+        Logger::log(RC_LOG_ERROR, ("FB error, status: 0x" + std::to_string((int) status)).c_str());
 
         printf("FB error, status: 0x%x\n", status);
         return HitTestResult(NONE, -1);

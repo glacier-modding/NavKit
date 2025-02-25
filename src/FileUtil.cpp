@@ -1,8 +1,9 @@
-#include "..\include\NavKit\FileUtil.h"
+#include "../include/NavKit/FileUtil.h"
+#include <filesystem>
 #include <string>
 
 namespace FileUtil {
-    char *openNfdLoadDialog(nfdu8filteritem_t *filters, nfdfiltersize_t filterCount, char *defaultPath) {
+    char *openNfdLoadDialog(nfdu8filteritem_t *filters, const nfdfiltersize_t filterCount, const char *defaultPath) {
         nfdu8char_t *outPath;
         std::string path(defaultPath);
         path = path.substr(0, path.find_last_of("/\\") + 1);

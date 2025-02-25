@@ -1,4 +1,5 @@
 #include "..\include\NavKit\Obj.h"
+#include "../include/NavKit/Logger.h"
 
 Obj::Obj(NavKit *navKit): navKit(navKit) {
     loadObjName = "Load Obj";
@@ -16,7 +17,7 @@ Obj::Obj(NavKit *navKit): navKit(navKit) {
     bBoxSize[0] = 600;
     bBoxSize[1] = 600;
     bBoxSize[2] = 600;
-    navKit->log(RC_LOG_PROGRESS,
+    Logger::log(RC_LOG_PROGRESS,
                 ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " +
                  std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxSize[0]) + ", " + std::to_string(bBoxSize[1]) +
                  ", " + std::to_string(bBoxSize[2]) + ")").c_str());
@@ -24,7 +25,7 @@ Obj::Obj(NavKit *navKit): navKit(navKit) {
 
 void Obj::copyObjFile(NavKit *navKit, const std::string &from, const std::string &to) {
     if (from == to) {
-        navKit->log(RC_LOG_ERROR, ("Cannot overwrite current obj file: " + from).c_str());
+        Logger::log(RC_LOG_ERROR, ("Cannot overwrite current obj file: " + from).c_str());
         return;
     }
     auto start = std::chrono::high_resolution_clock::now();
@@ -41,12 +42,12 @@ void Obj::copyObjFile(NavKit *navKit, const std::string &from, const std::string
     navKitObjProperties += "#!sz = " + std::to_string(navKit->obj->bBoxSize[2]) + "\n";
     std::ifstream inputFile(from);
     if (!inputFile.is_open()) {
-        navKit->log(RC_LOG_ERROR, ("Error opening obj file for reading: " + from).c_str());
+        Logger::log(RC_LOG_ERROR, ("Error opening obj file for reading: " + from).c_str());
         return;
     }
     std::ofstream outputFile(to);
     if (!outputFile.is_open()) {
-        navKit->log(RC_LOG_ERROR, ("Error opening file for writing: " + to).c_str());
+        Logger::log(RC_LOG_ERROR, ("Error opening file for writing: " + to).c_str());
         return;
     }
     outputFile << navKitObjProperties << std::endl;
@@ -77,14 +78,14 @@ void Obj::copyObjFile(NavKit *navKit, const std::string &from, const std::string
     std::string msg = "Finished saving Obj in ";
     msg += std::to_string(duration.count());
     msg += " seconds";
-    navKit->log(RC_LOG_PROGRESS, msg.data());
+    Logger::log(RC_LOG_PROGRESS, msg.data());
 }
 
 void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Obj to file at ";
     msg += std::ctime(&start_time);
-    navKit->log(RC_LOG_PROGRESS, msg.data());
+    Logger::log(RC_LOG_PROGRESS, msg.data());
     std::thread saveObjThread(&Obj::copyObjFile, navKit, objToCopy, newFileName);
     saveObjThread.detach();
 }
@@ -93,12 +94,12 @@ void Obj::loadObjMesh(Obj *obj) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Obj from file at ";
     msg += std::ctime(&start_time);
-    obj->navKit->log(RC_LOG_PROGRESS, msg.data());
+Logger::log(RC_LOG_PROGRESS, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
 
     std::ifstream inputFile(obj->objToLoad);
     if (!inputFile.is_open()) {
-        obj->navKit->log(RC_LOG_ERROR, ("Error opening obj file for reading: " + obj->objToLoad).c_str());
+Logger::log(RC_LOG_ERROR, ("Error opening obj file for reading: " + obj->objToLoad).c_str());
         return;
     }
 
@@ -119,14 +120,14 @@ void Obj::loadObjMesh(Obj *obj) {
                         try {
                             floatValues[i] = stof(value);
                         } catch (const std::invalid_argument &e) {
-                            obj->navKit->log(RC_LOG_ERROR,
+Logger::log(RC_LOG_ERROR,
                                              ("Error converting value to float for property " + propertyName + ": " + e.
                                               what()).c_str());
                             error = true;
                             break;
                         }
                         catch (const std::out_of_range &e) {
-                            obj->navKit->log(RC_LOG_ERROR,
+Logger::log(RC_LOG_ERROR,
                                              ("Value out of range for float for property " + propertyName + ": " + e.
                                               what()).c_str());
                             error = true;
@@ -166,10 +167,10 @@ void Obj::loadObjMesh(Obj *obj) {
             msg = "Finished loading Obj in ";
             msg += std::to_string(duration.count());
             msg += " seconds";
-            obj->navKit->log(RC_LOG_PROGRESS, msg.data());
+Logger::log(RC_LOG_PROGRESS, msg.data());
         }
     } else {
-        obj->navKit->log(RC_LOG_ERROR, "Error loading obj.");
+Logger::log(RC_LOG_ERROR, "Error loading obj.");
     }
     obj->objToLoad.clear();
 }
@@ -195,7 +196,7 @@ void Obj::setBBox(float *pos, float *size) {
         navKit->geom->m_meshBMax[1] = bBoxPos[1] + bBoxSize[1] / 2;
         navKit->geom->m_meshBMax[2] = bBoxPos[2] + bBoxSize[2] / 2;
     }
-    navKit->log(RC_LOG_PROGRESS,
+    Logger::log(RC_LOG_PROGRESS,
                 ("Setting bbox to (" + std::to_string(pos[0]) + ", " + std::to_string(pos[1]) + ", " +
                  std::to_string(pos[2]) + ") (" + std::to_string(size[0]) + ", " + std::to_string(size[1]) + ", " +
                  std::to_string(size[2]) + ")").c_str());
@@ -350,7 +351,7 @@ void Obj::finalizeLoad() {
         std::string msg = "Loading Obj file: '";
         msg += objToLoad;
         msg += "'...";
-        navKit->log(RC_LOG_PROGRESS, msg.data());
+        Logger::log(RC_LOG_PROGRESS, msg.data());
         std::thread loadObjThread(&Obj::loadObjMesh, this);
         loadObjThread.detach();
         loadObj = false;

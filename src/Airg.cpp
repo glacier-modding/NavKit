@@ -1,6 +1,6 @@
 #include "..\include\NavKit\Airg.h"
 #include "..\include\NavKit\FileUtil.h"
-
+#include "../include/NavKit/Logger.h"
 Airg::Airg(NavKit *navKit) : navKit(navKit) {
     airgName = "Load Airg";
     lastLoadAirgFile = airgName;
@@ -77,7 +77,7 @@ void Airg::drawMenu() {
                 std::string msg = "Loading Airg.Json file: '";
                 msg += fileName;
                 msg += "'...";
-                navKit->log(RC_LOG_PROGRESS, msg.data());
+                Logger::log(RC_LOG_PROGRESS, msg.data());
                 std::thread loadAirgThread(&Airg::loadAirg, this, fileName, true);
                 loadAirgThread.detach();
             } else if (extension == "AIRG") {
@@ -86,7 +86,7 @@ void Airg::drawMenu() {
                 std::string msg = "Loading Airg file: '";
                 msg += fileName;
                 msg += "'...";
-                navKit->log(RC_LOG_PROGRESS, msg.data());
+                Logger::log(RC_LOG_PROGRESS, msg.data());
                 std::thread loadAirgThread(&Airg::loadAirg, this, fileName, false);
                 loadAirgThread.detach();
             }
@@ -107,7 +107,7 @@ void Airg::drawMenu() {
             msg += " file: '";
             msg += fileName;
             msg += "'...";
-            navKit->log(RC_LOG_PROGRESS, msg.data());
+            Logger::log(RC_LOG_PROGRESS, msg.data());
             std::thread saveAirgThread(&Airg::saveAirg, this, fileName, extension == "JSON");
             saveAirgThread.detach();
         }
@@ -117,11 +117,11 @@ void Airg::drawMenu() {
         if (lastSpacing != spacing) {
             saveSpacing(spacing);
             lastSpacing = spacing;
-            navKit->log(RC_LOG_PROGRESS, ("Setting spacing to: " + std::to_string(spacing)).c_str());
+            Logger::log(RC_LOG_PROGRESS, ("Setting spacing to: " + std::to_string(spacing)).c_str());
         }
     }
     if (imguiButton("Reset Defaults")) {
-        navKit->log(RC_LOG_PROGRESS, "Resetting Airg Default settings");
+        Logger::log(RC_LOG_PROGRESS, "Resetting Airg Default settings");
         resetDefaults();
     }
     if (imguiButton("Build Airg from Navp",
@@ -130,7 +130,7 @@ void Airg::drawMenu() {
         delete reasoningGrid;
         reasoningGrid = new ReasoningGrid();
         std::string msg = "Building Airg from Navp";
-        navKit->log(RC_LOG_PROGRESS, msg.data());
+        Logger::log(RC_LOG_PROGRESS, msg.data());
         std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navKit->navp->navMesh, navKit, spacing,
                                     zSpacing, tolerance, zTolerance);
         buildAirgThread.detach();
@@ -138,7 +138,7 @@ void Airg::drawMenu() {
     if (imguiButton("Connect Waypoint", (airgLoaded && selectedWaypointIndex != -1 && !connectWaypointModeEnabled))) {
         connectWaypointModeEnabled = true;
         std::string msg = "Entering Connect Waypoint mode. Start waypoint: " + std::to_string(selectedWaypointIndex);
-        navKit->log(RC_LOG_PROGRESS, msg.data());
+        Logger::log(RC_LOG_PROGRESS, msg.data());
     }
     imguiSeparatorLine();
     imguiLabel("Selected Waypoint");
@@ -219,7 +219,7 @@ void Airg::connectWaypoints(int startWaypointIndex, int endWaypointIndex) {
     }
     startWaypoint.nNeighbors[bestDirection] = endWaypointIndex;
     endWaypoint.nNeighbors[(bestDirection + 4) % 8] = startWaypointIndex;
-    navKit->log(RC_LOG_PROGRESS,
+    Logger::log(RC_LOG_PROGRESS,
                 ("Connected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(
                      endWaypointIndex)).c_str());
 }
@@ -497,7 +497,7 @@ void Airg::renderAirgForHitTest() {
 
 void Airg::setSelectedAirgWaypointIndex(int index) {
     if (index == -1 && selectedWaypointIndex != -1) {
-        navKit->log(RC_LOG_PROGRESS, ("Deselected waypoint: " + std::to_string(selectedWaypointIndex)).c_str());
+        Logger::log(RC_LOG_PROGRESS, ("Deselected waypoint: " + std::to_string(selectedWaypointIndex)).c_str());
     }
     selectedWaypointIndex = index;
     if (index != -1 && index < reasoningGrid->m_WaypointList.size()) {
@@ -509,8 +509,8 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
                 msg += ":  Neighbor " + std::to_string(i) + ": " + std::to_string(neighborIndex);
             }
         }
-        navKit->log(RC_LOG_PROGRESS, msg.c_str());
-        navKit->log(RC_LOG_PROGRESS,
+        Logger::log(RC_LOG_PROGRESS, msg.c_str());
+        Logger::log(RC_LOG_PROGRESS,
                     ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + " Y: " +
                      std::to_string(waypoint.vPos.y) + " Z: " + std::to_string(waypoint.vPos.z) + "   XI: " +
                      std::to_string(waypoint.xi) + " YI: " + std::to_string(waypoint.yi) + " ZI: " + std::to_string(
@@ -529,7 +529,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 
         char numHex[3];
         msg += "  Visibility Data Type: " + std::to_string(waypointVisibilityData[0]); // +" Visibility data:";
-        navKit->log(RC_LOG_PROGRESS, msg.c_str());
+        Logger::log(RC_LOG_PROGRESS, msg.c_str());
         for (int count = 2; count < waypointVisibilityData.size(); count++) {
             uint8_t num = waypointVisibilityData[count];
             sprintf(numHex, "%02X", num);
@@ -543,14 +543,14 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
                 waypointVisibilityDataString += " ";
             }
             if ((count - 1) % 96 == 0) {
-                //navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+                //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
                 waypointVisibilityDataString = "";
             }
         }
-        //navKit->log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+        //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
         const unsigned int colorRgb = (waypoint.nLayerIndex << 6) | 0xC0000000;
         std::string hexColor = std::format("{:x}", colorRgb);
-        navKit->log(RC_LOG_PROGRESS, ("Layer Index RGB " + hexColor).c_str());
+        Logger::log(RC_LOG_PROGRESS, ("Layer Index RGB " + hexColor).c_str());
     }
 }
 
@@ -560,7 +560,7 @@ void Airg::saveAirg(Airg *airg, std::string fileName, bool isJson) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Airg to file at ";
     msg += std::ctime(&start_time);
-    airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+Logger::log(RC_LOG_PROGRESS, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
 
     std::string tempJsonFile = fileName;
@@ -584,7 +584,7 @@ void Airg::saveAirg(Airg *airg, std::string fileName, bool isJson) {
     msg = "Finished saving Airg to " + std::string{fileName} + " in ";
     msg += std::to_string(duration.count());
     msg += " seconds";
-    airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+Logger::log(RC_LOG_PROGRESS, msg.data());
     airg->airgSaveState.push_back(true);
 }
 
@@ -593,7 +593,7 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Airg from file at ";
     msg += std::ctime(&start_time);
-    airg->navKit->log(RC_LOG_PROGRESS, msg.data());
+Logger::log(RC_LOG_PROGRESS, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
 
     std::string jsonFileName = fileName;
@@ -613,8 +613,8 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
     msg = "Finished loading Airg in ";
     msg += std::to_string(duration.count());
     msg += " seconds";
-    airg->navKit->log(RC_LOG_PROGRESS, msg.data());
-    airg->navKit->log(RC_LOG_PROGRESS,
+Logger::log(RC_LOG_PROGRESS, msg.data());
+Logger::log(RC_LOG_PROGRESS,
                       ("Waypoint count: " + std::to_string(airg->reasoningGrid->m_WaypointList.size()) +
                        ", Visibility Data size: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) +
                        ", Visibility Data points per waypoint: " + std::to_string(
@@ -631,7 +631,7 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
         total += visionDataSize;
         if (lastVisionDataSize != visionDataSize) {
             lastVisionDataSize = visionDataSize;
-            airg->navKit->log(RC_LOG_PROGRESS,
+Logger::log(RC_LOG_PROGRESS,
                               ("Vision Data Offset[" + std::to_string(i - 1) + "]: " +
                                std::to_string(w1.nVisionDataOffset) + " Vision Data Offset[" + std::to_string(i) + "]: "
                                + std::to_string(w2.nVisionDataOffset) + " Difference : " +
@@ -649,7 +649,7 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
     }
     int finalVisionDataSize = airg->reasoningGrid->m_pVisibilityData.size() - airg->reasoningGrid->m_WaypointList[
                                   airg->reasoningGrid->m_WaypointList.size() - 1].nVisionDataOffset;
-    airg->navKit->log(RC_LOG_PROGRESS,
+Logger::log(RC_LOG_PROGRESS,
                       ("Vision Data Offset[" + std::to_string(airg->reasoningGrid->m_WaypointList.size() - 1) + "]: " +
                        std::to_string(
                            airg->reasoningGrid->m_WaypointList[airg->reasoningGrid->m_WaypointList.size() - 1].
@@ -657,13 +657,13 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
                            airg->reasoningGrid->m_pVisibilityData.size()) + " Difference : " + std::to_string(
                            finalVisionDataSize)).c_str());
     total += finalVisionDataSize;
-    airg->navKit->log(RC_LOG_PROGRESS,
+Logger::log(RC_LOG_PROGRESS,
                       ("Total: " + std::to_string(total) + " Max Visibility: " + std::to_string(
                            airg->reasoningGrid->m_pVisibilityData.size())).c_str());
-    airg->navKit->log(RC_LOG_PROGRESS, "Visibility data offset map:");
+Logger::log(RC_LOG_PROGRESS, "Visibility data offset map:");
     for (auto &pair: visionDataOffsetCounts) {
         VisionData visionData = VisionData::GetVisionDataType(pair.first);
-        airg->navKit->log(RC_LOG_PROGRESS,
+Logger::log(RC_LOG_PROGRESS,
                           ("Offset difference: " + std::to_string(pair.first) + " Color: " + visionData.getName() +
                            " Count: " + std::to_string(pair.second)).c_str());
     }
