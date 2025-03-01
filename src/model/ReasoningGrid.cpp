@@ -1,5 +1,6 @@
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include <algorithm>
+#include <chrono>
 #include <from_current.hpp>
 #include <set>
 #include "../../include/NavKit/module/Airg.h"
