@@ -7,30 +7,33 @@ include_directories(SYSTEM include)
 configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h")
 add_executable (NavKit
   NavKit.cpp
-  RecastDemo/imgui.cpp
-  RecastDemo/imguiRenderGL.cpp
-  RecastDemo/MeshLoaderObj.cpp
-  RecastDemo/InputGeom.cpp
-  RecastDemo/ChunkyTriMesh.cpp
-  RecastDemo/SampleInterfaces.cpp
-  RecastDemo/PerfTimer.cpp
-  ReasoningGrid.cpp
-  RecastDemo/Sample.cpp
-  RecastDemo/Sample_SoloMesh.cpp
-  GameConnection.cpp
-  easywsclient/easywsclient.cpp
-  Navp.cpp
-  Obj.cpp
-  FileUtil.cpp
-  Airg.cpp
-  SceneExtract.cpp
-  Renderer.cpp
-  InputHandler.cpp
-  Gui.cpp
-  PfBoxes.cpp
-  VisionData.cpp
   NavKit.rc
-  Logger.cpp
+  adapter/RecastAdapter.cpp
+  extern/RecastDemo/ChunkyTriMesh.cpp
+  extern/RecastDemo/InputGeom.cpp
+  extern/RecastDemo/MeshLoaderObj.cpp
+  extern/RecastDemo/PerfTimer.cpp
+  extern/RecastDemo/Sample.cpp
+  extern/RecastDemo/SampleInterfaces.cpp
+  extern/RecastDemo/Sample_SoloMesh.cpp
+  extern/RecastDemo/imgui.cpp
+  extern/RecastDemo/imguiRenderGL.cpp
+  extern/easywsclient/easywsclient.cpp
+  model/PfBoxes.cpp
+  model/ReasoningGrid.cpp
+  model/VisionData.cpp
+  module/Airg.cpp
+  module/GameConnection.cpp
+  module/Gui.cpp
+  module/InputHandler.cpp
+  module/Logger.cpp
+  module/Navp.cpp
+  module/Obj.cpp
+  module/Renderer.cpp
+  module/SceneExtract.cpp
+  module/Settings.cpp
+  util/FileUtil.cpp
+        util/ErrorHandler.cpp
 )
 target_include_directories(NavKit PUBLIC "${PROJECT_BINARY_DIR}")
 target_include_directories(NavKit PRIVATE ${SIMPLEINI_INCLUDE_DIRS})

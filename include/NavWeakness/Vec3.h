@@ -31,6 +31,7 @@ SOFTWARE.
 #pragma once
 
 #include <cmath>
+#include <iostream>
 
 struct Vec3
 {
