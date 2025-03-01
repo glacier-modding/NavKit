@@ -33,7 +33,7 @@ add_executable (NavKit
   module/SceneExtract.cpp
   module/Settings.cpp
   util/FileUtil.cpp
-        util/ErrorHandler.cpp
+  util/ErrorHandler.cpp
 )
 target_include_directories(NavKit PUBLIC "${PROJECT_BINARY_DIR}")
 target_include_directories(NavKit PRIVATE ${SIMPLEINI_INCLUDE_DIRS})
@@ -72,7 +72,6 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NAV_WEAKNESS_DLL}" "${CMAKE_CURRENT_BINARY_DIR}/"
   COMMENT "Copying ${NAV_WEAKNESS_DLL} to ${CMAKE_BINARY_DIR}"
 )
-
 
 file(COPY "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.exe" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
@@ -113,6 +112,4 @@ target_link_libraries(NavKit
 )
 set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)
-endif()
+set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)

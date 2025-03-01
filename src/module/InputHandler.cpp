@@ -1,13 +1,13 @@
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Gui.h"
-#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/RecastDemo/imgui.h"
 
 #include <algorithm>
-#include <SDL_opengl.h>
 #include <SDL.h>
+#include <SDL_opengl.h>
 
 const int InputHandler::QUIT = 1;
 
@@ -32,6 +32,7 @@ int InputHandler::handleInput() {
     Renderer& renderer = Renderer::getInstance();
     Airg& airg = Airg::getInstance();
     Navp& navp = Navp::getInstance();
+    bool done = false;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_WINDOWEVENT:
@@ -109,8 +110,8 @@ int InputHandler::handleInput() {
                 break;
 
             case SDL_QUIT:
-                return QUIT;
-
+                done = true;
+                break;
             default:
                 break;
         }
@@ -127,6 +128,9 @@ int InputHandler::handleInput() {
     }
     if (SDL_GetModState() & KMOD_CTRL) {
         keybSpeed /= 4.0f;
+    }
+    if (done) {
+        return QUIT;
     }
     return 0;
 }

@@ -1,6 +1,6 @@
 #include "../../include/NavKit/util/ErrorHandler.h"
-#include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/module/Renderer.h"
 
 std::string *ErrorHandler::errorMessage = nullptr;
 
@@ -18,27 +18,26 @@ INT_PTR CALLBACK ErrorHandler::ErrorDialogHandler(HWND hwndDlg, UINT uMsg, WPARA
                 EndDialog(hwndDlg, IDOK);
                 return TRUE;
             }
-        if (LOWORD(wParam) == IDC_COPY_BUTTON) {
-            OpenClipboard(hwndDlg);
-            EmptyClipboard();
-            if (errorMessage) {
-                HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, errorMessage->length() + 1);
-                char *data = (char *) GlobalLock(hMem);
-                strcpy_s(data, errorMessage->length() + 1, errorMessage->c_str());
-                GlobalUnlock(hMem);
-                SetClipboardData(CF_TEXT, hMem);
-                CloseClipboard();
-                GlobalFree(hMem);
+            if (LOWORD(wParam) == IDC_COPY_BUTTON) {
+                OpenClipboard(hwndDlg);
+                EmptyClipboard();
+                if (errorMessage) {
+                    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, errorMessage->length() + 1);
+                    char *data = (char *) GlobalLock(hMem);
+                    strcpy_s(data, errorMessage->length() + 1, errorMessage->c_str());
+                    GlobalUnlock(hMem);
+                    SetClipboardData(CF_TEXT, hMem);
+                    CloseClipboard();
+                    GlobalFree(hMem);
+                }
+                return TRUE;
             }
-            return TRUE;
-        }
-        break;
+            return FALSE;
         default: return FALSE;
     }
-    return FALSE;
 }
 
-void ErrorHandler::openErrorDialog(const std::string& message) {
+void ErrorHandler::openErrorDialog(const std::string &message) {
     errorMessage = new std::string(message);
     DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, ErrorDialogHandler, 0);
 }

@@ -19,7 +19,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
 */
-#include "../include/NavKit/NavKit.h"
 #include <SDL.h>
 #include <cpptrace/from_current.hpp>
 #include "../include/NavKit/module/Airg.h"
@@ -36,10 +35,6 @@
 #undef main
 
 int SDL_main(const int argc, char **argv) {
-    return NavKit::runProgram();
-}
-
-int NavKit::runProgram() {
     CPPTRACE_TRY
         {
             std::thread logThread(Logger::logRunner);
@@ -86,17 +81,14 @@ int NavKit::runProgram() {
 
             NFD_Quit();
             renderer.closeWindow();
+            return 0;
         }
     CPPTRACE_CATCH(const std::exception& e) {
         ErrorHandler::openErrorDialog("An unexpected error occurred: " + std::string(e.what()) + "\n\nStack Trace:\n" +
                                       cpptrace::from_current_exception().to_string());
-
-        return 1;
     } catch (...) {
-        ErrorHandler::openErrorDialog("An unexpected error occurred:\n\nStack Trace:\n" +
+        ErrorHandler::openErrorDialog("An unexpected error occurred:\n\nStack Trace: \n" +
                                       cpptrace::from_current_exception().to_string());
-        return 1;
     }
-
     return 0;
 }

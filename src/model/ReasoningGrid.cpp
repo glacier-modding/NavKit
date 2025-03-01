@@ -1,12 +1,12 @@
 #include "../../include/NavKit/model/ReasoningGrid.h"
-#include "../../include/NavKit/module/Logger.h"
-#include "../../include/NavKit/module/Airg.h"
-#include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/util/ErrorHandler.h"
 #include <algorithm>
 #include <from_current.hpp>
 #include <set>
+#include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/util/ErrorHandler.h"
 
 const void Vec4::writeJson(std::ostream &f) {
     f << "{";
