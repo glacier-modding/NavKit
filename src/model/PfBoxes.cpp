@@ -51,23 +51,36 @@ PfBoxes::PfBoxes::PfBoxes(const char *fileName) {
     simdjson::ondemand::parser parser;
     simdjson::padded_string json = simdjson::padded_string::load(fileName);
     auto jsonDocument = parser.iterate(json);
-    simdjson::ondemand::array entitiesJson = jsonDocument["entities"];
-    for (simdjson::ondemand::value hashAndEntityJson: entitiesJson) {
+    simdjson::ondemand::array pfBoxes = jsonDocument["pfBoxes"];
+    for (simdjson::ondemand::value hashAndEntityJson: pfBoxes) {
         HashAndEntity hashAndEntity;
         hashAndEntity.readJson(hashAndEntityJson);
         hashesAndEntities.push_back(hashAndEntity);
     }
 }
 
-PfBoxes::PfBox PfBoxes::PfBoxes::getPathfindingBBox() {
-    for (HashAndEntity hashAndEntity: hashesAndEntities) {
+PfBoxes::PfBox PfBoxes::PfBoxes::getPathfindingBBox() const {
+    for (const HashAndEntity &hashAndEntity: hashesAndEntities) {
         if (hashAndEntity.entity.type.data == INCLUDE_TYPE) {
             Vec3 p = hashAndEntity.entity.position;
             Vec3 s = hashAndEntity.entity.size.data;
-            return PfBox(p, s);
+            return {p, s};
         }
     }
     Vec3 pos(0, 0, 0);
     Vec3 size(-1, -1, -1);
-    return PfBox(pos, size);
+    return {pos, size};
+}
+
+std::vector<PfBoxes::PfBox> PfBoxes::PfBoxes::getExclusionBoxes() const {
+    std::vector<PfBox> exclusionBoxes;
+    for (const HashAndEntity &hashAndEntity: hashesAndEntities) {
+        if (hashAndEntity.entity.type.data == EXCLUDE_TYPE) {
+            Vec3 p = hashAndEntity.entity.position;
+            Vec3 s = hashAndEntity.entity.size.data;
+            Rotation r = hashAndEntity.entity.rotation;
+            exclusionBoxes.emplace_back(p, s, r);
+        }
+    }
+    return exclusionBoxes;
 }

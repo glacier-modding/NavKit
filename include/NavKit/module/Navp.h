@@ -3,6 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "../model/PfBoxes.h"
+
+struct Vec3;
+
 namespace NavPower {
     class Area;
 
@@ -19,32 +23,36 @@ public:
 
     ~Navp();
 
-    static Navp& getInstance() {
+    static Navp &getInstance() {
         static Navp instance;
         return instance;
     }
 
     void resetDefaults();
 
+    void renderExclusionBoxes();
+
     void renderNavMesh();
 
-    void renderNavMeshForHitTest();
+    void renderNavMeshForHitTest() const;
 
     void drawMenu();
 
-    void finalizeLoad();
+    void finalizeBuild();
 
-    void buildBinaryAreaToAreaMap();
+    void buildAreaMaps();
 
     void setSelectedNavpAreaIndex(int index);
 
     NavPower::NavMesh *navMesh{};
     void *navMeshFileData{};
     std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap{};
+    std::map<Vec3, NavPower::Area *> posToAreaMap{};
     int selectedNavpAreaIndex;
     bool navpLoaded;
     bool showNavp;
     bool showNavpIndices;
+    bool showPfExclusionBoxes;
     bool doNavpHitTest{};
     int navpScroll;
     bool loading;
@@ -65,20 +73,30 @@ public:
 
     bool stairsCheckboxValue;
 
+    float bBoxPos[3];
+    float bBoxSize[3];
+    std::vector<PfBoxes::PfBox> exclusionBoxes;
+
     void setLastLoadFileName(const char *fileName);
 
     void setLastSaveFileName(const char *fileName);
 
+    void setBBox(float *pos, float *size);
+
+    void updateExclusionBoxConvexVolumes();
+
 private:
-    static void buildNavp(Navp *navp);
+    static void buildNavp();
 
     void renderArea(NavPower::Area area, bool selected, int areaIndex);
 
     static bool areaIsStairs(NavPower::Area area);
 
-    static void loadNavMesh(Navp *navp, char *fileName, bool isFromJson);
+    void setStairsFlags() const;
 
-    static void loadNavMeshFileData(Navp *navp, char *fileName);
+    static void loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding);
+
+    static void loadNavMeshFileData(char *fileName);
 
     static char *openLoadNavpFileDialog(char *lastNavpFolder);
 
@@ -91,4 +109,5 @@ private:
     std::string outputNavpFilename = "output.navp";
     std::vector<bool> navpLoadDone;
     std::vector<bool> navpBuildDone;
+    bool building;
 };

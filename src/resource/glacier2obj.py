@@ -33,6 +33,8 @@ from bpy.types import (
     Operator,
     PropertyGroup,
 )
+global glacier2obj_enabled_log_levels
+glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
 
 class AlocProperties(PropertyGroup):
     """ "Stored exposed variables relevant to the Physics files"""
@@ -440,8 +442,7 @@ class PrimitiveSphere:
 
 
 def log(level, msg, filter_field):
-    enabled = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
-    if level in enabled: # and filter_field == "007573591BE1BE69":
+    if level in glacier2obj_enabled_log_levels: # and filter_field == "007573591BE1BE69":
         print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
 
         
@@ -832,8 +833,8 @@ class Physics:
         self.collision_type = br.readUInt()
         br.readUByteVec(11)  # "ID\0\0\0\u{5}PhysX"
         mesh_type = br.readString(3).decode("utf-8")  # Mesh Type ("CVX", "TRI", "ICP", "BCP")
-        log("DEBUG", "Mesh type: " + mesh_type, aloc_name)
         log("DEBUG", "Data type: " + str(PhysicsDataType(self.data_type)), aloc_name)
+        log("DEBUG", "Current Mesh type: " + mesh_type, aloc_name)
         try:
             br.readUByte()  # .
         except struct.error as err:
@@ -846,6 +847,9 @@ class Physics:
             for convex_mesh_index in range(self.convex_mesh_count):
                 log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count), aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
+            mesh_type = br.readString(3).decode("utf-8")  # Mesh Type ("TRI")
+            br.readUByte()  # .
+            log("DEBUG", "Current Mesh type: " + mesh_type, aloc_name)
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
                 log("DEBUG", "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count), aloc_name)
@@ -987,18 +991,27 @@ def to_mesh(bm, mesh, obj, collection, context):
 
 
 def set_mesh_aloc_properties(mesh, collision_type, data_type, sub_data_type):
-    mask = []
-    for col_type in PhysicsCollisionType:
-        mask.append(collision_type == col_type.value)
-    mesh.aloc_properties.collision_type = mask
-    mesh.aloc_properties.aloc_type = str(PhysicsDataType(data_type))
-    mesh.aloc_properties.aloc_subtype = str(PhysicsCollisionPrimitiveType(sub_data_type))
+    if bpy.app.version_string[0] == "3":
+        mask = []
+        log("DEBUG", "Setting Mesh ALOC properties. Sub-data type: " + str(sub_data_type), "set_mesh_aloc_properties")
+        for col_type in PhysicsCollisionType:
+            mask.append(collision_type == col_type.value)
+        log("DEBUG", "Setting Collision type", "set_mesh_aloc_properties")
+        mesh.aloc_properties.collision_type = mask
+        log("DEBUG", "Setting Data type", "set_mesh_aloc_properties")
+        mesh.aloc_properties.aloc_type = str(PhysicsDataType(data_type))
+        log("DEBUG", "Setting Sub-data type", "set_mesh_aloc_properties")
+        mesh.aloc_properties.aloc_subtype = str(PhysicsCollisionPrimitiveType(sub_data_type))
+        log("DEBUG", "Finished setting Mesh ALOC properties.", "set_mesh_aloc_properties")
 
 
 def create_new_object(aloc_name, collision_type, data_type):
+    log("DEBUG", "Creating new object for ALOC: " + aloc_name + " with collision type: "
+        + str(collision_type) + " and data type: " + str(data_type), "create_new_object")
     mesh = bpy.data.meshes.new(aloc_name)
     set_mesh_aloc_properties(mesh, collision_type, data_type, PhysicsCollisionPrimitiveType.NONE)
     obj = bpy.data.objects.new(aloc_name, mesh)
+    log("DEBUG", "Finished Creating new object for ALOC: " + aloc_name, "create_new_object")
     return obj
 
 
@@ -1042,10 +1055,64 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
 
     collection = context.scene.collection
     objects = []
+    log("DEBUG", "Initialized collection and objects", aloc_name)
+    log("DEBUG", "Collision type: " + str(aloc.collision_type), aloc_name)
+    log("DEBUG", "Data type: " + str(aloc.data_type), aloc_name)
+
     if aloc.collision_type == PhysicsCollisionType.RIGIDBODY:
         log("DEBUG", "Skipping RigidBody ALOC " + aloc_name, "load_aloc")
         return PhysicsCollisionType.RIGIDBODY, objects
-    if aloc.data_type == PhysicsDataType.CONVEX_MESH:
+    if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
+        log("DEBUG", "Converting Convex Mesh and Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        for mesh_index in range(aloc.convex_mesh_count):
+            log("DEBUG", " " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count),
+                "load_aloc")
+            obj = create_new_object(aloc_name, aloc.collision_type, aloc.data_type)
+            bm = bmesh.new()
+            m = aloc.convex_meshes[mesh_index]
+            if include_non_collidable_layers or collidable_layer(m.collision_layer):
+                for v in m.vertices:
+                    bm.verts.new(v)
+            else:
+                _ = -1
+                log("DEBUG",
+                    "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+                        mesh_index) + " and collision layer type: " + str(m.collision_layer) + " +++++++++++++",
+                    "load_aloc")
+            mesh = obj.data
+            bm.from_mesh(mesh)
+            convex_hull(bm)
+            to_mesh(bm, mesh, obj, collection, context)
+            objects.append(obj)
+        for mesh_index in range(aloc.triangle_mesh_count):
+            obj = create_new_object(aloc_name, aloc.collision_type, aloc.data_type)
+            bm = bmesh.new()
+            m = aloc.triangle_meshes[mesh_index]
+            bmv = []
+            if include_non_collidable_layers or collidable_layer(m.collision_layer):
+                for v in m.vertices:
+                    bmv.append(bm.verts.new(v))
+                d = m.triangle_data
+                for i in range(0, len(d), 3):
+                    face = (bmv[d[i]], bmv[d[i + 1]], bmv[d[i + 2]])
+                    try:
+                        bm.faces.new(face)
+                    except ValueError as err:
+                        _ = -1
+                        log("DEBUG", "[ERROR] Could not add face to TriangleMesh: " + str(err), "load_aloc")
+            else:
+                _ = -1
+                log("DEBUG",
+                    "+++++++++++++++++++++ Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+                        mesh_index) + " and collision layer type: " + str(m.collision_layer) + " +++++++++++++",
+                    "load_aloc")
+
+            mesh = obj.data
+            to_mesh(bm, mesh, obj, collection, context)
+
+            objects.append(obj)
+
+    elif aloc.data_type == PhysicsDataType.CONVEX_MESH:
         log("DEBUG", "Converting Convex Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         for mesh_index in range(aloc.convex_mesh_count):
             log("DEBUG", " " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count), "load_aloc")
@@ -1064,6 +1131,8 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
             to_mesh(bm, mesh, obj, collection, context)
             objects.append(obj)
     elif aloc.data_type == PhysicsDataType.TRIANGLE_MESH:
+        log("DEBUG", "Converting Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("DEBUG", "triangle_mesh_count: " + str(aloc.triangle_mesh_count), "load_aloc")
         for mesh_index in range(aloc.triangle_mesh_count):
             obj = create_new_object(aloc_name, aloc.collision_type, aloc.data_type)
             bm = bmesh.new()
@@ -1089,6 +1158,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
 
             objects.append(obj)
     elif aloc.data_type == PhysicsDataType.PRIMITIVE:
+        log("DEBUG", "Converting Primitive ALOC " + aloc_name + " to blender mesh", "load_aloc")
         log("DEBUG", "Primitive Type", "load_aloc")
         log("DEBUG", "Primitive count: " + str(aloc.primitive_count), "load_aloc")
         log("DEBUG", "Primitive Box count: " + str(aloc.primitive_boxes_count), "load_aloc")
@@ -1194,7 +1264,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     return aloc.collision_type, objects
 
 
-def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json):
+def load_scenario(context, collection, path_to_alocs_json):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Alocs file: " + path_to_alocs_json, "load_scenario")
@@ -1202,7 +1272,7 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
     data = json.loads(f.read())
     f.close()
     transforms = {}
-    for hash_and_entity in data['entities']:
+    for hash_and_entity in data['alocs']:
         aloc_hash = hash_and_entity['hash']
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
@@ -1211,24 +1281,8 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
         if aloc_hash not in transforms:
             transforms[aloc_hash] = []
         transforms[aloc_hash].append(transform)
-
-    log("INFO", "Loading PfBoxes.", "load_scenario")
     alocs_json_dir = os.path.dirname(path_to_alocs_json)
-    log("INFO", "PfBoxes file: " + path_to_pf_boxes_json, "load_scenario")
-    f = open(path_to_pf_boxes_json, "r")
-    pb_boxes_data = json.loads(f.read())
-    f.close()
-    pf_transforms = []
-    log("INFO", "Loading file: " + str(path_to_pf_boxes_json), "load_scenario")
 
-    for hash_and_entity in pb_boxes_data['entities']:
-        entity = hash_and_entity['entity']
-        pf_box_type = entity["type"]["data"]
-        log("DEBUG", "PF Box Type: " + str(pf_box_type), "load_scenario")
-        if pf_box_type == "PFBT_EXCLUDE_MESH_COLLISION":
-            transform = {"position": entity["position"], "rotate": entity["rotation"],
-                         "scale": entity["size"]["data"], "id": entity["id"]}
-            pf_transforms.append(transform)
     path_to_aloc_dir = "%s\\%s" % (alocs_json_dir, "aloc")
     log("INFO", "Path to aloc dir:" + path_to_aloc_dir, "load_scenario")
     file_list = sorted(os.listdir(path_to_aloc_dir))
@@ -1305,91 +1359,40 @@ def load_scenario(context, collection, path_to_alocs_json, path_to_pf_boxes_json
                 cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
                 cur.select_set(False)
 
-    if len(pf_transforms) > 0:
-        log("INFO", "Creating PF Box", "load_scenario")
-        mesh = bpy.data.meshes.new("PF_BOX")
-        pb_box_obj = bpy.data.objects.new("PF_BOX", mesh)
-        bm = bmesh.new()
-        bmv = []
-        x = 0
-        y = 0
-        z = 0
-        sx = .5
-        sy = .5
-        sz = .5
-        vertices = [
-            [x + sx, y + sy, z - sz],
-            [x + sx, y - sy, z - sz],
-            [x - sx, y - sy, z - sz],
-            [x - sx, y + sy, z - sz],
-            [x + sx, y + sy, z + sz],
-            [x + sx, y - sy, z + sz],
-            [x - sx, y - sy, z + sz],
-            [x - sx, y + sy, z + sz]
-        ]
-        for v in vertices:
-            bmv.append(bm.verts.new(v))
-        bm.faces.new((bmv[0], bmv[1], bmv[2], bmv[3]))  # bottom
-        bm.faces.new((bmv[4], bmv[5], bmv[6], bmv[7]))  # top
-        bm.faces.new((bmv[0], bmv[1], bmv[5], bmv[4]))  # right
-        bm.faces.new((bmv[2], bmv[3], bmv[7], bmv[6]))
-        bm.faces.new((bmv[0], bmv[3], bmv[7], bmv[4]))
-        bm.faces.new((bmv[1], bmv[2], bmv[6], bmv[5]))
-        mesh = pb_box_obj.data
-        bm.to_mesh(mesh)
-        pb_box_obj.data = mesh
-        bm.free()
-        t_size = len(pf_transforms)
-        for i in range(0, t_size):
-            transform = pf_transforms[i]
-            p = transform["position"]
-            r = transform["rotate"]
-            s = transform["scale"]
-            log("DEBUG", "Transforming pf box:" + " #" + str(i), "load_scenario")
-
-            if i != 0:
-                cur = pb_box_obj.copy()
-            else:
-                cur = pb_box_obj
-            collection.objects.link(cur)
-            cur.select_set(True)
-            cur.name = "PF_BOX " + transform["id"]
-            cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
-            cur.rotation_mode = 'QUATERNION'
-            cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
-            cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
-            cur.select_set(False)
-        log("DEBUG", "PfBox Exclusion entity ids:", "load_scenario")
-        log("DEBUG", "[", "load_scenario")
-        for pf_box in pf_transforms:
-            log("DEBUG", "   \"" + pf_box["id"] + "\",", "load_scenario")
-        log("DEBUG", "]", "load_scenario")
     end = timer()
     log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "load_scenario")
     return 0
 
 
 def main():
-    log("INFO", "Usage: blender -b -P glacier2obj.py -- <alocs.json path> <pfBoxes.json> <output.obj path>", "main")
+    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <debug logs enabled>", "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
-    alocs_path = argv[0]
-    pf_boxes_path = argv[1]
-    output_path = argv[2]
+    scene_path = argv[0]
+    output_path = argv[1]
+    global glacier2obj_enabled_log_levels
+    if len(argv) > 2 and argv[2] == True:
+        log("INFO", "Enabling debug logs", "main"),
+        glacier2obj_enabled_log_levels.append("DEBUG")
+
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
     collection = bpy.data.collections.new(
-        bpy.path.display_name_from_filepath(alocs_path)
+        bpy.path.display_name_from_filepath(scene_path)
     )
     bpy.context.scene.collection.children.link(collection)
 
-    scenario = load_scenario(bpy.context, collection, alocs_path, pf_boxes_path)
+    scenario = load_scenario(bpy.context, collection, scene_path)
     if scenario == 1:
-        log("INFO", 'Failed to import scenario "%s"' % alocs_path, "main")
+        log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1
-    bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
+    if bpy.app.version_string[0] == "3":
+        bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
+    else:
+        bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
+    return None
 
 
 if __name__ == "__main__":
@@ -1398,5 +1401,6 @@ if __name__ == "__main__":
     ]
     for c in classes:
         bpy.utils.register_class(c)
-    bpy.types.Mesh.aloc_properties = PointerProperty(type=AlocProperties)
+    if bpy.app.version_string[0] == "3":
+        bpy.types.Mesh.aloc_properties = PointerProperty(type=AlocProperties)
     main()

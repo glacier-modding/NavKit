@@ -8,10 +8,11 @@
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/model/PfBoxes.h"
-#include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/RecastDemo/imgui.h"
 
@@ -29,6 +30,7 @@ SceneExtract::SceneExtract() {
     extractScroll = 0;
     errorExtracting = false;
     closing = false;
+    glacier2ObjDebugLogsEnabled = false;
 }
 
 SceneExtract::~SceneExtract() {
@@ -83,8 +85,11 @@ void SceneExtract::setBlenderFile(const char *filename) {
 
 void SceneExtract::drawMenu() {
     Renderer& renderer = Renderer::getInstance();
-    imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
-                         renderer.height - 10 - 205 - 390 - 195 - 10, 250, 195, &extractScroll);
+    int sceneExtractHeight = 238;
+    if (imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
+                         renderer.height - 10 - 205 - 417 - sceneExtractHeight - 10, 250, sceneExtractHeight, &extractScroll)) {
+        Gui::getInstance().mouseOverMenu = true;
+    }
     imguiLabel("Set Hitman Directory");
     if (imguiButton(hitmanFolderName.c_str())) {
         char *folderName = openHitmanFolderDialog(lastHitmanFolder.data());
@@ -106,15 +111,29 @@ void SceneExtract::drawMenu() {
             setBlenderFile(blenderFileName);
         }
     }
-    if (imguiButton("Extract from game", hitmanSet && outputSet && blenderSet && extractionDone.empty())) {
+    if (imguiButton("Extract from game", hitmanSet && outputSet && extractionDone.empty())) {
         Gui& gui = Gui::getInstance();
         gui.showLog = true;
+        alsoBuildObj = false;
+        extractScene(lastHitmanFolder.data(), lastOutputFolder.data());
+    }
+    if (imguiButton("Build obj", outputSet && blenderSet && extractionDone.empty() && !blenderObjStarted && !blenderObjGenerationDone)) {
+        Gui& gui = Gui::getInstance();
+        gui.showLog = true;
+        Obj::getInstance().objLoaded = false;
+        buildObj(lastBlenderFile.data(), lastOutputFolder.data());
+    }
+    if (imguiButton("Extract from game and build obj", hitmanSet && blenderSet && outputSet && extractionDone.empty() && !blenderObjStarted && !blenderObjGenerationDone)) {
+        Gui& gui = Gui::getInstance();
+        gui.showLog = true;
+        alsoBuildObj = true;
+        Obj::getInstance().objLoaded = false;
         extractScene(lastHitmanFolder.data(), lastOutputFolder.data());
     }
     imguiEndScrollArea();
 }
 
-void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, std::string logFileName) {
+void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, std::string logFileName, bool extracting) {
     SECURITY_ATTRIBUTES saAttr = {sizeof(saAttr), nullptr, TRUE};
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
@@ -150,6 +169,7 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
     }
 
     CloseHandle(hWritePipe);
+    std::vector<char> lastOutput;
     std::vector<char> output;
     char buffer[4096];
     DWORD bytesRead;
@@ -193,9 +213,13 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
             sceneExtract->handles.pop_back();
             return;
         }
-        if (size_t found = outputString.find("Error: Python"); found != std::string::npos) {
-            Logger::log(NK_ERROR,
-                                      "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
+        bool pythonError = false;
+        std::string outputErrorCheck = output.data();
+        if (size_t found = outputErrorCheck.find("Error"); found != std::string::npos) {
+            pythonError = true;
+        }
+        if (pythonError) {
+            Logger::log(NK_ERROR, "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
             sceneExtract->errorExtracting = true;
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(hReadPipe);
@@ -204,8 +228,14 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
             sceneExtract->handles.pop_back();
             sceneExtract->handles.pop_back();
             sceneExtract->handles.pop_back();
+            std::string errorMessage = lastOutput.data();
+            errorMessage += output.data();
+            errorMessage += "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
+            ErrorHandler::openErrorDialog(errorMessage);
             return;
         }
+        lastOutput.resize(output.size());
+        std::ranges::copy(output, lastOutput.begin());
         output.clear();
         //}
     }
@@ -238,12 +268,15 @@ void SceneExtract::runCommand(SceneExtract *sceneExtract, std::string command, s
     sceneExtract->handles.pop_back();
     sceneExtract->handles.pop_back();
 
-    if (sceneExtract->extractionDone.size() == 1) {
-        Logger::log(NK_INFO, "Finished extracting scene from game to alocs.json.");
+    if (sceneExtract->extractionDone.size() == 1 && extracting) {
+        Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
         sceneExtract->extractionDone.push_back(true);
-    } else {
-        sceneExtract->extractionDone.push_back(true);
-        Logger::log(NK_INFO, "Finished generating obj from alocs.json.");
+    }
+    if (sceneExtract->blenderObjStarted && !extracting) {
+        Logger::log(NK_INFO, "Finished generating obj from nav.json file.");
+        Obj& obj = Obj::getInstance();
+        obj.objLoaded = false;
+        sceneExtract->blenderObjGenerationDone = true;
     }
 }
 
@@ -253,12 +286,9 @@ void SceneExtract::extractScene(char *hitmanFolder, char *outputFolder) {
     retailFolder += hitmanFolder;
     retailFolder += "\\Retail\"";
     std::string gameVersion = "HM3";
-    std::string alocs = "\"";
-    alocs += outputFolder;
-    alocs += "\\alocs.json\"";
-    std::string pfBoxes = "\"";
-    pfBoxes += outputFolder;
-    pfBoxes += "\\pfBoxes.json\"";
+    std::string navJsonFilePath = "\"";
+    navJsonFilePath += outputFolder;
+    navJsonFilePath += "\\output.nav.json\"";
     std::string runtimeFolder = "\"";
     runtimeFolder += hitmanFolder;
     runtimeFolder += "\\Runtime\"";
@@ -282,78 +312,90 @@ void SceneExtract::extractScene(char *hitmanFolder, char *outputFolder) {
     command += " ";
     command += gameVersion;
     command += " ";
-    command += alocs;
-    command += " ";
-    command += pfBoxes;
+    command += navJsonFilePath;
     command += " ";
     command += runtimeFolder;
     command += " \"";
     command += alocFolder;
     command += "\"";
     extractionDone.push_back(true);
-    std::thread commandThread(runCommand, this, command, "Glacier2ObjExtract.log");
+    std::thread commandThread(runCommand, this, command, "Glacier2ObjExtract.log", true);
     commandThread.detach();
 }
 
-void SceneExtract::generateObj(char *blenderPath, char *outputFolder) {
-    Logger::log(NK_INFO, "Generating obj from alocs.json.");
+void SceneExtract::buildObj(char *blenderPath, char *outputFolder) {
+    startedObjGeneration = true;
+    Logger::log(NK_INFO, "Generating obj from nav.json file.");
     std::string command = "\"";
     command += blenderPath;
-    command += "\" -b --factory-startup -P glacier2obj.py -- ";
+    command += "\" -b --factory-startup -P glacier2obj.py -- "; //--debug-all
     std::string alocs = "\"";
     alocs += outputFolder;
-    alocs += "\\alocs.json\"";
+    alocs += "\\output.nav.json\"";
     command += alocs;
-    std::string pfBoxes = " \"";
-    pfBoxes += outputFolder;
-    pfBoxes += "\\pfBoxes.json\"";
-    command += pfBoxes;
     command += " \"";
     command += outputFolder;
     command += "\\output.obj\"";
-    std::thread commandThread(runCommand, this, command, "Glacier2ObjBlender.log");
+    if (glacier2ObjDebugLogsEnabled) {
+        command += " True";
+    }
+    blenderObjStarted = true;
+
+    std::thread commandThread(runCommand, this, command, "Glacier2ObjBlender.log", false);
     commandThread.detach();
 }
 
 
 void SceneExtract::finalizeExtract() {
-    if (extractionDone.size() == 2 && !startedObjGeneration) {
-        startedObjGeneration = true;
-        generateObj(lastBlenderFile.data(), lastOutputFolder.data());
-    }
-    if (extractionDone.size() == 3) {
+    if (extractionDone.size() == 2) {
         std::string pfBoxesFile = lastOutputFolder.data();
-        pfBoxesFile += "\\pfBoxes.json";
+        pfBoxesFile += "\\output.nav.json";
         PfBoxes::PfBoxes pfBoxes;
         try {
             pfBoxes = PfBoxes::PfBoxes(pfBoxesFile.data());
         } catch (...) {
             return;
         }
+        Navp& navp = Navp::getInstance();
         PfBoxes::PfBox bBox = pfBoxes.getPathfindingBBox();
-        Obj& obj = Obj::getInstance();
         if (bBox.size.x != -1) {
-            RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-            recastAdapter.resetInputGeom();
 
             // Swap Y and Z to go from Hitman's Z+ = Up coordinates to Recast's Y+ = Up coordinates
             // Negate Y position to go from Hitman's Z+ = North to Recast's Y- = North
             float pos[3] = {bBox.pos.x, bBox.pos.z, -bBox.pos.y};
             float size[3] = {bBox.size.x, bBox.size.z, bBox.size.y};
-            obj.setBBox(pos, size);
+            navp.setBBox(pos, size);
         }
-        startedObjGeneration = false;
+        navp.exclusionBoxes = pfBoxes.getExclusionBoxes();
         extractionDone.clear();
-        obj.objToLoad = lastOutputFolder;
-        obj.objToLoad += "\\output.obj";
-        obj.loadObj = true;
-        obj.lastObjFileName = lastOutputFolder.data();
-        obj.lastObjFileName += "output.obj";
+        if (alsoBuildObj && !startedObjGeneration) {
+            buildObj(lastBlenderFile.data(), lastOutputFolder.data());
+        }
     }
     if (errorExtracting) {
         errorExtracting = false;
         startedObjGeneration = false;
         extractionDone.clear();
+    }
+}
+
+void SceneExtract::finalizeObjBuild() {
+    if (blenderObjGenerationDone) {
+        Obj& obj = Obj::getInstance();
+        startedObjGeneration = false;
+        obj.objToLoad = lastOutputFolder;
+        obj.objToLoad += "\\output.obj";
+        obj.loadObj = true;
+        obj.lastObjFileName = lastOutputFolder.data();
+        obj.lastObjFileName += "output.obj";
+        blenderObjStarted = false;
+        blenderObjGenerationDone = false;
+    }
+    if (errorExtracting) {
+        errorExtracting = false;
+        startedObjGeneration = false;
+        blenderObjStarted = false;
+        blenderObjGenerationDone = false;
     }
 }
 

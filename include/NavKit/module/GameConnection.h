@@ -3,7 +3,6 @@
 #include <vector>
 #include "../../easywsclient/easywsclient.hpp"
 #ifdef _WIN32
-#define NOMINMAX
 #pragma comment( lib, "ws2_32" )
 #include <WinSock2.h>
 #endif

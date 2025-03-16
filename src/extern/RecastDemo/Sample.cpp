@@ -29,6 +29,7 @@
 #include "SDL.h"
 #include "SDL_opengl.h"
 #include <fstream>
+#include <vector>
 
 #ifdef WIN32
 #	define snprintf _snprintf
@@ -186,7 +187,7 @@ void Sample::resetCommonSettings()
 	m_agentMaxSlope = 45.0f;
 	m_regionMinSize = 30;
 	m_regionMergeSize = 30;
-	m_edgeMaxLen = 500.0f;
+	m_edgeMaxLen = 5.0f;
 	m_edgeMaxError = 1.4f;
 	m_vertsPerPoly = 3.0f;
 	m_detailSampleDist = 1.5f;
@@ -425,12 +426,33 @@ void Sample::saveAll(const char* s_OutputFileName)
 		const dtMeshTile* tile = mesh->getTile(i);
 		if (!tile || !tile->header || !tile->dataSize) continue;
 		int numPolys = tile->header->polyCount;
+		std::vector<int> indexToPolyId;
+		indexToPolyId.push_back(0);
+		int curPoly = 0;
 		for (int pi = 0; pi < numPolys; pi++) {
+			if (const dtPoly& poly = tile->polys[pi]; poly.flags != SAMPLE_POLYFLAGS_DISABLED) {
+				curPoly++;
+				indexToPolyId.push_back(curPoly);
+			} else {
+				indexToPolyId.push_back(-1);
+			}
+		}
+		bool validAreaFound = false;
+		for (int pi = 0; pi < numPolys; pi++) {
+			const dtPoly& poly = tile->polys[pi];
+			if (poly.flags == SAMPLE_POLYFLAGS_DISABLED) {
+				continue;
+			}
+			if (validAreaFound) {
+				f << ",";
+			}
+			if (!validAreaFound) {
+				validAreaFound = true;
+			}
 			f << "{";
-			f << "\"Area\":{\"Index\":" << pi + 1 << "},";
+			f << R"("Area":{"Index":)" << indexToPolyId[pi] << "},";
 			f << "\"Edges\":[";
 
-			dtPoly poly = tile->polys[pi];
 			int numVerts = poly.vertCount;
 			for (int vi = 0; vi < numVerts; vi++) {
 				unsigned short neiIndex = poly.neis[vi];
@@ -441,8 +463,10 @@ void Sample::saveAll(const char* s_OutputFileName)
 				f << "{";
 				if (poly.neis[vi] != NULL)
 				{
-					f << "\"Adjacent Area\":";
-					f << poly.neis[vi] << ",";
+					if (auto nPoly = tile->polys[poly.neis[vi]]; nPoly.flags != SAMPLE_POLYFLAGS_DISABLED && indexToPolyId[poly.neis[vi]] != -1) {
+						f << "\"Adjacent Area\":";
+						f << indexToPolyId[poly.neis[vi]] << ",";
+					}
 				}
 				f << "\"Position\":";
 				f << "{";
@@ -458,10 +482,6 @@ void Sample::saveAll(const char* s_OutputFileName)
 			}
 
 			f << "]}";
-			if (pi < numPolys - 1)
-			{
-				f << ",";
-			}
 		}
 	}
 	f << "],";

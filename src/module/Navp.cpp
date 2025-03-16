@@ -6,20 +6,22 @@
 
 #include <GL/glut.h>
 #include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/model/PfBoxes.h"
 #include "../../include/NavKit/module/GameConnection.h"
+#include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/imgui.h"
+#include "../../include/RecastDemo/InputGeom.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceLib.h"
 #include "../../include/ResourceLib_HM3/Generated/ZHMGen.h"
 
-#include "../../include/NavKit/module/Gui.h"
-#include "../../include/NavKit/module/Obj.h"
 
 Navp::Navp() {
     loadNavpName = "Load Navp";
@@ -29,6 +31,7 @@ Navp::Navp() {
     navpLoaded = false;
     showNavp = true;
     showNavpIndices = false;
+    showPfExclusionBoxes = true;
     navMesh = new NavPower::NavMesh();
     selectedNavpAreaIndex = -1;
     navpScroll = 0;
@@ -44,8 +47,18 @@ Navp::Navp() {
     lastBBoxSizeX = 100.0;
     lastBBoxSizeY = 100.0;
     lastBBoxSizeZ = 100.0;
+    bBoxPos[0] = 0;
+    bBoxPos[1] = 0;
+    bBoxPos[2] = 0;
+    bBoxSize[0] = 600;
+    bBoxSize[1] = 600;
+    bBoxSize[2] = 600;
     stairsCheckboxValue = false;
     loading = false;
+    Logger::log(NK_INFO,
+                ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " +
+                 std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxSize[0]) + ", " + std::to_string(bBoxSize[1]) +
+                 ", " + std::to_string(bBoxSize[2]) + ")").c_str());
 }
 
 Navp::~Navp() = default;
@@ -65,6 +78,24 @@ void Navp::resetDefaults() {
     lastBBoxSizeZ = 100.0;
 }
 
+void Navp::renderExclusionBoxes() {
+    if (showPfExclusionBoxes) {
+        Obj &obj = Obj::getInstance();
+        Renderer &renderer = Renderer::getInstance();
+        for (PfBoxes::PfBox exclusionBox: exclusionBoxes) {
+            renderer.drawBox(
+                {exclusionBox.pos.x, exclusionBox.pos.z, -exclusionBox.pos.y},
+                {exclusionBox.size.x, exclusionBox.size.z, -exclusionBox.size.y},
+                {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
+                true,
+                {0.6, 0, 0},
+                true,
+                {0.8, 0, 0},
+                1.0);
+        }
+    }
+}
+
 char *Navp::openLoadNavpFileDialog(char *lastNavpFolder) {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdLoadDialog(filters, 2, lastNavpFolder);
@@ -75,8 +106,80 @@ char *Navp::openSaveNavpFileDialog(char *lastNavpFolder) {
     return FileUtil::openNfdSaveDialog(filters, 2, "output", lastNavpFolder);
 }
 
+void Navp::setBBox(float *pos, float *size) {
+    Navp &navp = Navp::getInstance();
+    bBoxPos[0] = pos[0];
+    navp.bBoxPosX = pos[0];
+    bBoxPos[1] = pos[1];
+    navp.bBoxPosY = pos[1];
+    bBoxPos[2] = pos[2];
+    navp.bBoxPosZ = pos[2];
+    bBoxSize[0] = size[0];
+    navp.bBoxSizeX = size[0];
+    bBoxSize[1] = size[1];
+    navp.bBoxSizeY = size[1];
+    bBoxSize[2] = size[2];
+    navp.bBoxSizeZ = size[2];
+    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const float bBoxMin[3] = {
+        bBoxPos[0] - bBoxSize[0] / 2,
+        bBoxPos[1] - bBoxSize[1] / 2,
+        bBoxPos[2] - bBoxSize[2] / 2
+    };
+    const float bBoxMax[3] = {
+        bBoxPos[0] + bBoxSize[0] / 2,
+        bBoxPos[1] + bBoxSize[1] / 2,
+        bBoxPos[2] + bBoxSize[2] / 2
+    };
+    recastAdapter.setMeshBBox(bBoxMin, bBoxMax);
+    Logger::log(NK_INFO,
+                ("Setting bbox to (" + std::to_string(pos[0]) + ", " + std::to_string(pos[1]) + ", " +
+                 std::to_string(pos[2]) + ") (" + std::to_string(size[0]) + ", " + std::to_string(size[1]) + ", " +
+                 std::to_string(size[2]) + ")").c_str());
+    Settings::setValue("BBox", "x", std::to_string(pos[0]));
+    Settings::setValue("BBox", "y", std::to_string(pos[1]));
+    Settings::setValue("BBox", "z", std::to_string(pos[2]));
+    Settings::setValue("BBox", "sx", std::to_string(size[0]));
+    Settings::setValue("BBox", "sy", std::to_string(size[1]));
+    Settings::setValue("BBox", "sz", std::to_string(size[2]));
+    Settings::save();
+}
+
+void Navp::updateExclusionBoxConvexVolumes() {
+    if (Obj::getInstance().objLoaded) {
+        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        if (recastAdapter.inputGeom) {
+            recastAdapter.clearConvexVolumes();
+            for (PfBoxes::PfBox exclusionBox : exclusionBoxes) {
+                recastAdapter.addConvexVolume(exclusionBox);
+            }
+        }
+    }
+}
+
 bool Navp::areaIsStairs(NavPower::Area area) {
     return area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
+}
+
+void Navp::setStairsFlags() const {
+    for (auto &area: navMesh->m_areas) {
+        Vec3 normal = area.CalculateNormal();
+        Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
+        float horizontalMagnitude = std::sqrt(
+            horizontalProjection.X * horizontalProjection.X + horizontalProjection.Z * horizontalProjection.Z);
+        if (horizontalMagnitude == 0.0f) {
+            continue;
+        }
+        float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
+        float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
+        float cosineAngle = dotProduct / (normalMagnitude * horizontalMagnitude);
+        cosineAngle = std::clamp(cosineAngle, -1.0f, 1.0f);
+        float angleRadians = std::acos(cosineAngle);
+        float angleDegrees = angleRadians * 180.0f / M_PI;
+        if (angleDegrees >= 18.0f) {
+            area.m_area->m_usageFlags = NavPower::AreaUsageFlags::AREA_STEPS;
+        }
+    }
 }
 
 void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
@@ -156,8 +259,9 @@ void Navp::setSelectedNavpAreaIndex(int index) {
     }
     selectedNavpAreaIndex = index;
     if (index != -1 && index < navMesh->m_areas.size()) {
+        auto &selectedArea = navMesh->m_areas[index];
         Logger::log(NK_INFO, ("Selected area: " + std::to_string(index + 1)).c_str());
-        Vec3 pos = navMesh->m_areas[index].m_area->m_pos;
+        Vec3 pos = selectedArea.m_area->m_pos;
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
         std::string msg = "Area " + std::to_string(index + 1) + ": pos: (";
@@ -167,7 +271,7 @@ void Navp::setSelectedNavpAreaIndex(int index) {
         snprintf(v, sizeof(v), "%.2f", pos.Z);
         msg += ", " + std::string{v} + ") Edges: [";
         int edgeIndex = 0;
-        for (auto vertex: navMesh->m_areas[index].m_edges) {
+        for (auto vertex: selectedArea.m_edges) {
             msg += std::to_string(edgeIndex + 1) + ": (";
             snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
             msg += std::string{v};
@@ -178,6 +282,22 @@ void Navp::setSelectedNavpAreaIndex(int index) {
             edgeIndex++;
         }
         msg += "]";
+        Vec3 normal = selectedArea.CalculateNormal();
+        Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
+        float horizontalMagnitude = std::sqrt(
+            horizontalProjection.X * horizontalProjection.X + horizontalProjection.Z * horizontalProjection.Z);
+        float angleDegrees = 0;
+        if (horizontalMagnitude == 0.0f) {
+            angleDegrees = 90;
+        } else {
+            float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
+            float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
+            float cosineAngle = dotProduct / (normalMagnitude * horizontalMagnitude);
+            cosineAngle = std::clamp(cosineAngle, -1.0f, 1.0f);
+            float angleRadians = std::acos(cosineAngle);
+            angleDegrees = angleRadians * 180.0f / M_PI;
+        }
+        msg += " Angle: " + std::to_string(angleDegrees);
         Logger::log(NK_INFO, (msg).c_str());
     }
 }
@@ -194,19 +314,19 @@ void Navp::renderNavMesh() {
         Vec3 colorBlue = {.7f, .7f, 1.0};
         if (showNavpIndices) {
             areaIndex = 0;
-            Renderer& renderer = Renderer::getInstance();
+            Renderer &renderer = Renderer::getInstance();
             for (const NavPower::Area &area: navMesh->m_areas) {
                 renderer.drawText(std::to_string(areaIndex + 1), {
-                                       area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y
-                                   }, colorBlue);
+                                      area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y
+                                  }, colorBlue);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
                     for (auto vertex: area.m_edges) {
                         renderer.drawText(std::to_string(edgeIndex + 1),
-                                           {vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y},
-                                           vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
-                                               ? colorRed
-                                               : colorGreen);
+                                          {vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y},
+                                          vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
+                                              ? colorRed
+                                              : colorGreen);
                         edgeIndex++;
                     }
                 }
@@ -216,7 +336,7 @@ void Navp::renderNavMesh() {
     }
 }
 
-void Navp::renderNavMeshForHitTest() {
+void Navp::renderNavMeshForHitTest() const {
     if (!loading && showNavp) {
         int areaIndex = 0;
         for (const NavPower::Area &area: navMesh->m_areas) {
@@ -231,7 +351,7 @@ void Navp::renderNavMeshForHitTest() {
     }
 }
 
-void Navp::loadNavMeshFileData(Navp *navp, char *fileName) {
+void Navp::loadNavMeshFileData(char *fileName) {
     if (!std::filesystem::is_regular_file(fileName))
         throw std::runtime_error("Input path is not a regular file.");
 
@@ -251,24 +371,32 @@ void Navp::loadNavMeshFileData(Navp *navp, char *fileName) {
 
     s_FileStream.close();
 
-    navp->navMeshFileData = s_FileData;
+    getInstance().navMeshFileData = s_FileData;
 }
 
-void Navp::loadNavMesh(Navp *navp, char *fileName, bool isFromJson) {
+void Navp::loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
-    navp->loading = true;
+    Navp& navp = Navp::getInstance();
+    navp.loading = true;
     try {
         NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
-        std::swap(*navp->navMesh, newNavMesh);
+        std::swap(*navp.navMesh, newNavMesh);
+        if (isFromBuilding) {
+            navp.setStairsFlags();
+            OutputNavMesh_JSON_Write(navp.navMesh, "output.navp.json");
+            NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson("output.navp.json");
+            std::swap(*navp.navMesh, reloadedNavMesh);
+        }
         if (isFromJson) {
-            OutputNavMesh_NAVP_Write(navp->navMesh, navp->outputNavpFilename.data());
-            loadNavMeshFileData(navp, navp->outputNavpFilename.data());
+            navp.outputNavpFilename = "output.navp";
+            OutputNavMesh_NAVP_Write(navp.navMesh, navp.outputNavpFilename.data());
+            loadNavMeshFileData(navp.outputNavpFilename.data());
         } else {
-            loadNavMeshFileData(navp, fileName);
+            loadNavMeshFileData(fileName);
         }
     } catch (...) {
         msg = "Invalid Navp file: '";
@@ -284,30 +412,35 @@ void Navp::loadNavMesh(Navp *navp, char *fileName, bool isFromJson) {
     msg += std::to_string(duration.count());
     msg += " seconds";
     Logger::log(NK_INFO, msg.data());
-    navp->setSelectedNavpAreaIndex(-1);
-    navp->loading = false;
-    navp->navpLoaded = true;
-    navp->buildBinaryAreaToAreaMap();
+    navp.setSelectedNavpAreaIndex(-1);
+    navp.loading = false;
+    navp.navpLoaded = true;
+    navp.buildAreaMaps();
 }
 
-void Navp::buildNavp(Navp *navp) {
+void Navp::buildNavp() {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Building Navp at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
-    RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    Navp& navp = getInstance();
+    navp.updateExclusionBoxConvexVolumes();
+    navp.building = true;
     if (recastAdapter.handleBuild()) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        navp->navpBuildDone.push_back(true);
+        navp.navpBuildDone.push_back(true);
         msg = "Finished building Navp in ";
         msg += std::to_string(duration.count());
         msg += " seconds";
         Logger::log(NK_INFO, msg.data());
-        navp->setSelectedNavpAreaIndex(-1);
+        navp.setSelectedNavpAreaIndex(-1);
     } else {
         Logger::log(NK_ERROR, "Error building Navp");
+        navp.building = false;
+        navp.navpBuildDone.clear();
     }
 }
 
@@ -330,9 +463,9 @@ void Navp::setLastSaveFileName(const char *fileName) {
 }
 
 void Navp::drawMenu() {
-    Renderer& renderer = Renderer::getInstance();
-    Gui& gui = Gui::getInstance();
-    int navpMenuHeight = std::min(1200, renderer.height - 20);
+    Renderer &renderer = Renderer::getInstance();
+    Gui &gui = Gui::getInstance();
+    int navpMenuHeight = std::min(1222, renderer.height - 20);
     if (imguiBeginScrollArea("Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
                              &navpScroll))
         gui.mouseOverMenu = true;
@@ -340,6 +473,8 @@ void Navp::drawMenu() {
         showNavp = !showNavp;
     if (imguiCheck("Show Navp Indices", showNavpIndices))
         showNavpIndices = !showNavpIndices;
+    if (imguiCheck("Show Pathfinding Exclusion Boxes", showPfExclusionBoxes))
+        showPfExclusionBoxes = !showPfExclusionBoxes;
     imguiLabel("Load Navp from file");
     if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
         char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
@@ -354,7 +489,7 @@ void Navp::drawMenu() {
                 msg += fileName;
                 msg += "'...";
                 Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, this, lastLoadNavpFile.data(), true);
+                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), true, false);
                 loadNavMeshThread.detach();
             } else if (extension == "NAVP") {
                 navpLoaded = true;
@@ -362,7 +497,7 @@ void Navp::drawMenu() {
                 msg += fileName;
                 msg += "'...";
                 Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, this, lastLoadNavpFile.data(), false);
+                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), false, false);
                 loadNavMeshThread.detach();
             }
         }
@@ -385,7 +520,11 @@ void Navp::drawMenu() {
             if (extension == "JSON") {
                 OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
             } else if (extension == "NAVP") {
+                OutputNavMesh_JSON_Write(navMesh, "output.navp.json");
+                NavPower::NavMesh newNavMesh = LoadNavMeshFromJson("output.navp.json");
+                std::swap(*navMesh, newNavMesh);
                 OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
+                buildAreaMaps();
             }
             Logger::log(NK_INFO, "Done saving Navp.");
         }
@@ -395,10 +534,10 @@ void Navp::drawMenu() {
         gameConnection.SendNavp(navMesh);
         gameConnection.HandleMessages();
     }
-    RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-    Obj& obj = Obj::getInstance();
-    if (imguiButton("Build Navp from Obj", navpBuildDone.empty() && recastAdapter.inputGeom && obj.objLoaded)) {
-        std::thread buildNavpThread(&Navp::buildNavp, this);
+    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    Obj &obj = Obj::getInstance();
+    if (imguiButton("Build Navp from Obj", navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded)) {
+        std::thread buildNavpThread(&Navp::buildNavp);
         buildNavpThread.detach();
     }
     imguiSeparatorLine();
@@ -478,32 +617,35 @@ void Navp::drawMenu() {
         recastAdapter.resetCommonSettings();
         float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
         float bBoxSize[3] = {bBoxSizeX, bBoxSizeY, bBoxSizeZ};
-        obj.setBBox(bBoxPos, bBoxSize);
+        setBBox(bBoxPos, bBoxSize);
     }
 
     if (bboxChanged) {
         float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
         float bBoxSize[3] = {bBoxSizeX, bBoxSizeY, bBoxSizeZ};
-        obj.setBBox(bBoxPos, bBoxSize);
+        setBBox(bBoxPos, bBoxSize);
     }
     imguiEndScrollArea();
 }
 
-void Navp::buildBinaryAreaToAreaMap() {
+void Navp::buildAreaMaps() {
     binaryAreaToAreaMap.clear();
+    posToAreaMap.clear();
     for (NavPower::Area &area: navMesh->m_areas) {
         binaryAreaToAreaMap.emplace(area.m_area, &area);
+        posToAreaMap.emplace(area.m_area->m_pos, &area);
     }
 }
 
-void Navp::finalizeLoad() {
+void Navp::finalizeBuild() {
     if (!navpBuildDone.empty()) {
         navpLoaded = true;
-        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-        recastAdapter.save(outputNavpFilename.data());
-        std::thread loadNavMeshThread(&Navp::loadNavMesh, this, outputNavpFilename.data(), true);
+        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        outputNavpFilename = "output.navp.json";
+        recastAdapter.save(outputNavpFilename);
+        std::thread loadNavMeshThread(&Navp::loadNavMesh, outputNavpFilename.data(), true, true);
         loadNavMeshThread.detach();
         navpBuildDone.clear();
-        buildBinaryAreaToAreaMap();
+        building = false;
     }
 }

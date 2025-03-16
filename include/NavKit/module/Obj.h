@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+
 class Obj {
     explicit Obj();
 
@@ -22,8 +23,6 @@ public:
     std::string objToLoad;
     std::vector<bool> objLoadDone;
     int objScroll;
-    float bBoxPos[3];
-    float bBoxSize[3];
 
     static void loadObjMesh(Obj *obj);
 
@@ -32,8 +31,6 @@ public:
     void saveObjMesh(char *objToCopy, char *newFileName);
 
     void renderObj();
-
-    void setBBox(float *pos, float *size);
 
     char *openLoadObjFileDialog(char *lastObjFolder);
 

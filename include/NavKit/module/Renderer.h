@@ -2,6 +2,7 @@
 
 #include <SDL_syswm.h>
 #include "../../NavWeakness/Vec3.h"
+#include "../util/Math.h"
 class FTPixmapFont;
 
 enum HitTestType {
@@ -32,6 +33,8 @@ public:
     void initFrameBuffer(int width, int height);
 
     void drawText(const std::string &text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0);
+
+    void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined, Vec3 outlineColor, float alpha);
 
     bool initWindowAndRenderer();
 

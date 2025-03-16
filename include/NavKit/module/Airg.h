@@ -13,7 +13,7 @@ public:
 
     ~Airg();
 
-    static Airg& getInstance() {
+    static Airg &getInstance() {
         static Airg instance;
         return instance;
     }
@@ -30,7 +30,6 @@ public:
     std::vector<bool> visionDataBuildState;
     bool showAirg;
     bool showAirgIndices;
-    bool showGrid;
     float cellColorSource;
     ResourceConverter *airgResourceConverter;
     ResourceGenerator *airgResourceGenerator;
@@ -49,8 +48,6 @@ public:
 
     void finalizeBuildVisionAndDeadEndData();
 
-    void renderGrid(float gridSpacing, Vec3 color, float zOffset);
-
     void renderLayerIndices(int waypointIndex, bool selected);
 
     void renderCellBitmaps(int waypointIndex, bool selected);
@@ -64,8 +61,6 @@ public:
     void setSelectedAirgWaypointIndex(int index);
 
     void saveTolerance(float tolerance);
-
-    void saveSpacing(float spacing);
 
     void saveZSpacing(float zSpacing);
 
@@ -87,7 +82,6 @@ private:
     static void loadAirg(Airg *airg, char *fileName, bool isFromJson);
 
     float tolerance;
-    float spacing;
     float zSpacing;
     float zTolerance;
 };

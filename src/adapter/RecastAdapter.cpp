@@ -1,6 +1,9 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/RecastDemo/Sample_SoloMesh.h"
 #include "../../extern/vcpkg/packages/recastnavigation_x64-windows/include/recastnavigation/RecastDebugDraw.h"
+
+#include "../../include/NavKit/model/PfBoxes.h"
+#include "../../include/NavKit/util/Math.h"
 #include "../../include/RecastDemo/InputGeom.h"
 
 RecastAdapter::RecastAdapter() {
@@ -8,7 +11,7 @@ RecastAdapter::RecastAdapter() {
     sample = new Sample_SoloMesh();
     sample->setContext(buildContext);
     debugDraw = new DebugDrawGL();
-    inputGeom = nullptr;
+    inputGeom = new InputGeom();
 }
 
 void RecastAdapter::log(const int category, const std::string &message) const {
@@ -23,14 +26,7 @@ void RecastAdapter::drawInputGeom() const {
 }
 
 bool RecastAdapter::loadInputGeom(const std::string &fileName) {
-    delete inputGeom;
-    inputGeom = new InputGeom();
     return inputGeom->load(buildContext, fileName);
-}
-
-void RecastAdapter::resetInputGeom() {
-    delete inputGeom;
-    inputGeom = new InputGeom();
 }
 
 void RecastAdapter::setMeshBBox(const float *bBoxMin, const float *bBoxMax) const {
@@ -93,10 +89,94 @@ int RecastAdapter::getTriCount() const {
     return inputGeom->getMesh()->getTriCount();
 }
 
-int RecastAdapter::getLogCount() const{
+int RecastAdapter::getLogCount() const {
     return buildContext->getLogCount();
 }
 
 std::deque<std::string> &RecastAdapter::getLogBuffer() const {
     return buildContext->m_logBuffer;
+}
+
+void RecastAdapter::addConvexVolume(PfBoxes::PfBox &pfBox) {
+    float verts[4 * 3];
+    verts[0] = -pfBox.size.x / 2;
+    verts[1] = -pfBox.size.y / 2;
+    verts[2] = -pfBox.size.z / 2;
+    verts[3] = pfBox.size.x / 2;
+    verts[4] = -pfBox.size.y / 2;
+    verts[5] = -pfBox.size.z / 2;
+    verts[6] = pfBox.size.x / 2;
+    verts[7] = pfBox.size.y / 2;
+    verts[8] = -pfBox.size.z / 2;
+    verts[9] = -pfBox.size.x / 2;
+    verts[10] = pfBox.size.y / 2;
+    verts[11] = -pfBox.size.z / 2;
+    Vec3 rotated = Math::rotatePoint(
+        {verts[0], verts[1], verts[2]},
+        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
+        );
+    verts[0] = rotated.X;
+    verts[1] = rotated.Y;
+    verts[2] = rotated.Z;
+    rotated = Math::rotatePoint(
+        {verts[3], verts[4], verts[5]},
+        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
+        );
+    verts[3] = rotated.X;
+    verts[4] = rotated.Y;
+    verts[5] = rotated.Z;
+    rotated = Math::rotatePoint(
+        {verts[6], verts[7], verts[8]},
+        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
+        );
+    verts[6] = rotated.X;
+    verts[7] = rotated.Y;
+    verts[8] = rotated.Z;
+    rotated = Math::rotatePoint(
+        {verts[9], verts[10], verts[11]},
+        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
+        );
+    verts[9] = rotated.X;
+    verts[10] = rotated.Y;
+    verts[11] = rotated.Z;
+
+    verts[0] += pfBox.pos.x;
+    verts[1] += pfBox.pos.y;
+    verts[2] += pfBox.pos.z;
+    verts[3] += pfBox.pos.x;
+    verts[4] += pfBox.pos.y;
+    verts[5] += pfBox.pos.z;
+    verts[6] += pfBox.pos.x;
+    verts[7] += pfBox.pos.y;
+    verts[8] += pfBox.pos.z;
+    verts[9] += pfBox.pos.x;
+    verts[10] += pfBox.pos.y;
+    verts[11] += pfBox.pos.z;
+
+    for (int i = 0; i < 4; i++) {
+        float recastY = verts[i * 3 + 2];
+        float recastZ = -verts[i * 3 + 1];
+        verts[i * 3 + 1] = recastY;
+        verts[i * 3 + 2] = recastZ;
+    }
+    inputGeom->addConvexVolume(verts,
+                               4,
+                               pfBox.pos.z - pfBox.size.z / 2 - 1.5,
+                               pfBox.pos.z + pfBox.size.z / 2,
+                               1); // areaType 1 is water
+}
+
+const ConvexVolume *RecastAdapter::getConvexVolumes() const {
+    return inputGeom->getConvexVolumes();
+}
+
+int RecastAdapter::getConvexVolumeCount() const {
+    return inputGeom->getConvexVolumeCount();
+}
+
+void RecastAdapter::clearConvexVolumes() const {
+    int count = inputGeom->getConvexVolumeCount();
+    for (int i = 0; i < count; i++) {
+        inputGeom->deleteConvexVolume(0);
+    }
 }

@@ -1,17 +1,17 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <vector>
-#include <filesystem>
 #include "../../../extern/simdjson/simdjson.h"
 
 namespace PfBoxes {
     class Vec3 {
     public:
-        Vec3() {
-        };
+        Vec3(): x(0), y(0), z(0) {
+        } ;
 
-        Vec3(float x, float y, float z) : x(x), y(y), z(z) {
+        Vec3(const float x, const float y, const float z) : x(x), y(y), z(z) {
         }
 
         float x;
@@ -23,8 +23,8 @@ namespace PfBoxes {
 
     class Rotation {
     public:
-        Rotation() {
-        };
+        Rotation(): x(0), y(0), z(0), w(0) {
+        } ;
         float x;
         float y;
         float z;
@@ -35,7 +35,7 @@ namespace PfBoxes {
 
     class PfBoxType {
     public:
-        PfBoxType() {
+        PfBoxType(): type(""), data("") {
         };
         std::string type;
         std::string data;
@@ -69,8 +69,7 @@ namespace PfBoxes {
 
     class HashAndEntity {
     public:
-        HashAndEntity() {
-        };
+        HashAndEntity() = default;
         std::string hash;
         Entity entity;
 
@@ -79,26 +78,32 @@ namespace PfBoxes {
 
     class PfBox {
     public:
-        PfBox() {
-        };
+        PfBox() = default;
 
-        PfBox(Vec3 pos, Vec3 size) : pos(pos), size(size) {
+        PfBox(const Vec3 pos, const Vec3 size) : pos(pos), size(size) {
         }
 
-        Vec3 pos;
-        Vec3 size;
+        PfBox(const Vec3 pos, const Vec3 size, const Rotation rotation) : pos(pos), size(size), rotation(rotation) {
+        }
+
+        Vec3 pos{};
+        Vec3 size{};
+        Rotation rotation{};
     };
 
     class PfBoxes {
     public:
-        PfBoxes() {
+        PfBoxes() : hashesAndEntities() {
         }
 
         static inline const std::string INCLUDE_TYPE = "PFBT_INCLUDE_MESH_COLLISION";
+        static inline const std::string EXCLUDE_TYPE = "PFBT_EXCLUDE_MESH_COLLISION";
 
         PfBoxes(const char *fileName);
 
-        PfBox getPathfindingBBox();
+        PfBox getPathfindingBBox() const;
+
+        std::vector<PfBox> getExclusionBoxes() const;
 
         std::vector<HashAndEntity> hashesAndEntities;
     };

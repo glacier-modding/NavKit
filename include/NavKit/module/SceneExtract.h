@@ -17,9 +17,12 @@ public:
 
     void finalizeExtract();
 
+    void finalizeObjBuild();
+
     std::string lastBlenderFile;
     std::string lastHitmanFolder;
     std::string lastOutputFolder;
+    bool glacier2ObjDebugLogsEnabled;
 
     void setHitmanFolder(const char *folderName);
 
@@ -33,15 +36,19 @@ private:
     int extractScroll;
     bool startedObjGeneration;
     std::vector<bool> extractionDone;
+    bool blenderObjGenerationDone;
+    bool blenderObjStarted;
+    bool buildDone2;
     std::string hitmanFolderName;
     bool hitmanSet;
     std::string outputFolderName;
     bool outputSet;
     bool errorExtracting;
+    bool alsoBuildObj;
     std::vector<HANDLE> handles;
     bool closing;
 
-    static void runCommand(SceneExtract *sceneExtract, std::string command, std::string logFileName);
+    static void runCommand(SceneExtract *sceneExtract, std::string command, std::string logFileName, bool extracting);
 
     char *openSetBlenderFileDialog(char *lastBlenderFile);
 
@@ -51,5 +58,5 @@ private:
 
     void extractScene(char *hitmanFolder, char *outputFolder);
 
-    void generateObj(char *blenderPath, char *outputFolder);
+    void buildObj(char *blenderPath, char *outputFolder);
 };

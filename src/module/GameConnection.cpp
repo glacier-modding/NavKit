@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "../../include/NavKit/module/GameConnection.h"
 #include <iomanip>
 #include <sstream>
@@ -79,7 +80,7 @@ void GameConnection::SendNavp(NavPower::NavMesh *navMesh) {
     }
 }
 
-void GameConnection::SendChunk(const std::vector<NavPower::Area>& areas, int chunkIndex, int chunkCount) const {
+void GameConnection::SendChunk(const std::vector<NavPower::Area> &areas, int chunkIndex, int chunkCount) const {
     std::stringstream m;
     m << std::fixed << std::setprecision(3);
     m << "{\"type\":\"loadNavp\",\"chunkCount\":";

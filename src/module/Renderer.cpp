@@ -1,16 +1,20 @@
 #include <FTGL/ftgl.h>
+#include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/NavKitConfig.h"
+#include "../../include/RecastDemo/imguiRenderGL.h"
 #include <SDL.h>
 #include <GL/glew.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include <SDL_opengl.h>
+
+#include "../../include/NavKit/util/Math.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
 
 HWND Renderer::hwnd = nullptr;
@@ -25,8 +29,8 @@ Renderer::Renderer() {
     frameRate = 60.0f;
     window = 0;
 
-    cameraEulers[0] = 45.0, cameraEulers[1] = 45.0;
-    cameraPos[0] = -15, cameraPos[1] = 18, cameraPos[2] = 15;
+    cameraEulers[0] = 45.0, cameraEulers[1] = -45.0;
+    cameraPos[0] = 10, cameraPos[1] = 15, cameraPos[2] = 10;
     camr = 1000;
     origCameraEulers[0] = 0, origCameraEulers[1] = 0; // Used to compute rotational changes across frames.
     prevFrameTime = 0;
@@ -90,6 +94,148 @@ void Renderer::drawText(const std::string &text, const Vec3 pos, const Vec3 colo
     font->FaceSize(fontSize);
     glRasterPos3f(pos.X, pos.Y, pos.Z);
     font->Render(text.c_str());
+}
+
+void Renderer::drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
+                       Vec3 outlineColor, float alpha) {
+    // Bottom face
+    Vec3 rotated1 = rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
+    Vec3 rotated2 = rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
+    Vec3 rotated3 = rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
+    Vec3 rotated4 = rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
+    if (filled) {
+        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
+        glBegin(GL_POLYGON);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    if (outlined) {
+        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    // Top face
+    rotated1 = rotatePoint({- size.X / 2, - size.Y / 2, + size.Z / 2}, rotation);
+    rotated2 = rotatePoint({- size.X / 2, + size.Y / 2, + size.Z / 2}, rotation);
+    rotated3 = rotatePoint({+ size.X / 2, + size.Y / 2, + size.Z / 2}, rotation);
+    rotated4 = rotatePoint({+ size.X / 2, - size.Y / 2, + size.Z / 2}, rotation);
+    if (filled) {
+        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
+        glBegin(GL_POLYGON);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    if (outlined) {
+        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    // Left face
+    rotated1 = rotatePoint({- size.X / 2, - size.Y / 2, - size.Z / 2}, rotation);
+    rotated2 = rotatePoint({- size.X / 2, - size.Y / 2, + size.Z / 2}, rotation);
+    rotated3 = rotatePoint({- size.X / 2, + size.Y / 2, + size.Z / 2}, rotation);
+    rotated4 = rotatePoint({- size.X / 2, + size.Y / 2, - size.Z / 2}, rotation);
+    if (filled) {
+        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
+        glBegin(GL_POLYGON);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    if (outlined) {
+        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    // Right face
+    rotated1 = rotatePoint({+ size.X / 2, - size.Y / 2, - size.Z / 2}, rotation);
+    rotated2 = rotatePoint({+ size.X / 2, - size.Y / 2, + size.Z / 2}, rotation);
+    rotated3 = rotatePoint({+ size.X / 2, + size.Y / 2, + size.Z / 2}, rotation);
+    rotated4 = rotatePoint({+ size.X / 2, + size.Y / 2, - size.Z / 2}, rotation);
+    if (filled) {
+        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
+        glBegin(GL_POLYGON);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    if (outlined) {
+        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    // Front face
+    rotated1 = rotatePoint({- size.X / 2, - size.Y / 2, - size.Z / 2}, rotation);
+    rotated2 = rotatePoint({- size.X / 2, - size.Y / 2, + size.Z / 2}, rotation);
+    rotated3 = rotatePoint({+ size.X / 2, - size.Y / 2, + size.Z / 2}, rotation);
+    rotated4 = rotatePoint({+ size.X / 2, - size.Y / 2, - size.Z / 2}, rotation);
+    if (filled) {
+        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
+        glBegin(GL_POLYGON);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    if (outlined) {
+        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    // Back face
+    rotated1 = rotatePoint({- size.X / 2, + size.Y / 2, - size.Z / 2}, rotation);
+    rotated2 = rotatePoint({- size.X / 2, + size.Y / 2, + size.Z / 2}, rotation);
+    rotated3 = rotatePoint({+ size.X / 2, + size.Y / 2, + size.Z / 2}, rotation);
+    rotated4 = rotatePoint({+ size.X / 2, + size.Y / 2, - size.Z / 2}, rotation);
+    if (filled) {
+        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
+        glBegin(GL_POLYGON);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
+    if (outlined) {
+        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
+        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
+        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
+        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
+        glEnd();
+    }
 }
 
 bool Renderer::initWindowAndRenderer() {
@@ -222,8 +368,15 @@ void Renderer::renderFrame() {
     InputHandler::getInstance().handleMovement(dt, modelviewMatrix);
 
     glFrontFace(GL_CW);
+    Grid grid = Grid::getInstance();
+    if (grid.showGrid) {
+        grid.renderGrid();
+    }
     if (Navp &navp = Navp::getInstance(); navp.navpLoaded && navp.showNavp) {
         navp.renderNavMesh();
+    }
+    if (Navp &navp = Navp::getInstance(); navp.showPfExclusionBoxes) {
+        navp.renderExclusionBoxes();
     }
     if (Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showAirg) {
         airg.renderAirg();
@@ -255,9 +408,9 @@ void drawLine(const Vec3 s, const Vec3 e, const Vec3 color = {-1, -1, -1}) {
 
 void Renderer::drawBounds() const {
     glDepthMask(GL_FALSE);
-    Obj &obj = Obj::getInstance();
-    float *p = obj.bBoxPos;
-    float *s = obj.bBoxSize;
+    Navp& navp = Navp::getInstance();
+    float *p = navp.bBoxPos;
+    float *s = navp.bBoxSize;
     float l = p[0] - s[0] / 2;
     float r = p[0] + s[0] / 2;
     float u = p[2] + s[2] / 2;

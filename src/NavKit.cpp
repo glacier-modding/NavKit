@@ -70,7 +70,8 @@ int SDL_main(const int argc, char **argv) {
                 gui.drawGui();
 
                 sceneExtract.finalizeExtract();
-                navp.finalizeLoad();
+                sceneExtract.finalizeObjBuild();
+                navp.finalizeBuild();
                 obj.finalizeLoad();
                 airg.finalizeLoad();
                 airg.finalizeSave();

@@ -3,6 +3,12 @@
 #include <mutex>
 #include <string>
 
+struct ConvexVolume;
+
+namespace PfBoxes {
+    class PfBox;
+}
+
 class Sample;
 class BuildContext;
 class InputGeom;
@@ -22,8 +28,6 @@ public:
     void drawInputGeom() const;
 
     [[nodiscard]] bool loadInputGeom(const std::string & fileName);
-
-    void resetInputGeom();
 
     void setMeshBBox(const float * bBoxMin, const float * bBoxMax) const;
     [[nodiscard]] const float* getBBoxMin() const;
@@ -49,6 +53,14 @@ public:
     [[nodiscard]] int getLogCount() const;
 
     std::deque<std::string> &getLogBuffer() const;
+
+    void addConvexVolume(PfBoxes::PfBox &pfBox);
+
+    [[nodiscard]] const ConvexVolume *getConvexVolumes() const;
+
+    int getConvexVolumeCount() const;
+
+    void clearConvexVolumes() const;
 
     Sample *sample;
     BuildContext *buildContext;

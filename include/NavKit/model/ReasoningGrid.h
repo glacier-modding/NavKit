@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include "../../NavWeakness/NavPower.h"
 #include "../../../extern/simdjson/simdjson.h"
+#include "../../NavWeakness/NavPower.h"
 
 class Vec4 {
 public:
@@ -41,7 +41,8 @@ public:
 
 class Waypoint {
 public:
-    Waypoint() : nNeighbors{65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535}, vPos({}), nVisionDataOffset(0), nLayerIndex(0), cellBitmap{false}, xi(-1), yi(-1),
+    Waypoint() : nNeighbors{65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535}, vPos({}), nVisionDataOffset(0),
+                 nLayerIndex(0), cellBitmap{false}, xi(-1), yi(-1),
                  zi(-1) {
     }
 

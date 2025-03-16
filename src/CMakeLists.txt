@@ -32,8 +32,12 @@ add_executable (NavKit
   module/Renderer.cpp
   module/SceneExtract.cpp
   module/Settings.cpp
+  util/ErrorHandler.cpp
   util/FileUtil.cpp
   util/ErrorHandler.cpp
+  util/Math.cpp
+  module/Grid.cpp
+  ../include/NavKit/module/Grid.h
 )
 target_include_directories(NavKit PUBLIC "${PROJECT_BINARY_DIR}")
 target_include_directories(NavKit PRIVATE ${SIMPLEINI_INCLUDE_DIRS})

@@ -591,7 +591,7 @@ bool Sample_SoloMesh::handleBuild()
 			}
 			else if (m_pmesh->areas[i] == SAMPLE_POLYAREA_WATER)
 			{
-				m_pmesh->flags[i] = SAMPLE_POLYFLAGS_SWIM;
+				m_pmesh->flags[i] = SAMPLE_POLYFLAGS_DISABLED;//SAMPLE_POLYFLAGS_SWIM;
 			}
 			else if (m_pmesh->areas[i] == SAMPLE_POLYAREA_DOOR)
 			{

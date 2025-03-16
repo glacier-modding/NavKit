@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "../../include/NavKit/module/Airg.h"
 
 #include <filesystem>
@@ -6,10 +7,10 @@
 
 #include <SDL.h>
 #include <GL/glew.h>
-#include <GL/glu.h>
 #include <GL/glut.h>
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/VisionData.h"
+#include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
@@ -32,13 +33,11 @@ Airg::Airg() {
     connectWaypointModeEnabled = false;
     showAirg = true;
     showAirgIndices = false;
-    showGrid = false;
     cellColorSource = 0.0f;
     airgScroll = 0;
     airgResourceConverter = HM3_GetConverterForResource("AIRG");;
     airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
     reasoningGrid = new ReasoningGrid();
-    spacing = 2.25;
     zSpacing = 1;
     tolerance = 0.3;
     zTolerance = 1.0;
@@ -50,7 +49,10 @@ Airg::~Airg() {
 }
 
 void Airg::resetDefaults() {
-    spacing = 2.25;
+    Grid& grid = Grid::getInstance();
+    grid.spacing = 2.25;
+    grid.xOffset = 0;
+    grid.yOffset = 0;
     zSpacing = 1;
     tolerance = 0.3;
     zTolerance = 1.0;
@@ -72,17 +74,18 @@ void Airg::setLastSaveFileName(const char *fileName) {
 }
 
 void Airg::drawMenu() {
-    Renderer& renderer = Renderer::getInstance();
-    Gui& gui = Gui::getInstance();
-    if (imguiBeginScrollArea("Airg menu", renderer.width - 250 - 10, renderer.height - 10 - 390, 250,
-                             390, &airgScroll))
+    Renderer &renderer = Renderer::getInstance();
+    Gui &gui = Gui::getInstance();
+    Grid& grid = Grid::getInstance();
+    if (imguiBeginScrollArea("Airg menu", renderer.width - 250 - 10, renderer.height - 10 - 417, 250,
+                             417, &airgScroll))
         gui.mouseOverMenu = true;
     if (imguiCheck("Show Airg", showAirg))
         showAirg = !showAirg;
     if (imguiCheck("Show Airg Indices", showAirgIndices))
         showAirgIndices = !showAirgIndices;
-    if (imguiCheck("Show Grid", showGrid))
-        showGrid = !showGrid;
+    if (imguiCheck("Show Grid", grid.showGrid))
+        grid.showGrid = !grid.showGrid;
     imguiLabel("Cell color data source");
     imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
 
@@ -135,27 +138,31 @@ void Airg::drawMenu() {
             saveAirgThread.detach();
         }
     }
-    float lastSpacing = spacing;
-    if (imguiSlider("Spacing", &spacing, 0.1f, 4.0f, 0.05f)) {
-        if (lastSpacing != spacing) {
-            saveSpacing(spacing);
-            lastSpacing = spacing;
-            Logger::log(NK_INFO, ("Setting spacing to: " + std::to_string(spacing)).c_str());
+    float lastSpacing = grid.spacing;
+    if (imguiSlider("Spacing", &grid.spacing, 0.1f, 4.0f, 0.05f)) {
+        if (lastSpacing != grid.spacing) {
+            grid.saveSpacing(grid.spacing);
+            Logger::log(NK_INFO, ("Setting spacing to: " + std::to_string(grid.spacing)).c_str());
         }
+    }
+    Navp &navp = Navp::getInstance();
+
+    if (imguiButton("Load grid bounds from Navp", navp.navpLoaded && airgLoadState.empty() && airgSaveState.empty())) {
+        Logger::log(NK_INFO, "Loading Airg grid bounds from Navp");
+        grid.loadBoundsFromNavp();
     }
     if (imguiButton("Reset Defaults")) {
         Logger::log(NK_INFO, "Resetting Airg Default settings");
         resetDefaults();
     }
-    Navp& navp = Navp::getInstance();
     if (imguiButton("Build Airg from Navp",
-                    (navp.navpLoaded && airgLoadState.empty() && airgSaveState.empty()))) {
+                    navp.navpLoaded && airgLoadState.empty() && airgSaveState.empty())) {
         airgLoaded = false;
         delete reasoningGrid;
         reasoningGrid = new ReasoningGrid();
         std::string msg = "Building Airg from Navp";
         Logger::log(NK_INFO, msg.data());
-        std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navp.navMesh, spacing,
+        std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navp.navMesh, grid.spacing,
                                     zSpacing, tolerance, zTolerance);
         buildAirgThread.detach();
     }
@@ -177,6 +184,7 @@ void Airg::drawMenu() {
 void Airg::finalizeLoad() {
     if (airgLoadState.size() == 2) {
         airgLoadState.clear();
+        Grid::getInstance().loadBoundsFromAirg();
         airgLoaded = true;
     }
 }
@@ -196,11 +204,6 @@ void Airg::finalizeBuildVisionAndDeadEndData() {
 void Airg::saveTolerance(float newTolerance) {
     Settings::setValue("Airg", "tolerance", std::to_string(newTolerance).c_str());
     tolerance = newTolerance;
-}
-
-void Airg::saveSpacing(float newSpacing) {
-    Settings::setValue("Airg", "spacing", std::to_string(newSpacing).c_str());
-    spacing = newSpacing;
 }
 
 void Airg::saveZSpacing(float newZSpacing) {
@@ -292,38 +295,6 @@ int visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
         offset2 = reasoningGrid->m_pVisibilityData.size();
     }
     return offset2 - offset1;
-}
-
-void Airg::renderGrid(float gridSpacing, Vec3 color, float zOffset = 0.0) {
-    float minX = reasoningGrid->m_Properties.vMin.x;
-    float minY = reasoningGrid->m_Properties.vMin.y;
-    int yi = -1, xi = -1;
-    glColor4f(color.X, color.Y, color.Z, 0.6);
-    float z = 0;
-    Renderer& renderer = Renderer::getInstance();
-    //Vec3 camPos{ navKit->renderer->cameraPos[0], navKit->renderer->cameraPos[1], navKit->renderer->cameraPos[2] };
-    for (float x = minX; x < reasoningGrid->m_Properties.vMax.x; x += gridSpacing) {
-        xi++;
-        yi = -1;
-        for (float y = minY; y < reasoningGrid->m_Properties.vMax.y; y += gridSpacing) {
-            yi++;
-            //Vec3 pos{ x, y, z };
-            //float distance = camPos.DistanceTo(pos);
-            //if (distance > 100) {
-            //	continue;
-            //}
-            glBegin(GL_LINE_LOOP);
-            glVertex3f(x + gridSpacing, z + 0.02 - zOffset, -y);
-            glVertex3f(x + gridSpacing, z + 0.02 - zOffset, -(y + gridSpacing));
-            glVertex3f(x, z + 0.02 - zOffset, -(y + gridSpacing));
-            glVertex3f(x, z + 0.02 - zOffset, -y);
-            glEnd();
-            Vec3 textCoords{x + gridSpacing / 2.0f, z + 0.02f - zOffset, -(y + gridSpacing / 2.0f)};
-            int cellIndex = xi + yi * (reasoningGrid->m_Properties.nGridWidth);
-            std::string cellText = std::to_string(xi) + ", " + std::to_string(yi) + " = " + std::to_string(cellIndex);
-            renderer.drawText(cellText, textCoords, color);
-        }
-    }
 }
 
 // Render Layer Index
@@ -454,18 +425,9 @@ void Airg::renderVisionData(int waypointIndex, bool selected) {
 }
 
 void Airg::renderAirg() {
-    float gridZOffset = 0;
-    if (selectedWaypointIndex != -1) {
-        if (selectedWaypointIndex >= reasoningGrid->m_WaypointList.size()) {
-            selectedWaypointIndex = -1;
-        } else {
-            const Waypoint &selectedWaypoint = reasoningGrid->m_WaypointList[selectedWaypointIndex];
-            gridZOffset = -selectedWaypoint.vPos.z;
-        }
-    } else {
-        gridZOffset = reasoningGrid->m_Properties.vMin.z;
+    if (selectedWaypointIndex >= reasoningGrid->m_WaypointList.size()) {
+        selectedWaypointIndex = -1;
     }
-
     int numWaypoints = reasoningGrid->m_WaypointList.size();
     for (size_t i = 0; i < numWaypoints; i++) {
         const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
@@ -497,16 +459,13 @@ void Airg::renderAirg() {
             }
         }
     }
-    Renderer& renderer = Renderer::getInstance();
+    Renderer &renderer = Renderer::getInstance();
     if (showAirgIndices) {
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
             renderer.drawText(std::to_string(i), {waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y},
-                                       {1, .7f, .7f});
+                              {1, .7f, .7f});
         }
-    }
-    if (showGrid) {
-        renderGrid(reasoningGrid->m_Properties.fGridSpacing, {0.6, 0.6, 0.6}, gridZOffset);
     }
 }
 
@@ -630,7 +589,7 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
         airg->airgResourceConverter->FromResourceFileToJsonFile(fileName, jsonFileName.data());
     }
     airg->reasoningGrid->readJson(jsonFileName.data());
-    airg->saveSpacing(airg->reasoningGrid->m_Properties.fGridSpacing);
+    Grid::getInstance().saveSpacing(airg->reasoningGrid->m_Properties.fGridSpacing);
     if (!isFromJson) {
         std::filesystem::remove(jsonFileName);
     }

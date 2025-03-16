@@ -33,11 +33,21 @@ INT_PTR CALLBACK ErrorHandler::ErrorDialogHandler(HWND hwndDlg, UINT uMsg, WPARA
                 return TRUE;
             }
             return FALSE;
+        case WM_CLOSE:
+            EndDialog(hwndDlg, IDOK);
+            return TRUE;
         default: return FALSE;
     }
 }
 
 void ErrorHandler::openErrorDialog(const std::string &message) {
-    errorMessage = new std::string(message);
+    std::string formattedMessage = message;
+
+    size_t pos = 0;
+    while ((pos = formattedMessage.find('\n', pos)) != std::string::npos) {
+        formattedMessage.replace(pos, 1, "\r\n");
+        pos += 2;
+    }
+    errorMessage = new std::string(formattedMessage);
     DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, ErrorDialogHandler, 0);
 }

@@ -23,16 +23,6 @@ Obj::Obj() {
     objToLoad = "";
     loadObj = false;
     objScroll = 0;
-    bBoxPos[0] = 0;
-    bBoxPos[1] = 0;
-    bBoxPos[2] = 0;
-    bBoxSize[0] = 600;
-    bBoxSize[1] = 600;
-    bBoxSize[2] = 600;
-    Logger::log(NK_INFO,
-                ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " +
-                 std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxSize[0]) + ", " + std::to_string(bBoxSize[1]) +
-                 ", " + std::to_string(bBoxSize[2]) + ")").c_str());
 }
 
 void Obj::copyObjFile(const std::string &from, const std::string &to) {
@@ -44,15 +34,16 @@ void Obj::copyObjFile(const std::string &from, const std::string &to) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
     Obj &obj = getInstance();
+    Navp &navp = Navp::getInstance();
     std::string navKitObjProperties = "";
     navKitObjProperties += "# NavKit OBJ Properties:\n";
     navKitObjProperties += "#![BBox]\n";
-    navKitObjProperties += "#!x = " + std::to_string(obj.bBoxPos[0]) + "\n";
-    navKitObjProperties += "#!y = " + std::to_string(obj.bBoxPos[1]) + "\n";
-    navKitObjProperties += "#!z = " + std::to_string(obj.bBoxPos[2]) + "\n";
-    navKitObjProperties += "#!sx = " + std::to_string(obj.bBoxSize[0]) + "\n";
-    navKitObjProperties += "#!sy = " + std::to_string(obj.bBoxSize[1]) + "\n";
-    navKitObjProperties += "#!sz = " + std::to_string(obj.bBoxSize[2]) + "\n";
+    navKitObjProperties += "#!x = " + std::to_string(navp.bBoxPos[0]) + "\n";
+    navKitObjProperties += "#!y = " + std::to_string(navp.bBoxPos[1]) + "\n";
+    navKitObjProperties += "#!z = " + std::to_string(navp.bBoxPos[2]) + "\n";
+    navKitObjProperties += "#!sx = " + std::to_string(navp.bBoxSize[0]) + "\n";
+    navKitObjProperties += "#!sy = " + std::to_string(navp.bBoxSize[1]) + "\n";
+    navKitObjProperties += "#!sz = " + std::to_string(navp.bBoxSize[2]) + "\n";
     std::ifstream inputFile(from);
     if (!inputFile.is_open()) {
         Logger::log(NK_ERROR, ("Error opening obj file for reading: " + from).c_str());
@@ -118,6 +109,7 @@ void Obj::loadObjMesh(Obj *obj) {
 
     std::vector<std::string> lines;
     std::string line;
+    Navp& navp = Navp::getInstance();
     if (std::getline(inputFile, line)) {
         if (line.find("NavKit") != std::string::npos) {
             std::getline(inputFile, line); // Get the BBox line
@@ -150,30 +142,30 @@ void Obj::loadObjMesh(Obj *obj) {
                 }
             }
             if (!error) {
-                obj->bBoxPos[0] = floatValues[0];
-                obj->bBoxPos[1] = floatValues[1];
-                obj->bBoxPos[2] = floatValues[2];
-                obj->bBoxSize[0] = floatValues[3];
-                obj->bBoxSize[1] = floatValues[4];
-                obj->bBoxSize[2] = floatValues[5];
+                navp.bBoxPos[0] = floatValues[0];
+                navp.bBoxPos[1] = floatValues[1];
+                navp.bBoxPos[2] = floatValues[2];
+                navp.bBoxSize[0] = floatValues[3];
+                navp.bBoxSize[1] = floatValues[4];
+                navp.bBoxSize[2] = floatValues[5];
             }
         }
     }
     inputFile.close();
-
-    if (RecastAdapter::getInstance().loadInputGeom(obj->objToLoad)) {
+    RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+    if (recastAdapter.loadInputGeom(obj->objToLoad)) {
         if (obj->objLoadDone.empty()) {
             float pos[3] = {
-                obj->bBoxPos[0],
-                obj->bBoxPos[1],
-                obj->bBoxPos[2]
+                navp.bBoxPos[0],
+                navp.bBoxPos[1],
+                navp.bBoxPos[2]
             };
             float size[3] = {
-                obj->bBoxSize[0],
-                obj->bBoxSize[1],
-                obj->bBoxSize[2]
+                navp.bBoxSize[0],
+                navp.bBoxSize[1],
+                navp.bBoxSize[2]
             };
-            obj->setBBox(pos, size);
+            navp.setBBox(pos, size);
             obj->objLoadDone.push_back(true);
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -186,45 +178,6 @@ void Obj::loadObjMesh(Obj *obj) {
         Logger::log(NK_ERROR, "Error loading obj.");
     }
     obj->objToLoad.clear();
-}
-
-void Obj::setBBox(float *pos, float *size) {
-    Navp &navp = Navp::getInstance();
-    bBoxPos[0] = pos[0];
-    navp.bBoxPosX = pos[0];
-    bBoxPos[1] = pos[1];
-    navp.bBoxPosY = pos[1];
-    bBoxPos[2] = pos[2];
-    navp.bBoxPosZ = pos[2];
-    bBoxSize[0] = size[0];
-    navp.bBoxSizeX = size[0];
-    bBoxSize[1] = size[1];
-    navp.bBoxSizeY = size[1];
-    bBoxSize[2] = size[2];
-    navp.bBoxSizeZ = size[2];
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    const float bBoxMin[3] = {
-        bBoxPos[0] - bBoxSize[0] / 2,
-        bBoxPos[1] - bBoxSize[1] / 2,
-        bBoxPos[2] - bBoxSize[2] / 2
-    };
-    const float bBoxMax[3] = {
-        bBoxPos[0] + bBoxSize[0] / 2,
-        bBoxPos[1] + bBoxSize[1] / 2,
-        bBoxPos[2] + bBoxSize[2] / 2
-    };
-    recastAdapter.setMeshBBox(bBoxMin, bBoxMax);
-    Logger::log(NK_INFO,
-                ("Setting bbox to (" + std::to_string(pos[0]) + ", " + std::to_string(pos[1]) + ", " +
-                 std::to_string(pos[2]) + ") (" + std::to_string(size[0]) + ", " + std::to_string(size[1]) + ", " +
-                 std::to_string(size[2]) + ")").c_str());
-    Settings::setValue("BBox", "x", std::to_string(pos[0]));
-    Settings::setValue("BBox", "y", std::to_string(pos[1]));
-    Settings::setValue("BBox", "z", std::to_string(pos[2]));
-    Settings::setValue("BBox", "sx", std::to_string(size[0]));
-    Settings::setValue("BBox", "sy", std::to_string(size[1]));
-    Settings::setValue("BBox", "sz", std::to_string(size[2]));
-    Settings::save();
 }
 
 void Obj::renderObj() {
@@ -263,8 +216,9 @@ void Obj::drawMenu() {
     Gui &gui = Gui::getInstance();
     Renderer &renderer = Renderer::getInstance();
     if (imguiBeginScrollArea("Obj menu", renderer.width - 250 - 10,
-                             renderer.height - 10 - 205 - 5 - 390, 250, 205, &objScroll))
+                             renderer.height - 10 - 205 - 5 - 417, 250, 205, &objScroll)) {
         gui.mouseOverMenu = true;
+    }
     if (imguiCheck("Show Obj", showObj))
         showObj = !showObj;
     imguiLabel("Load Obj file");
@@ -319,10 +273,11 @@ void Obj::finalizeLoad() {
     }
 
     if (!objLoadDone.empty()) {
+        objLoaded = true;
         RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         if (recastAdapter.inputGeom) {
             recastAdapter.handleMeshChanged();
-            objLoaded = true;
+            Navp::getInstance().updateExclusionBoxConvexVolumes();
         }
         objLoadDone.clear();
     }

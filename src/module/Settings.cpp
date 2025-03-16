@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
@@ -36,7 +37,7 @@ void Settings::Load() {
             static_cast<float>(atof(ini.GetValue("BBox", "sy", "100.0f"))),
             static_cast<float>(atof(ini.GetValue("BBox", "sz", "100.0f")))
         };
-        obj.setBBox(bBoxPos, bBoxSize);
+        navp.setBBox(bBoxPos, bBoxSize);
         navp.setLastLoadFileName(ini.GetValue("Paths", "loadnavp", "default"));
         const char *fileName = ini.GetValue("Paths", "savenavp", "default");
         if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
@@ -52,7 +53,8 @@ void Settings::Load() {
         if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
             obj.setLastSaveFileName(fileName);
         }
-        airg.saveSpacing(static_cast<float>(atof(ini.GetValue("Airg", "spacing", "2.0f"))));
+        Grid& grid = Grid::getInstance();
+        grid.saveSpacing(static_cast<float>(atof(ini.GetValue("Airg", "spacing", "2.0f"))));
         airg.saveTolerance(static_cast<float>(atof(ini.GetValue("Airg", "tolerance", "0.2f"))));
         airg.saveZSpacing(static_cast<float>(atof(ini.GetValue("Airg", "ySpacing", "1.0f"))));
         airg.saveZTolerance(static_cast<float>(atof(ini.GetValue("Airg", "zTolerance", "1.0f"))));
