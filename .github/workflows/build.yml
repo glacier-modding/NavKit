@@ -44,12 +44,14 @@ jobs:
       - name: Copy debug artifacts
         run: |
           mkdir _dist-debug
+          Copy-Item build/x64-debug/src/* -Destination _dist-debug/ -Recurse
           Remove-Item -Path _dist-debug/cmake_install.cmake -Force -Recurse -ErrorAction SilentlyContinue
           Remove-Item -Path _dist-debug/CMakeFiles -Force -Recurse -ErrorAction SilentlyContinue
 
       - name: Copy release artifacts
         run: |
           mkdir _dist-release
+          Copy-Item build/x64-release/src/* -Destination _dist-release/ -Recurse
           Remove-Item -Path _dist-release/cmake_install.cmake -Force -Recurse -ErrorAction SilentlyContinue
           Remove-Item -Path _dist-release/CMakeFiles -Force -Recurse -ErrorAction SilentlyContinue
 

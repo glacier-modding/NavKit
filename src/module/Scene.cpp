@@ -121,7 +121,7 @@ void Scene::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
 
-    if (imguiBeginScrollArea("Scene menu", renderer.width - 250 - 10,
+    if (imguiBeginScrollArea("NavKit Scene menu", renderer.width - 250 - 10,
                              renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - SCENE_MENU_HEIGHT - 5, 250,
                              SCENE_MENU_HEIGHT, &sceneScroll)) {
         gui.mouseOverMenu = true;
@@ -152,11 +152,11 @@ void Scene::drawMenu() {
             loadSceneThread.detach();
         }
     }
-    imguiLabel("Save Scene to file");
+    imguiLabel("Save NavKit Scene to file");
     if (imguiButton(saveSceneName.c_str(), sceneLoaded)) {
         if (char *fileName = openSaveSceneFileDialog(lastLoadSceneFile.data())) {
             setLastSaveFileName(fileName);
-            std::string msg = "Saving Scene file: '";
+            std::string msg = "Saving NavKit Scene file: '";
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());

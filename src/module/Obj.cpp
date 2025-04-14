@@ -309,7 +309,7 @@ void Obj::drawMenu() {
         }
     }
     SceneExtract &sceneExtract = SceneExtract::getInstance();
-    if (Scene &scene = Scene::getInstance(); imguiButton("Build obj from Nav.json",
+    if (Scene &scene = Scene::getInstance(); imguiButton("Build obj from NavKit Scene",
                                                          sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
                                                          sceneExtract.extractingAlocs && !blenderObjStarted && !
                                                          blenderObjGenerationDone)) {

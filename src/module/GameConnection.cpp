@@ -83,10 +83,14 @@ int GameConnection::listAlocEntities() const {
     f << R"({"alocs":[)";
     bool done = false;
     bool isFirst = true;
+    int messagesReceived = 0;
     while (!done) {
         ws->poll();
         ws->dispatch([&](const std::string &message) {
-            Logger::log(NK_INFO, ("Received message: " + message).c_str());
+            messagesReceived++;
+            if (messagesReceived % 100 == 0) {
+                Logger::log(NK_INFO, ("Aloc entities found: " + std::to_string(messagesReceived)).c_str());
+            }
             if (message == "Done sending entities.") {
                 done = true;
                 return;
@@ -121,10 +125,14 @@ int GameConnection::listPfBoxEntities() const {
     std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
     bool done = false;
     bool isFirst = true;
+    int messagesReceived = 0;
     while (!done) {
         ws->poll();
         ws->dispatch([&](const std::string &message) {
-            Logger::log(NK_INFO, ("Received message: " + message).c_str());
+            messagesReceived++;
+            if (messagesReceived % 100 == 0) {
+                Logger::log(NK_INFO, ("PF Boxes found: " + std::to_string(messagesReceived)).c_str());
+            }
             if (message == "Done sending entities.") {
                 done = true;
                 return;
@@ -159,10 +167,14 @@ int GameConnection::listPfSeedPointEntities() const {
     std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
     bool done = false;
     bool isFirst = true;
+    int messagesReceived = 0;
     while (!done) {
         ws->poll();
         ws->dispatch([&](const std::string &message) {
-            Logger::log(NK_INFO, ("Received message: " + message).c_str());
+            messagesReceived++;
+            if (messagesReceived % 100 == 0) {
+                Logger::log(NK_INFO, ("PF Seed points found: " + std::to_string(messagesReceived)).c_str());
+            }
             if (message == "Done sending entities.") {
                 done = true;
                 return;
