@@ -2,11 +2,13 @@
 
 class Gui {
     explicit Gui();
+
 public:
-    static Gui& getInstance() {
+    static Gui &getInstance() {
         static Gui instance;
         return instance;
     }
+
     void drawGui();
 
     bool mouseOverMenu;

@@ -150,7 +150,7 @@ namespace Math {
     }
 
     // Quaternion multiplication
-    Quaternion quaternionMultiply(const Quaternion& q1, const Quaternion& q2) {
+    Quaternion quaternionMultiply(const Quaternion &q1, const Quaternion &q2) {
         Quaternion result{};
         result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
         result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
@@ -160,7 +160,7 @@ namespace Math {
     }
 
     // Quaternion inverse
-    Quaternion quaternionInverse(const Quaternion& q) {
+    Quaternion quaternionInverse(const Quaternion &q) {
         float normSq = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
         Quaternion result{};
         result.w = q.w / normSq;
@@ -171,10 +171,11 @@ namespace Math {
     }
 
     // Rotate a point with a quaternion
-    Vec3 rotatePoint(const Vec3& point, const Quaternion& quaternion) {
-        Quaternion pointQuat = { point.X, point.Y, point.Z, 0 };
-        Quaternion rotatedPointQuat = quaternionMultiply(quaternion, quaternionMultiply(pointQuat, quaternionInverse(quaternion)));
-        Vec3 rotatedPoint = { rotatedPointQuat.x, rotatedPointQuat.y, rotatedPointQuat.z };
+    Vec3 rotatePoint(const Vec3 &point, const Quaternion &quaternion) {
+        Quaternion pointQuat = {point.X, point.Y, point.Z, 0};
+        Quaternion rotatedPointQuat = quaternionMultiply(
+            quaternion, quaternionMultiply(pointQuat, quaternionInverse(quaternion)));
+        Vec3 rotatedPoint = {rotatedPointQuat.x, rotatedPointQuat.y, rotatedPointQuat.z};
         return rotatedPoint;
     }
 }

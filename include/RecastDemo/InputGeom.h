@@ -78,7 +78,7 @@ class InputGeom
 	
 	/// @name Off-Mesh connections.
 	///@{
-	static const int MAX_OFFMESH_CONNECTIONS = 256;
+	static const int MAX_OFFMESH_CONNECTIONS = 1024;
 	float m_offMeshConVerts[MAX_OFFMESH_CONNECTIONS*3*2];
 	float m_offMeshConRads[MAX_OFFMESH_CONNECTIONS];
 	unsigned char m_offMeshConDirs[MAX_OFFMESH_CONNECTIONS];
@@ -90,7 +90,7 @@ class InputGeom
 
 	/// @name Convex Volumes.
 	///@{
-	static const int MAX_VOLUMES = 256;
+	static const int MAX_VOLUMES = 1024;
 	ConvexVolume m_volumes[MAX_VOLUMES];
 	int m_volumeCount;
 	///@}
@@ -114,7 +114,7 @@ public:
 	const float* getNavMeshBoundsMax() const { return m_hasBuildSettings ? m_buildSettings.navMeshBMax : m_meshBMax; }
 	const rcChunkyTriMesh* getChunkyMesh() const { return m_chunkyMesh; }
 	const BuildSettings* getBuildSettings() const { return m_hasBuildSettings ? &m_buildSettings : 0; }
-	bool raycastMesh(float* src, float* dst, float& tmin);
+	int raycastMesh(float* src, float* dst, float& tmin);
 
 	/// @name Off-Mesh connections.
 	///@{

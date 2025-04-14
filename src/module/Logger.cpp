@@ -3,20 +3,27 @@
 #include "../../include/RecastDemo/SampleInterfaces.h"
 
 Logger::Logger() {
-    logQueue = new rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>();
+    logQueue = new rsj::ConcurrentQueue<std::pair<LogCategory, std::string> >();
 }
 
 [[noreturn]] void Logger::logRunner() {
-    BuildContext *buildContext = RecastAdapter::getInstance().buildContext;
-    if (buildContext == nullptr) {
+    if (const BuildContext *buildContext = RecastAdapter::getInstance().buildContext; buildContext == nullptr) {
         throw std::exception("Logger not initialized.");
     }
-    Logger &logger = getInstance();
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const Logger &logger = getInstance();
+    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     while (true) {
         if (std::optional<std::pair<LogCategory, std::string> > message = logger.logQueue->try_pop(); message.
             has_value()) {
-            recastAdapter.log(static_cast<int>(message.value().first), message.value().second);
+            std::string msg;
+            if (message.value().first == RC_LOG_ERROR) {
+                msg = "[ERROR] ";
+            }
+            if (message.value().first == RC_LOG_WARNING) {
+                msg = "[WARN] ";
+            }
+            msg += message.value().second;
+            recastAdapter.log(message.value().first, msg);
         }
     }
 }

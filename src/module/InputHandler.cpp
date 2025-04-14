@@ -1,7 +1,9 @@
+#include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/RecastDemo/imgui.h"
 
@@ -28,10 +30,11 @@ int InputHandler::handleInput() {
     // Handle input events.
     SDL_Event event;
     mouseScroll = 0;
-    const Gui& gui = Gui::getInstance();
-    Renderer& renderer = Renderer::getInstance();
-    Airg& airg = Airg::getInstance();
-    Navp& navp = Navp::getInstance();
+    const Gui &gui = Gui::getInstance();
+    Renderer &renderer = Renderer::getInstance();
+    Airg &airg = Airg::getInstance();
+    Navp &navp = Navp::getInstance();
+    Obj &obj = Obj::getInstance();
     bool done = false;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -88,7 +91,10 @@ int InputHandler::handleInput() {
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
                     if (!gui.mouseOverMenu) {
                         navp.doNavpHitTest = true;
+                        navp.doNavpExclusionBoxHitTest = true;
+                        navp.doNavpPfSeedPointHitTest = true;
                         airg.doAirgHitTest = true;
+                        obj.doObjHitTest = true;
                     }
                 }
 
@@ -135,8 +141,7 @@ int InputHandler::handleInput() {
     return 0;
 }
 
-void InputHandler::handleMovement(float dt, double* modelviewMatrix) {
-
+void InputHandler::handleMovement(float dt, double *modelviewMatrix) {
     // Handle keyboard movement.
     const Uint8 *keyState = SDL_GetKeyboardState(nullptr);
     moveFront = std::clamp(
@@ -161,7 +166,7 @@ void InputHandler::handleMovement(float dt, double* modelviewMatrix) {
     float movey = (moveBack - moveFront) * keybSpeed * dt + scrollZoom * 2.0f;
     scrollZoom = 0;
 
-    Renderer& renderer = Renderer::getInstance();
+    Renderer &renderer = Renderer::getInstance();
     renderer.cameraPos[0] += movex * static_cast<float>(modelviewMatrix[0]);
     renderer.cameraPos[1] += movex * static_cast<float>(modelviewMatrix[4]);
     renderer.cameraPos[2] += movex * static_cast<float>(modelviewMatrix[8]);
@@ -175,13 +180,18 @@ void InputHandler::handleMovement(float dt, double* modelviewMatrix) {
 
 
 void InputHandler::hitTest() {
-    Gui& gui = Gui::getInstance();
-    Navp& navp = Navp::getInstance();
-    Airg& airg = Airg::getInstance();
-    Renderer& renderer = Renderer::getInstance();
+    Gui &gui = Gui::getInstance();
+    Navp &navp = Navp::getInstance();
+    Airg &airg = Airg::getInstance();
+    Obj &obj = Obj::getInstance();
+    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    Renderer &renderer = Renderer::getInstance();
     if (!gui.mouseOverMenu) {
         if ((navp.doNavpHitTest && navp.navpLoaded && navp.showNavp) ||
-            (airg.doAirgHitTest && airg.airgLoaded && airg.showAirg)) {
+            (navp.doNavpExclusionBoxHitTest && navp.showPfExclusionBoxes) ||
+            (navp.doNavpPfSeedPointHitTest && navp.showPfSeedPoints) ||
+            (airg.doAirgHitTest && airg.airgLoaded && airg.showAirg) ||
+            (obj.doObjHitTest && obj.objLoaded && obj.showObj)) {
             HitTestResult hitTestResult = renderer.hitTestRender(mousePos[0], mousePos[1]);
             if (hitTestResult.type == HitTestType::NAVMESH_AREA) {
                 if (hitTestResult.selectedIndex == navp.selectedNavpAreaIndex) {
@@ -195,19 +205,36 @@ void InputHandler::hitTest() {
                     airg.connectWaypointModeEnabled = false;
                 } else {
                     if (airg.connectWaypointModeEnabled) {
-                        airg.
-                                connectWaypoints(airg.selectedWaypointIndex, hitTestResult.selectedIndex);
+                        airg.connectWaypoints(airg.selectedWaypointIndex, hitTestResult.selectedIndex);
                     } else {
                         airg.setSelectedAirgWaypointIndex(hitTestResult.selectedIndex);
                     }
                     airg.connectWaypointModeEnabled = false;
                 }
+            } else if (hitTestResult.type == HitTestType::PF_SEED_POINT) {
+                if (hitTestResult.selectedIndex == navp.selectedPfSeedPointIndex) {
+                    navp.setSelectedPfSeedPointIndex(-1);
+                } else {
+                    navp.setSelectedPfSeedPointIndex(hitTestResult.selectedIndex);
+                }
+            } else if (hitTestResult.type == HitTestType::PF_EXCLUSION_BOX) {
+                if (hitTestResult.selectedIndex == navp.selectedExclusionBoxIndex) {
+                    navp.setSelectedExclusionBoxIndex(-1);
+                } else {
+                    navp.setSelectedExclusionBoxIndex(hitTestResult.selectedIndex);
+                }
             } else {
                 navp.setSelectedNavpAreaIndex(-1);
                 airg.setSelectedAirgWaypointIndex(-1);
+                if (obj.showObj && obj.objLoaded) {
+                    recastAdapter.doHitTest(mousePos[0], mousePos[1]);
+                }
             }
             navp.doNavpHitTest = false;
+            navp.doNavpExclusionBoxHitTest = false;
+            navp.doNavpPfSeedPointHitTest = false;
             airg.doAirgHitTest = false;
+            obj.doObjHitTest = false;
         }
     }
 }

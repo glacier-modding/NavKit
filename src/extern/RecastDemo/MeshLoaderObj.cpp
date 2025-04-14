@@ -20,7 +20,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
+#include <map>
 #include <math.h>
+
+#include "../../../include/NavKit/module/Obj.h"
 
 rcMeshLoaderObj::rcMeshLoaderObj() :
 	m_scale(1.0f),
@@ -180,7 +183,8 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 	int nv;
 	int vcap = 0;
 	int tcap = 0;
-	
+	std::string objectName;
+	Obj& obj = Obj::getInstance();
 	while (src < srcEnd)
 	{
 		// Parse one row
@@ -188,12 +192,23 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 		src = parseRow(src, srcEnd, row, sizeof(row)/sizeof(char));
 		// Skip comments
 		if (row[0] == '#') continue;
+		if (row[0] == 'o')
+		{
+			if (strlen(row) >= 2) {
+				const char* startPtr = &row[2];
+				std::string myString(startPtr);
+				objectName = myString;
+				obj.objectTriangleRanges[objectName] = {m_triCount, m_triCount};
+			}
+		}
+
 		if (row[0] == 'v' && row[1] != 'n' && row[1] != 't')
 		{
 			// Vertex pos
 			sscanf(row+1, "%f %f %f", &x, &y, &z);
 			addVertex(x, y, z, vcap);
 		}
+
 		if (row[0] == 'f')
 		{
 			// Faces
@@ -205,7 +220,11 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 				const int c = face[i];
 				if (a < 0 || a >= m_vertCount || b < 0 || b >= m_vertCount || c < 0 || c >= m_vertCount)
 					continue;
+				if (!obj.objectTriangleRanges.contains(objectName)) {
+					obj.objectTriangleRanges[objectName] = {m_triCount, m_triCount};
+				}
 				addTriangle(a, b, c, tcap);
+				obj.objectTriangleRanges[objectName].second = m_triCount;
 			}
 		}
 	}

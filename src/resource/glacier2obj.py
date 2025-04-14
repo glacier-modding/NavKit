@@ -1026,22 +1026,37 @@ def link_new_object(aloc_name, context):
 
 def collidable_layer(collision_layer):
     excluded_collision_layer_types = [
-        # PhysicsCollisionLayerType.SHOT_ONLY_COLLISION,
-        # PhysicsCollisionLayerType.ACTOR_DYN_BODY,
-        # PhysicsCollisionLayerType.ACTOR_PROXY,
-        # PhysicsCollisionLayerType.ACTOR_RAGDOLL,
-        # PhysicsCollisionLayerType.AI_VISION_BLOCKER,
-        # PhysicsCollisionLayerType.AI_VISION_BLOCKER_AMBIENT_ONLY,
-        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_OFF,
+        # PhysicsCollisionLayerType.COLLIDE_WITH_ALL,
+        # PhysicsCollisionLayerType.STATIC_COLLIDABLES_ONLY,
         # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY,
-        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER,
-        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER_TRANSPARENT,
+        # PhysicsCollisionLayerType.STAIRS,
+        # PhysicsCollisionLayerType.SHOT_ONLY_COLLISION,
         # PhysicsCollisionLayerType.DYNAMIC_TRASH_COLLIDABLES,
+        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY,
+        # PhysicsCollisionLayerType.STATIC_COLLIDABLES_ONLY_TRANSPARENT,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_TRANSPARENT,
+        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY_TRANSPARENT,
+        # PhysicsCollisionLayerType.STAIRS_STEPS,
+        # PhysicsCollisionLayerType.STAIRS_SLOPE,
+        # PhysicsCollisionLayerType.HERO_PROXY,
+        # PhysicsCollisionLayerType.ACTOR_PROXY,
+        # PhysicsCollisionLayerType.HERO_VR,
+        # PhysicsCollisionLayerType.CLIP,
+        # PhysicsCollisionLayerType.ACTOR_RAGDOLL,
+        # PhysicsCollisionLayerType.CROWD_RAGDOLL,
+        # PhysicsCollisionLayerType.LEDGE_ANCHOR,
+        # PhysicsCollisionLayerType.ACTOR_DYN_BODY,
         # PhysicsCollisionLayerType.HERO_DYN_BODY,
         # PhysicsCollisionLayerType.ITEMS,
-        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY,
-        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY_TRANSPARENT,
-        # PhysicsCollisionLayerType.WEAPONS
+        # PhysicsCollisionLayerType.WEAPONS,
+        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_ON,
+        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_OFF,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER_TRANSPARENT,
+        # PhysicsCollisionLayerType.COLLIDE_WITH_STATIC_ONLY,
+        # PhysicsCollisionLayerType.AI_VISION_BLOCKER,
+        # PhysicsCollisionLayerType.AI_VISION_BLOCKER_AMBIENT_ONLY,
+        # PhysicsCollisionLayerType.UNUSED_LAST
     ]
     return collision_layer not in excluded_collision_layer_types
 
@@ -1264,11 +1279,11 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     return aloc.collision_type, objects
 
 
-def load_scenario(context, collection, path_to_alocs_json):
+def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
-    log("INFO", "Alocs file: " + path_to_alocs_json, "load_scenario")
-    f = open(path_to_alocs_json, "r")
+    log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
+    f = open(path_to_nav_json, "r")
     data = json.loads(f.read())
     f.close()
     transforms = {}
@@ -1281,7 +1296,7 @@ def load_scenario(context, collection, path_to_alocs_json):
         if aloc_hash not in transforms:
             transforms[aloc_hash] = []
         transforms[aloc_hash].append(transform)
-    alocs_json_dir = os.path.dirname(path_to_alocs_json)
+    alocs_json_dir = os.path.dirname(path_to_output_obj_file)
 
     path_to_aloc_dir = "%s\\%s" % (alocs_json_dir, "aloc")
     log("INFO", "Path to aloc dir:" + path_to_aloc_dir, "load_scenario")
@@ -1384,7 +1399,7 @@ def main():
     )
     bpy.context.scene.collection.children.link(collection)
 
-    scenario = load_scenario(bpy.context, collection, scene_path)
+    scenario = load_scenario(bpy.context, collection, scene_path, output_path)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1

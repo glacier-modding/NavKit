@@ -1,16 +1,22 @@
+#define NOMINMAX
+
 #include "../../include/NavKit/module/Obj.h"
 
 #include <filesystem>
 #include <fstream>
 #include <thread>
 
+#include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Gui.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/Settings.h"
+#include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavWeakness/NavPower.h"
 #include "../../include/RecastDemo/imgui.h"
 
 Obj::Obj() {
@@ -23,6 +29,132 @@ Obj::Obj() {
     objToLoad = "";
     loadObj = false;
     objScroll = 0;
+    lastBlenderFile = R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")";
+    blenderName = "Choose Blender app";
+    blenderSet = false;
+    startedObjGeneration = false;
+    glacier2ObjDebugLogsEnabled = false;
+    blenderObjStarted = false;
+    blenderObjGenerationDone = false;
+    errorBuilding = false;
+    doObjHitTest = false;
+}
+
+const int Obj::OBJ_MENU_HEIGHT = 194;
+
+void Obj::setBlenderFile(const char *fileName) {
+    if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+        blenderSet = true;
+        lastBlenderFile = fileName;
+        blenderName = fileName;
+        blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
+        Logger::log(NK_INFO, ("Setting Blender exe to: " + lastBlenderFile).c_str());
+        Settings::setValue("Paths", "blender", fileName);
+        Settings::save();
+    } else {
+        Logger::log(NK_WARN, ("Could not find Blender exe: " + lastBlenderFile).c_str());
+    }
+}
+
+void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
+    std::string fileName = sceneExtract.lastOutputFolder + "\\outputNavp.obj";
+
+    Logger::log(NK_INFO, ("Building obj from loaded navp. Saving to: " + fileName).c_str());
+    Navp &navp = Navp::getInstance();
+    std::vector<Vec3> vertices;
+    std::vector<std::vector<int> > faces;
+    std::map<Vec3, int> pointsToIndexMap;
+    int pointCount = 1;
+    for (const auto &[m_area, m_edges]: navp.navMesh->m_areas) {
+        std::vector<int> face;
+        for (auto edge: m_edges) {
+            auto point = edge->m_pos;
+            if (!pointsToIndexMap.contains(point)) {
+                vertices.push_back(point);
+                pointsToIndexMap[point] = pointCount++;
+            }
+            face.push_back(pointsToIndexMap[point]);
+        }
+        faces.push_back(face);
+    }
+    std::ofstream f(fileName);
+    f.clear();
+    for (auto v: vertices) {
+        f << "v " << v.X << " " << v.Z << " " << -v.Y << "\n";
+    }
+    for (auto face: faces) {
+        f << "f ";
+        for (auto vi: face) {
+            f << vi;
+            if (vi != face.back()) {
+                f << " ";
+            }
+        }
+        f << "\n";
+    }
+    f.close();
+    Logger::log(NK_INFO, "Done Building obj from loaded navp.");
+    if (alsoLoadIntoUi) {
+        Obj &obj = getInstance();
+        obj.generatedObjName = "outputNavp.obj";
+        obj.objLoaded = false;
+        obj.blenderObjGenerationDone = true;
+        obj.loadObj = true;
+    }
+}
+
+void Obj::buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder) {
+    startedObjGeneration = true;
+    Logger::log(NK_INFO, "Generating obj from nav.json file.");
+    std::string command = "\"";
+    command += blenderPath;
+    command += "\" -b --factory-startup -P glacier2obj.py -- \""; //--debug-all
+    command += sceneFilePath;
+    command += "\" \"";
+    command += outputFolder;
+    command += "\\output.obj\"";
+    if (glacier2ObjDebugLogsEnabled) {
+        command += " True";
+    }
+    blenderObjStarted = true;
+    generatedObjName = "output.obj";
+
+    std::thread commandThread(CommandRunner::runCommand, command, "Glacier2ObjBlender.log", [this] {
+        Logger::log(NK_INFO, "Finished generating obj from nav.json file.");
+        objLoaded = false;
+        blenderObjGenerationDone = true;
+    }, [this] {
+        objLoaded = false;
+        errorBuilding = true;
+    });
+    commandThread.detach();
+}
+
+char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
+    nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
+    return FileUtil::openNfdLoadDialog(filters, 1, lastBlenderFile);
+}
+
+void Obj::finalizeObjBuild() {
+    if (blenderObjGenerationDone) {
+        Obj &obj = getInstance();
+        startedObjGeneration = false;
+        const SceneExtract &sceneExtract = SceneExtract::getInstance();
+        obj.objToLoad = sceneExtract.lastOutputFolder;
+        obj.objToLoad += "\\" + generatedObjName;
+        obj.loadObj = true;
+        obj.lastObjFileName = sceneExtract.lastOutputFolder;
+        obj.lastObjFileName += generatedObjName;
+        blenderObjStarted = false;
+        blenderObjGenerationDone = false;
+    }
+    if (errorBuilding) {
+        errorBuilding = false;
+        startedObjGeneration = false;
+        blenderObjStarted = false;
+        blenderObjGenerationDone = false;
+    }
 }
 
 void Obj::copyObjFile(const std::string &from, const std::string &to) {
@@ -31,19 +163,7 @@ void Obj::copyObjFile(const std::string &from, const std::string &to) {
         return;
     }
     auto start = std::chrono::high_resolution_clock::now();
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-    Obj &obj = getInstance();
-    Navp &navp = Navp::getInstance();
-    std::string navKitObjProperties = "";
-    navKitObjProperties += "# NavKit OBJ Properties:\n";
-    navKitObjProperties += "#![BBox]\n";
-    navKitObjProperties += "#!x = " + std::to_string(navp.bBoxPos[0]) + "\n";
-    navKitObjProperties += "#!y = " + std::to_string(navp.bBoxPos[1]) + "\n";
-    navKitObjProperties += "#!z = " + std::to_string(navp.bBoxPos[2]) + "\n";
-    navKitObjProperties += "#!sx = " + std::to_string(navp.bBoxSize[0]) + "\n";
-    navKitObjProperties += "#!sy = " + std::to_string(navp.bBoxSize[1]) + "\n";
-    navKitObjProperties += "#!sz = " + std::to_string(navp.bBoxSize[2]) + "\n";
     std::ifstream inputFile(from);
     if (!inputFile.is_open()) {
         Logger::log(NK_ERROR, ("Error opening obj file for reading: " + from).c_str());
@@ -54,21 +174,11 @@ void Obj::copyObjFile(const std::string &from, const std::string &to) {
         Logger::log(NK_ERROR, ("Error opening file for writing: " + to).c_str());
         return;
     }
-    outputFile << navKitObjProperties << std::endl;
 
     std::vector<std::string> lines;
     std::string line;
     if (std::getline(inputFile, line)) {
-        if (line.find("NavKit") != std::string::npos) {
-            // Input obj already has NavKit OBJ Properties. Override them with the latest from NavKit
-            for (int i = 0; i < 8; i++) {
-                if (!std::getline(inputFile, line)) {
-                    break;
-                }
-            }
-        } else {
-            outputFile << line << std::endl;
-        }
+        outputFile << line << std::endl;
     }
 
     while (std::getline(inputFile, line)) {
@@ -109,64 +219,22 @@ void Obj::loadObjMesh(Obj *obj) {
 
     std::vector<std::string> lines;
     std::string line;
-    Navp& navp = Navp::getInstance();
-    if (std::getline(inputFile, line)) {
-        if (line.find("NavKit") != std::string::npos) {
-            std::getline(inputFile, line); // Get the BBox line
-            float floatValues[6]{0, 0, 0, 100, 100, 100};
-            bool error = false;
-            for (int i = 0; i < 6; i++) {
-                std::getline(inputFile, line);
-                std::stringstream ss(line);
-                std::string propertyName;
-                if (getline(ss, propertyName, '=')) {
-                    std::string value;
-                    if (getline(ss, value)) {
-                        try {
-                            floatValues[i] = stof(value);
-                        } catch (const std::invalid_argument &e) {
-                            Logger::log(NK_ERROR,
-                                        ("Error converting value to float for property " + propertyName + ": " + e.
-                                         what()).c_str());
-                            error = true;
-                            break;
-                        }
-                        catch (const std::out_of_range &e) {
-                            Logger::log(NK_ERROR,
-                                        ("Value out of range for float for property " + propertyName + ": " + e.
-                                         what()).c_str());
-                            error = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (!error) {
-                navp.bBoxPos[0] = floatValues[0];
-                navp.bBoxPos[1] = floatValues[1];
-                navp.bBoxPos[2] = floatValues[2];
-                navp.bBoxSize[0] = floatValues[3];
-                navp.bBoxSize[1] = floatValues[4];
-                navp.bBoxSize[2] = floatValues[5];
-            }
-        }
-    }
-    inputFile.close();
-    RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     if (recastAdapter.loadInputGeom(obj->objToLoad)) {
         if (obj->objLoadDone.empty()) {
+            obj->objLoadDone.push_back(true);
+            Navp &navp = Navp::getInstance();
             float pos[3] = {
                 navp.bBoxPos[0],
                 navp.bBoxPos[1],
                 navp.bBoxPos[2]
             };
             float size[3] = {
-                navp.bBoxSize[0],
-                navp.bBoxSize[1],
-                navp.bBoxSize[2]
+                navp.bBoxScale[0],
+                navp.bBoxScale[1],
+                navp.bBoxScale[2]
             };
             navp.setBBox(pos, size);
-            obj->objLoadDone.push_back(true);
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
             msg = "Finished loading Obj in ";
@@ -184,7 +252,7 @@ void Obj::renderObj() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
-char *Obj::openLoadObjFileDialog(char *lastObjFolder) {
+char *Obj::openLoadObjFileDialog(const char *lastObjFolder) {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
     return FileUtil::openNfdLoadDialog(filters, 1, lastObjFolder);
 }
@@ -200,27 +268,26 @@ void Obj::setLastLoadFileName(const char *fileName) {
         loadObjName = fileName;
         lastObjFileName = loadObjName;
         loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
-        Settings::setValue("Paths", "loadobj", fileName);
-        Settings::save();
     }
 }
 
 void Obj::setLastSaveFileName(const char *fileName) {
     lastSaveObjFileName = fileName;
     loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
-    Settings::setValue("Paths", "saveobj", fileName);
-    Settings::save();
 }
 
 void Obj::drawMenu() {
     Gui &gui = Gui::getInstance();
     Renderer &renderer = Renderer::getInstance();
     if (imguiBeginScrollArea("Obj menu", renderer.width - 250 - 10,
-                             renderer.height - 10 - 205 - 5 - 417, 250, 205, &objScroll)) {
+                             renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
+                             SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - OBJ_MENU_HEIGHT - 15, 250, OBJ_MENU_HEIGHT,
+                             &objScroll)) {
         gui.mouseOverMenu = true;
     }
     if (imguiCheck("Show Obj", showObj))
         showObj = !showObj;
+
     imguiLabel("Load Obj file");
     if (imguiButton(loadObjName.c_str(), objToLoad.empty())) {
         char *fileName = openLoadObjFileDialog(loadObjName.data());
@@ -241,28 +308,31 @@ void Obj::drawMenu() {
             saveObjName = loadObjName;
         }
     }
-    imguiSeparatorLine();
-    char polyText[64];
-    char voxelText[64];
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    if (recastAdapter.inputGeom && objToLoad.empty() && objLoaded) {
-        snprintf(polyText, 64, "Verts: %.1fk  Tris: %.1fk",
-                 recastAdapter.getVertCount() / 1000.0f,
-                 recastAdapter.getTriCount() / 1000.0f);
-        std::pair<int, int> gridSize = recastAdapter.getGridSize();
-        snprintf(voxelText, 64, "Voxels: %d x %d", gridSize.first, gridSize.second);
-    } else {
-        snprintf(polyText, 64, "Verts: 0  Tris: 0");
-        snprintf(voxelText, 64, "Voxels: 0 x 0");
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
+    if (Scene &scene = Scene::getInstance(); imguiButton("Build obj from Nav.json",
+                                                         sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
+                                                         sceneExtract.extractingAlocs && !blenderObjStarted && !
+                                                         blenderObjGenerationDone)) {
+        gui.showLog = true;
+        objLoaded = false;
+        buildObj(lastBlenderFile.data(), scene.lastLoadSceneFile.data(), sceneExtract.lastOutputFolder.data());
     }
-    imguiValue(polyText);
-    imguiValue(voxelText);
+    Navp &navp = Navp::getInstance();
+    if (imguiButton("Build obj from Navp",
+                    sceneExtract.outputSet && blenderSet && navp.navpLoaded)) {
+        gui.showLog = true;
+        buildObjFromNavp(true);
+    }
     imguiEndScrollArea();
 }
 
 void Obj::finalizeLoad() {
     if (loadObj) {
         lastObjFileName = objToLoad;
+        objectTriangleRanges.clear();
+        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        recastAdapter.selectedObject = "";
+        recastAdapter.markerPositionSet = false;
         std::string msg = "Loading Obj file: '";
         msg += objToLoad;
         msg += "'...";

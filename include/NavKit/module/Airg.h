@@ -23,11 +23,9 @@ public:
     std::string saveAirgName;
     std::string lastSaveAirgFile;
     bool airgLoaded;
-    bool buildingVisionAndDeadEndData;
+    bool airgLoading;
     bool connectWaypointModeEnabled;
-    std::vector<bool> airgLoadState;
     std::vector<bool> airgSaveState;
-    std::vector<bool> visionDataBuildState;
     bool showAirg;
     bool showAirgIndices;
     float cellColorSource;
@@ -37,16 +35,16 @@ public:
     int airgScroll;
     int selectedWaypointIndex;
     bool doAirgHitTest;
+    bool buildingVisionAndDeadEndData;
+    static const int AIRG_MENU_HEIGHT;
 
     void resetDefaults();
 
     void drawMenu();
 
-    void finalizeLoad();
-
     void finalizeSave();
 
-    void finalizeBuildVisionAndDeadEndData();
+    void build();
 
     void renderLayerIndices(int waypointIndex, bool selected);
 
@@ -60,28 +58,18 @@ public:
 
     void setSelectedAirgWaypointIndex(int index);
 
-    void saveTolerance(float tolerance);
-
-    void saveZSpacing(float zSpacing);
-
-    void saveZTolerance(float zTolerance);
-
-    void connectWaypoints(int startWaypointIndex, int endWaypointIndex);
+    void connectWaypoints(int startWaypointIndex, int endWaypointIndex) const;
 
     void setLastLoadFileName(const char *fileName);
 
     void setLastSaveFileName(const char *fileName);
 
 private:
-    char *openSaveAirgFileDialog(char *lastAirgFolder);
+    static char *openSaveAirgFileDialog(char *lastAirgFolder);
 
-    char *openAirgFileDialog(char *lastAirgFolder);
+    static char *openAirgFileDialog(const char *lastAirgFolder);
 
     static void saveAirg(Airg *airg, std::string fileName, bool isJson);
 
     static void loadAirg(Airg *airg, char *fileName, bool isFromJson);
-
-    float tolerance;
-    float zSpacing;
-    float zTolerance;
 };

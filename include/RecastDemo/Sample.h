@@ -98,7 +98,7 @@ struct SampleToolState {
 
 class Sample
 {
-protected:
+public:
 	class dtNavMesh* m_navMesh;
 	class dtNavMeshQuery* m_navQuery;
 	class dtCrowd* m_crowd;

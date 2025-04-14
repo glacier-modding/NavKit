@@ -2,8 +2,7 @@
 #include <string>
 #include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 
-enum LogCategory
-{
+enum LogCategory {
     NK_INFO = 1,
     NK_WARN,
     NK_ERROR
@@ -12,7 +11,7 @@ enum LogCategory
 class Logger {
     explicit Logger();
 
-    rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>* logQueue;
+    rsj::ConcurrentQueue<std::pair<LogCategory, std::string> > *logQueue;
 
 public:
     static Logger &getInstance() {

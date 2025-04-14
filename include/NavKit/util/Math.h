@@ -47,7 +47,9 @@ namespace Math {
 
     class Quaternion {
     public:
-        Quaternion() : x(0), y(0), z(0), w(0) {}
+        Quaternion() : x(0), y(0), z(0), w(0) {
+        }
+
         Quaternion(const float x, const float y, const float z, const float w) : x(x), y(y), z(z), w(w) {
         }
 

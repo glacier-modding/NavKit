@@ -14,7 +14,10 @@
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/RecastDemo/imgui.h"
@@ -29,7 +32,7 @@ Airg::Airg() {
     saveAirgName = "Save Airg";
     lastSaveAirgFile = saveAirgName;
     airgLoaded = false;
-    buildingVisionAndDeadEndData = false;
+    airgLoading = false;
     connectWaypointModeEnabled = false;
     showAirg = true;
     showAirgIndices = false;
@@ -38,30 +41,25 @@ Airg::Airg() {
     airgResourceConverter = HM3_GetConverterForResource("AIRG");;
     airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
     reasoningGrid = new ReasoningGrid();
-    zSpacing = 1;
-    tolerance = 0.3;
-    zTolerance = 1.0;
     doAirgHitTest = false;
     selectedWaypointIndex = -1;
 }
 
-Airg::~Airg() {
-}
+const int Airg::AIRG_MENU_HEIGHT = 429;
+
+Airg::~Airg() = default;
 
 void Airg::resetDefaults() {
-    Grid& grid = Grid::getInstance();
+    Grid &grid = Grid::getInstance();
     grid.spacing = 2.25;
     grid.xOffset = 0;
     grid.yOffset = 0;
-    zSpacing = 1;
-    tolerance = 0.3;
-    zTolerance = 1.0;
 }
 
 void Airg::setLastLoadFileName(const char *fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         airgName = fileName;
-        lastLoadAirgFile = airgName.data();
+        lastLoadAirgFile = airgName;
         airgLoaded = false;
         airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
     }
@@ -69,16 +67,22 @@ void Airg::setLastLoadFileName(const char *fileName) {
 
 void Airg::setLastSaveFileName(const char *fileName) {
     saveAirgName = fileName;
-    lastSaveAirgFile = saveAirgName.data();
+    lastSaveAirgFile = saveAirgName;
     saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
 }
 
 void Airg::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
-    Grid& grid = Grid::getInstance();
-    if (imguiBeginScrollArea("Airg menu", renderer.width - 250 - 10, renderer.height - 10 - 417, 250,
-                             417, &airgScroll))
+    Grid &grid = Grid::getInstance();
+    int airgMenuHeight = std::min(AIRG_MENU_HEIGHT,
+                                  renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
+                                  SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - Obj::OBJ_MENU_HEIGHT - 20 - 10);
+
+    if (imguiBeginScrollArea("Airg menu", renderer.width - 250 - 10,
+                             renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
+                             SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - Obj::OBJ_MENU_HEIGHT - airgMenuHeight - 20, 250,
+                             airgMenuHeight, &airgScroll))
         gui.mouseOverMenu = true;
     if (imguiCheck("Show Airg", showAirg))
         showAirg = !showAirg;
@@ -86,11 +90,9 @@ void Airg::drawMenu() {
         showAirgIndices = !showAirgIndices;
     if (imguiCheck("Show Grid", grid.showGrid))
         grid.showGrid = !grid.showGrid;
-    imguiLabel("Cell color data source");
-    imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
 
     imguiLabel("Load Airg from file");
-    if (imguiButton(airgName.c_str(), (airgLoadState.empty() && airgSaveState.empty()))) {
+    if (imguiButton(airgName.c_str(), (!airgLoading && airgSaveState.empty()))) {
         char *fileName = openAirgFileDialog(lastLoadAirgFile.data());
         if (fileName) {
             setLastLoadFileName(fileName);
@@ -138,6 +140,33 @@ void Airg::drawMenu() {
             saveAirgThread.detach();
         }
     }
+    Navp &navp = Navp::getInstance();
+
+    if (imguiButton("Build Airg from Navp",
+                    navp.navpLoaded && !airgLoading && airgSaveState.empty())) {
+        airgLoaded = false;
+        delete reasoningGrid;
+        reasoningGrid = new ReasoningGrid();
+        std::string msg = "Building Airg from Navp";
+        Logger::log(NK_INFO, msg.data());
+        build();
+    }
+    if (imguiButton("Load grid bounds from Navp", navp.navpLoaded && !airgLoading && airgSaveState.empty())) {
+        Logger::log(NK_INFO, "Loading Airg grid bounds from Navp");
+        grid.loadBoundsFromNavp();
+    }
+    if (imguiButton("Connect Waypoint", (airgLoaded && selectedWaypointIndex != -1 && !connectWaypointModeEnabled))) {
+        connectWaypointModeEnabled = true;
+        std::string msg = "Entering Connect Waypoint mode. Start waypoint: " + std::to_string(selectedWaypointIndex);
+        Logger::log(NK_INFO, msg.data());
+    }
+    char selectedWaypointText[64];
+    snprintf(selectedWaypointText, 64,
+             selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
+             selectedWaypointIndex);
+    imguiValue(selectedWaypointText);
+    imguiLabel("Cell color data source");
+    imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
     float lastSpacing = grid.spacing;
     if (imguiSlider("Spacing", &grid.spacing, 0.1f, 4.0f, 0.05f)) {
         if (lastSpacing != grid.spacing) {
@@ -145,48 +174,24 @@ void Airg::drawMenu() {
             Logger::log(NK_INFO, ("Setting spacing to: " + std::to_string(grid.spacing)).c_str());
         }
     }
-    Navp &navp = Navp::getInstance();
-
-    if (imguiButton("Load grid bounds from Navp", navp.navpLoaded && airgLoadState.empty() && airgSaveState.empty())) {
-        Logger::log(NK_INFO, "Loading Airg grid bounds from Navp");
-        grid.loadBoundsFromNavp();
+    float lastXOffset = grid.xOffset;
+    if (imguiSlider("X Offset", &grid.xOffset, -grid.spacing, grid.spacing, 0.05f)) {
+        if (lastXOffset != grid.xOffset) {
+            Logger::log(NK_INFO, ("Setting X offset to: " + std::to_string(grid.xOffset)).c_str());
+        }
+    }
+    float lastZOffset = grid.yOffset;
+    if (imguiSlider("Z Offset", &grid.yOffset, -grid.spacing, grid.spacing, 0.05f)) {
+        if (lastZOffset != grid.yOffset) {
+            Logger::log(NK_INFO, ("Setting Z offset to: " + std::to_string(grid.yOffset)).c_str());
+        }
     }
     if (imguiButton("Reset Defaults")) {
         Logger::log(NK_INFO, "Resetting Airg Default settings");
         resetDefaults();
     }
-    if (imguiButton("Build Airg from Navp",
-                    navp.navpLoaded && airgLoadState.empty() && airgSaveState.empty())) {
-        airgLoaded = false;
-        delete reasoningGrid;
-        reasoningGrid = new ReasoningGrid();
-        std::string msg = "Building Airg from Navp";
-        Logger::log(NK_INFO, msg.data());
-        std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, navp.navMesh, grid.spacing,
-                                    zSpacing, tolerance, zTolerance);
-        buildAirgThread.detach();
-    }
-    if (imguiButton("Connect Waypoint", (airgLoaded && selectedWaypointIndex != -1 && !connectWaypointModeEnabled))) {
-        connectWaypointModeEnabled = true;
-        std::string msg = "Entering Connect Waypoint mode. Start waypoint: " + std::to_string(selectedWaypointIndex);
-        Logger::log(NK_INFO, msg.data());
-    }
-    imguiSeparatorLine();
-    imguiLabel("Selected Waypoint");
-    char selectedWaypointText[64];
-    snprintf(selectedWaypointText, 64, selectedWaypointIndex != -1 ? "Waypoint Index: %d" : "Waypoint Index: None",
-             selectedWaypointIndex);
-    imguiValue(selectedWaypointText);
 
     imguiEndScrollArea();
-}
-
-void Airg::finalizeLoad() {
-    if (airgLoadState.size() == 2) {
-        airgLoadState.clear();
-        Grid::getInstance().loadBoundsFromAirg();
-        airgLoaded = true;
-    }
 }
 
 void Airg::finalizeSave() {
@@ -195,28 +200,7 @@ void Airg::finalizeSave() {
     }
 }
 
-void Airg::finalizeBuildVisionAndDeadEndData() {
-    if (visionDataBuildState.size() == 2) {
-        visionDataBuildState.clear();
-    }
-}
-
-void Airg::saveTolerance(float newTolerance) {
-    Settings::setValue("Airg", "tolerance", std::to_string(newTolerance).c_str());
-    tolerance = newTolerance;
-}
-
-void Airg::saveZSpacing(float newZSpacing) {
-    Settings::setValue("Airg", "ySpacing", std::to_string(newZSpacing).c_str());
-    zSpacing = newZSpacing;
-}
-
-void Airg::saveZTolerance(float newZTolerance) {
-    Settings::setValue("Airg", "yTolerance", std::to_string(newZTolerance).c_str());
-    zTolerance = newZTolerance;
-}
-
-void Airg::connectWaypoints(int startWaypointIndex, int endWaypointIndex) {
+void Airg::connectWaypoints(const int startWaypointIndex, const int endWaypointIndex) const {
     Waypoint &startWaypoint = reasoningGrid->m_WaypointList[startWaypointIndex];
     Waypoint &endWaypoint = reasoningGrid->m_WaypointList[endWaypointIndex];
     Vec3 startPos = {startWaypoint.vPos.x, startWaypoint.vPos.y, startWaypoint.vPos.z};
@@ -251,7 +235,7 @@ void Airg::connectWaypoints(int startWaypointIndex, int endWaypointIndex) {
                      endWaypointIndex)).c_str());
 }
 
-char *Airg::openAirgFileDialog(char *lastAirgFolder) {
+char *Airg::openAirgFileDialog(const char *lastAirgFolder) {
     nfdu8filteritem_t filters[2] = {{"Airg files", "airg"}, {"Airg.json files", "airg.json"}};
     return FileUtil::openNfdLoadDialog(filters, 2, lastAirgFolder);
 }
@@ -261,7 +245,7 @@ char *Airg::openSaveAirgFileDialog(char *lastAirgFolder) {
     return FileUtil::openNfdSaveDialog(filters, 2, "output", lastAirgFolder);
 }
 
-void renderWaypoint(const Waypoint &waypoint, bool fan) {
+void renderWaypoint(const Waypoint &waypoint, const bool fan) {
     if (fan) {
         glBegin(GL_TRIANGLE_FAN);
         glVertex3f(waypoint.vPos.x, waypoint.vPos.z + 0.03, -waypoint.vPos.y);
@@ -295,6 +279,15 @@ int visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
         offset2 = reasoningGrid->m_pVisibilityData.size();
     }
     return offset2 - offset1;
+}
+
+void Airg::build() {
+    float tolerance = 0.3f;
+    float spacing = 2.25f;
+    float zSpacing = 1.0f;
+    float zTolerance = 1.0f;
+    std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, Navp::getInstance().navMesh, spacing, zSpacing, tolerance, zTolerance);
+    buildAirgThread.detach();
 }
 
 // Render Layer Index
@@ -436,10 +429,10 @@ void Airg::renderAirg() {
         if (cellColorSource == 1.0f) {
             renderCellBitmaps(i, i == selectedWaypointIndex);
         }
-        if (cellColorSource == 2.0f && !buildingVisionAndDeadEndData) {
+        if (cellColorSource == 2.0f) {
             renderVisionData(i, i == selectedWaypointIndex);
         }
-        if (cellColorSource == 3.0f && !buildingVisionAndDeadEndData) {
+        if (cellColorSource == 3.0f) {
             renderLayerIndices(i, i == selectedWaypointIndex);
         }
 
@@ -510,26 +503,27 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
 
         std::vector<uint8_t> waypointVisibilityData = reasoningGrid->getWaypointVisionData(index);
 
-        std::string waypointVisibilityDataString;
-
-        char numHex[3];
-        msg += "  Visibility Data Type: " + std::to_string(waypointVisibilityData[0]); // +" Visibility data:";
-        Logger::log(NK_INFO, msg.c_str());
-        for (int count = 2; count < waypointVisibilityData.size(); count++) {
-            uint8_t num = waypointVisibilityData[count];
-            sprintf(numHex, "%02X", num);
-            if (numHex[0] == '0' && numHex[1] == '0') {
-                numHex[0] = '~';
-                numHex[1] = '~';
-            }
-            waypointVisibilityDataString += std::string{numHex};
-            waypointVisibilityDataString += " ";
-            if ((count - 1) % 8 == 0) {
+        if (!waypointVisibilityData.empty()) {
+            std::string waypointVisibilityDataString;
+            char numHex[3];
+            msg += "  Visibility Data Type: " + std::to_string(waypointVisibilityData[0]); // +" Visibility data:";
+            Logger::log(NK_INFO, msg.c_str());
+            for (int count = 2; count < waypointVisibilityData.size(); count++) {
+                uint8_t num = waypointVisibilityData[count];
+                sprintf(numHex, "%02X", num);
+                if (numHex[0] == '0' && numHex[1] == '0') {
+                    numHex[0] = '~';
+                    numHex[1] = '~';
+                }
+                waypointVisibilityDataString += std::string{numHex};
                 waypointVisibilityDataString += " ";
-            }
-            if ((count - 1) % 96 == 0) {
-                //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
-                waypointVisibilityDataString = "";
+                if ((count - 1) % 8 == 0) {
+                    waypointVisibilityDataString += " ";
+                }
+                if ((count - 1) % 96 == 0) {
+                    //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+                    waypointVisibilityDataString = "";
+                }
             }
         }
         //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
@@ -574,7 +568,8 @@ void Airg::saveAirg(Airg *airg, std::string fileName, bool isJson) {
 }
 
 void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
-    airg->airgLoadState.push_back(true);
+    airg->airgLoading = true;
+    airg->airgLoaded = false;
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Airg from file at ";
     msg += std::ctime(&start_time);
@@ -653,5 +648,7 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
                      " Count: " + std::to_string(pair.second)).c_str());
     }
 
-    airg->airgLoadState.push_back(true);
+    airg->airgLoading = false;
+    airg->airgLoaded = true;
+    Grid::getInstance().loadBoundsFromAirg();
 }

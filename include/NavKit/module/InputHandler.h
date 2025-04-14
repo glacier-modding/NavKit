@@ -2,16 +2,18 @@
 
 class InputHandler {
     explicit InputHandler();
+
 public:
-    static InputHandler& getInstance() {
+    static InputHandler &getInstance() {
         static InputHandler instance;
         return instance;
     }
+
     int handleInput();
 
     void hitTest();
 
-    void handleMovement(float dt, double* modelviewMatrix);
+    void handleMovement(float dt, double *modelviewMatrix);
 
     int mousePos[2]{};
     int origMousePos[2]{};

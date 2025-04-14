@@ -26,7 +26,7 @@
 
 class Sample_TileMesh : public Sample
 {
-protected:
+public:
 	bool m_keepInterResults;
 	bool m_buildAll;
 	float m_totalBuildTimeMs;
@@ -78,11 +78,12 @@ protected:
 	unsigned char* buildTileMesh(const int tx, const int ty, const float* bmin, const float* bmax, int& dataSize);
 	
 	void cleanup();
-	
-	void saveAll(const char* path, const dtNavMesh* mesh);
+
+	void handleTileSettingsWithNoUI();
+
+	// void saveAll(const char* path);
 	dtNavMesh* loadAll(const char* path);
 	
-public:
 	Sample_TileMesh();
 	virtual ~Sample_TileMesh();
 	

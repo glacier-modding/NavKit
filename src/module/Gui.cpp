@@ -8,7 +8,9 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/Settings.h"
 #include <SDL.h>
 #include <GL/glew.h>
 #include <GL/glu.h>
@@ -32,8 +34,8 @@ void Gui::drawGui() {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    InputHandler& inputHandler = InputHandler::getInstance();
-    Renderer& renderer = Renderer::getInstance();
+    InputHandler &inputHandler = InputHandler::getInstance();
+    Renderer &renderer = Renderer::getInstance();
     gluOrtho2D(0, renderer.width, 0, renderer.height);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -54,24 +56,28 @@ void Gui::drawGui() {
                  renderer.cameraEulers[0], renderer.cameraEulers[1]);
         imguiDrawText(280, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
                       imguiRGBA(255, 255, 255, 128));
-        SceneExtract& sceneExtract = SceneExtract::getInstance();
-        Navp& navp = Navp::getInstance();
-        Airg& airg = Airg::getInstance();
-        Obj& obj = Obj::getInstance();
-        sceneExtract.drawMenu();
+        SceneExtract &sceneExtract = SceneExtract::getInstance();
+        Navp &navp = Navp::getInstance();
+        Airg &airg = Airg::getInstance();
+        Obj &obj = Obj::getInstance();
+        Scene &scene = Scene::getInstance();
+        Settings &settings = Settings::getInstance();
         navp.drawMenu();
         airg.drawMenu();
         obj.drawMenu();
+        sceneExtract.drawMenu();
+        scene.drawMenu();
+        settings.drawMenu();
 
         int consoleHeight = showLog ? 220 : 60;
         int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;
         if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
             mouseOverMenu = true;
         if (showLog) {
-            RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+            RecastAdapter &recastAdapter = RecastAdapter::getInstance();
             std::lock_guard lock(recastAdapter.getLogMutex());
 
-            std::deque<std::string>& logBuffer = recastAdapter.getLogBuffer();
+            std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
             for (auto it = logBuffer.cbegin();
                  it != logBuffer.cend(); ++it) {
                 imguiLabel(it->c_str());

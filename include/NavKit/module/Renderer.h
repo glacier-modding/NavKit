@@ -5,9 +5,14 @@
 #include "../util/Math.h"
 class FTPixmapFont;
 
+typedef double GLdouble;
+typedef int GLint;
+
 enum HitTestType {
     NAVMESH_AREA,
     AIRG_WAYPOINT,
+    PF_SEED_POINT,
+    PF_EXCLUSION_BOX,
     NONE
 };
 
@@ -23,9 +28,10 @@ public:
 class Renderer {
 public:
     Renderer();
+
     ~Renderer();
 
-    static Renderer& getInstance() {
+    static Renderer &getInstance() {
         static Renderer instance;
         return instance;
     }
@@ -34,7 +40,8 @@ public:
 
     void drawText(const std::string &text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0);
 
-    void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined, Vec3 outlineColor, float alpha);
+    void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
+                 Vec3 outlineColor, float alpha);
 
     bool initWindowAndRenderer();
 
@@ -68,6 +75,9 @@ public:
     float cameraPos[3];
     float camr;
     float origCameraEulers[2];
+    GLdouble projectionMatrix[16];
+    GLdouble modelviewMatrix[16];
+    GLint viewport[4];
 
     SDL_Window *window;
     static HWND hwnd;

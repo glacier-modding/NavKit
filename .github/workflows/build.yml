@@ -2,7 +2,8 @@ name: CMake Build
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - '*'
   release:
     types: [ created ]
   pull_request:
@@ -15,58 +16,62 @@ jobs:
       matrix:
         preset: [ x64-debug ]
     steps:
-    - name: Set up CMake
-      uses: lukka/get-cmake@latest
-      with:
-        cmakeVersion: "~3.28.0"
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.28.0"
 
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Setup VS environment
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+      - name: Setup VS environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-    - name: Build and install debug
-      run: |
-        cmake --preset x64-debug .
-        cmake --build build/x64-debug -j12
+      - name: Build and install debug
+        run: |
+          cmake --preset x64-debug .
+          cmake --build build/x64-debug -j12
+          cmake --install build/x64-debug --prefix _install/debug
 
-    - name: Build and install release
-      run: |
-        cmake --preset x64-release .
-        cmake --build build/x64-release -j12
-        cmake --install build/x64-release
+      - name: Build and install release
+        run: |
+          cmake --preset x64-release .
+          cmake --build build/x64-release -j12
+          cmake --install build/x64-release --prefix _install/release
 
-    - name: Copy debug artifacts
-      run: |
-        mkdir _dist-debug
-        Copy-Item build/x64-debug/src/* -Destination _dist-debug/ -Recurse
+      - name: Copy debug artifacts
+        run: |
+          mkdir _dist-debug
+          Copy-Item _install/debug/* -Destination _dist-debug/ -Recurse
+          Remove-Item -Path _dist-debug/cmake_install.cmake -Force -Recurse -ErrorAction SilentlyContinue
+          Remove-Item -Path _dist-debug/CMakeFiles -Force -Recurse -ErrorAction SilentlyContinue
 
-    - name: Copy release artifacts
-      run: |
-        mkdir _dist-release
-        Copy-Item build/x64-release/src/* -Destination _dist-release/ -Recurse
+      - name: Copy release artifacts
+        run: |
+          mkdir _dist-release
+          Copy-Item _install/release/* -Destination _dist-release/ -Recurse
+          Remove-Item -Path _dist-release/cmake_install.cmake -Force -Recurse -ErrorAction SilentlyContinue
+          Remove-Item -Path _dist-release/CMakeFiles -Force -Recurse -ErrorAction SilentlyContinue
 
-    - name: Archive debug NavKit
-      uses: actions/upload-artifact@v4
-      with:
-        name: NavKit-Debug
-        path: _dist-debug/*
+      - name: Archive debug NavKit
+        uses: actions/upload-artifact@v4
+        with:
+          name: NavKit-Debug
+          path: _dist-debug/*
 
-    - name: Archive release Navkit
-      uses: actions/upload-artifact@v4
-      with:
-        name: NavKit-Release
-        path: _dist-release/*
+      - name: Archive release Navkit
+        uses: actions/upload-artifact@v4
+        with:
+          name: NavKit-Release
+          path: _dist-release/*
 
   upload_release:
     name: Upload artifacts
     needs: build
-    #if: github.event_name == 'release'
     runs-on: ubuntu-latest
 
     strategy:

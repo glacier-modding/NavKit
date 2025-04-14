@@ -81,10 +81,45 @@ void Grid::renderGrid() const {
             glVertex3f(x, z, -(y + gridSpacing));
             glVertex3f(x, z, -y);
             glEnd();
+        }
+    }
+}
+
+void Grid::renderGridText() const {
+    const Vec3 color = {0.6, 0.6, 0.6};
+    float zOffset = 0;
+    Airg &airg = Airg::getInstance();
+    ReasoningGrid *reasoningGrid = airg.reasoningGrid;
+    if (airg.selectedWaypointIndex != -1) {
+        if (airg.selectedWaypointIndex < reasoningGrid->m_WaypointList.size()) {
+            const Waypoint &selectedWaypoint = reasoningGrid->m_WaypointList[airg.selectedWaypointIndex];
+            zOffset = -selectedWaypoint.vPos.z;
+        }
+    } else {
+        zOffset = reasoningGrid->m_Properties.vMin.z;
+    }
+    const float minX = xMin + xOffset;
+    const float minY = yMin + yOffset;
+    const float gridSpacing = spacing;
+    const float z = 0.02 - zOffset;
+    int xi = -1;
+    glColor4f(color.X, color.Y, color.Z, 0.6);
+    Renderer &renderer = Renderer::getInstance();
+    Vec3 camPos{renderer.cameraPos[0], -renderer.cameraPos[2], renderer.cameraPos[1]};
+    for (float x = minX; x < xMax; x += gridSpacing) {
+        xi++;
+        int yi = -1;
+        for (float y = minY; y < yMax; y += gridSpacing) {
+            yi++;
+            Vec3 pos{x, y, z};
+            float distance = camPos.DistanceTo(pos);
+            if (distance > 100) {
+                continue;
+            }
             Vec3 textCoords{x + gridSpacing / 2.0f, z, -(y + gridSpacing / 2.0f)};
-            int cellIndex = xi + yi * gridWidth;
-            std::string cellText = std::to_string(xi) + ", " + std::to_string(yi) + " = " + std::to_string(cellIndex);
-            renderer.drawText(cellText, textCoords, color);
+            // int cellIndex = xi + yi * gridWidth;
+            std::string cellText = std::to_string(xi) + ", " + std::to_string(yi);// + " = " + std::to_string(cellIndex);
+            renderer.drawText(cellText, textCoords, color, 20);
         }
     }
 }

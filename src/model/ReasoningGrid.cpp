@@ -589,7 +589,7 @@ void ReasoningGrid::build(ReasoningGrid *reasoningGrid, NavPower::NavMesh *navMe
             Logger::log(NK_INFO, msg.data());
             auto start = std::chrono::high_resolution_clock::now();
 
-            airg.airgLoadState.push_back(true);
+            airg.airgLoading = true;
             // grid is set up in this order: Z[Y[X[]]]
             std::vector<std::vector<std::vector<int> *> *> grid;
             Vec3 min = navMesh->m_graphHdr->m_bbox.m_min;
@@ -667,7 +667,7 @@ void ReasoningGrid::build(ReasoningGrid *reasoningGrid, NavPower::NavMesh *navMe
 
             addWaypointsForGrid(reasoningGrid, navMesh, helper);
             if (helper.result == -1) {
-               airg.airgLoadState.push_back(true);
+            airg.airgLoading = false;
                 return;
             }
             helper.tolerance = tolerance;
@@ -677,7 +677,7 @@ void ReasoningGrid::build(ReasoningGrid *reasoningGrid, NavPower::NavMesh *navMe
             Logger::log(NK_INFO, "Building waypoints within tolerance around areas...");
             addWaypointsForGrid(reasoningGrid, navMesh, helper);
             if (helper.result == -1) {
-                airg.airgLoadState.push_back(true);
+            airg.airgLoading = false;
                 return;
             }
 
@@ -749,7 +749,7 @@ void ReasoningGrid::build(ReasoningGrid *reasoningGrid, NavPower::NavMesh *navMe
             msg += std::to_string(duration.count());
             msg += " seconds";
             Logger::log(NK_INFO, msg.data());
-            airg.airgLoadState.push_back(true);
+            airg.airgLoading = false;
             airg.airgLoaded = true;
         }
     CPPTRACE_CATCH(const std::exception& e) {

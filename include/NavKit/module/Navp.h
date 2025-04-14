@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "../model/PfBoxes.h"
+#include "../model/ZPathfinding.h"
 
 struct Vec3;
 
@@ -23,6 +23,10 @@ public:
 
     ~Navp();
 
+    void renderPfSeedPoints() const;
+
+    void renderPfSeedPointsForHitTest() const;
+
     static Navp &getInstance() {
         static Navp instance;
         return instance;
@@ -30,7 +34,9 @@ public:
 
     void resetDefaults();
 
-    void renderExclusionBoxes();
+    void renderExclusionBoxes() const;
+
+    void renderExclusionBoxesForHitTest() const;
 
     void renderNavMesh();
 
@@ -44,38 +50,48 @@ public:
 
     void setSelectedNavpAreaIndex(int index);
 
+    void setSelectedPfSeedPointIndex(int index);
+
+    void setSelectedExclusionBoxIndex(int index);
+
     NavPower::NavMesh *navMesh{};
     void *navMeshFileData{};
     std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap{};
     std::map<Vec3, NavPower::Area *> posToAreaMap{};
     int selectedNavpAreaIndex;
+    int selectedPfSeedPointIndex;
+    int selectedExclusionBoxIndex;
     bool navpLoaded;
     bool showNavp;
     bool showNavpIndices;
     bool showPfExclusionBoxes;
-    bool doNavpHitTest{};
+    bool showPfSeedPoints;
+    bool doNavpHitTest;
+    bool doNavpExclusionBoxHitTest;
+    bool doNavpPfSeedPointHitTest;
     int navpScroll;
     bool loading;
 
     float bBoxPosX;
     float bBoxPosY;
     float bBoxPosZ;
-    float bBoxSizeX;
-    float bBoxSizeY;
-    float bBoxSizeZ;
+    float bBoxScaleX;
+    float bBoxScaleY;
+    float bBoxScaleZ;
 
     float lastBBoxPosX;
     float lastBBoxPosY;
     float lastBBoxPosZ;
-    float lastBBoxSizeX;
-    float lastBBoxSizeY;
-    float lastBBoxSizeZ;
+    float lastBBoxScaleX;
+    float lastBBoxScaleY;
+    float lastBBoxScaleZ;
 
     bool stairsCheckboxValue;
 
     float bBoxPos[3];
-    float bBoxSize[3];
-    std::vector<PfBoxes::PfBox> exclusionBoxes;
+    float bBoxScale[3];
+    std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
+    float pruningMode;
 
     void setLastLoadFileName(const char *fileName);
 
@@ -85,6 +101,10 @@ public:
 
     void updateExclusionBoxConvexVolumes();
 
+    static void loadNavMeshFileData(char *fileName);
+
+    static void loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding);
+
 private:
     static void buildNavp();
 
@@ -93,10 +113,6 @@ private:
     static bool areaIsStairs(NavPower::Area area);
 
     void setStairsFlags() const;
-
-    static void loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding);
-
-    static void loadNavMeshFileData(char *fileName);
 
     static char *openLoadNavpFileDialog(char *lastNavpFolder);
 

@@ -4,19 +4,26 @@
 
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
+#include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+
+#include "../../include/RecastDemo/imgui.h"
+
+Settings::Settings(): ini(CSimpleIniA()), settingsScroll(0), backgroundColor(0.30f) {
+}
+
+const int Settings::SETTINGS_MENU_HEIGHT = 210;
 
 void Settings::Load() {
     CSimpleIni &ini = getInstance().ini;
     ini.SetUnicode();
     SceneExtract &sceneExtract = SceneExtract::getInstance();
     Obj &obj = Obj::getInstance();
-    Navp &navp = Navp::getInstance();
-    Airg &airg = Airg::getInstance();
     Renderer &renderer = Renderer::getInstance();
 
     if (const SI_Error rc = ini.LoadFile("NavKit.ini"); rc < 0) {
@@ -26,40 +33,46 @@ void Settings::Load() {
 
         sceneExtract.setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
         sceneExtract.setOutputFolder(ini.GetValue("Paths", "output", "default"));
-        sceneExtract.setBlenderFile(ini.GetValue("Paths", "blender", "default"));
-        float bBoxPos[3] = {
-            static_cast<float>(atof(ini.GetValue("BBox", "x", "0.0f"))),
-            static_cast<float>(atof(ini.GetValue("BBox", "y", "0.0f"))),
-            static_cast<float>(atof(ini.GetValue("BBox", "z", "0.0f")))
-        };
-        float bBoxSize[3] = {
-            static_cast<float>(atof(ini.GetValue("BBox", "sx", "100.0f"))),
-            static_cast<float>(atof(ini.GetValue("BBox", "sy", "100.0f"))),
-            static_cast<float>(atof(ini.GetValue("BBox", "sz", "100.0f")))
-        };
-        navp.setBBox(bBoxPos, bBoxSize);
-        navp.setLastLoadFileName(ini.GetValue("Paths", "loadnavp", "default"));
-        const char *fileName = ini.GetValue("Paths", "savenavp", "default");
-        if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-            navp.setLastSaveFileName(fileName);
-        }
-        airg.setLastLoadFileName(ini.GetValue("Paths", "loadairg", "default"));
-        fileName = ini.GetValue("Paths", "saveairg", "default");
-        if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-            airg.setLastSaveFileName(fileName);
-        }
-        obj.setLastLoadFileName(ini.GetValue("Paths", "loadobj", "default"));
-        fileName = ini.GetValue("Paths", "saveobj", "default");
-        if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-            obj.setLastSaveFileName(fileName);
-        }
-        Grid& grid = Grid::getInstance();
+        obj.setBlenderFile(ini.GetValue("Paths", "blender", "default"));
+        Grid &grid = Grid::getInstance();
         grid.saveSpacing(static_cast<float>(atof(ini.GetValue("Airg", "spacing", "2.0f"))));
-        airg.saveTolerance(static_cast<float>(atof(ini.GetValue("Airg", "tolerance", "0.2f"))));
-        airg.saveZSpacing(static_cast<float>(atof(ini.GetValue("Airg", "ySpacing", "1.0f"))));
-        airg.saveZTolerance(static_cast<float>(atof(ini.GetValue("Airg", "zTolerance", "1.0f"))));
         renderer.initFrameRate(static_cast<float>(atof(ini.GetValue("Renderer", "frameRate", "-1.0f"))));
+        getInstance().backgroundColor = static_cast<float>(atof(ini.GetValue("Colors", "backgroundColor", "0.16f")));
     }
+}
+
+void Settings::drawMenu() {
+    Renderer &renderer = Renderer::getInstance();
+    if (imguiBeginScrollArea("Settings menu", renderer.width - 250 - 10,
+                             renderer.height - 10 - SETTINGS_MENU_HEIGHT, 250,
+                             SETTINGS_MENU_HEIGHT, &settingsScroll)) {
+        Gui::getInstance().mouseOverMenu = true;;
+    }
+    imguiLabel("Background color");
+    if (imguiSlider("Black                      White", &backgroundColor, 0.0f, 1.0f, 0.01f)) {
+        setValue("Colors", "backgroundColor", std::to_string(backgroundColor));
+        save();
+    }
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
+    imguiLabel("Set Hitman Directory");
+    if (imguiButton(sceneExtract.hitmanFolderName.c_str())) {
+        if (const char *folderName = sceneExtract.openHitmanFolderDialog(sceneExtract.lastHitmanFolder.data())) {
+            sceneExtract.setHitmanFolder(folderName);
+        }
+    }
+    imguiLabel("Set Output Directory");
+    if (imguiButton(sceneExtract.outputFolderName.c_str())) {
+        if (const char *folderName = sceneExtract.openOutputFolderDialog(sceneExtract.lastOutputFolder.data())) {
+            sceneExtract.setOutputFolder(folderName);
+        }
+    }
+    imguiLabel("Set Blender Executable");
+    if (Obj &obj = Obj::getInstance(); imguiButton(obj.blenderName.c_str())) {
+        if (const char *blenderFileName = obj.openSetBlenderFileDialog(obj.lastBlenderFile.data())) {
+            obj.setBlenderFile(blenderFileName);
+        }
+    }
+    imguiEndScrollArea();
 }
 
 void Settings::save() {

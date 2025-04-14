@@ -12,10 +12,13 @@ public:
 
     void renderGrid() const;
 
+    void renderGridText() const;
+
     static Grid &getInstance() {
         static Grid instance;
         return instance;
     }
+
     bool showGrid;
 
     float spacing;
