@@ -31,29 +31,25 @@ jobs:
         with:
           arch: x64
 
-      - name: Build and install debug
+      - name: Build debug
         run: |
           cmake --preset x64-debug .
           cmake --build build/x64-debug -j12
-          cmake --install build/x64-debug --prefix _install/debug
 
-      - name: Build and install release
+      - name: Build release
         run: |
           cmake --preset x64-release .
           cmake --build build/x64-release -j12
-          cmake --install build/x64-release --prefix _install/release
 
       - name: Copy debug artifacts
         run: |
           mkdir _dist-debug
-          Copy-Item _install/debug/* -Destination _dist-debug/ -Recurse
           Remove-Item -Path _dist-debug/cmake_install.cmake -Force -Recurse -ErrorAction SilentlyContinue
           Remove-Item -Path _dist-debug/CMakeFiles -Force -Recurse -ErrorAction SilentlyContinue
 
       - name: Copy release artifacts
         run: |
           mkdir _dist-release
-          Copy-Item _install/release/* -Destination _dist-release/ -Recurse
           Remove-Item -Path _dist-release/cmake_install.cmake -Force -Recurse -ErrorAction SilentlyContinue
           Remove-Item -Path _dist-release/CMakeFiles -Force -Recurse -ErrorAction SilentlyContinue
 
