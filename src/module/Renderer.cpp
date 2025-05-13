@@ -130,7 +130,7 @@ bool Renderer::initWindowAndRenderer() {
 
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     const std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
-    std::string title = "NavKit v";
+    std::string title = "NavKit ";
     title += navKitVersion;
     SDL_SetWindowTitle(window, title.data());
 
@@ -223,20 +223,27 @@ void Renderer::renderFrame() {
     if (Navp &navp = Navp::getInstance(); navp.navpLoaded && navp.showNavp) {
         navp.renderNavMesh();
     }
+    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    if (Navp &navp = Navp::getInstance(); navp.navpLoaded && navp.showRecastDebugInfo) {
+        recastAdapter.renderRecastNavmesh(false);
+    }
     Scene &scene = Scene::getInstance();
     if (Navp &navp = Navp::getInstance(); navp.showPfExclusionBoxes && scene.sceneLoaded) {
         navp.renderExclusionBoxes();
     }
-    if (Navp &navp = Navp::getInstance(); navp.showPfSeedPoints) {
+    if (Navp &navp = Navp::getInstance(); navp.showPfSeedPoints && scene.sceneLoaded) {
         navp.renderPfSeedPoints();
     }
     if (Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showAirg) {
         airg.renderAirg();
     }
+    if (Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showRecastDebugInfo) {
+        RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
+        recastAirgAdapter.renderRecastNavmesh(true);
+    }
     if (Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
         obj.renderObj();
     }
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     // Marker
     GLdouble x, y, z;
     if (recastAdapter.markerPositionSet) {

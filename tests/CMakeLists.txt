@@ -14,7 +14,6 @@ target_link_libraries(NavKitTests PRIVATE
         NavKitLib
 )
 
-#file(COPY "${NavKit_SOURCE_DIR}/src/resource/DroidSans.ttf" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(NAV_WEAKNESS_DLL "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll")

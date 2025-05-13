@@ -32,6 +32,11 @@ public:
         return instance;
     }
 
+    static Navp &getAirgInstance() {
+        static Navp instance;
+        return instance;
+    }
+
     void resetDefaults();
 
     void renderExclusionBoxes() const;
@@ -66,6 +71,7 @@ public:
     bool showNavpIndices;
     bool showPfExclusionBoxes;
     bool showPfSeedPoints;
+    bool showRecastDebugInfo;
     bool doNavpHitTest;
     bool doNavpExclusionBoxHitTest;
     bool doNavpPfSeedPointHitTest;
@@ -103,7 +109,7 @@ public:
 
     static void loadNavMeshFileData(char *fileName);
 
-    static void loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding);
+    static void loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp);
 
 private:
     static void buildNavp();

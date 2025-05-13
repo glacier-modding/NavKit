@@ -211,7 +211,6 @@ void SceneExtract::finalizeExtract() {
                         sceneScoped.sceneLoaded = true;
                         std::string fileNameString = sceneFile;
                         sceneExtract.extractingAlocs = false;
-                        sceneScoped.sceneLoaded = true;
                         sceneScoped.lastLoadSceneFile = sceneFile;
                         if (sceneExtract.alsoBuildObj && !objScoped.startedObjGeneration) {
                             objScoped.buildObj(objScoped.lastBlenderFile.data(), fileNameString.data(),

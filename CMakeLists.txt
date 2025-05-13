@@ -1,4 +1,8 @@
-﻿cmake_minimum_required(VERSION 3.28)
+﻿cmake_minimum_required(VERSION 3.28.6)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>" CACHE PATH "Runtime output directory" FORCE)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>" CACHE PATH "Library output directory" FORCE)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib" CACHE PATH "Archive output directory" FORCE)
+
 # Enable Hot Reload for MSVC compilers if supported.
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_CXX_FLAGS_DEBUG "/ZI")
@@ -12,7 +16,7 @@ endif ()
 
 project(
         NavKit
-        VERSION 0.10.1
+        VERSION 1.0.0
         DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman"
         LANGUAGES CXX)
 

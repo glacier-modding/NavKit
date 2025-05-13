@@ -36,7 +36,9 @@ add_library(NavKitLib STATIC
         util/CommandRunner.cpp
         util/ErrorHandler.cpp
         util/FileUtil.cpp
+        util/GridGenerator.cpp
         util/Math.cpp
+        util/Pathfinding.cpp
 )
 set_property(TARGET NavKitLib PROPERTY CXX_STANDARD 20)
 
@@ -76,36 +78,98 @@ add_executable(NavKit
         NavKit.rc
 )
 target_link_libraries(NavKit PRIVATE NavKitLib)
+set(OUTPUT_DIR_DEBUG "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug")
+set(OUTPUT_DIR_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release")
 
-
-file(COPY "${NavKit_SOURCE_DIR}/src/resource/DroidSans.ttf" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(NAV_WEAKNESS_DLL "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll")
-elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(NAV_WEAKNESS_DLL "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.dll")
-endif ()
 add_custom_command(
-        TARGET NavKit
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NAV_WEAKNESS_DLL}" "${CMAKE_CURRENT_BINARY_DIR}/"
-        COMMENT "Copying ${NAV_WEAKNESS_DLL} to ${CMAKE_BINARY_DIR}"
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NavKit_SOURCE_DIR}/src/resource/DroidSans.ttf"
+        "$<TARGET_FILE_DIR:NavKit>/" # Use generator expression for destination dir
+    COMMENT "Copying DroidSans.ttf to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
+set(NAV_WEAKNESS_DLL_PATH_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll")
+set(NAV_WEAKNESS_DLL_PATH_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.dll")
+set(NAV_WEAKNESS_DLL_GENEX "$<IF:$<CONFIG:Debug>,${NAV_WEAKNESS_DLL_PATH_DEBUG},${NAV_WEAKNESS_DLL_PATH_RELEASE}>")
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NAV_WEAKNESS_DLL_GENEX}"
+        "$<TARGET_FILE_DIR:NavKit>/" # Use generator expression for destination dir
+    COMMENT "Copying NavWeakness.dll to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
 )
 
-file(COPY "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.exe" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/bin/Editor.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-file(COPY "${NavKit_SOURCE_DIR}/src/resource/NavKit.ini" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+# Copy ResourceLib_HM3.dll (Adjust source path if Release version exists)
+set(RESOURCELIB_DLL_PATH_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll")
+set(RESOURCELIB_DLL_GENEX "$<IF:$<CONFIG:Debug>,${RESOURCELIB_DLL_PATH_DEBUG},${RESOURCELIB_DLL_PATH_DEBUG}>") # Assuming Debug only for now
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${RESOURCELIB_DLL_GENEX}"
+        "$<TARGET_FILE_DIR:NavKit>/"
+    COMMENT "Copying ResourceLib_HM3.dll to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
+# Copy Glacier2Obj.exe
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NavKit_SOURCE_DIR}/bin/Glacier2Obj.exe"
+        "$<TARGET_FILE_DIR:NavKit>/"
+    COMMENT "Copying Glacier2Obj.exe to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
+
+# Copy Glacier2Obj.py
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py"
+        "$<TARGET_FILE_DIR:NavKit>/"
+    COMMENT "Copying Glacier2Obj.py to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
+
+# Copy Editor.dll
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NavKit_SOURCE_DIR}/bin/Editor.dll"
+        "$<TARGET_FILE_DIR:NavKit>/"
+    COMMENT "Copying Editor.dll to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
+# Copy nfd.dll (Adjust source path if Release version exists)
+set(NFD_DLL_PATH_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll")
+set(NFD_DLL_GENEX "$<IF:$<CONFIG:Debug>,${NFD_DLL_PATH_DEBUG},${NFD_DLL_PATH_DEBUG}>") # Assuming Debug only for now
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NFD_DLL_GENEX}"
+        "$<TARGET_FILE_DIR:NavKit>/"
+    COMMENT "Copying nfd.dll to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
+
+# Copy NavKit.ini
+add_custom_command(
+    TARGET NavKit POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${NavKit_SOURCE_DIR}/src/resource/NavKit.ini"
+        "$<TARGET_FILE_DIR:NavKit>/"
+    COMMENT "Copying NavKit.ini to $<TARGET_FILE_DIR:NavKit>"
+    VERBATIM
+)
 
 set_target_properties(NavWeakness PROPERTIES
         IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
         IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/NavWeakness.dll"
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.lib"
         IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.lib"
-        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll"
-        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.dll"
+        IMPORTED_LOCATION_DEBUG "${OUTPUT_DIR_DEBUG}/NavWeakness.dll"
+        IMPORTED_LOCATION_RELEASE "${OUTPUT_DIR_RELEASE}/NavWeakness.dll"
 )
 set_target_properties(nfd::nfd PROPERTIES
         NFD_OVERRIDE_RECENT_WITH_DEFAULT ON
@@ -113,16 +177,17 @@ set_target_properties(nfd::nfd PROPERTIES
         IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/nfd.dll"
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.lib"
         IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/nfd.lib"
-        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll"
-        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll"
+        IMPORTED_LOCATION_DEBUG "${OUTPUT_DIR_DEBUG}/nfd.dll"
+        IMPORTED_LOCATION_RELEASE "${OUTPUT_DIR_RELEASE}/nfd.dll"
 )
 set_target_properties(ResourceLib_HM3 PROPERTIES
         IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/ResourceLib_HM3.dll"
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
         IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
-        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
-        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
+        IMPORTED_LOCATION_DEBUG "${OUTPUT_DIR_DEBUG}/ResourceLib_HM3.dll"
+        IMPORTED_LOCATION_RELEASE "${OUTPUT_DIR_RELEASE}/ResourceLib_HM3.dll"
 )
 set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
 
 set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)
+#add_definitions(-DDT_POLYREF64) # TODO: Add Recast Detour 64 bit support

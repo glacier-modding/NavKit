@@ -20,6 +20,7 @@
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/util/GridGenerator.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
@@ -33,9 +34,11 @@ Airg::Airg() {
     lastSaveAirgFile = saveAirgName;
     airgLoaded = false;
     airgLoading = false;
+    airgBuilding = false;
     connectWaypointModeEnabled = false;
     showAirg = true;
     showAirgIndices = false;
+    showRecastDebugInfo = false;
     cellColorSource = 0.0f;
     airgScroll = 0;
     airgResourceConverter = HM3_GetConverterForResource("AIRG");;
@@ -45,7 +48,7 @@ Airg::Airg() {
     selectedWaypointIndex = -1;
 }
 
-const int Airg::AIRG_MENU_HEIGHT = 429;
+const int Airg::AIRG_MENU_HEIGHT = 449;
 
 Airg::~Airg() = default;
 
@@ -90,6 +93,8 @@ void Airg::drawMenu() {
         showAirgIndices = !showAirgIndices;
     if (imguiCheck("Show Grid", grid.showGrid))
         grid.showGrid = !grid.showGrid;
+    if (imguiCheck("Show Recast Debug info", showRecastDebugInfo))
+        showRecastDebugInfo = !showRecastDebugInfo;
 
     imguiLabel("Load Airg from file");
     if (imguiButton(airgName.c_str(), (!airgLoading && airgSaveState.empty()))) {
@@ -143,8 +148,9 @@ void Airg::drawMenu() {
     Navp &navp = Navp::getInstance();
 
     if (imguiButton("Build Airg from Navp",
-                    navp.navpLoaded && !airgLoading && airgSaveState.empty())) {
+                    navp.navpLoaded && !airgLoading && airgSaveState.empty() && !airgBuilding)) {
         airgLoaded = false;
+        airgBuilding = true;
         delete reasoningGrid;
         reasoningGrid = new ReasoningGrid();
         std::string msg = "Building Airg from Navp";
@@ -282,11 +288,7 @@ int visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
 }
 
 void Airg::build() {
-    float tolerance = 0.3f;
-    float spacing = 2.25f;
-    float zSpacing = 1.0f;
-    float zTolerance = 1.0f;
-    std::thread buildAirgThread(&ReasoningGrid::build, reasoningGrid, Navp::getInstance().navMesh, spacing, zSpacing, tolerance, zTolerance);
+    std::thread buildAirgThread(&GridGenerator::build);
     buildAirgThread.detach();
 }
 

@@ -253,12 +253,6 @@ void Sample_TileMesh::handleSettings()
 {
 	Sample::handleCommonSettings();
 
-	if (imguiCheck("Keep Itermediate Results", m_keepInterResults))
-		m_keepInterResults = !m_keepInterResults;
-
-	if (imguiCheck("Build All Tiles", m_buildAll))
-		m_buildAll = !m_buildAll;
-	
 	imguiLabel("Tiling");
 	imguiSlider("TileSize", &m_tileSize, 16.0f, 1024.0f, 16.0f);
 	
@@ -292,35 +286,6 @@ void Sample_TileMesh::handleSettings()
 		m_maxTiles = 0;
 		m_maxPolysPerTile = 0;
 	}
-
-	imguiSeparator();
-
-	imguiIndent();
-	imguiIndent();
-
-	if (imguiButton("Save"))
-	{
-		Sample::saveAll("all_tiles_navmesh.bin");
-	}
-
-	if (imguiButton("Load"))
-	{
-		dtFreeNavMesh(m_navMesh);
-		m_navMesh = Sample::loadAll("all_tiles_navmesh.bin");
-		m_navQuery->init(m_navMesh, 65533);
-	}
-
-	imguiUnindent();
-	imguiUnindent();
-
-	char msg[64];
-	snprintf(msg, 64, "Build Time: %.1fms", m_totalBuildTimeMs);
-	imguiLabel(msg);
-
-	imguiSeparator();
-
-	imguiSeparator();
-
 }
 
 void Sample_TileMesh::handleTools()
@@ -352,14 +317,8 @@ void Sample_TileMesh::handleTools()
 	// 	setTool(new CrowdTool);
 	// }
 	
-	imguiSeparatorLine();
-
-	imguiIndent();
-
 	if (m_tool)
 		m_tool->handleMenu();
-
-	imguiUnindent();
 }
 
 void Sample_TileMesh::handleDebugMode()
@@ -764,12 +723,13 @@ void Sample_TileMesh::buildAllTiles()
 	
 	// Start the build process.
 	m_ctx->startTimer(RC_TIMER_TEMP);
+	Logger::log(NK_INFO, ("Building tiles. Number of rows (y): " + std::to_string(th) + ". Number of columns (x):" + std::to_string(tw)).c_str());
 
 	for (int y = 0; y < th; ++y)
 	{
+		Logger::log(NK_INFO, ("Building tile row: " + std::to_string(y) + " / " + std::to_string(th)).c_str());
 		for (int x = 0; x < tw; ++x)
 		{
-			Logger::log(NK_INFO, ("Building tile at x: " + std::to_string(x) + ", y: " + std::to_string(y)).c_str());
 			m_lastBuiltTileBmin[0] = bmin[0] + x*tcs;
 			m_lastBuiltTileBmin[1] = bmin[1];
 			m_lastBuiltTileBmin[2] = bmin[2] + y*tcs;

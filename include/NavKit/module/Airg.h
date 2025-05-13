@@ -24,10 +24,12 @@ public:
     std::string lastSaveAirgFile;
     bool airgLoaded;
     bool airgLoading;
+    bool airgBuilding;
     bool connectWaypointModeEnabled;
     std::vector<bool> airgSaveState;
     bool showAirg;
     bool showAirgIndices;
+    bool showRecastDebugInfo;
     float cellColorSource;
     ResourceConverter *airgResourceConverter;
     ResourceGenerator *airgResourceGenerator;

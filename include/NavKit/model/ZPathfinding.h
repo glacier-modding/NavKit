@@ -149,7 +149,7 @@ namespace ZPathfinding {
 
         PfBoxes(std::string fileName);
 
-        void readPathfindingBBoxes() const;
+        void readPathfindingBBoxes();
 
         std::vector<PfBox> readExclusionBoxes() const;
 

@@ -50,6 +50,7 @@ void Scene::setLastSaveFileName(char *fileName) {
 void Scene::loadScene(std::string fileName, const std::function<void()> &callback,
                       const std::function<void()> &errorCallback) {
     Scene &scene = getInstance();
+    scene.sceneLoaded = false;
     ZPathfinding::Alocs newAlocs;
     try {
         newAlocs = ZPathfinding::Alocs(fileName);
@@ -130,7 +131,6 @@ void Scene::drawMenu() {
     if (imguiButton(loadSceneName.c_str())) {
         if (char *fileName = openLoadSceneFileDialog(lastLoadSceneFile.data())) {
             setLastLoadFileName(fileName);
-            sceneLoaded = false;
             std::string msg = "Loading nav.json file: '";
             msg += fileName;
             msg += "'...";

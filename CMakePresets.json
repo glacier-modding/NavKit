@@ -4,8 +4,8 @@
     {
       "name": "base",
       "displayName": "Basic config",
-      "description": "Basic config using Ninja generator",
-      "generator": "Ninja",
+      "description": "Basic config using Visual Studio 17 2022 generator",
+      "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "architecture": {
         "value": "x64",
@@ -34,6 +34,18 @@
         "CMAKE_BUILD_TYPE": "Release"
       },
       "inherits": [ "base" ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "x64-debug",
+      "configurePreset": "x64-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "x64-release",
+      "configurePreset": "x64-release",
+      "configuration": "Release"
     }
   ]
 }

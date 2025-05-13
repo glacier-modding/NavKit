@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "../../include/RecastDemo/Sample_TileMesh.h"
+#include "../../RecastDemo/Sample_TileMesh.h"
 
 #include "../../NavWeakness/Vec3.h"
 
@@ -54,19 +54,23 @@ public:
 
     [[nodiscard]] bool handleBuild() const;
 
+    void cleanup() const;
+
     bool handleBuildForAirg() const;
 
     void handleCommonSettings() const;
 
     void resetCommonSettings() const;
 
+    void renderRecastNavmesh(bool isAirgInstance);
+
     dtPolyRef getPoly(int tileIndex, int polyIndex) const;
 
-    dtStatus findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt) const;
+    dtStatus findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt, bool includeExcludedAreas) const;
 
     void findPfSeedPointAreas();
 
-    void excludeNonReachableAreas() const;
+    void excludeNonReachableAreas();
 
     void save(const std::string &data) const;
 
@@ -118,6 +122,7 @@ public:
     DebugDrawGL *debugDraw;
 
     dtQueryFilter *filter;
+    dtQueryFilter *filterWithExcluded;
     bool markerPositionSet;
     bool processHitTestShift;
     float markerPosition[3]{};

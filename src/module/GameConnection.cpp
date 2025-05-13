@@ -40,11 +40,37 @@ int GameConnection::connectToGame() {
 
 int GameConnection::closeConnection() const {
     if (!ws || ws->getReadyState() == WebSocket::CLOSED) {
-        Logger::log(NK_ERROR, "GameConnection: closeConnection failed because the socket is not open.");
+        Logger::log(NK_ERROR, "GameConnection: closeConnection failed because the Editor connection is not open.");
         return 1;
     }
     const WebSocket::pointer wsp = &*ws;
     wsp->close();
+
+    using clock = std::chrono::steady_clock;
+    auto start_time = clock::now();
+    auto timeout = std::chrono::seconds(2);
+
+    while (ws && ws->getReadyState() != WebSocket::CLOSED) {
+        if (clock::now() - start_time > timeout) {
+            Logger::log(NK_WARN, "GameConnection: Timeout waiting for socket to close.");
+            break;
+        }
+
+        ws->poll(10);
+        ws->dispatch([&](const std::string &message) {
+            Logger::log(NK_INFO, ("GameConnection: Received message during close attempt: " + message).c_str());
+        });
+
+    }
+
+    if (ws && ws->getReadyState() == WebSocket::CLOSED) {
+        Logger::log(NK_INFO, "GameConnection: Editor connection closed.");
+    } else if (!ws) {
+        Logger::log(NK_WARN, "GameConnection: Editor connection became invalid during close polling.");
+    } else {
+        Logger::log(NK_WARN, "GameConnection: Socket state is still '%d' after close attempt.", static_cast<int>(ws->getReadyState()));
+    }
+
     return 0;
 }
 

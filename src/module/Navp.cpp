@@ -7,6 +7,7 @@
 #include <GL/glut.h>
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/GameConnection.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -35,6 +36,7 @@ Navp::Navp() {
     showNavpIndices = false;
     showPfExclusionBoxes = true;
     showPfSeedPoints = true;
+    showRecastDebugInfo = false;
     navMesh = new NavPower::NavMesh();
     selectedNavpAreaIndex = -1;
     selectedPfSeedPointIndex = -1;
@@ -46,21 +48,21 @@ Navp::Navp() {
     bBoxPosX = 0.0;
     bBoxPosY = 0.0;
     bBoxPosZ = 0.0;
-    bBoxScaleX = 100.0;
-    bBoxScaleY = 100.0;
-    bBoxScaleZ = 100.0;
+    bBoxScaleX = 1000.0;
+    bBoxScaleY = 300.0;
+    bBoxScaleZ = 1000.0;
     lastBBoxPosX = 0.0;
     lastBBoxPosY = 0.0;
     lastBBoxPosZ = 0.0;
-    lastBBoxScaleX = 100.0;
-    lastBBoxScaleY = 100.0;
-    lastBBoxScaleZ = 100.0;
+    lastBBoxScaleX = 1000.0;
+    lastBBoxScaleY = 300.0;
+    lastBBoxScaleZ = 1000.0;
     bBoxPos[0] = 0;
     bBoxPos[1] = 0;
     bBoxPos[2] = 0;
-    bBoxScale[0] = 600;
-    bBoxScale[1] = 600;
-    bBoxScale[2] = 600;
+    bBoxScale[0] = 1000;
+    bBoxScale[1] = 300;
+    bBoxScale[2] = 1000;
     stairsCheckboxValue = false;
     loading = false;
     pruningMode = 1.0f;
@@ -121,15 +123,15 @@ void Navp::resetDefaults() {
     bBoxPosX = 0.0;
     bBoxPosY = 0.0;
     bBoxPosZ = 0.0;
-    bBoxScaleX = 100.0;
-    bBoxScaleY = 100.0;
-    bBoxScaleZ = 100.0;
+    bBoxScaleX = 1000.0;
+    bBoxScaleY = 300.0;
+    bBoxScaleZ = 1000.0;
     lastBBoxPosX = 0.0;
     lastBBoxPosY = 0.0;
     lastBBoxPosZ = 0.0;
-    lastBBoxScaleX = 100.0;
-    lastBBoxScaleY = 100.0;
-    lastBBoxScaleZ = 100.0;
+    lastBBoxScaleX = 1000.0;
+    lastBBoxScaleY = 300.0;
+    lastBBoxScaleZ = 1000.0;
 }
 
 void Navp::renderExclusionBoxes() const {
@@ -505,13 +507,13 @@ void Navp::loadNavMeshFileData(char *fileName) {
     getInstance().navMeshFileData = s_FileData;
 }
 
-void Navp::loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding) {
+void Navp::loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
-    Navp &navp = Navp::getInstance();
+    Navp &navp = loadAirgNavp ? getAirgInstance() : getInstance();
     navp.loading = true;
     try {
         NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
@@ -600,7 +602,7 @@ void Navp::setLastSaveFileName(const char *fileName) {
 void Navp::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
-    int navpMenuHeight = std::min(1400, renderer.height - 20);
+    int navpMenuHeight = std::min(1310, renderer.height - 20);
     if (imguiBeginScrollArea("Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
                              &navpScroll))
         gui.mouseOverMenu = true;
@@ -612,6 +614,8 @@ void Navp::drawMenu() {
         showPfExclusionBoxes = !showPfExclusionBoxes;
     if (imguiCheck("Show Pathfinding Seed Points", showPfSeedPoints))
         showPfSeedPoints = !showPfSeedPoints;
+    if (imguiCheck("Show Recast Debug info", showRecastDebugInfo))
+        showRecastDebugInfo = !showRecastDebugInfo;
     imguiLabel("Load Navp from file");
     if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
         char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
@@ -625,14 +629,14 @@ void Navp::drawMenu() {
                 msg += fileName;
                 msg += "'...";
                 Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), true, false);
+                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), true, false, false);
                 loadNavMeshThread.detach();
             } else if (extension == "NAVP") {
                 std::string msg = "Loading Navp file: '";
                 msg += fileName;
                 msg += "'...";
                 Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), false, false);
+                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), false, false, false);
                 loadNavMeshThread.detach();
             }
         }
@@ -669,7 +673,7 @@ void Navp::drawMenu() {
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     Obj &obj = Obj::getInstance();
     if (imguiButton("Build Navp from Obj and Scene",
-                    navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded)) {
+                    navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded && !Airg::getInstance().airgBuilding)) {
         std::thread buildNavpThread(&Navp::buildNavp);
         buildNavpThread.detach();
     }
@@ -678,7 +682,6 @@ void Navp::drawMenu() {
         gameConnection.connectToGame();
         gameConnection.sendNavp(navMesh);
     }
-    imguiSeparatorLine();
     imguiLabel("Selected Area");
     char selectedNavpText[64];
     snprintf(selectedNavpText, 64, selectedNavpAreaIndex != -1 ? "Area Index: %d" : "Area Index: None",
@@ -706,13 +709,11 @@ void Navp::drawMenu() {
         }
     }
 
-    imguiSeparatorLine();
     imguiLabel("PFSeedPoint Pruning Mode");
     imguiSlider("Off             Delete             Debug", &pruningMode, 0.0f, 2.0f, 1.0f);
 
     recastAdapter.handleCommonSettings();
 
-    imguiSeparatorLine();
     imguiLabel("Bounding Box");
 
     bool bboxChanged = false;
@@ -787,7 +788,7 @@ void Navp::finalizeBuild() {
         SceneExtract &sceneExtract = SceneExtract::getInstance();
         outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
-        std::thread loadNavMeshThread(&Navp::loadNavMesh, outputNavpFilename.data(), true, true);
+        std::thread loadNavMeshThread(&Navp::loadNavMesh, outputNavpFilename.data(), true, true, false);
         loadNavMeshThread.detach();
         navpBuildDone.clear();
         building = false;

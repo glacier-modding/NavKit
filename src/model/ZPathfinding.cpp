@@ -144,11 +144,14 @@ ZPathfinding::PfBoxes::PfBoxes(std::string fileName) {
     }
 }
 
-void ZPathfinding::PfBoxes::readPathfindingBBoxes() const {
+void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
     Scene &scene = Scene::getInstance();
     scene.exclusionBoxes.clear();
     bool includeBoxFound = false;
-    for (const HashAndEntity &hashAndEntity: hashesAndEntities) {
+    for (HashAndEntity &hashAndEntity: hashesAndEntities) {
+        if (hashAndEntity.entity.id == "48b22d0153942122" && abs(hashAndEntity.entity.position.x - -26.9811001) < 0.1) {
+            hashAndEntity.entity.type.data = INCLUDE_TYPE; // Workaround for bug in Sapienza's include box
+        }
         if (hashAndEntity.entity.type.data == INCLUDE_TYPE) {
             std::string id = hashAndEntity.entity.id;
             std::string name = hashAndEntity.entity.name;

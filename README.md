@@ -99,7 +99,7 @@ NavKit performs the following series of steps to be able to generate Navp files.
 # Future enhancements
 * Faster Scene generation
 * Linux and MacOS support
-# Building instructions
+# Building instructions (CLion or Visual Studio)
 You can also build NavKit yourself. To build NavKit:
 1. Clone this repository with the '--recurse-submodules' option
 1. Open in Visual Studio or CLion
@@ -108,17 +108,27 @@ You can also build NavKit yourself. To build NavKit:
 `cmake -B . -S ..`
 1. Then change back to the main directory and run  
 `cmake --preset x64-debug`
+# Building instructions (Rider)
+See [Rider Instructions](docs/rider_instructions.md)
 # Credits
-NoFate  
-Atampy25  
-Notex  
-Anthony Fuller  
-Recast team  
-rdil  
 2kpr  
-kercyx  
-Kevin Rudd  
-Invalid  
-Kercyx  
+Anthony Fuller  
+Atampy25  
+Dafitius  
 Dribbleondo  
+Invalid  
+IOI  
+Jojje  
+Kercyx  
+Kevin Rudd  
+LaNombre  
+Luka  
+Lyssa  
+NoFate  
+Notex  
+Pavle  
+Piepieonline  
+Rdil  
+Recast team  
+Voodoo Hillbilly  
 And everyone at the Glacier 2 discord!
