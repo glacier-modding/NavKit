@@ -3,6 +3,8 @@
 # Running instructions
 You can run NavKit by opening `NavKit.exe`. To use the **View Navp in game** and **Scene Extraction** features, you will need ZHMModSdk installed, and you will need to copy the included `Editor.dll` to your `Hitman 3\Retail\mods` folder. For the **Scene Extraction** feature, you will also need to have Blender installed.
 
+You will also need to install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
+
 Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, scene extraction, building Navp, building Airg and viewing navp in game.  
 
 # View Navp in game
@@ -16,6 +18,7 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Backup the "HITMAN 3\Retail\mods\Editor.dll" file
 1. Copy the included Editor.dll from the NavKit folder to the "HITMAN 3\Retail\mods" folder
 1. Install Blender (tested with 3.4 https://download.blender.org/release/Blender3.4/)
+1. Install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
 1. Start Hitman and enter a mission
 1. Open NavKit
 1. On the "Extract menu" of NavKit, set your file paths:
