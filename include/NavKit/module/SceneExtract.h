@@ -37,9 +37,9 @@ public:
     bool errorExtracting;
     bool alsoBuildObj;
 
-    char *openHitmanFolderDialog(char *lastHitmanFolder);
+    static char *openHitmanFolderDialog(char *lastHitmanFolder);
 
-    char *openOutputFolderDialog(char *lastOutputFolder);
+    static char *openOutputFolderDialog(char *lastOutputFolder);
 
 private:
     void extractScene();

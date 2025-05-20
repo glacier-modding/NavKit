@@ -68,7 +68,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     recastAirgAdapter.save(outputNavpFilename);
     std::thread loadNavMeshThread(&Navp::loadNavMesh, outputNavpFilename.data(), true, true, true);
     loadNavMeshThread.join();
-    
+
     return false;
 }
 
@@ -166,37 +166,19 @@ void GridGenerator::GenerateWaypointNodes() {
     int areaCount = navMesh->m_areas.size();
     for (auto area: navMesh->m_areas) {
         areaIndex++;
-        NavPower::BBox areaBBox = Pathfinding::calculateBBox(&area);
+        auto [m_min, m_max] = Pathfinding::calculateBBox(&area);
         if (areaIndex % 100 == 0) {
             Vec3 pos = area.m_area->m_pos;
             char v[16];
             snprintf(v, sizeof(v), "%.2f", pos.X);
-            std::string msg = "Processing area " + std::to_string(areaIndex) + " / " + std::to_string(areaCount) +
-                              ": pos: (";
-            msg += std::string{v};
-            snprintf(v, sizeof(v), "%.2f", pos.Y);
-            msg += ", " + std::string{v};
-            snprintf(v, sizeof(v), "%.2f", pos.Z);
-            msg += ", " + std::string{v} + ") Edges: [";
-            int edgeIndex = 0;
-            for (auto vertex: area.m_edges) {
-                msg += std::to_string(edgeIndex) + ": (";
-                snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
-                msg += std::string{v};
-                snprintf(v, sizeof(v), "%.2f", vertex->m_pos.Y);
-                msg += ", " + std::string{v};
-                snprintf(v, sizeof(v), "%.2f", vertex->m_pos.Z);
-                msg += ", " + std::string{v} + ") ";
-                edgeIndex++;
-            }
-            msg += "]";
+            std::string msg = "Processing area " + std::to_string(areaIndex) + " / " + std::to_string(areaCount);
             Logger::log(NK_INFO, (msg).c_str());
         }
 
-        int minX = floor((areaBBox.m_min.X - grid->m_Properties.vMin.x) / spacing);
-        int minY = floor((areaBBox.m_min.Y - grid->m_Properties.vMin.y) / spacing);
-        int maxX = floor((areaBBox.m_max.X - grid->m_Properties.vMin.x) / spacing);
-        int maxY = floor((areaBBox.m_max.Y - grid->m_Properties.vMin.y) / spacing);
+        int minX = floor((m_min.X - grid->m_Properties.vMin.x) / spacing);
+        int minY = floor((m_min.Y - grid->m_Properties.vMin.y) / spacing);
+        int maxX = floor((m_max.X - grid->m_Properties.vMin.x) / spacing);
+        int maxY = floor((m_max.Y - grid->m_Properties.vMin.y) / spacing);
         for (int yi = minY; yi <= maxY; ++yi) {
             for (int xi = minX; xi <= maxX; ++xi) {
                 float worldX = xi * spacing + grid->m_Properties.vMin.x;
@@ -414,7 +396,9 @@ void GridGenerator::AlignNodes() {
             float distanceThreshold = static_cast<float>(gridSpacing * 0.2) * 0.33399999;
             if (IsInside(&remappedLocation)) {
                 SVector3 remappedNavPowerPosVec3 = remappedLocation.pos;
-                float4 remappedNavPowerPos{remappedNavPowerPosVec3.x, remappedNavPowerPosVec3.y, remappedNavPowerPosVec3.z, 0.0};
+                float4 remappedNavPowerPos{
+                    remappedNavPowerPosVec3.x, remappedNavPowerPosVec3.y, remappedNavPowerPosVec3.z, 0.0
+                };
                 float4 distance = {remappedNavPowerPos - cellNavPowerPosition};
                 if (distance.x < distanceThreshold &&
                     distance.y < distanceThreshold
@@ -520,7 +504,7 @@ void GridGenerator::GenerateLayerIndices() {
     int neighborIndex = 0;
     bool allLayersAssigned = false;
     while (!allLayersAssigned) {
-        allLayersAssigned = true; 
+        allLayersAssigned = true;
         while (waypoint != airg.reasoningGrid->m_WaypointList.end()) {
             if (waypoint->nLayerIndex == -1) {
                 int layerIndex = 0;
@@ -710,8 +694,7 @@ Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
     return result;
 }
 
-bool GridGenerator::MapLocation(const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped)
-{
+bool GridGenerator::MapLocation(const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped) {
     constexpr float fAcceptance = 2.0;
     Pathfinding::ZPFLocation *pfLocation;
     Pathfinding::ZPFLocation result;
@@ -763,9 +746,9 @@ float4 GridGenerator::MapToCell(const float4 *vCellNavPowerUpperLeft, const NavP
         const float offsetX = first * 0.2f + 0.1f;
         const float offsetY = second * 0.2f + 0.1f;
         float4 sampleNavPowerPoint = *vCellNavPowerUpperLeft + float4(
-                                 offsetX * airg.reasoningGrid->m_Properties.fGridSpacing,
-                                 offsetY * airg.reasoningGrid->m_Properties.fGridSpacing,
-                                 0.0f, 0.0f);
+                                         offsetX * airg.reasoningGrid->m_Properties.fGridSpacing,
+                                         offsetY * airg.reasoningGrid->m_Properties.fGridSpacing,
+                                         0.0f, 0.0f);
         MapLocation(&sampleNavPowerPoint, &pfLocation);
         if (IsInside(&pfLocation) && pfLocation.mapped) {
             const float4 candidateNavPowerPoint = {pfLocation.pos.x, pfLocation.pos.y, pfLocation.pos.z, 0.0f};
@@ -780,9 +763,11 @@ float4 GridGenerator::MapToCell(const float4 *vCellNavPowerUpperLeft, const NavP
                 distance.z <= distanceThreshold.z) {
                 Vec3 centroidNavPower;
                 RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
-                centroidNavPower = RecastAdapter::convertFromRecastToNavPower(recastAirgAdapter.calculateCentroid(pfLocation.polyRef));
+                centroidNavPower = RecastAdapter::convertFromRecastToNavPower(
+                    recastAirgAdapter.calculateCentroid(pfLocation.polyRef));
                 if (const auto areaNavPowerPos = area.m_area->m_pos;
-                    abs(centroidNavPower.X - areaNavPowerPos.X) < 0.1 && abs(centroidNavPower.Y - areaNavPowerPos.Y) < 0.1 && abs(
+                    abs(centroidNavPower.X - areaNavPowerPos.X) < 0.1 && abs(centroidNavPower.Y - areaNavPowerPos.Y) <
+                    0.1 && abs(
                         centroidNavPower.X - areaNavPowerPos.Z) < 0.1) {
                     if (area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) {
                         found = true;
@@ -889,7 +874,8 @@ void GridGenerator::GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap
                     // Check if cell is walkable (not stairs or other obstacles)
                     Navp &navp = Navp::getInstance();
                     RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
-                    auto centroidNavPowerVec3 = RecastAdapter::convertFromRecastToNavPower(recastAirgAdapter.calculateCentroid(cellLocation.polyRef));
+                    auto centroidNavPowerVec3 = RecastAdapter::convertFromRecastToNavPower(
+                        recastAirgAdapter.calculateCentroid(cellLocation.polyRef));
                     auto area = navp.posToAreaMap.find(centroidNavPowerVec3);
                     if (area != navp.posToAreaMap.end() && area->second->m_area->m_usageFlags ==
                         NavPower::AreaUsageFlags::AREA_STEPS) {
@@ -974,7 +960,8 @@ void GridGenerator::CalculateConnectivity(const bool *cellBitmap, int *pCellConn
     }
 }
 
-bool GridGenerator::NearestOuterEdge(Pathfinding::ZPFLocation &lFrom, float fRadius, float4 *edgeNavPowerResult, float4 *edgeNavPowerNormal) {
+bool GridGenerator::NearestOuterEdge(Pathfinding::ZPFLocation &lFrom, float fRadius, float4 *edgeNavPowerResult,
+                                     float4 *edgeNavPowerNormal) {
     // Check if the input location is inside a valid area
     if (!IsInside(&lFrom)) {
         return false;
@@ -1021,7 +1008,8 @@ bool GridGenerator::NearestOuterEdge(Pathfinding::ZPFLocation &lFrom, float fRad
             float4 edgeNavPowerEndPos = {edgeNavPowerEnd.X, edgeNavPowerEnd.Y, edgeNavPowerEnd.Z, 1.0f};
             float4 currentNavPowerPoint;
             float4 pointNavPower = {lFrom.pos.x, lFrom.pos.y, lFrom.pos.z, 1.0};
-            Pathfinding::ClosestPointOnSegment(&currentNavPowerPoint, &edgeNavPowerStartPos, &edgeNavPowerEndPos, &pointNavPower);
+            Pathfinding::ClosestPointOnSegment(&currentNavPowerPoint, &edgeNavPowerStartPos, &edgeNavPowerEndPos,
+                                               &pointNavPower);
 
             // Calculate distance squared from the input location to the current point
             const float4 distance = pointNavPower - currentNavPowerPoint;

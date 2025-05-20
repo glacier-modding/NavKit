@@ -60,7 +60,6 @@ int GameConnection::closeConnection() const {
         ws->dispatch([&](const std::string &message) {
             Logger::log(NK_INFO, ("GameConnection: Received message during close attempt: " + message).c_str());
         });
-
     }
 
     if (ws && ws->getReadyState() == WebSocket::CLOSED) {
@@ -68,7 +67,8 @@ int GameConnection::closeConnection() const {
     } else if (!ws) {
         Logger::log(NK_WARN, "GameConnection: Editor connection became invalid during close polling.");
     } else {
-        Logger::log(NK_WARN, "GameConnection: Socket state is still '%d' after close attempt.", static_cast<int>(ws->getReadyState()));
+        Logger::log(NK_WARN, "GameConnection: Socket state is still '%d' after close attempt.",
+                    static_cast<int>(ws->getReadyState()));
     }
 
     return 0;
@@ -96,129 +96,46 @@ int GameConnection::rebuildEntityTree() const {
     return 0;
 }
 
-int GameConnection::listAlocEntities() const {
+int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
     std::stringstream m;
-    m << R"({"type":"listAlocEntities"})";
+    m << R"({"type":"listAlocPfBoxAndSeedPointEntities"})";
     const std::string msg = m.str();
     ws->send(msg);
     if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: listAlocEntities failed because the socket is not open.");
+        Logger::log(
+            NK_ERROR, "GameConnection: listAlocPfBoxAndSeedPointEntities failed because the socket is not open.");
         return 1;
     }
     std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
-    f << R"({"alocs":[)";
     bool done = false;
-    bool isFirst = true;
     int messagesReceived = 0;
     while (!done) {
         ws->poll();
         ws->dispatch([&](const std::string &message) {
             messagesReceived++;
             if (messagesReceived % 100 == 0) {
-                Logger::log(NK_INFO, ("Aloc entities found: " + std::to_string(messagesReceived)).c_str());
+                Logger::log(NK_INFO, ("Entities found: " + std::to_string(messagesReceived)).c_str());
             }
             if (message == "Done sending entities.") {
                 done = true;
                 return;
             }
-            if (message.find("Unknown editor message type: listAlocEntities") != -1) {
+            if (message == "Rebuilding tree.") {
+                Logger::log(NK_INFO, "Rebuilding Entity Tree...");
+                return;
+            }
+            if (message == R"({"type":"welcome"})") {
+                return;
+            }
+            if (message.find("Unknown editor message type: listAlocPfBoxAndSeedPointEntities") != -1) {
                 Logger::log(NK_ERROR,
                             "Failed to get ALOCs from game. Is the included Editor.dll in the Retail/mods folder?");
                 done = true;
                 return;
             }
-            if (!isFirst) {
-                f << ",";
-            }
-            isFirst = false;
             f << message;
         });
     }
-    f << R"(],"pfBoxes":[)";
-    f.close();
-    return 0;
-}
-
-int GameConnection::listPfBoxEntities() const {
-    std::stringstream m;
-    m << R"({"type":"listPfBoxEntities"})";
-    const std::string msg = m.str();
-    ws->send(msg);
-    if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: listPfBoxEntities failed because the socket is not open.");
-        return 1;
-    }
-    std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
-    bool done = false;
-    bool isFirst = true;
-    int messagesReceived = 0;
-    while (!done) {
-        ws->poll();
-        ws->dispatch([&](const std::string &message) {
-            messagesReceived++;
-            if (messagesReceived % 100 == 0) {
-                Logger::log(NK_INFO, ("PF Boxes found: " + std::to_string(messagesReceived)).c_str());
-            }
-            if (message == "Done sending entities.") {
-                done = true;
-                return;
-            }
-            if (message.find("Unknown editor message type: listPfBoxEntities") != -1) {
-                Logger::log(NK_ERROR,
-                            "Failed to get Pathfinding Boxes from game. Is the included Editor.dll in the Retail/mods folder?");
-                done = true;
-                return;
-            }
-            if (!isFirst) {
-                f << ",";
-            }
-            isFirst = false;
-            f << message;
-        });
-    }
-    f << R"(],"pfSeedPoints":[)";
-    f.close();
-    return 0;
-}
-
-int GameConnection::listPfSeedPointEntities() const {
-    std::stringstream m;
-    m << R"({"type":"listPfSeedPointEntities"})";
-    const std::string msg = m.str();
-    ws->send(msg);
-    if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: listPfSeedPointEntities failed because the socket is not open.");
-        return 1;
-    }
-    std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
-    bool done = false;
-    bool isFirst = true;
-    int messagesReceived = 0;
-    while (!done) {
-        ws->poll();
-        ws->dispatch([&](const std::string &message) {
-            messagesReceived++;
-            if (messagesReceived % 100 == 0) {
-                Logger::log(NK_INFO, ("PF Seed points found: " + std::to_string(messagesReceived)).c_str());
-            }
-            if (message == "Done sending entities.") {
-                done = true;
-                return;
-            }
-            if (message.find("Unknown editor message type: listPfSeedPointEntities") != -1) {
-                Logger::log(NK_ERROR,
-                            "Failed to get Pathfinding Seed Points from game. Is the included Editor.dll in the Retail/mods folder?");
-                done = true;
-                return;
-            }
-            if (!isFirst) {
-                f << ",";
-            }
-            isFirst = false;
-            f << message;
-        });
-    }
-    f << "]}";
     f.close();
     return 0;
 }
