@@ -38,8 +38,7 @@ SceneExtract::SceneExtract() {
 
 const int SceneExtract::SCENE_EXTRACT_MENU_HEIGHT = 83;
 
-SceneExtract::~SceneExtract() {
-}
+SceneExtract::~SceneExtract() = default;
 
 void SceneExtract::setHitmanFolder(const char *folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
@@ -70,10 +69,13 @@ void SceneExtract::setOutputFolder(const char *folderName) {
 }
 
 void SceneExtract::drawMenu() {
-    Renderer &renderer = Renderer::getInstance();
-    if (imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
-                             renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
-                             SCENE_EXTRACT_MENU_HEIGHT - 10, 250, SCENE_EXTRACT_MENU_HEIGHT, &extractScroll)) {
+    if (const Renderer &renderer = Renderer::getInstance();
+        imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
+                             renderer.height - 10 -
+                             Settings::SETTINGS_MENU_HEIGHT -
+                             Scene::SCENE_MENU_HEIGHT -
+                             SCENE_EXTRACT_MENU_HEIGHT - 10, 250,
+                             SCENE_EXTRACT_MENU_HEIGHT, &extractScroll)) {
         Gui::getInstance().mouseOverMenu = true;
     }
     if (imguiButton("Extract from game", hitmanSet && outputSet && !extractingFromGame && !extractingAlocs)) {
@@ -82,10 +84,10 @@ void SceneExtract::drawMenu() {
         alsoBuildObj = false;
         extractScene();
     }
-    if (Obj &obj = Obj::getInstance(); imguiButton("Extract from game and build obj",
-                                                   hitmanSet && obj.blenderSet && outputSet && !extractingFromGame && !
-                                                   extractingAlocs && !obj.
-                                                   blenderObjStarted && !obj.blenderObjGenerationDone)) {
+    if (const Obj &obj = Obj::getInstance();
+        imguiButton("Extract from game and build obj",
+                    hitmanSet && obj.blenderSet && outputSet && !extractingFromGame
+                    && !extractingAlocs && !obj.blenderObjStarted && !obj.blenderObjGenerationDone)) {
         Gui &gui = Gui::getInstance();
         gui.showLog = true;
         alsoBuildObj = true;
@@ -105,19 +107,7 @@ void SceneExtract::extractFromGame(const std::function<void()> &callback, const 
         errorCallback();
         return;
     }
-    if (gameConnection.rebuildEntityTree()) {
-        errorCallback();
-        return;
-    }
-    if (gameConnection.listAlocEntities()) {
-        errorCallback();
-        return;
-    }
-    if (gameConnection.listPfBoxEntities()) {
-        errorCallback();
-        return;
-    }
-    if (gameConnection.listPfSeedPointEntities()) {
+    if (gameConnection.listAlocPfBoxAndSeedPointEntities()) {
         errorCallback();
         return;
     }
@@ -129,7 +119,7 @@ void SceneExtract::extractFromGame(const std::function<void()> &callback, const 
 }
 
 void SceneExtract::extractScene() {
-    Logger::log(NK_INFO, "Extracting scene from game.");
+    Logger::log(NK_INFO, "Extracting scene from game...");
     GameConnection &gameConnection = GameConnection::getInstance();
     extractingFromGame = true;
 
@@ -157,16 +147,14 @@ void SceneExtract::extractAlocs() {
     std::string runtimeFolder = "\"";
     runtimeFolder += lastHitmanFolder;
     runtimeFolder += "\\Runtime\"";
-    std::string alocFolder = "";
+    std::string alocFolder;
     alocFolder += lastOutputFolder;
     alocFolder += "\\aloc";
 
-    struct stat folderExists;
-    int statRC = stat(alocFolder.data(), &folderExists);
-    if (statRC != 0) {
+    struct stat folderExists{};
+    if (int statRC = stat(alocFolder.data(), &folderExists); statRC != 0) {
         if (errno == ENOENT) {
-            int status = mkdir(alocFolder.c_str());
-            if (status != 0) {
+            if (int status = _mkdir(alocFolder.c_str()); status != 0) {
                 Logger::log(NK_ERROR, "Error creating prim folder");
             }
         }

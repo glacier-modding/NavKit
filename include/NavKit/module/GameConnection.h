@@ -33,15 +33,11 @@ public:
 
     int connectToGame();
 
-    int closeConnection() const;
+    [[nodiscard]] int closeConnection() const;
 
-    int rebuildEntityTree() const;
+    [[nodiscard]] int rebuildEntityTree() const;
 
-    int listAlocEntities() const;
-
-    int listPfBoxEntities() const;
-
-    int listPfSeedPointEntities() const;
+    [[nodiscard]] int listAlocPfBoxAndSeedPointEntities() const;
 
 private:
     void sendHelloMessage() const;
