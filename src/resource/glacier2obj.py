@@ -824,6 +824,10 @@ class Physics:
         aloc_name = bpy.path.display_name_from_filepath(filepath)
 
         log("INFO", "Loading aloc file " + aloc_name, aloc_name)
+        file_size = os.path.getsize(filepath)
+        if file_size == 19:
+            log("INFO", "[INFO] Skipping header only ALOC: " + aloc_name, aloc_name)
+            return -1
 
         fp = os.fsencode(filepath)
         file = open(fp, "rb")
@@ -970,8 +974,10 @@ def read_aloc(filepath):
     file = open(fp, "rb")
     br = BinaryReader(file)
     aloc = Physics()
-    aloc.read(filepath)
+    return_val = aloc.read(filepath)
     br.close()
+    if return_val == -1:
+        return -1
     log("DEBUG", "Finished reading ALOC from file: " + filepath + ".", "read_aloc")
 
     return aloc
@@ -1066,6 +1072,8 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
 
     aloc_name = bpy.path.display_name_from_filepath(filepath)
     aloc = read_aloc(filepath)
+    if aloc == -1:
+        return -1, -1
     log("DEBUG", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
     collection = context.scene.collection
@@ -1329,6 +1337,7 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
         if aloc_hash not in transforms:
             continue
         if aloc_hash in excluded_aloc_hashes:
+            log("INFO", "Skipping aloc file " + aloc_hash, aloc_hash)
             continue
         aloc_path = os.path.join(path_to_aloc_dir, aloc_filename)
 
@@ -1337,6 +1346,8 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
             collision_type, objects = load_aloc(
                 None, context, aloc_path, False
             )
+            if collision_type == -1 and objects == -1:
+                continue
         except struct.error as err:
             log("DEBUG", "=========================== Error Loading aloc: " + str(aloc_hash) + " Exception: " + str(err) + " ================", "load_scenario")
             continue

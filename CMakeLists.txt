@@ -16,7 +16,7 @@ endif ()
 
 project(
         NavKit
-        VERSION 1.0.0
+        VERSION 2.0.0
         DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman"
         LANGUAGES CXX)
 
