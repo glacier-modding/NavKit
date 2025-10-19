@@ -130,26 +130,26 @@ void GridGenerator::GenerateGrid() {
 }
 
 void GridGenerator::GetGridProperties() {
-    const Airg &airg = Airg::getInstance();
     const Grid &grid = Grid::getInstance();
     const Navp &navp = Navp::getInstance();
-    ReasoningGrid *reasoningGrid = airg.reasoningGrid;
     Vec3 min = navp.navMesh->m_graphHdr->m_bbox.m_min;
     const Vec3 max = navp.navMesh->m_graphHdr->m_bbox.m_max;
     min.X += grid.xOffset;
     min.Y += grid.yOffset;
     const int gridXSize = std::ceil((max.X - min.X) / grid.spacing);
-    reasoningGrid->m_Properties.fGridSpacing = grid.spacing;
-    reasoningGrid->m_Properties.nGridWidth = gridXSize;
-    reasoningGrid->m_Properties.vMin.x = min.X;
-    reasoningGrid->m_Properties.vMin.y = min.Y;
-    reasoningGrid->m_Properties.vMin.z = min.Z;
-    reasoningGrid->m_Properties.vMin.w = 1;
-    reasoningGrid->m_Properties.vMax.x = max.X;
-    reasoningGrid->m_Properties.vMax.y = max.Y;
-    reasoningGrid->m_Properties.vMax.z = max.Z;
-    reasoningGrid->m_Properties.vMax.w = 1;
-    reasoningGrid->m_Properties.nVisibilityRange = 23;
+    auto &[vMin, vMax, nGridWidth, fGridSpacing, nVisibilityRange] =
+            Airg::getInstance().reasoningGrid->m_Properties;
+    fGridSpacing = grid.spacing;
+    nGridWidth = gridXSize;
+    vMin.x = min.X;
+    vMin.y = min.Y;
+    vMin.z = min.Z;
+    vMin.w = 1;
+    vMax.x = max.X;
+    vMax.y = max.Y;
+    vMax.z = max.Z;
+    vMax.w = 1;
+    nVisibilityRange = 23;
 }
 
 void GridGenerator::GenerateWaypointNodes() {

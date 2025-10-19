@@ -27,46 +27,47 @@
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 
-Navp::Navp() {
-    loadNavpName = "Load Navp";
-    lastLoadNavpFile = loadNavpName;
-    saveNavpName = "Save Navp";
-    lastSaveNavpFile = saveNavpName;
-    navpLoaded = false;
-    showNavp = true;
-    showNavpIndices = false;
-    showPfExclusionBoxes = true;
-    showPfSeedPoints = true;
-    showRecastDebugInfo = false;
-    navMesh = new NavPower::NavMesh();
-    selectedNavpAreaIndex = -1;
-    selectedPfSeedPointIndex = -1;
-    selectedExclusionBoxIndex = -1;
-    doNavpHitTest = false;
-    doNavpExclusionBoxHitTest = false;
-    doNavpPfSeedPointHitTest = false;
-    navpScroll = 0;
-    bBoxPosX = 0.0;
-    bBoxPosY = 0.0;
-    bBoxPosZ = 0.0;
-    bBoxScaleX = 1000.0;
-    bBoxScaleY = 300.0;
-    bBoxScaleZ = 1000.0;
-    lastBBoxPosX = 0.0;
-    lastBBoxPosY = 0.0;
-    lastBBoxPosZ = 0.0;
-    lastBBoxScaleX = 1000.0;
-    lastBBoxScaleY = 300.0;
-    lastBBoxScaleZ = 1000.0;
+Navp::Navp()
+    : navMesh(new NavPower::NavMesh())
+      , selectedNavpAreaIndex(-1)
+      , selectedPfSeedPointIndex(-1)
+      , selectedExclusionBoxIndex(-1)
+      , navpLoaded(false)
+      , showNavp(true)
+      , showNavpIndices(false)
+      , showPfExclusionBoxes(true)
+      , showPfSeedPoints(true)
+      , showRecastDebugInfo(false)
+      , doNavpHitTest(false)
+      , doNavpExclusionBoxHitTest(false)
+      , doNavpPfSeedPointHitTest(false)
+      , navpScroll(0)
+      , loading(false)
+      , bBoxPosX(0.0)
+      , bBoxPosY(0.0)
+      , bBoxPosZ(0.0)
+      , bBoxScaleX(1000.0)
+      , bBoxScaleY(300.0)
+      , bBoxScaleZ(1000.0)
+      , lastBBoxPosX(0.0)
+      , lastBBoxPosY(0.0)
+      , lastBBoxPosZ(0.0)
+      , lastBBoxScaleX(1000.0)
+      , lastBBoxScaleY(300.0)
+      , lastBBoxScaleZ(1000.0)
+      , stairsCheckboxValue(false)
+      , pruningMode(1.0f)
+      , loadNavpName("Load Navp")
+      , lastLoadNavpFile(loadNavpName)
+      , saveNavpName("Save Navp")
+      , lastSaveNavpFile(saveNavpName)
+      , building(false) {
     bBoxPos[0] = 0;
     bBoxPos[1] = 0;
     bBoxPos[2] = 0;
     bBoxScale[0] = 1000;
     bBoxScale[1] = 300;
     bBoxScale[2] = 1000;
-    stairsCheckboxValue = false;
-    loading = false;
-    pruningMode = 1.0f;
     Logger::log(NK_INFO,
                 ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " +
                  std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxScale[0]) + ", " + std::to_string(bBoxScale[1])
@@ -80,7 +81,7 @@ void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (ZPathfinding::PfSeedPoint seedPoint: Scene::getInstance().pfSeedPoints) {
+        for (const ZPathfinding::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
             Vec3 fill = {0, 0, 0.6};
             Vec3 outline = {0, 0, 0.8};
             if (selectedPfSeedPointIndex == i) {
@@ -105,15 +106,17 @@ void Navp::renderPfSeedPointsForHitTest() const {
     if (showPfSeedPoints) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (ZPathfinding::PfSeedPoint seedPoint: Scene::getInstance().pfSeedPoints) {
+        for (const ZPathfinding::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
+            const int highByte = (i >> 8) & 0xFF;
+            const int lowByte = i & 0xFF;
             renderer.drawBox(
                 {seedPoint.pos.x, seedPoint.pos.z + 0.5f, -seedPoint.pos.y},
                 {0.25, 0.5, 0.25},
                 {0, 0, 0, 1},
                 true,
-                {62.0f / 255.05f, float(i / 255) / 255.0f, float(i % 255) / 255.05f},
+                {62.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 true,
-                {62.0f / 255.05f, float(i / 255) / 255.0f, float(i % 255) / 255.05f},
+                {62.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 1.0);
             i++;
         }
@@ -139,7 +142,7 @@ void Navp::renderExclusionBoxes() const {
     if (showPfExclusionBoxes) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (ZPathfinding::PfBox exclusionBox: Scene::getInstance().exclusionBoxes) {
+        for (const ZPathfinding::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
             Vec3 fill = {0.6, 0, 0};
             Vec3 outline = {0.8, 0, 0};
             if (selectedExclusionBoxIndex == i) {
@@ -164,22 +167,24 @@ void Navp::renderExclusionBoxesForHitTest() const {
     if (showPfExclusionBoxes) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (ZPathfinding::PfBox exclusionBox: Scene::getInstance().exclusionBoxes) {
+        for (const ZPathfinding::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
+            const int highByte = (i >> 8) & 0xFF;
+            const int lowByte = i & 0xFF;
             renderer.drawBox(
                 {exclusionBox.pos.x, exclusionBox.pos.z, -exclusionBox.pos.y},
                 {exclusionBox.scale.x, exclusionBox.scale.z, -exclusionBox.scale.y},
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
                 true,
-                {63.0f / 255.05f, float(i / 255) / 255.0f, float(i % 255) / 255.05f},
+                {63.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 true,
-                {63.0f / 255.05f, float(i / 255) / 255.0f, float(i % 255) / 255.05f},
+                {63.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 1.0);
             i++;
         }
     }
 }
 
-char *Navp::openLoadNavpFileDialog(char *lastNavpFolder) {
+char *Navp::openLoadNavpFileDialog(const char *lastNavpFolder) {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdLoadDialog(filters, 2, lastNavpFolder);
 }
@@ -189,8 +194,8 @@ char *Navp::openSaveNavpFileDialog(char *lastNavpFolder) {
     return FileUtil::openNfdSaveDialog(filters, 2, "output", lastNavpFolder);
 }
 
-void Navp::setBBox(float *pos, float *scale) {
-    Navp &navp = Navp::getInstance();
+void Navp::setBBox(const float *pos, const float *scale) {
+    Navp &navp = getInstance();
     bBoxPos[0] = pos[0];
     navp.bBoxPosX = pos[0];
     bBoxPos[1] = pos[1];
@@ -223,8 +228,7 @@ void Navp::setBBox(float *pos, float *scale) {
 
 void Navp::updateExclusionBoxConvexVolumes() {
     if (Obj::getInstance().objLoaded) {
-        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        if (recastAdapter.inputGeom) {
+        if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             recastAdapter.clearConvexVolumes();
             for (ZPathfinding::PfBox exclusionBox: Scene::getInstance().exclusionBoxes) {
                 recastAdapter.addConvexVolume(exclusionBox);
@@ -233,26 +237,25 @@ void Navp::updateExclusionBoxConvexVolumes() {
     }
 }
 
-bool Navp::areaIsStairs(NavPower::Area area) {
+bool Navp::areaIsStairs(const NavPower::Area &area) {
     return area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
 }
 
 void Navp::setStairsFlags() const {
     for (auto &area: navMesh->m_areas) {
-        Vec3 normal = area.CalculateNormal();
-        Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
-        float horizontalMagnitude = std::sqrt(
+        const Vec3 normal = area.CalculateNormal();
+        const Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
+        const float horizontalMagnitude = std::sqrt(
             horizontalProjection.X * horizontalProjection.X + horizontalProjection.Z * horizontalProjection.Z);
         if (horizontalMagnitude == 0.0f) {
             continue;
         }
-        float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
-        float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
+        const float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
+        const float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
         float cosineAngle = dotProduct / (normalMagnitude * horizontalMagnitude);
         cosineAngle = std::clamp(cosineAngle, -1.0f, 1.0f);
-        float angleRadians = std::acos(cosineAngle);
-        float angleDegrees = angleRadians * 180.0f / M_PI;
-        if (angleDegrees >= 18.0f) {
+        const float angleRadians = std::acos(cosineAngle);
+        if (const float angleDegrees = angleRadians * 180.0f / std::numbers::pi_v<float>; angleDegrees >= 18.0f) {
             area.m_area->m_usageFlags = NavPower::AreaUsageFlags::AREA_STEPS;
         }
     }

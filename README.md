@@ -1,7 +1,9 @@
 # NavKit
 *A tool to generate Navp and Airg files for Hitman: World of Assassination Scenes in the Glacier 2 Engine*
-# Running instructions
-You can run NavKit by opening `NavKit.exe`. To use the **View Navp in game** and **Scene Extraction** features, you will need ZHMModSdk installed, and you will need to copy the included `Editor.dll` to your `Hitman 3\Retail\mods` folder. For the **Scene Extraction** feature, you will also need to have Blender installed.
+# How to Use
+The [NavKit Guide](https://glaciermodding.org/docs/modding/hitman/customcampaigns/using_navkit) is available on the [Glacier Modding Wiki](https://glaciermodding.org/).
+
+You can run NavKit by opening `NavKit.exe`. To use the **View Navp in game** and **Scene Extraction** features, you will need ZHMModSdk installed. For the **Scene Extraction** feature, you will also need to have Blender installed.
 
 You will also need to install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
 
@@ -13,19 +15,17 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Click the `Send Navp` button in NavKit.
 
 # Full generation of Navp and Airg (Scene Extraction, Navp generation, Airg generation)
-1. Download the lastest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and extract it to any folder (e.g. C:\NavKit)
+1. Download the latest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and extract it to any folder (e.g., C:\NavKit)
 1. Install ZHMModSDK (https://github.com/OrfeasZ/ZHMModSDK/releases/latest)
-1. Backup the "HITMAN 3\Retail\mods\Editor.dll" file
-1. Copy the included Editor.dll from the NavKit folder to the "HITMAN 3\Retail\mods" folder
 1. Install Blender (tested with 3.4 https://download.blender.org/release/Blender3.4/)
 1. Install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
 1. Start Hitman and enter a mission
 1. Open NavKit
 1. On the "Extract menu" of NavKit, set your file paths:
-    1. Hitman 3 directory (e.g. C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
-    1. Output directory (e.g. C:\NavKit\Output)
+    1. Hitman 3 directory (e.g., C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
+    1. Output directory (e.g., C:\NavKit\Output)
     1. Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)
-1. On the "Extract menu" of NavKit, click "Extract from game". It may take up to around 10 minutes depending on the complexity of the mission being extracted, and whether the alocs have already been extracted from the rpkg files.  
+1. On the "Extract menu" of NavKit, click the "Extract from game" button. It may take up to around 10 minutes depending on the complexity of the mission being extracted, and whether the alocs have already been extracted from the rpkg files.  
 1. When the OBJ finishes generating, you can save it to an OBJ file so you can load it later if you'd like by clicking the "Save Obj" button on the "Obj menu"
 1. On the "Navp menu" click the "Build Navp from Obj" button
 1. On the "Navp menu" click the "Save Navp" button and choose where to save the navp file
@@ -34,7 +34,7 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 
 # Adding navp and airg to a new scene
 1. Include the .navp and .airg files in the chunk folder for your brick
-1. Choose an IOI string for it (for instance [assembly:/_pro/scenes/missions/trapped/scene_wolverine_modified.navp].pc_navp)
+1. Choose an IOI string for it (for instance, [assembly:/_pro/scenes/missions/trapped/scene_wolverine_modified.navp].pc_navp)
 1. In GlacierKit, search the original scene file for "navp" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario_[scene name]\Global\Pathfinder\PathfinderConfiguration
 1. Copy the entity id (in this example screenshot it is 0f374e8c1e033807) and put it somewhere easily accessible
 1. Open your new brick file in GlacierKit in the Editor
@@ -92,8 +92,8 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 # How NavKit generates Navp and Airg files 
 NavKit performs the following series of steps to be able to generate Navp files.
 1. Connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's ZGeomEntities, PFBox entities, and PFSeedPoint entities and send their data back to NavKit, where they are saved to `output.nav.json` in the specified output folder.
-1. Extract all the needed Aloc files from the rpkg files to the `aloc` folder of the specified output folder.
-1. Open the blender cli and run `glacier2obj.py` to generate an obj by importing all of the Aloc files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` in the specified output folder.
+1. Extract all the necessary Aloc files from the rpkg files to the `aloc` folder of the specified output folder.
+1. Open the blender cli and run `glacier2obj.py` to generate an obj by importing all the Aloc files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` in the specified output folder.
 1. Load `output.obj` from the specified output folder or another specified Obj file.
 1. At this point, the build Navp section of the menu will be available, and you can customize the parameters, then press build to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
 1. At this point, the build Airg section of the menu will be available, and you can customize the parameters, then press build to generate the Airg.
@@ -101,7 +101,7 @@ NavKit performs the following series of steps to be able to generate Navp files.
 *NavKit is still a work in progress, and there may be glitches or issues with Obj, Navp, or Airg generation in the current version. If you encounter any problems while running NavKit please create an issue on this GitHub repo.*
 # Future enhancements
 * Faster Scene generation
-* Linux and MacOS support
+* Linux and macOS support
 # Building instructions (CLion or Visual Studio)
 You can also build NavKit yourself. To build NavKit:
 1. Clone this repository with the '--recurse-submodules' option

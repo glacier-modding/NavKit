@@ -132,15 +132,6 @@ add_custom_command(
     VERBATIM
 )
 
-# Copy Editor.dll
-add_custom_command(
-    TARGET NavKit POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${NavKit_SOURCE_DIR}/bin/Editor.dll"
-        "$<TARGET_FILE_DIR:NavKit>/"
-    COMMENT "Copying Editor.dll to $<TARGET_FILE_DIR:NavKit>"
-    VERBATIM
-)
 # Copy nfd.dll (Adjust source path if Release version exists)
 set(NFD_DLL_PATH_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.dll")
 set(NFD_DLL_GENEX "$<IF:$<CONFIG:Debug>,${NFD_DLL_PATH_DEBUG},${NFD_DLL_PATH_DEBUG}>") # Assuming Debug only for now

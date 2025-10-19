@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../model/CollisionMesh.h"
 #include "../model/ReasoningGrid.h"
 #include "../util/Pathfinding.h"
 #include <DetourNavMesh.h>

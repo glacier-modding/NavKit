@@ -1,7 +1,7 @@
 ## Building and debugging NavKit with JetBrains Rider
 1. Create a new run configuration of type Shell Script
    1. Set the name to `CMake init`
-   2. Set the command type to Script text and set the script text to `New-Item -ItemType Directory -Path [NavKit root directory]\build -ErrorAction SilentlyContinue; cd build; cmake --preset x64-debug ..`
+   2. Set the command type to "Script text" and set the script text to `New-Item -ItemType Directory -Path [NavKit root directory]\build -ErrorAction SilentlyContinue; cd build; cmake --preset x64-debug ..`
    3. Set the working directory to the NavKit root directory
 2. Create another new run configuration of type Native Executable
    1. Set the name to `NavKit`

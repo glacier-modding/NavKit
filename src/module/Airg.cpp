@@ -27,25 +27,26 @@
 #include "../../include/ResourceLib_HM3/ResourceGenerator.h"
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
-Airg::Airg() {
-    airgName = "Load Airg";
-    lastLoadAirgFile = airgName;
-    saveAirgName = "Save Airg";
-    lastSaveAirgFile = saveAirgName;
-    airgLoaded = false;
-    airgLoading = false;
-    airgBuilding = false;
-    connectWaypointModeEnabled = false;
-    showAirg = true;
-    showAirgIndices = false;
-    showRecastDebugInfo = false;
-    cellColorSource = 0.0f;
-    airgScroll = 0;
-    airgResourceConverter = HM3_GetConverterForResource("AIRG");;
-    airgResourceGenerator = HM3_GetGeneratorForResource("AIRG");
-    reasoningGrid = new ReasoningGrid();
-    doAirgHitTest = false;
-    selectedWaypointIndex = -1;
+Airg::Airg()
+    : airgName("Load Airg")
+      , lastLoadAirgFile(airgName)
+      , saveAirgName("Save Airg")
+      , lastSaveAirgFile(saveAirgName)
+      , airgLoaded(false)
+      , airgLoading(false)
+      , airgBuilding(false)
+      , connectWaypointModeEnabled(false)
+      , showAirg(true)
+      , showAirgIndices(false)
+      , showRecastDebugInfo(false)
+      , cellColorSource(0.0f)
+      , airgResourceConverter(HM3_GetConverterForResource("AIRG"))
+      , airgResourceGenerator(HM3_GetGeneratorForResource("AIRG"))
+      , reasoningGrid(new ReasoningGrid())
+      , airgScroll(0)
+      , selectedWaypointIndex(-1)
+      , doAirgHitTest(false)
+      , buildingVisionAndDeadEndData(false) {
 }
 
 const int Airg::AIRG_MENU_HEIGHT = 449;

@@ -40,7 +40,7 @@ public:
     bool buildingVisionAndDeadEndData;
     static const int AIRG_MENU_HEIGHT;
 
-    void resetDefaults();
+    static void resetDefaults();
 
     void drawMenu();
 

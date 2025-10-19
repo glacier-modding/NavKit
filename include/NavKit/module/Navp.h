@@ -61,8 +61,8 @@ public:
 
     NavPower::NavMesh *navMesh{};
     void *navMeshFileData{};
-    std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap{};
-    std::map<Vec3, NavPower::Area *> posToAreaMap{};
+    std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap;
+    std::map<Vec3, NavPower::Area *> posToAreaMap;
     int selectedNavpAreaIndex;
     int selectedPfSeedPointIndex;
     int selectedExclusionBoxIndex;
@@ -94,8 +94,8 @@ public:
 
     bool stairsCheckboxValue;
 
-    float bBoxPos[3];
-    float bBoxScale[3];
+    float bBoxPos[3]{};
+    float bBoxScale[3]{};
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
     float pruningMode;
 
@@ -103,9 +103,9 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
-    void setBBox(float *pos, float *size);
+    void setBBox(const float *pos, const float *size);
 
-    void updateExclusionBoxConvexVolumes();
+    static void updateExclusionBoxConvexVolumes();
 
     static void loadNavMeshFileData(const std::string &fileName);
 
@@ -116,11 +116,11 @@ private:
 
     void renderArea(NavPower::Area area, bool selected, int areaIndex);
 
-    static bool areaIsStairs(NavPower::Area area);
+    static bool areaIsStairs(const NavPower::Area &area);
 
     void setStairsFlags() const;
 
-    static char *openLoadNavpFileDialog(char *lastNavpFolder);
+    static char *openLoadNavpFileDialog(const char *lastNavpFolder);
 
     static char *openSaveNavpFileDialog(char *lastNavpFolder);
 
