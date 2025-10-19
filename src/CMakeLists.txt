@@ -101,9 +101,9 @@ add_custom_command(
     VERBATIM
 )
 
-# Copy ResourceLib_HM3.dll (Adjust source path if Release version exists)
 set(RESOURCELIB_DLL_PATH_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll")
-set(RESOURCELIB_DLL_GENEX "$<IF:$<CONFIG:Debug>,${RESOURCELIB_DLL_PATH_DEBUG},${RESOURCELIB_DLL_PATH_DEBUG}>") # Assuming Debug only for now
+set(RESOURCELIB_DLL_PATH_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.dll")
+set(RESOURCELIB_DLL_GENEX "$<IF:$<CONFIG:Debug>,${RESOURCELIB_DLL_PATH_DEBUG},${RESOURCELIB_DLL_PATH_RELEASE}>")
 add_custom_command(
     TARGET NavKit POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -172,7 +172,7 @@ set_target_properties(NavWeakness PROPERTIES
         IMPORTED_LOCATION_RELEASE "${OUTPUT_DIR_RELEASE}/NavWeakness.dll"
 )
 set_target_properties(nfd::nfd PROPERTIES
-        NFD_OVERRIDE_RECENT_WITH_DEFAULT ON
+#        NFD_OVERRIDE_RECENT_WITH_DEFAULT ON
         IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
         IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/nfd.dll"
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/nfd.lib"
@@ -183,7 +183,7 @@ set_target_properties(nfd::nfd PROPERTIES
 set_target_properties(ResourceLib_HM3 PROPERTIES
         IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/ResourceLib_HM3.dll"
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
-        IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
+        IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.lib"
         IMPORTED_LOCATION_DEBUG "${OUTPUT_DIR_DEBUG}/ResourceLib_HM3.dll"
         IMPORTED_LOCATION_RELEASE "${OUTPUT_DIR_RELEASE}/ResourceLib_HM3.dll"
 )

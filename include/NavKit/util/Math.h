@@ -1,6 +1,6 @@
 #pragma once
 #include "../../NavWeakness/Vec3.h"
-#include "../../ResourceLib_HM3/Generated/ZHMGen.h"
+#include "../../ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 namespace Math {
     class Plane {

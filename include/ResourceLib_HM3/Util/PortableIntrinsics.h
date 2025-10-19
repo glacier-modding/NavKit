@@ -35,7 +35,7 @@ inline void c_aligned_free(void* p_Memory)
 #endif
 }
 
-// Already defined in NavWeakness
+// Already defined in NavPower
 //inline uint32_t c_byteswap_ulong(uint32_t p_Value)
 //{
 //#if _MSC_VER

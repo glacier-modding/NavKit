@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../ResourceLib_HM3/Generated/ZHMGen.h"
+#include "../../ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 #include "../model/ReasoningGrid.h"
 #include <DetourNavMesh.h>
 

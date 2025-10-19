@@ -54,6 +54,8 @@ void Scene::loadScene(std::string fileName, const std::function<void()> &callbac
     ZPathfinding::Alocs newAlocs;
     try {
         newAlocs = ZPathfinding::Alocs(fileName);
+    } catch (const std::exception &e) {
+        Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
     }
@@ -62,6 +64,8 @@ void Scene::loadScene(std::string fileName, const std::function<void()> &callbac
     ZPathfinding::PfBoxes pfBoxes;
     try {
         pfBoxes = ZPathfinding::PfBoxes(fileName);
+    } catch (const std::exception &e) {
+        Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
     }
@@ -78,6 +82,8 @@ void Scene::loadScene(std::string fileName, const std::function<void()> &callbac
     ZPathfinding::PfSeedPoints newPfSeedPoints;
     try {
         newPfSeedPoints = ZPathfinding::PfSeedPoints(fileName);
+    } catch (const std::exception &e) {
+        Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
     }

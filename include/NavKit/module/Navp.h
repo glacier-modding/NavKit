@@ -107,9 +107,9 @@ public:
 
     void updateExclusionBoxConvexVolumes();
 
-    static void loadNavMeshFileData(char *fileName);
+    static void loadNavMeshFileData(const std::string &fileName);
 
-    static void loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp);
+    static void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp);
 
 private:
     static void buildNavp();

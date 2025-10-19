@@ -25,7 +25,7 @@
 #include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceGenerator.h"
-#include "../../include/ResourceLib_HM3/Generated/ZHMGen.h"
+#include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 Airg::Airg() {
     airgName = "Load Airg";

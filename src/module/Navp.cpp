@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include <cpptrace/from_current.hpp>
 #include <GL/glut.h>
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
@@ -23,7 +24,7 @@
 #include "../../include/RecastDemo/InputGeom.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceLib.h"
-#include "../../include/ResourceLib_HM3/Generated/ZHMGen.h"
+#include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 
 Navp::Navp() {
@@ -382,16 +383,23 @@ void Navp::setSelectedPfSeedPointIndex(int index) {
 
     if (index == -1 && selectedPfSeedPointIndex != -1) {
         auto &selectedPFSeedPoint = scene.pfSeedPoints[selectedPfSeedPointIndex];
-        Logger::log(NK_INFO, ("Deselected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").c_str());
+        Logger::log(
+            NK_INFO,
+            ("Deselected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").
+            c_str());
     }
     selectedPfSeedPointIndex = index;
     if (index != -1 && index < scene.pfSeedPoints.size()) {
         auto &selectedPFSeedPoint = scene.pfSeedPoints[index];
-        Logger::log(NK_INFO, ("Selected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").c_str());
+        Logger::log(
+            NK_INFO,
+            ("Selected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").
+            c_str());
         Vec3 pos = {selectedPFSeedPoint.pos.x, selectedPFSeedPoint.pos.y, selectedPFSeedPoint.pos.z};
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
-        std::string msg = "PF Seed point name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "' pos: (";
+        std::string msg = "PF Seed point name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id +
+                          "' pos: (";
         msg += std::string{v};
         snprintf(v, sizeof(v), "%.2f", pos.Y);
         msg += ", " + std::string{v};
@@ -406,17 +414,24 @@ void Navp::setSelectedExclusionBoxIndex(int index) {
 
     if (index == -1 && selectedExclusionBoxIndex != -1) {
         auto &selectedExclusionBox = scene.exclusionBoxes[selectedExclusionBoxIndex];
-        Logger::log(NK_INFO, ("Deselected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" +  selectedExclusionBox.id + "'").c_str());
+        Logger::log(
+            NK_INFO,
+            ("Deselected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'")
+            .c_str());
     }
     selectedExclusionBoxIndex = index;
     if (index != -1 && index < scene.exclusionBoxes.size()) {
         auto &selectedExclusionBox = scene.exclusionBoxes[index];
 
-        Logger::log(NK_INFO, ("Selected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" +  selectedExclusionBox.id + "'").c_str());
+        Logger::log(
+            NK_INFO,
+            ("Selected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'").
+            c_str());
         Vec3 pos = {selectedExclusionBox.pos.x, selectedExclusionBox.pos.y, selectedExclusionBox.pos.z};
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
-        std::string msg = "Exclusion Box name '" + selectedExclusionBox.name + "' id: '" +  selectedExclusionBox.id + "' pos: (";
+        std::string msg =
+                "Exclusion Box name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "' pos: (";
         msg += std::string{v};
         snprintf(v, sizeof(v), "%.2f", pos.Y);
         msg += ", " + std::string{v};
@@ -484,7 +499,7 @@ void Navp::renderNavMeshForHitTest() const {
     }
 }
 
-void Navp::loadNavMeshFileData(char *fileName) {
+void Navp::loadNavMeshFileData(const std::string &fileName) {
     if (!std::filesystem::is_regular_file(fileName))
         throw std::runtime_error("Input path is not a regular file.");
 
@@ -507,36 +522,47 @@ void Navp::loadNavMeshFileData(char *fileName) {
     getInstance().navMeshFileData = s_FileData;
 }
 
-void Navp::loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp) {
+void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp) {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
-    Logger::log(NK_INFO, msg.data());
+    Logger::log(NK_INFO, msg.c_str());
     auto start = std::chrono::high_resolution_clock::now();
     Navp &navp = loadAirgNavp ? getAirgInstance() : getInstance();
     navp.loading = true;
-    try {
-        NavPower::NavMesh newNavMesh = isFromJson ? LoadNavMeshFromJson(fileName) : LoadNavMeshFromBinary(fileName);
+    CPPTRACE_TRY {
+        NavPower::NavMesh newNavMesh = isFromJson
+                                           ? LoadNavMeshFromJson(fileName.c_str())
+                                           : LoadNavMeshFromBinary(fileName.c_str());
         std::swap(*navp.navMesh, newNavMesh);
         SceneExtract &sceneExtract = SceneExtract::getInstance();
         if (isFromBuilding) {
             navp.setStairsFlags();
             navp.outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-            OutputNavMesh_JSON_Write(navp.navMesh, navp.outputNavpFilename.data());
-            NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson(navp.outputNavpFilename.data());
+            OutputNavMesh_JSON_Write(navp.navMesh, (navp.outputNavpFilename + ".json").c_str());
+            NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((navp.outputNavpFilename + ".json").c_str());
             std::swap(*navp.navMesh, reloadedNavMesh);
         }
         if (isFromJson) {
-            OutputNavMesh_NAVP_Write(navp.navMesh, navp.outputNavpFilename.data());
-            loadNavMeshFileData(navp.outputNavpFilename.data());
+            OutputNavMesh_NAVP_Write(navp.navMesh, navp.outputNavpFilename.c_str());
+            loadNavMeshFileData(navp.outputNavpFilename);
         } else {
             loadNavMeshFileData(fileName);
         }
+    } CPPTRACE_CATCH(const std::exception& e) {
+        msg = "Error loading Navp file '";
+        msg += fileName;
+        msg += "': ";
+        msg += e.what();
+        msg += " Stack trace: ";
+        msg += cpptrace::from_current_exception().to_string();
+        Logger::log(NK_ERROR, msg.c_str());
+        return;
     } catch (...) {
         msg = "Invalid Navp file: '";
         msg += fileName;
         msg += "'...";
-        Logger::log(NK_ERROR, msg.data());
+        Logger::log(NK_ERROR, msg.c_str());
         return;
     }
 
@@ -545,7 +571,7 @@ void Navp::loadNavMesh(char *fileName, bool isFromJson, bool isFromBuilding, boo
     msg = "Finished loading Navp in ";
     msg += std::to_string(duration.count());
     msg += " seconds";
-    Logger::log(NK_INFO, msg.data());
+    Logger::log(NK_INFO, msg.c_str());
     navp.setSelectedNavpAreaIndex(-1);
     navp.loading = false;
     navp.navpLoaded = true;
@@ -673,7 +699,8 @@ void Navp::drawMenu() {
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     Obj &obj = Obj::getInstance();
     if (imguiButton("Build Navp from Obj and Scene",
-                    navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded && !Airg::getInstance().airgBuilding)) {
+                    navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded && !
+                    Airg::getInstance().airgBuilding)) {
         std::thread buildNavpThread(&Navp::buildNavp);
         buildNavpThread.detach();
     }
