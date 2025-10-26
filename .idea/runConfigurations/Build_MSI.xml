@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Build MSI" type="BatchConfigurationType" factoryName="Batch">
+    <module name="NavKit" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="WORKING_DIRECTORY" value="./build/x64-release" />
+    <option name="PARENT_ENVS" value="true" />
+    <option name="SCRIPT_NAME" value="cmake --build . --target installer --config Release" />
+    <option name="PARAMETERS" value="" />
+    <method v="2" />
+  </configuration>
+</component>

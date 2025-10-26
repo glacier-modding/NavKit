@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "../../include/NavKit/module/GameConnection.h"
 
 #include <fstream>
@@ -149,9 +148,9 @@ void GameConnection::sendNavp(NavPower::NavMesh *navMesh) const {
         Logger::log(NK_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
         return;
     }
-    int chunkSize = 30;
+    constexpr int chunkSize = 30;
     auto chunkHead = navMesh->m_areas.begin();
-    int areaCount = navMesh->m_areas.size();
+    const int areaCount = navMesh->m_areas.size();
     int chunkCount = (areaCount % chunkSize == 0) ? (areaCount / chunkSize) : ((areaCount / chunkSize) + 1);
     for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
         int curChunkSize = (chunkIndex < (chunkCount - 1)) ? chunkSize : (areaCount % chunkSize);

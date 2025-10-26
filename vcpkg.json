@@ -1,5 +1,48 @@
 {
+  "name": "navkit",
+  "version-string": "2.0.0",
   "dependencies": [
+    {
+      "name": "brotli",
+      "version>=": "1.1.0#1"
+    },
+    {
+      "name": "bzip2",
+      "version>=": "1.0.8#6"
+    },
+    {
+      "name": "catch2",
+      "version>=": "3.8.0#0"
+    },
+    {
+      "name": "cpptrace",
+      "version>=": "0.8.1#0"
+    },
+    {
+      "name": "freetype",
+      "version>=": "2.13.3"
+    },
+    {
+      "name": "ftgl",
+      "version>=": "2.4.0#6"
+    },
+    {
+      "name": "glew",
+      "version>=": "2.2.0#3"
+    },
+    {
+      "name": "cpp-httplib",
+      "version>=": "0.26.0",
+      "features": [ "openssl", "brotli" ]
+    },
+    {
+      "name": "libpng",
+      "version>=": "1.6.50"
+    },
+    {
+      "name": "nativefiledialog-extended",
+      "version>=": "1.2.1"
+    },
     {
       "name": "recastnavigation",
       "version>=": "1.6.0"
@@ -9,32 +52,22 @@
       "version>=": "2.30.3#1"
     },
     {
-      "name": "freeglut",
-      "version>=": "3.4.0"
-    },
-    {
       "name": "simdjson",
       "version>=": "3.1.8"
-    },
-    {
-      "name": "glew",
-      "version>=": "2.2.0#3"
     },
     {
       "name": "simpleini",
       "version>=": "4.22"
     },
     {
+      "name": "zlib",
+      "version>=": "1.3.1"
+    }
+  ],
+  "overrides": [
+    {
       "name": "ftgl",
-      "version>=": "2022-05-18#1"
-    },
-    {
-      "name": "cpptrace",
-      "version>=": "0.8.1#0"
-    },
-    {
-      "name": "catch2",
-      "version>=": "3.8.0#0"
+      "version": "2.4.0#6"
     }
   ]
 }

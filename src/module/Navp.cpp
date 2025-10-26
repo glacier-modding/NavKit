@@ -5,7 +5,7 @@
 #include <fstream>
 
 #include <cpptrace/from_current.hpp>
-#include <GL/glut.h>
+#include <GL/glew.h>
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
 #include "../../include/NavKit/module/Airg.h"

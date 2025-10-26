@@ -1,6 +1,5 @@
 #pragma once
 
-#define NOMINMAX
 #include "../../include/NavKit/util/Pathfinding.h"
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"

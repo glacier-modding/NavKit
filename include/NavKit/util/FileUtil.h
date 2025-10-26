@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../nativefiledialog-extended/nfd.h"
+#include <nfd.h>
 
 namespace FileUtil {
     char *openNfdLoadDialog(nfdu8filteritem_t *filters, nfdfiltersize_t filterCount, const char *defaultPath = nullptr);

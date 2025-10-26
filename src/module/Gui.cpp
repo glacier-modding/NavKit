@@ -14,7 +14,6 @@
 #include <SDL.h>
 #include <GL/glew.h>
 #include <GL/glu.h>
-#include <GL/glut.h>
 
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/RecastDemo/imgui.h"

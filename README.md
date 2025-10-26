@@ -103,7 +103,6 @@ NavKit performs the following series of steps to be able to generate Navp files.
 * Faster Scene generation
 * Linux and macOS support
 # Building instructions (CLion or Visual Studio)
-You can also build NavKit yourself. To build NavKit:
 1. Clone this repository with the '--recurse-submodules' option
 1. Open in Visual Studio or CLion
 1. Cmake should load
@@ -111,12 +110,19 @@ You can also build NavKit yourself. To build NavKit:
 `cmake -B . -S ..`
 1. Then change back to the main directory and run  
 `cmake --preset x64-debug`
+# MSI Building instructions
+1. Install WiX 6.0 and add its bin/x64 folder to your PATH
+1. Run the installer target. For CLion there is an included run configuration that should automatically be added called Build MSI that runs this command:  
+`cmake --build . --target installer --config Release`  
+in this working directory:  
+`build\x64-release`
+
 # Building instructions (Rider)
 See [Rider Instructions](docs/rider_instructions.md)
 # Credits
 2kpr  
 Anthony Fuller  
-Atampy25  
+Atampy26  
 Dafitius  
 Dribbleondo  
 Invalid  

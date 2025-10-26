@@ -9,6 +9,7 @@
 #include "../../include/NavKit/module/Renderer.h"
 
 #include <numbers>
+#include <array>
 
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/Settings.h"
@@ -16,7 +17,7 @@
 #include <SDL.h>
 #include <GL/glew.h>
 #include <GL/glu.h>
-#include <GL/glut.h>
+#include <GL/glew.h>
 #include <SDL_opengl.h>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -43,6 +44,7 @@ Renderer::Renderer() {
 }
 
 Renderer::~Renderer() {
+    delete font;
     imguiRenderGLDestroy();
     SDL_Quit();
 }
@@ -74,9 +76,9 @@ void Renderer::initFrameRate(float frameRateValue) {
 void Renderer::updateFrameRate() {
     if (initialFrameRate == -1.00000000) {
         const int displayIndex = SDL_GetWindowDisplayIndex(window);
-        SDL_DisplayMode *displayMode = new SDL_DisplayMode();
-        if (!SDL_GetCurrentDisplayMode(displayIndex, displayMode)) {
-            frameRate = static_cast<float>(displayMode->refresh_rate);
+        SDL_DisplayMode displayMode;
+        if (!SDL_GetCurrentDisplayMode(displayIndex, &displayMode)) {
+            frameRate = static_cast<float>(displayMode.refresh_rate);
         } else {
             frameRate = 60.0f;
         }
@@ -526,13 +528,13 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
         return HitTestResult(NONE, -1);
     }
     HitTestType result = NONE;
-    if (int(pixel[0]) == 60) {
+    if (int(pixel[0]) == NAVMESH_AREA) {
         result = NAVMESH_AREA;
-    } else if (int(pixel[0]) == 61) {
+    } else if (int(pixel[0]) == AIRG_WAYPOINT) {
         result = AIRG_WAYPOINT;
-    } else if (int(pixel[0]) == 62) {
+    } else if (int(pixel[0]) == PF_SEED_POINT) {
         result = PF_SEED_POINT;
-    } else if (int(pixel[0]) == 63) {
+    } else if (int(pixel[0]) == PF_EXCLUSION_BOX) {
         result = PF_EXCLUSION_BOX;
     }
     return HitTestResult(result, result != NONE ? selectedIndex : -1);

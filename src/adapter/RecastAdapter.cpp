@@ -1,9 +1,7 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 
-#include "../../extern/vcpkg/buildtrees/recastnavigation/src/v1.6.0-fcf1526bd5.clean/Detour/Include/DetourNavMeshQuery.h"
-
-#include "../../include/RecastDemo/Sample_SoloMesh.h"
-#include "../../extern/vcpkg/packages/recastnavigation_x64-windows/include/recastnavigation/RecastDebugDraw.h"
+#include <DetourNavMeshQuery.h>
+#include <RecastDebugDraw.h>
 
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
