@@ -80,12 +80,16 @@ jobs:
           Write-Host "Installing WiX from $msi_path..."
           Start-Process msiexec.exe -ArgumentList "/i `"$msi_path`" /quiet" -Wait
 
+      - name: Download Release Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: build/x64-release/
+
       - name: Configure and Build Installer
         shell: pwsh
         run: |
-          $dotNetToolsPath = Join-Path -Path $env:USERPROFILE -ChildPath ".dotnet\tools"
-
-          cmake --preset x64-release
+          cmake --preset x64-release -D BUILD_INSTALLER=ON
           Write-Host "Starting the installer build..."
           cmake --build build/x64-release --target installer --config Release
 

@@ -34,6 +34,14 @@
         "CMAKE_BUILD_TYPE": "Release"
       },
       "inherits": [ "base" ]
+    },
+    {
+      "name": "x64-release-installer",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_INSTALLER": "ON"
+      },
+      "inherits": [ "base" ]
     }
   ],
   "buildPresets": [
@@ -45,6 +53,11 @@
     {
       "name": "x64-release",
       "configurePreset": "x64-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "x64-release-installer",
+      "configurePreset": "x64-release-installer",
       "configuration": "Release"
     }
   ]

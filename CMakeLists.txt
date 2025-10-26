@@ -54,82 +54,84 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE_DIR:PNG::PNG>/../bin/libpng16.dll"
         "$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlib1.dll"
 )
+option(BUILD_INSTALLER "Build the WiX MSI installer package" OFF)
 
-if (PROJECT_IS_TOP_LEVEL)
-    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installer_layout")
+if(BUILD_INSTALLER)
+    if (PROJECT_IS_TOP_LEVEL)
+        set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installer_layout")
 
-    set(COMPANY_NAME "Glacier Modding")
-    set(CONTACT_INFO "dannybierek@gmail.com")
-    set(WIX_UPGRADE_CODE "65a9e019-b66c-40f3-8ee0-f9d3d31c2554")
-    set(WIX_LICENSE_FILE "${CMAKE_SOURCE_DIR}/License.rtf")
-    set(WIX_PRODUCT_ICON "${CMAKE_SOURCE_DIR}/src/resource/NavKitLogo.ico")
-    find_program(WIX_HEAT_EXECUTABLE heat.exe
-            HINTS
-            "C:/Program Files/WiX Toolset v6.0/bin/x64"
-            "$ENV{WIX}/bin/x64"
-            REQUIRED
-    )
-    find_program(WIX_EXECUTABLE wix.exe
-            HINTS
-            "C:/Program Files/WiX Toolset v6.0/bin"
-            "$ENV{WIX}/bin"
-            REQUIRED
-    )
-
-    message(STATUS "Using WiX Heat: ${WIX_HEAT_EXECUTABLE}")
-    message(STATUS "Using WiX Build: ${WIX_EXECUTABLE}")
-
-        install(TARGETS NavKit
-                RUNTIME DESTINATION .
+        set(COMPANY_NAME "Glacier Modding")
+        set(CONTACT_INFO "dannybierek@gmail.com")
+        set(WIX_UPGRADE_CODE "65a9e019-b66c-40f3-8ee0-f9d3d31c2554")
+        set(WIX_LICENSE_FILE "${CMAKE_SOURCE_DIR}/License.rtf")
+        set(WIX_PRODUCT_ICON "${CMAKE_SOURCE_DIR}/src/resource/NavKitLogo.ico")
+        find_program(WIX_HEAT_EXECUTABLE heat.exe
+                HINTS
+                "C:/Program Files/WiX Toolset v6.0/bin/x64"
+                "$ENV{WIX}/bin/x64"
+                REQUIRED
         )
-        install(FILES
-                $<TARGET_FILE:NavWeakness>
-                $<TARGET_FILE:nfd::nfd>
-                $<TARGET_FILE:ResourceLib_HM3>
+        find_program(WIX_EXECUTABLE wix.exe
+                HINTS
+                "C:/Program Files/WiX Toolset v6.0/bin"
+                "$ENV{WIX}/bin"
+                REQUIRED
+        )
+
+        message(STATUS "Using WiX Heat: ${WIX_HEAT_EXECUTABLE}")
+        message(STATUS "Using WiX Build: ${WIX_EXECUTABLE}")
+
+            install(TARGETS NavKit
+                    RUNTIME DESTINATION .
+            )
+            install(FILES
+                    $<TARGET_FILE:NavWeakness>
+                    $<TARGET_FILE:nfd::nfd>
+                    $<TARGET_FILE:ResourceLib_HM3>
+                    DESTINATION .
+            )
+            install(FILES ${THIRD_PARTY_DLL_PATHS}
+                    DESTINATION .
+            )
+
+        install(FILES ${RUNTIME_FILE_DEPENDENCIES}
                 DESTINATION .
         )
-        install(FILES ${THIRD_PARTY_DLL_PATHS}
-                DESTINATION .
+        set(HARVESTED_COMPONENTS_FILE "${CMAKE_CURRENT_BINARY_DIR}/HarvestedComponents.wxs")
+        add_custom_command(
+                OUTPUT ${HARVESTED_COMPONENTS_FILE}
+                COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target install --config $<CONFIG>
+                COMMAND ${WIX_HEAT_EXECUTABLE} dir "${CMAKE_BINARY_DIR}/installer_layout"
+                -ag -srd -sreg -cg NavKit_Components -dr INSTALLFOLDER
+                -t "${CMAKE_SOURCE_DIR}/wix/heat_exclude_navkit.xslt"
+                -o ${HARVESTED_COMPONENTS_FILE}
+                DEPENDS NavKit
+                COMMENT "Harvesting staged files with WiX heat.exe..."
         )
+        add_custom_target(HarvestWixComponents DEPENDS ${HARVESTED_COMPONENTS_FILE})
 
-    install(FILES ${RUNTIME_FILE_DEPENDENCIES}
-            DESTINATION .
-    )
-    set(HARVESTED_COMPONENTS_FILE "${CMAKE_CURRENT_BINARY_DIR}/HarvestedComponents.wxs")
-    add_custom_command(
-            OUTPUT ${HARVESTED_COMPONENTS_FILE}
-            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target install --config $<CONFIG>
-            COMMAND ${WIX_HEAT_EXECUTABLE} dir "${CMAKE_BINARY_DIR}/installer_layout"
-            -ag -srd -sreg -cg NavKit_Components -dr INSTALLFOLDER
-            -t "${CMAKE_SOURCE_DIR}/wix/heat_exclude_navkit.xslt"
-            -o ${HARVESTED_COMPONENTS_FILE}
-            DEPENDS NavKit
-            COMMENT "Harvesting staged files with WiX heat.exe..."
-    )
-    add_custom_target(HarvestWixComponents DEPENDS ${HARVESTED_COMPONENTS_FILE})
-
-    set(WIX_INSTALLER_NAME "NavKit.msi")
-    add_custom_command(
-            OUTPUT "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
-            COMMAND ${WIX_EXECUTABLE} build
-            -ext WixToolset.UI.wixext
-            -b "${CMAKE_BINARY_DIR}/installer_layout"
-            -d ProductName="${PROJECT_NAME}"
-            -d ProductVersion="${PROJECT_VERSION}"
-            -d ProductManufacturer="${COMPANY_NAME}"
-            -d ProductContact="${CONTACT_INFO}"
-            -d UpgradeCode="${WIX_UPGRADE_CODE}"
-            -d LicenseFile="${WIX_LICENSE_FILE}"
-            -d ProductIcon="${WIX_PRODUCT_ICON}"
-            -d LayoutDir="${CMAKE_BINARY_DIR}/installer_layout"
-            -d InstallScope="perUser"
-            -d PerUserInstall="1"
-            -o "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
-            "${CMAKE_SOURCE_DIR}/wix/Package.wxs"
-            "${HARVESTED_COMPONENTS_FILE}"
-            DEPENDS HarvestWixComponents
-            COMMENT "Building installer from staged files..."
-    )
-
-    add_custom_target(installer DEPENDS "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}")
+        set(WIX_INSTALLER_NAME "NavKit.msi")
+        add_custom_command(
+                OUTPUT "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
+                COMMAND ${WIX_EXECUTABLE} build
+                -ext WixToolset.UI.wixext
+                -b "${CMAKE_BINARY_DIR}/installer_layout"
+                -d ProductName="${PROJECT_NAME}"
+                -d ProductVersion="${PROJECT_VERSION}"
+                -d ProductManufacturer="${COMPANY_NAME}"
+                -d ProductContact="${CONTACT_INFO}"
+                -d UpgradeCode="${WIX_UPGRADE_CODE}"
+                -d LicenseFile="${WIX_LICENSE_FILE}"
+                -d ProductIcon="${WIX_PRODUCT_ICON}"
+                -d LayoutDir="${CMAKE_BINARY_DIR}/installer_layout"
+                -d InstallScope="perUser"
+                -d PerUserInstall="1"
+                -o "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
+                "${CMAKE_SOURCE_DIR}/wix/Package.wxs"
+                "${HARVESTED_COMPONENTS_FILE}"
+                DEPENDS HarvestWixComponents
+                COMMENT "Building installer from staged files..."
+        )
+        add_custom_target(installer DEPENDS "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}")
+    endif()
 endif()
