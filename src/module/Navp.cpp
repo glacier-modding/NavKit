@@ -690,8 +690,9 @@ void Navp::drawMenu() {
                 OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
             } else if (extension == "NAVP") {
                 outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-                OutputNavMesh_JSON_Write(navMesh, outputNavpFilename.data());
-                NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(outputNavpFilename.data());
+                std::string tempOutputJSONFilename = outputNavpFilename + ".json";
+                OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.data());
+                NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.data());
                 std::swap(*navMesh, newNavMesh);
                 OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
                 buildAreaMaps();
