@@ -1,5 +1,3 @@
-#define NOMINMAX
-
 #include "../../include/NavKit/module/Obj.h"
 
 #include <filesystem>

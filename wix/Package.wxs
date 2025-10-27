@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+    <Package Name="$(var.ProductName)"
+             Manufacturer="$(var.ProductManufacturer)"
+             Version="$(var.ProductVersion)"
+             UpgradeCode="$(var.UpgradeCode)"
+             Language="1033"
+             Scope="$(var.InstallScope)">
+        <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseFile)" />
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <MediaTemplate EmbedCab="true" />
+
+        <ui:WixUI Id="WixUI_InstallDir"
+              InstallDirectory="INSTALLFOLDER"
+       />
+
+        <Icon Id="icon.ico" SourceFile="$(var.ProductIcon)"/>
+        <Property Id="ARPPRODUCTICON" Value="icon.ico"/>
+        <Property Id="ARPCONTACT" Value="$(var.ProductContact)" />
+
+        <Feature Id="MainFeature" Title="Main" Level="1">
+            <ComponentGroupRef Id="NavKit_Components" />
+            <ComponentRef Id="ApplicationShortcut" />
+            <ComponentRef Id="RemoveFolderComponent" />
+            <ComponentRef Id="NavKitExecutable" />
+        </Feature>
+    </Package>
+
+    <Fragment>
+        <StandardDirectory Id="ProgramMenuFolder">
+            <Directory Id="ApplicationProgramsFolder" Name="NavKit" />
+        </StandardDirectory>
+        <?if $(var.PerUserInstall) = 1?>
+            <StandardDirectory Id="LocalAppDataFolder">
+                <Directory Name="$(var.ProductManufacturer)">
+                    <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+                </Directory>
+            </StandardDirectory>
+        <?else?>
+            <StandardDirectory Id="ProgramFiles64Folder">
+                <Directory Name="$(var.ProductManufacturer)">
+                    <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+                </Directory>
+            </StandardDirectory>
+        <?endif?>
+        <Component Id="ApplicationShortcut" Guid="40264e7c-a931-42c6-a8bd-25c8e3c71ec9" Directory="ApplicationProgramsFolder">
+            <Shortcut Id="ApplicationStartMenuShortcut"
+                      Name="NavKit"
+                      Description="An app to create NAVP and AIRG files for use with Hitman"
+                      Target="[#NavKit.exe]"
+                      WorkingDirectory="INSTALLFOLDER" />
+
+            <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+            <RegistryValue Root="HKCU" Key="Software\Glacier Modding\NavKit" Name="installed" Type="integer" Value="1" KeyPath="true"/>
+        </Component>
+        <DirectoryRef Id="INSTALLFOLDER">
+            <Component Id="NavKitExecutable" Guid="d867f1ca-b135-4fc0-ad72-09b51e16826a">
+                <File Id="NavKit.exe" Source="$(var.LayoutDir)\NavKit.exe" KeyPath="true" />
+            </Component>
+            <Component Id="RemoveFolderComponent" Guid="*">
+                <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
+                <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]" Name="Path" Type="string" Value="[INSTALLFOLDER]" KeyPath="true" />
+                <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]" Name="ProductCode" Type="string" Value="[ProductCode]" />
+            </Component>
+        </DirectoryRef>
+    </Fragment>
+</Wix>

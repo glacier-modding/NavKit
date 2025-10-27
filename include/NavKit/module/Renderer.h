@@ -9,11 +9,11 @@ typedef double GLdouble;
 typedef int GLint;
 
 enum HitTestType {
-    NAVMESH_AREA,
-    AIRG_WAYPOINT,
-    PF_SEED_POINT,
-    PF_EXCLUSION_BOX,
-    NONE
+    NONE = 0,
+    NAVMESH_AREA = 60,
+    AIRG_WAYPOINT = 61,
+    PF_SEED_POINT = 62,
+    PF_EXCLUSION_BOX = 63
 };
 
 class HitTestResult {

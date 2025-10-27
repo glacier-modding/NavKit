@@ -1,24 +1,24 @@
-name: CMake Build
+name: CMake Build and Release
 
 on:
-  push:
-    tags:
-      - '*'
-  release:
-    types: [ created ]
   pull_request:
     types: [ opened, synchronize, reopened ]
+  push:
+    tags:
+      - 'v*.*.*'
+
 jobs:
-  build:
+  validate_build:
+    name: Validate Build
     runs-on: windows-latest
     strategy:
       matrix:
-        preset: [ x64-debug ]
+        config: [ debug, release ]
     steps:
       - name: Set up CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "~3.28.0"
+          cmakeVersion: "~3.30.0"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,57 +30,74 @@ jobs:
         with:
           arch: x64
 
-      - name: Build debug
+      - name: Build ${{ matrix.config }}
         run: |
-          cmake --preset x64-debug .
-          cmake --build --preset x64-debug -j12
+          cmake --preset x64-${{ matrix.config }}
+          cmake --build --preset x64-${{ matrix.config }} -j12
 
-      - name: Build release
-        run: |
-          cmake --preset x64-release .
-          cmake --build --preset x64-release -j12
-
-      - name: Copy debug artifacts
-        run: |
-          mkdir _dist-debug
-          Copy-Item build/x64-debug/Debug/* -Destination _dist-debug/ -Recurse
-
-      - name: Copy release artifacts
-        run: |
-          mkdir _dist-release
-          Copy-Item build/x64-release/Release/* -Destination _dist-release/ -Recurse
-
-      - name: Archive debug NavKit
+      - name: Upload Release Build Artifact
+        if: matrix.config == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: NavKit-Debug
-          path: _dist-debug/*
+          name: release-build
+          path: build/x64-release/
 
-      - name: Archive release Navkit
-        uses: actions/upload-artifact@v4
-        with:
-          name: NavKit-Release
-          path: _dist-release/*
+  create_release:
+    name: Create Release with MSI
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate_build
 
-  upload_release:
-    name: Upload artifacts
-    needs: build
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        artifact:
-          - NavKit-Release
-          - NavKit-Debug
+    permissions:
+      contents: write
 
     steps:
-      - name: Download artifact
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup VS environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install WiX v6 Toolset from MSI
+        shell: pwsh
+        run: |
+          $wix_version = "6.0.2"
+          $msi_url = "https://github.com/wixtoolset/wix/releases/download/v${wix_version}/wix-cli-x64.msi"
+          $msi_path = "wix.msi"
+          
+          Write-Host "Downloading WiX v$($wix_version) from $msi_url"
+          Invoke-WebRequest -Uri $msi_url -OutFile $msi_path
+          
+          Write-Host "Installing WiX from $msi_path..."
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi_path`" /quiet" -Wait
+
+      - name: Download Release Build Artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
+          name: release-build
+          path: build/x64-release/
 
-      - name: Archive artifact files
+      - name: Configure and Build Installer
+        shell: pwsh
         run: |
-          cd ${{ matrix.artifact }}
-          zip -r ${{ matrix.artifact }}.zip *
+          cmake --preset x64-release -D BUILD_INSTALLER=ON
+          Write-Host "Starting the installer build..."
+          cmake --build build/x64-release --target installer --config Release
+
+      - name: Upload MSI to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/x64-release/NavKit.msi
+          asset_name: NavKit.msi
+          tag: ${{ github.ref }}
+          overwrite: true

@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "../../include/NavKit/module/Airg.h"
 
 #include <filesystem>
@@ -7,7 +6,6 @@
 
 #include <SDL.h>
 #include <GL/glew.h>
-#include <GL/glut.h>
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/VisionData.h"
 #include "../../include/NavKit/module/Grid.h"
@@ -49,7 +47,7 @@ Airg::Airg()
       , buildingVisionAndDeadEndData(false) {
 }
 
-const int Airg::AIRG_MENU_HEIGHT = 449;
+const int Airg::AIRG_MENU_HEIGHT = 450;
 
 Airg::~Airg() = default;
 

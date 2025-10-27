@@ -39,7 +39,7 @@ bld/
 #wwwroot/
 
 # JetBrains auto generated files
-.idea/
+.idea/workspace.xml
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
@@ -399,3 +399,4 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+/.idea/.idea.NavKit/.idea/workspace.xml

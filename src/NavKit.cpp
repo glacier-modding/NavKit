@@ -32,6 +32,7 @@
 #include "../include/NavKit/module/Settings.h"
 #include "../include/NavKit/util/ErrorHandler.h"
 #include "../include/NavKit/util/FileUtil.h"
+#include "../include/NavKit/util/UpdateChecker.h"
 #undef main
 
 int SDL_main(const int argc, char **argv) {
@@ -46,6 +47,8 @@ int SDL_main(const int argc, char **argv) {
                 return -1;
             }
 
+            UpdateChecker &updateChecker = UpdateChecker::getInstance();
+            updateChecker.startUpdateCheck();
             SceneExtract &sceneExtract = SceneExtract::getInstance();
             Navp &navp = Navp::getInstance();
             Obj &obj = Obj::getInstance();
