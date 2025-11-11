@@ -1,4 +1,8 @@
 #pragma once
+#include <SDL_events.h>
+#include <SDL_syswm.h>
+
+#include "Airg.h"
 
 class InputHandler {
     explicit InputHandler();
@@ -9,17 +13,21 @@ public:
         return instance;
     }
 
+    static int handleMenu(const SDL_SysWMmsg * wmMsg);
+
     int handleInput();
 
-    void hitTest();
+    void hitTest() const;
 
-    void handleMovement(float dt, double *modelviewMatrix);
+    static void handleCheckboxMenuItem(UINT menuId, bool &stateVariable, const char *itemName);
+
+    static void handleCellColorDataRadioMenuItem(int selectedMenuId);
+
+    void handleMovement(float dt, const double *modelviewMatrix);
 
     int mousePos[2]{};
     int origMousePos[2]{};
     int mouseScroll;
-    bool resized;
-    bool moved;
 
     float scrollZoom;
     bool rotate;
@@ -36,4 +44,8 @@ public:
     float moveDown;
 
     static const int QUIT;
+    static constexpr float BASE_KEYBOARD_SPEED = 22.0f;
+    static constexpr float SHIFT_SPEED_MULTIPLIER = 4.0f;
+    static constexpr float CTRL_SPEED_DIVISOR = 4.0f;
+    static constexpr float CAMERA_ROTATION_SENSITIVITY = 0.25f;
 };

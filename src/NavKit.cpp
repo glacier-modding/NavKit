@@ -38,7 +38,7 @@
 int SDL_main(const int argc, char **argv) {
     CPPTRACE_TRY
         {
-            std::thread logThread(Logger::logRunner);
+            std::jthread logThread(Logger::logRunner);
             logThread.detach();
 
             Settings::Load();
@@ -46,7 +46,7 @@ int SDL_main(const int argc, char **argv) {
             if (!renderer.initWindowAndRenderer()) {
                 return -1;
             }
-
+            SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
             UpdateChecker &updateChecker = UpdateChecker::getInstance();
             updateChecker.startUpdateCheck();
             SceneExtract &sceneExtract = SceneExtract::getInstance();
@@ -55,18 +55,11 @@ int SDL_main(const int argc, char **argv) {
             Airg &airg = Airg::getInstance();
             InputHandler &inputHandler = InputHandler::getInstance();
             Gui &gui = Gui::getInstance();
+            bool isRunning = true;
             Logger::log(NK_INFO, "NavKit initialized.");
-            while (true) {
+            while (isRunning) {
                 if (inputHandler.handleInput() == InputHandler::QUIT) {
-                    break;
-                }
-                if (inputHandler.resized) {
-                    renderer.handleResize();
-                    inputHandler.resized = false;
-                }
-                if (inputHandler.moved) {
-                    renderer.updateFrameRate();
-                    inputHandler.moved = false;
+                    isRunning = false;
                 }
                 renderer.renderFrame();
                 inputHandler.hitTest();

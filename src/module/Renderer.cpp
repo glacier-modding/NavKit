@@ -1,4 +1,5 @@
 #include <FTGL/ftgl.h>
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
@@ -160,8 +161,19 @@ bool Renderer::initWindowAndRenderer() {
 
     SDL_SysWMinfo wmInfo;
     SDL_VERSION(&wmInfo.version);
-    SDL_GetWindowWMInfo(window, &wmInfo);
+    if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
+        Logger::log(NK_ERROR, "Could not get window manager info.");
+        return false;
+    }
     hwnd = wmInfo.info.win.window;
+    HINSTANCE hInstance = wmInfo.info.win.hinstance;
+
+    if (HMENU hMenu = LoadMenu(hInstance, MAKEINTRESOURCE(IDR_NAVKITMENU))) {
+        SetMenu(hwnd, hMenu);
+    } else {
+        Logger::log(NK_ERROR, "Failed to load menu resource.");
+    }
+
     return true;
 }
 

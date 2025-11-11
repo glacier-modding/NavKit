@@ -23,7 +23,6 @@ Gui::Gui() {
     showMenu = true;
     showLog = true;
     logScroll = 0;
-    collapsedLogScroll = 0;
     lastLogCount = -1;
     mouseOverMenu = false;
 }
@@ -33,8 +32,8 @@ void Gui::drawGui() {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    InputHandler &inputHandler = InputHandler::getInstance();
-    Renderer &renderer = Renderer::getInstance();
+    const InputHandler &inputHandler = InputHandler::getInstance();
+    const Renderer &renderer = Renderer::getInstance();
     gluOrtho2D(0, renderer.width, 0, renderer.height);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -42,7 +41,7 @@ void Gui::drawGui() {
     imguiBeginFrame(inputHandler.mousePos[0], inputHandler.mousePos[1],
                     inputHandler.mouseButtonMask, inputHandler.mouseScroll);
     if (showMenu) {
-        const char msg[] =
+        constexpr char msg[] =
                 "W/S/A/D/Q/E: Move  LMB: Select / Deselect RMB: Rotate  Tab: Show / Hide UI  Ctrl: Slow camera movement  Shift: Fast camera movement";
         imguiDrawText(280, renderer.height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
         char cameraPosMessage[128];
@@ -68,33 +67,22 @@ void Gui::drawGui() {
         scene.drawMenu();
         settings.drawMenu();
 
-        int consoleHeight = showLog ? 220 : 60;
-        int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;
-        if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
-            mouseOverMenu = true;
+        const int consoleHeight = showLog ? 220 : 60;
+        const int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;
         if (showLog) {
-            RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+            if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
+                mouseOverMenu = true;
+            const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
             std::lock_guard lock(recastAdapter.getLogMutex());
 
-            std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
+            const std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
             for (auto it = logBuffer.cbegin();
                  it != logBuffer.cend(); ++it) {
                 imguiLabel(it->c_str());
             }
-            const int logCount = recastAdapter.getLogCount();
-            if (lastLogCount != logCount) {
+            if (const int logCount = recastAdapter.getLogCount(); lastLogCount != logCount) {
                 logScroll = std::max(0, logCount * 20 - 160);
                 lastLogCount = logCount;
-            }
-        }
-        if (imguiCheck("Show Log", showLog)) {
-            if (showLog) {
-                showLog = false;
-                collapsedLogScroll = logScroll;
-                logScroll = 0;
-            } else {
-                showLog = true;
-                logScroll = collapsedLogScroll;
             }
         }
 

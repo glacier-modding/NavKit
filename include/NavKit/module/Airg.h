@@ -7,6 +7,10 @@ struct ResourceConverter;
 struct ResourceGenerator;
 class ReasoningGrid;
 
+enum CellColorDataSource {
+    OFF, AIRG_BITMAP, VISION_DATA, LAYER
+};
+
 class Airg {
 public:
     explicit Airg();
@@ -30,7 +34,7 @@ public:
     bool showAirg;
     bool showAirgIndices;
     bool showRecastDebugInfo;
-    float cellColorSource;
+    CellColorDataSource cellColorSource;
     ResourceConverter *airgResourceConverter;
     ResourceGenerator *airgResourceGenerator;
     ReasoningGrid *reasoningGrid;

@@ -37,7 +37,7 @@ Airg::Airg()
       , showAirg(true)
       , showAirgIndices(false)
       , showRecastDebugInfo(false)
-      , cellColorSource(0.0f)
+      , cellColorSource(OFF)
       , airgResourceConverter(HM3_GetConverterForResource("AIRG"))
       , airgResourceGenerator(HM3_GetGeneratorForResource("AIRG"))
       , reasoningGrid(new ReasoningGrid())
@@ -170,8 +170,8 @@ void Airg::drawMenu() {
              selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
              selectedWaypointIndex);
     imguiValue(selectedWaypointText);
-    imguiLabel("Cell color data source");
-    imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
+    // imguiLabel("Cell color data source");
+    // imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
     float lastSpacing = grid.spacing;
     if (imguiSlider("Spacing", &grid.spacing, 0.1f, 4.0f, 0.05f)) {
         if (lastSpacing != grid.spacing) {
@@ -427,13 +427,13 @@ void Airg::renderAirg() {
         const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
         int size = visibilityDataSize(reasoningGrid, i);
         // cellColorSource options: 0 Off, 1 Bitmap, 2 Vision Data, 3 Layer
-        if (cellColorSource == 1.0f) {
+        if (cellColorSource == CellColorDataSource::AIRG_BITMAP) {
             renderCellBitmaps(i, i == selectedWaypointIndex);
         }
-        if (cellColorSource == 2.0f) {
+        if (cellColorSource == LAYER) {
             renderVisionData(i, i == selectedWaypointIndex);
         }
-        if (cellColorSource == 3.0f) {
+        if (cellColorSource == VISION_DATA) {
             renderLayerIndices(i, i == selectedWaypointIndex);
         }
 
