@@ -38,7 +38,7 @@ Obj::Obj() {
     doObjHitTest = false;
 }
 
-const int Obj::OBJ_MENU_HEIGHT = 194;
+const int Obj::OBJ_MENU_HEIGHT = 174;
 
 void Obj::setBlenderFile(const char *fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
@@ -283,8 +283,6 @@ void Obj::drawMenu() {
                              &objScroll)) {
         gui.mouseOverMenu = true;
     }
-    if (imguiCheck("Show Obj", showObj))
-        showObj = !showObj;
 
     imguiLabel("Load Obj file");
     if (imguiButton(loadObjName.c_str(), objToLoad.empty())) {

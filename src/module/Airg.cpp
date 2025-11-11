@@ -47,7 +47,7 @@ Airg::Airg()
       , buildingVisionAndDeadEndData(false) {
 }
 
-const int Airg::AIRG_MENU_HEIGHT = 450;
+const int Airg::AIRG_MENU_HEIGHT = 310;
 
 Airg::~Airg() = default;
 
@@ -86,14 +86,6 @@ void Airg::drawMenu() {
                              SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - Obj::OBJ_MENU_HEIGHT - airgMenuHeight - 20, 250,
                              airgMenuHeight, &airgScroll))
         gui.mouseOverMenu = true;
-    if (imguiCheck("Show Airg", showAirg))
-        showAirg = !showAirg;
-    if (imguiCheck("Show Airg Indices", showAirgIndices))
-        showAirgIndices = !showAirgIndices;
-    if (imguiCheck("Show Grid", grid.showGrid))
-        grid.showGrid = !grid.showGrid;
-    if (imguiCheck("Show Recast Debug info", showRecastDebugInfo))
-        showRecastDebugInfo = !showRecastDebugInfo;
 
     imguiLabel("Load Airg from file");
     if (imguiButton(airgName.c_str(), (!airgLoading && airgSaveState.empty()))) {

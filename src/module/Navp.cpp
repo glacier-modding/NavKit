@@ -533,26 +533,28 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     auto start = std::chrono::high_resolution_clock::now();
     Navp &navp = loadAirgNavp ? getAirgInstance() : getInstance();
     navp.loading = true;
-    CPPTRACE_TRY {
-        NavPower::NavMesh newNavMesh = isFromJson
-                                           ? LoadNavMeshFromJson(fileName.c_str())
-                                           : LoadNavMeshFromBinary(fileName.c_str());
-        std::swap(*navp.navMesh, newNavMesh);
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
-        if (isFromBuilding) {
-            navp.setStairsFlags();
-            navp.outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-            OutputNavMesh_JSON_Write(navp.navMesh, (navp.outputNavpFilename + ".json").c_str());
-            NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((navp.outputNavpFilename + ".json").c_str());
-            std::swap(*navp.navMesh, reloadedNavMesh);
+    CPPTRACE_TRY
+        {
+            NavPower::NavMesh newNavMesh = isFromJson
+                                               ? LoadNavMeshFromJson(fileName.c_str())
+                                               : LoadNavMeshFromBinary(fileName.c_str());
+            std::swap(*navp.navMesh, newNavMesh);
+            SceneExtract &sceneExtract = SceneExtract::getInstance();
+            if (isFromBuilding) {
+                navp.setStairsFlags();
+                navp.outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
+                OutputNavMesh_JSON_Write(navp.navMesh, (navp.outputNavpFilename + ".json").c_str());
+                NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((navp.outputNavpFilename + ".json").c_str());
+                std::swap(*navp.navMesh, reloadedNavMesh);
+            }
+            if (isFromJson) {
+                OutputNavMesh_NAVP_Write(navp.navMesh, navp.outputNavpFilename.c_str());
+                loadNavMeshFileData(navp.outputNavpFilename);
+            } else {
+                loadNavMeshFileData(fileName);
+            }
         }
-        if (isFromJson) {
-            OutputNavMesh_NAVP_Write(navp.navMesh, navp.outputNavpFilename.c_str());
-            loadNavMeshFileData(navp.outputNavpFilename);
-        } else {
-            loadNavMeshFileData(fileName);
-        }
-    } CPPTRACE_CATCH(const std::exception& e) {
+    CPPTRACE_CATCH(const std::exception& e) {
         msg = "Error loading Navp file '";
         msg += fileName;
         msg += "': ";
@@ -631,20 +633,11 @@ void Navp::setLastSaveFileName(const char *fileName) {
 void Navp::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
-    int navpMenuHeight = std::min(1310, renderer.height - 20);
+    int navpMenuHeight = std::min(1190, renderer.height - 20);
     if (imguiBeginScrollArea("Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
-                             &navpScroll))
+                             &navpScroll)) {
         gui.mouseOverMenu = true;
-    if (imguiCheck("Show Navp", showNavp))
-        showNavp = !showNavp;
-    if (imguiCheck("Show Navp Indices", showNavpIndices))
-        showNavpIndices = !showNavpIndices;
-    if (imguiCheck("Show Pathfinding Exclusion Boxes", showPfExclusionBoxes))
-        showPfExclusionBoxes = !showPfExclusionBoxes;
-    if (imguiCheck("Show Pathfinding Seed Points", showPfSeedPoints))
-        showPfSeedPoints = !showPfSeedPoints;
-    if (imguiCheck("Show Recast Debug info", showRecastDebugInfo))
-        showRecastDebugInfo = !showRecastDebugInfo;
+    }
     imguiLabel("Load Navp from file");
     if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
         char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());

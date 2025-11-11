@@ -251,10 +251,16 @@ void InputHandler::handleCheckboxMenuItem(const UINT menuId, bool &stateVariable
 }
 
 void InputHandler::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
-    const std::vector<UINT> menuGroupIds = {IDM_VIEW_AIRG_CELL_COLOR_OFF,IDM_VIEW_AIRG_CELL_COLOR_BITMAP,IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA,IDM_VIEW_AIRG_CELL_COLOR_LAYER};
+    const std::vector<UINT> menuGroupIds =
+    {
+        IDM_VIEW_AIRG_CELL_COLOR_OFF,
+        IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
+        IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA,
+        IDM_VIEW_AIRG_CELL_COLOR_LAYER
+    };
     HWND hwnd = Renderer::hwnd;
     HMENU hMenu = GetMenu(hwnd);
-    for (const UINT menuId : menuGroupIds) {
+    for (const UINT menuId: menuGroupIds) {
         if (selectedMenuId == menuId) {
             CheckMenuItem(hMenu, menuId, MF_BYCOMMAND | MF_CHECKED);
         } else
@@ -313,7 +319,8 @@ int InputHandler::handleMenu(const SDL_SysWMmsg *wmMsg) {
                     break;
 
                 case IDM_VIEW_NAVP_SHOW_INDICES:
-                    handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_INDICES, Navp::getInstance().showNavpIndices, "Show Navp Indices");
+                    handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_INDICES, Navp::getInstance().showNavpIndices,
+                                           "Show Navp Indices");
                     break;
 
                 case IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES:
