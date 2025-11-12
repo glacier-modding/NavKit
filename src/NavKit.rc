@@ -5,20 +5,15 @@ IDR_NAVKITMENU MENU
 BEGIN
     POPUP "&File"
     BEGIN
-        POPUP "&Open"
-        BEGIN
-            MENUITEM "Open &Scene",                          IDM_FILE_OPEN_SCENE
-            MENUITEM "Open &Obj",                            IDM_FILE_OPEN_OBJ
-            MENUITEM "Open &Navp",                           IDM_FILE_OPEN_NAVP
-            MENUITEM "Open &Airg",                           IDM_FILE_OPEN_AIRG
-        END
-        POPUP "&Save"
-        BEGIN
-            MENUITEM "Save &Scene",                          IDM_FILE_SAVE_SCENE
-            MENUITEM "Save &Obj",                            IDM_FILE_SAVE_OBJ
-            MENUITEM "Save &Navp",                           IDM_FILE_SAVE_NAVP
-            MENUITEM "Save &Airg",                           IDM_FILE_SAVE_AIRG
-        END
+        MENUITEM "Open &Scene",                              IDM_FILE_OPEN_SCENE
+        MENUITEM "Open &Obj",                                IDM_FILE_OPEN_OBJ
+        MENUITEM "Open &Navp",                               IDM_FILE_OPEN_NAVP
+        MENUITEM "Open &Airg",                               IDM_FILE_OPEN_AIRG
+        MENUITEM SEPARATOR
+        MENUITEM "Save &Scene",                              IDM_FILE_SAVE_SCENE
+        MENUITEM "Save &Obj",                                IDM_FILE_SAVE_OBJ
+        MENUITEM "Save &Navp",                               IDM_FILE_SAVE_NAVP
+        MENUITEM "Save &Airg",                               IDM_FILE_SAVE_AIRG
         MENUITEM SEPARATOR
         MENUITEM "E&xit",                                    IDM_FILE_EXIT
     END
@@ -83,7 +78,7 @@ BEGIN
             MENUITEM "Build Obj from &Navp",                 IDM_BUILD_OBJ_FROM_NAVP
         END
         MENUITEM "Build &Navp from Obj and Scene",           IDM_BUILD_NAVP
-        MENUITEM "Build &Airg from Navp",                    IDM_BUILD_ARG
+        MENUITEM "Build &Airg from Navp",                    IDM_BUILD_AIRG
     END
 
     POPUP "&Help"

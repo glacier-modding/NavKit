@@ -143,43 +143,6 @@ void GameConnection::sendHelloMessage() const {
     ws->send(R"({"type":"hello","identifier":"NavKit"})");
 }
 
-void GameConnection::sendNavp(NavPower::NavMesh *navMesh) const {
-    if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
-        return;
-    }
-    constexpr int chunkSize = 30;
-    auto chunkHead = navMesh->m_areas.begin();
-    const int areaCount = navMesh->m_areas.size();
-    int chunkCount = (areaCount % chunkSize == 0) ? (areaCount / chunkSize) : ((areaCount / chunkSize) + 1);
-    for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-        int curChunkSize = (chunkIndex < (chunkCount - 1)) ? chunkSize : (areaCount % chunkSize);
-        std::vector<NavPower::Area> areas = std::vector<NavPower::Area>(chunkHead, chunkHead + curChunkSize);
-        sendChunk(areas, chunkIndex, chunkCount);
-        chunkHead += curChunkSize;
-    }
-    if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: HandleMessages failed because the socket is not open.");
-        return;
-    }
-    while (ws->getReadyState() != WebSocket::CLOSED) {
-        WebSocket::pointer wsp = &*ws;
-        ws->poll();
-        ws->dispatch([&](const std::string &message) {
-            Logger::log(NK_INFO, ("Received message: " + message).c_str());
-            if (message == "Done loading Navp." || message == "Done sending entities." || message ==
-                R"({"type":"entityTreeRebuilt"})") {
-                wsp->close();
-            }
-            if (message.find("Unknown editor message type: loadNavp") != -1) {
-                Logger::log(NK_ERROR,
-                            "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
-                wsp->close();
-            }
-        });
-    }
-}
-
 void GameConnection::sendChunk(const std::vector<NavPower::Area> &areas, int chunkIndex, int chunkCount) const {
     std::stringstream m;
     m << std::fixed << std::setprecision(3);

@@ -57,6 +57,8 @@ void Obj::setBlenderFile(const char *fileName) {
 void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
     SceneExtract &sceneExtract = SceneExtract::getInstance();
     std::string fileName = sceneExtract.lastOutputFolder + "\\outputNavp.obj";
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
 
     Logger::log(NK_INFO, ("Building obj from loaded navp. Saving to: " + fileName).c_str());
     Navp &navp = Navp::getInstance();
@@ -103,6 +105,7 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
 }
 
 void Obj::buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder) {
+    objLoaded = false;
     startedObjGeneration = true;
     Logger::log(NK_INFO, "Generating obj from nav.json file.");
     std::string command = "\"";
@@ -116,6 +119,8 @@ void Obj::buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder) {
         command += " True";
     }
     blenderObjStarted = true;
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
     generatedObjName = "output.obj";
 
     std::thread commandThread(CommandRunner::runCommand, command, "Glacier2ObjBlender.log", [this] {
@@ -131,7 +136,7 @@ void Obj::buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder) {
 
 char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
     nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
-    return FileUtil::openNfdLoadDialog(filters, 1, lastBlenderFile);
+    return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
 void Obj::finalizeObjBuild() {
@@ -252,13 +257,13 @@ void Obj::renderObj() {
 
 char *Obj::openLoadObjFileDialog(const char *lastObjFolder) {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
-    return FileUtil::openNfdLoadDialog(filters, 1, lastObjFolder);
+    return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
 
 char *Obj::openSaveObjFileDialog(char *lastObjFolder) {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
-    return FileUtil::openNfdSaveDialog(filters, 1, "output", lastObjFolder);
+    return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
 void Obj::setLastLoadFileName(const char *fileName) {
@@ -274,6 +279,26 @@ void Obj::setLastSaveFileName(const char *fileName) {
     loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
 }
 
+void Obj::handleOpenObjPressed() {
+    char *fileName = openLoadObjFileDialog(loadObjName.data());
+    if (fileName) {
+        setLastLoadFileName(fileName);
+        objLoaded = false;
+        objToLoad = fileName;
+        loadObj = true;
+    }
+}
+
+void Obj::handleSaveObjPressed() {
+    char *fileName = openSaveObjFileDialog(loadObjName.data());
+    if (fileName) {
+        loadObjName = fileName;
+        setLastSaveFileName(fileName);
+        saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
+        saveObjName = loadObjName;
+    }
+}
+
 void Obj::drawMenu() {
     Gui &gui = Gui::getInstance();
     Renderer &renderer = Renderer::getInstance();
@@ -286,37 +311,22 @@ void Obj::drawMenu() {
 
     imguiLabel("Load Obj file");
     if (imguiButton(loadObjName.c_str(), objToLoad.empty())) {
-        char *fileName = openLoadObjFileDialog(loadObjName.data());
-        if (fileName) {
-            setLastLoadFileName(fileName);
-            objLoaded = false;
-            objToLoad = fileName;
-            loadObj = true;
-        }
+        handleOpenObjPressed();
     }
     imguiLabel("Save Obj file");
     if (imguiButton(saveObjName.c_str(), objLoaded)) {
-        char *fileName = openSaveObjFileDialog(loadObjName.data());
-        if (fileName) {
-            loadObjName = fileName;
-            setLastSaveFileName(fileName);
-            saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
-            saveObjName = loadObjName;
-        }
+        handleSaveObjPressed();
     }
     SceneExtract &sceneExtract = SceneExtract::getInstance();
     if (Scene &scene = Scene::getInstance(); imguiButton("Build obj from NavKit Scene",
                                                          sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
                                                          sceneExtract.extractingAlocs && !blenderObjStarted && !
                                                          blenderObjGenerationDone)) {
-        gui.showLog = true;
-        objLoaded = false;
         buildObj(lastBlenderFile.data(), scene.lastLoadSceneFile.data(), sceneExtract.lastOutputFolder.data());
     }
     Navp &navp = Navp::getInstance();
     if (imguiButton("Build obj from Navp",
                     sceneExtract.outputSet && blenderSet && navp.navpLoaded)) {
-        gui.showLog = true;
         buildObjFromNavp(true);
     }
     imguiEndScrollArea();

@@ -11,26 +11,26 @@
 
 #include "../../include/NavKit/util/FileUtil.h"
 
-Scene::Scene() {
-    sceneLoaded = false;
-    sceneScroll = 0;
-    loadSceneName = "Load NavKit Scene";
-    saveSceneName = "Save NavKit Scene";
-}
+Scene::Scene()
+    : sceneLoaded(false)
+      , sceneScroll(0)
+      , loadSceneName("Load NavKit Scene")
+      , saveSceneName("Save NavKit Scene")
+{}
 
 const int Scene::SCENE_MENU_HEIGHT = 125;
 
 Scene::~Scene() {
 }
 
-char *Scene::openLoadSceneFileDialog(const char *lastSceneFolder) {
-    nfdu8filteritem_t filters[2] = {{"Nav.json files", "nav.json"}};
-    return FileUtil::openNfdLoadDialog(filters, 2, lastSceneFolder);
+char *Scene::openLoadSceneFileDialog() {
+    nfdu8filteritem_t filters[1] = {{"Nav.json files", "nav.json"}};
+    return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-char *Scene::openSaveSceneFileDialog(char *lastSceneFolder) {
-    nfdu8filteritem_t filters[2] = {{"Nav.json files", "nav.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 2, "output", lastSceneFolder);
+char *Scene::openSaveSceneFileDialog() {
+    nfdu8filteritem_t filters[1] = {{"Nav.json files", "nav.json"}};
+    return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
 void Scene::setLastLoadFileName(char *fileName) {
@@ -43,7 +43,6 @@ void Scene::setLastLoadFileName(char *fileName) {
 
 void Scene::setLastSaveFileName(char *fileName) {
     saveSceneName = fileName;
-    lastSaveSceneFile = saveSceneName.data();
     saveSceneName = saveSceneName.substr(saveSceneName.find_last_of("/\\") + 1);
 }
 
@@ -124,6 +123,43 @@ void Scene::saveScene(char *fileName) {
     Logger::log(NK_INFO, "Done saving Scene.");
 }
 
+void Scene::handleOpenScenePressed() {
+    if (char *fileName = openLoadSceneFileDialog()) {
+        setLastLoadFileName(fileName);
+        std::string msg = "Loading nav.json file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        std::string fileNameToLoad = fileName;
+        auto loadSceneThread =
+                std::thread(
+                    loadScene,
+                    fileNameToLoad,
+                    [fileNameToLoad]() {
+                        getInstance().sceneLoaded = true;
+                        Logger::log(
+                            NK_INFO,
+                            ("Done loading nav.json file: '" + fileNameToLoad + "'.").
+                            c_str());
+                    }, []() {
+                        Logger::log(NK_ERROR, "Error loading scene file.");
+                    });
+        loadSceneThread.detach();
+    }
+}
+
+void Scene::handleSaveScenePressed() {
+    if (char *fileName = openSaveSceneFileDialog()) {
+        setLastSaveFileName(fileName);
+        std::string msg = "Saving NavKit Scene file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        auto saveSceneThread = std::thread(saveScene, fileName);
+        saveSceneThread.detach();
+    }
+}
+
 void Scene::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
@@ -135,7 +171,7 @@ void Scene::drawMenu() {
     }
     imguiLabel("Load NavKit Scene from file");
     if (imguiButton(loadSceneName.c_str())) {
-        if (char *fileName = openLoadSceneFileDialog(lastLoadSceneFile.data())) {
+        if (char *fileName = openLoadSceneFileDialog()) {
             setLastLoadFileName(fileName);
             std::string msg = "Loading nav.json file: '";
             msg += fileName;
@@ -157,18 +193,11 @@ void Scene::drawMenu() {
                         });
             loadSceneThread.detach();
         }
+        // handleOpenScenePressed();
     }
     imguiLabel("Save NavKit Scene to file");
     if (imguiButton(saveSceneName.c_str(), sceneLoaded)) {
-        if (char *fileName = openSaveSceneFileDialog(lastLoadSceneFile.data())) {
-            setLastSaveFileName(fileName);
-            std::string msg = "Saving NavKit Scene file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            auto saveSceneThread = std::thread(saveScene, fileName);
-            saveSceneThread.detach();
-        }
+        handleSaveScenePressed();
     }
     imguiEndScrollArea();
 }

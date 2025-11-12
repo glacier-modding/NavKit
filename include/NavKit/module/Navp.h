@@ -103,6 +103,10 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
+    void handleOpenNavpPressed();
+
+    void handleSaveNavpPressed();
+
     void setBBox(const float *pos, const float *size);
 
     static void updateExclusionBoxConvexVolumes();
@@ -129,7 +133,6 @@ private:
     std::string saveNavpName;
     std::string lastSaveNavpFile;
     std::string outputNavpFilename = "output.navp";
-    std::vector<bool> navpLoadDone;
     std::vector<bool> navpBuildDone;
     bool building;
 };

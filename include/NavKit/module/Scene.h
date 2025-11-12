@@ -9,9 +9,9 @@ public:
 
     ~Scene();
 
-    static char *openLoadSceneFileDialog(const char *lastSceneFolder);
+    static char *openLoadSceneFileDialog();
 
-    static char *openSaveSceneFileDialog(char *lastSceneFolder);
+    static char *openSaveSceneFileDialog();
 
     void setLastLoadFileName(char *file_name);
 
@@ -21,6 +21,10 @@ public:
                           const std::function<void()> &errorCallback);
 
     static void saveScene(char *fileName);
+
+    void handleOpenScenePressed();
+
+    void handleSaveScenePressed();
 
     void drawMenu();
 
@@ -41,5 +45,4 @@ private:
     int sceneScroll;
     std::string loadSceneName;
     std::string saveSceneName;
-    std::string lastSaveSceneFile;
 };

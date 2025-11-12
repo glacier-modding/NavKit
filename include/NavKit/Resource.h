@@ -36,7 +36,7 @@
 #define IDM_BUILD_OBJ_FROM_SCENE                1500
 #define IDM_BUILD_OBJ_FROM_NAVP                 1501
 #define IDM_BUILD_NAVP                          1510
-#define IDM_BUILD_ARG                           1520
+#define IDM_BUILD_AIRG                           1520
 #define IDM_HELP_ABOUT                          1600
 
 #define IDD_ERROR_DIALOG                        20000

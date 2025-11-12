@@ -65,6 +65,10 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
+    void handleOpenObjPressed();
+
+    void handleSaveObjPressed();
+
     void drawMenu();
 
     void finalizeLoad();

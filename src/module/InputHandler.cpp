@@ -15,6 +15,7 @@
 #include <SDL_opengl.h>
 
 #include "../../include/NavKit/module/Grid.h"
+#include "../../include/NavKit/module/Scene.h"
 
 const int InputHandler::QUIT = 1;
 
@@ -121,7 +122,9 @@ int InputHandler::handleInput() {
                 done = true;
                 break;
             case SDL_SYSWMEVENT:
-                handleMenu(event.syswm.msg);
+                if (handleMenu(event.syswm.msg) == QUIT) {
+                    done = true;
+                }
                 break;
             default:
                 break;
@@ -241,6 +244,15 @@ void InputHandler::hitTest() const {
     }
 }
 
+void InputHandler::setMenuItemEnabled(UINT menuId, bool isEnabled) {
+    HWND hwnd = Renderer::hwnd;
+    if (!hwnd) return;
+    HMENU hMenu = GetMenu(hwnd);
+    if (!hMenu) return;
+    UINT flags = MF_BYCOMMAND | (isEnabled ? MF_ENABLED : MF_GRAYED);
+    EnableMenuItem(hMenu, menuId, flags);
+}
+
 void InputHandler::handleCheckboxMenuItem(const UINT menuId, bool &stateVariable, const char *itemName) {
     HWND hwnd = Renderer::hwnd;
     HMENU hMenu = GetMenu(hwnd);
@@ -297,8 +309,37 @@ int InputHandler::handleMenu(const SDL_SysWMmsg *wmMsg) {
     if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
         if (wmMsg->msg.win.msg == WM_COMMAND) {
             switch (LOWORD(wmMsg->msg.win.wParam)) {
+                case IDM_FILE_OPEN_SCENE:
+                    Scene::getInstance().handleOpenScenePressed();
+                    Logger::log(NK_INFO, "File -> Open Scene clicked");
+                    break;
+                case IDM_FILE_OPEN_OBJ:
+                    Obj::getInstance().handleOpenObjPressed();
+                    Logger::log(NK_INFO, "File -> Open Obj clicked");
+                    break;
                 case IDM_FILE_OPEN_NAVP:
-                    Logger::log(NK_INFO, "File -> Open -> Navp clicked!");
+                    Navp::getInstance().handleOpenNavpPressed();
+                    Logger::log(NK_INFO, "File -> Open Navp clicked");
+                    break;
+                case IDM_FILE_OPEN_AIRG:
+                    Airg::getInstance().handleOpenAirgPressed();
+                    Logger::log(NK_INFO, "File -> Open Airg clicked");
+                    break;
+                case IDM_FILE_SAVE_SCENE:
+                    Scene::getInstance().handleSaveScenePressed();
+                    Logger::log(NK_INFO, "File -> Save Scene clicked");
+                    break;
+                case IDM_FILE_SAVE_OBJ:
+                    Obj::getInstance().handleSaveObjPressed();
+                    Logger::log(NK_INFO, "File -> Save Obj clicked");
+                    break;
+                case IDM_FILE_SAVE_NAVP:
+                    Navp::getInstance().handleSaveNavpPressed();
+                    Logger::log(NK_INFO, "File -> Save Navp clicked");
+                    break;
+                case IDM_FILE_SAVE_AIRG:
+                    Airg::getInstance().handleSaveAirgPressed();
+                    Logger::log(NK_INFO, "File -> Save Airg clicked");
                     break;
 
                 case IDM_FILE_EXIT:
@@ -312,7 +353,7 @@ int InputHandler::handleMenu(const SDL_SysWMmsg *wmMsg) {
                     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About",
                                              ("NavKit version " + currentVersionStr).data(), nullptr);
                 }
-                break;
+                    break;
 
                 case IDM_VIEW_NAVP_SHOW_NAVP:
                     handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_NAVP, Navp::getInstance().showNavp, "Show Navp");

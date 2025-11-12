@@ -19,6 +19,8 @@ public:
 
     void hitTest() const;
 
+    static void setMenuItemEnabled(UINT menuId, bool isEnabled);
+
     static void handleCheckboxMenuItem(UINT menuId, bool &stateVariable, const char *itemName);
 
     static void handleCellColorDataRadioMenuItem(int selectedMenuId);

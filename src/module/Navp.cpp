@@ -11,6 +11,7 @@
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/GameConnection.h"
 #include "../../include/NavKit/module/Gui.h"
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
@@ -18,6 +19,7 @@
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/imgui.h"
@@ -186,12 +188,12 @@ void Navp::renderExclusionBoxesForHitTest() const {
 
 char *Navp::openLoadNavpFileDialog(const char *lastNavpFolder) {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
-    return FileUtil::openNfdLoadDialog(filters, 2, lastNavpFolder);
+    return FileUtil::openNfdLoadDialog(filters, 2);
 }
 
 char *Navp::openSaveNavpFileDialog(char *lastNavpFolder) {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 2, "output", lastNavpFolder);
+    return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
 
 void Navp::setBBox(const float *pos, const float *scale) {
@@ -581,6 +583,8 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     navp.loading = false;
     navp.navpLoaded = true;
     navp.buildAreaMaps();
+    InputHandler::setMenuItemEnabled(IDM_FILE_SAVE_NAVP, true);
+    InputHandler::setMenuItemEnabled(IDM_BUILD_AIRG, true);
 }
 
 void Navp::buildNavp() {
@@ -630,6 +634,61 @@ void Navp::setLastSaveFileName(const char *fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
+void Navp::handleOpenNavpPressed() {
+    char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
+    if (fileName) {
+        setLastLoadFileName(fileName);
+        std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+
+        if (extension == "JSON") {
+            std::string msg = "Loading Navp.json file: '";
+            msg += fileName;
+            msg += "'...";
+            Logger::log(NK_INFO, msg.data());
+            std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), true, false, false);
+            loadNavMeshThread.detach();
+        } else if (extension == "NAVP") {
+            std::string msg = "Loading Navp file: '";
+            msg += fileName;
+            msg += "'...";
+            Logger::log(NK_INFO, msg.data());
+            std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), false, false, false);
+            loadNavMeshThread.detach();
+        }
+    }
+}
+
+void Navp::handleSaveNavpPressed() {
+    char *fileName = openSaveNavpFileDialog(lastLoadNavpFile.data());
+    if (fileName) {
+        setLastSaveFileName(fileName);
+        std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+        std::string msg = "Saving Navp";
+        if (extension == "JSON") {
+            msg += ".Json";
+        }
+        msg += " file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        SceneExtract &sceneExtract = SceneExtract::getInstance();
+        if (extension == "JSON") {
+            OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
+        } else if (extension == "NAVP") {
+            outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
+            std::string tempOutputJSONFilename = outputNavpFilename + ".json";
+            OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.data());
+            NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.data());
+            std::swap(*navMesh, newNavMesh);
+            OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
+            buildAreaMaps();
+        }
+        Logger::log(NK_INFO, "Done saving Navp.");
+    }
+}
+
 void Navp::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
@@ -639,59 +698,12 @@ void Navp::drawMenu() {
         gui.mouseOverMenu = true;
     }
     imguiLabel("Load Navp from file");
-    if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
-        char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
-        if (fileName) {
-            setLastLoadFileName(fileName);
-            std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
-            std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-
-            if (extension == "JSON") {
-                std::string msg = "Loading Navp.json file: '";
-                msg += fileName;
-                msg += "'...";
-                Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), true, false, false);
-                loadNavMeshThread.detach();
-            } else if (extension == "NAVP") {
-                std::string msg = "Loading Navp file: '";
-                msg += fileName;
-                msg += "'...";
-                Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), false, false, false);
-                loadNavMeshThread.detach();
-            }
-        }
+    if (imguiButton(loadNavpName.c_str())) {
+        handleOpenNavpPressed();
     }
     imguiLabel("Save Navp to file");
     if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
-        char *fileName = openSaveNavpFileDialog(lastLoadNavpFile.data());
-        if (fileName) {
-            setLastSaveFileName(fileName);
-            std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
-            std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-            std::string msg = "Saving Navp";
-            if (extension == "JSON") {
-                msg += ".Json";
-            }
-            msg += " file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            SceneExtract &sceneExtract = SceneExtract::getInstance();
-            if (extension == "JSON") {
-                OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
-            } else if (extension == "NAVP") {
-                outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-                std::string tempOutputJSONFilename = outputNavpFilename + ".json";
-                OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.data());
-                NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.data());
-                std::swap(*navMesh, newNavMesh);
-                OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
-                buildAreaMaps();
-            }
-            Logger::log(NK_INFO, "Done saving Navp.");
-        }
+        handleSaveNavpPressed();
     }
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     Obj &obj = Obj::getInstance();
@@ -700,11 +712,6 @@ void Navp::drawMenu() {
                     Airg::getInstance().airgBuilding)) {
         std::thread buildNavpThread(&Navp::buildNavp);
         buildNavpThread.detach();
-    }
-    if (imguiButton("Send Navp to game", navpLoaded)) {
-        GameConnection &gameConnection = GameConnection::getInstance();
-        gameConnection.connectToGame();
-        gameConnection.sendNavp(navMesh);
     }
     imguiLabel("Selected Area");
     char selectedNavpText[64];

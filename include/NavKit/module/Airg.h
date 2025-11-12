@@ -70,6 +70,10 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
+    void handleOpenAirgPressed();
+
+    void handleSaveAirgPressed();
+
 private:
     static char *openSaveAirgFileDialog(char *lastAirgFolder);
 
