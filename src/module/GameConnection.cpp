@@ -140,7 +140,7 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
 }
 
 void GameConnection::sendHelloMessage() const {
-    ws->send(R"({"type":"hello","identifier":"glacier2obj"})");
+    ws->send(R"({"type":"hello","identifier":"NavKit"})");
 }
 
 void GameConnection::sendNavp(NavPower::NavMesh *navMesh) const {

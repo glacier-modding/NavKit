@@ -194,7 +194,7 @@ std::vector<ZPathfinding::PfBox> ZPathfinding::PfBoxes::readExclusionBoxes() con
 }
 
 void ZPathfinding::PfSeedPoint::writeJson(std::ofstream &f) {
-    f << R"({"hash":"00724CDE424AFE76","entity":{"id":")" << id <<
+    f << R"({"hash":"00280B8C4462FAC8","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
     pos.writeJson(f);
