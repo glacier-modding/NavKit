@@ -2,6 +2,9 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/RecastDemo/SampleInterfaces.h"
 
+#include <cstdarg>
+#include <vector>
+
 Logger::Logger() {
     logQueue = new rsj::ConcurrentQueue<std::pair<LogCategory, std::string> >();
 }
@@ -28,7 +31,25 @@ Logger::Logger() {
     }
 }
 
-void Logger::log(LogCategory category, const char *message, ...) {
-    const std::pair<LogCategory, std::string> logMessage = {category, message};
+void Logger::log(LogCategory category, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+    const int length = vsnprintf(nullptr, 0, format, args_copy);
+    va_end(args_copy);
+
+    if (length < 0) {
+        va_end(args);
+        return;
+    }
+
+    std::vector<char> buffer(static_cast<size_t>(length) + 1);
+
+    vsnprintf(buffer.data(), buffer.size(), format, args);
+    va_end(args);
+
+    const std::pair logMessage = {category, std::string(buffer.data())};
     getInstance().logQueue->push(logMessage);
 }

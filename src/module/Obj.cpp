@@ -162,40 +162,23 @@ void Obj::finalizeObjBuild() {
 
 void Obj::copyObjFile(const std::string &from, const std::string &to) {
     if (from == to) {
-        Logger::log(NK_ERROR, ("Cannot overwrite current obj file: " + from).c_str());
+        Logger::log(NK_ERROR, "Cannot overwrite current obj file: %s", from.c_str());
         return;
     }
+
     auto start = std::chrono::high_resolution_clock::now();
+    Logger::log(NK_INFO, "Copying OBJ from '%s' to '%s'...", from.c_str(), to.c_str());
 
-    std::ifstream inputFile(from);
-    if (!inputFile.is_open()) {
-        Logger::log(NK_ERROR, ("Error opening obj file for reading: " + from).c_str());
-        return;
-    }
-    std::ofstream outputFile(to);
-    if (!outputFile.is_open()) {
-        Logger::log(NK_ERROR, ("Error opening file for writing: " + to).c_str());
-        return;
-    }
+    try {
+        std::filesystem::copy(from, to, std::filesystem::copy_options::overwrite_existing);
 
-    std::vector<std::string> lines;
-    std::string line;
-    if (std::getline(inputFile, line)) {
-        outputFile << line << std::endl;
-    }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        Logger::log(NK_INFO, "Finished saving Obj in %lld ms.", duration.count());
 
-    while (std::getline(inputFile, line)) {
-        outputFile << line << std::endl;
+    } catch (const std::filesystem::filesystem_error& e) {
+        Logger::log(NK_ERROR, "Error copying file: %s", e.what());
     }
-    inputFile.close();
-    outputFile.close();
-
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    std::string msg = "Finished saving Obj in ";
-    msg += std::to_string(duration.count());
-    msg += " seconds";
-    Logger::log(NK_INFO, msg.data());
 }
 
 void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
@@ -214,14 +197,6 @@ void Obj::loadObjMesh(Obj *obj) {
     Logger::log(NK_INFO, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
 
-    std::ifstream inputFile(obj->objToLoad);
-    if (!inputFile.is_open()) {
-        Logger::log(NK_ERROR, ("Error opening obj file for reading: " + obj->objToLoad).c_str());
-        return;
-    }
-
-    std::vector<std::string> lines;
-    std::string line;
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     if (recastAdapter.loadInputGeom(obj->objToLoad)) {
         if (obj->objLoadDone.empty()) {

@@ -105,9 +105,11 @@ public:
 
     void handleOpenNavpPressed();
 
+    void saveNavMesh(const std::string &fileName, const std::string &extension);
+
     void handleSaveNavpPressed();
 
-    void setBBox(const float *pos, const float *size);
+    void setBBox(const float *pos, const float *scale);
 
     static void updateExclusionBoxConvexVolumes();
 
@@ -118,15 +120,15 @@ public:
 private:
     static void buildNavp();
 
-    void renderArea(NavPower::Area area, bool selected, int areaIndex);
+    static void renderArea(const NavPower::Area &area, bool selected);
 
     static bool areaIsStairs(const NavPower::Area &area);
 
     void setStairsFlags() const;
 
-    static char *openLoadNavpFileDialog(const char *lastNavpFolder);
+    static char *openLoadNavpFileDialog();
 
-    static char *openSaveNavpFileDialog(char *lastNavpFolder);
+    static char *openSaveNavpFileDialog();
 
     std::string loadNavpName;
     std::string lastLoadNavpFile;

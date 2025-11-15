@@ -90,37 +90,43 @@ void Scene::loadScene(std::string fileName, const std::function<void()> &callbac
     callback();
 }
 
-void Scene::saveScene(char *fileName) {
-    Scene &scene = getInstance();
+void Scene::saveScene(char* fileName) {
+    Scene& scene = getInstance();
+
+    std::stringstream ss;
+
+    ss << R"({"alocs":[)";
+    const char* separator = "";
+    for (const auto& aloc : scene.alocs) {
+        ss << separator;
+        aloc.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"pfBoxes":[)";
+    scene.includeBox.writeJson(ss);
+    for (const auto& pfBox : scene.exclusionBoxes) {
+        ss << ",";
+        pfBox.writeJson(ss);
+    }
+
+    ss << R"(],"pfSeedPoints":[)";
+    separator = "";
+    for (auto& pfSeedPoint : scene.pfSeedPoints) {
+        ss << separator;
+        pfSeedPoint.writeJson(ss);
+        separator = ",";
+    }
+    ss << "]}";
+
     std::ofstream f(fileName);
-    f.clear();
-    f << R"({"alocs":[)";
-    bool first = true;
-    for (auto aloc: scene.alocs) {
-        if (!first) {
-            f << ",";
-        }
-        first = false;
-        aloc.writeJson(f);
+    if (f.is_open()) {
+        f << ss.rdbuf();
+        f.close();
+        Logger::log(NK_INFO, "Done saving Scene.");
+    } else {
+        Logger::log(NK_ERROR, "Failed to open file for saving scene: %s", fileName);
     }
-    f << R"(],"pfBoxes":[)";
-    scene.includeBox.writeJson(f);
-    for (auto pfBox: scene.exclusionBoxes) {
-        f << ",";
-        pfBox.writeJson(f);
-    }
-    f << R"(],"pfSeedPoints":[)";
-    first = true;
-    for (auto pfSeedPoint: scene.pfSeedPoints) {
-        if (!first) {
-            f << ",";
-        }
-        first = false;
-        pfSeedPoint.writeJson(f);
-    }
-    f << "]}";
-    f.close();
-    Logger::log(NK_INFO, "Done saving Scene.");
 }
 
 void Scene::handleOpenScenePressed() {
@@ -171,30 +177,9 @@ void Scene::drawMenu() {
     }
     imguiLabel("Load NavKit Scene from file");
     if (imguiButton(loadSceneName.c_str())) {
-        if (char *fileName = openLoadSceneFileDialog()) {
-            setLastLoadFileName(fileName);
-            std::string msg = "Loading nav.json file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            std::string fileNameToLoad = fileName;
-            auto loadSceneThread =
-                    std::thread(
-                        loadScene,
-                        fileNameToLoad,
-                        [fileNameToLoad]() {
-                            getInstance().sceneLoaded = true;
-                            Logger::log(
-                                NK_INFO,
-                                ("Done loading nav.json file: '" + fileNameToLoad + "'.").
-                                c_str());
-                        }, []() {
-                            Logger::log(NK_ERROR, "Error loading scene file.");
-                        });
-            loadSceneThread.detach();
-        }
-        // handleOpenScenePressed();
+        handleOpenScenePressed();
     }
+
     imguiLabel("Save NavKit Scene to file");
     if (imguiButton(saveSceneName.c_str(), sceneLoaded)) {
         handleSaveScenePressed();

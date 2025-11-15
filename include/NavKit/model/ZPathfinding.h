@@ -20,7 +20,7 @@ namespace ZPathfinding {
 
         void readJson(simdjson::ondemand::object json);
 
-        void writeJson(std::ofstream &f) const;
+        void writeJson(std::ostream &f) const;
     };
 
     class Rotation {
@@ -37,7 +37,7 @@ namespace ZPathfinding {
 
         void readJson(simdjson::ondemand::object json);
 
-        void writeJson(std::ofstream &f) const;
+        void writeJson(std::ostream &f) const;
     };
 
     class PfBoxType {
@@ -49,7 +49,7 @@ namespace ZPathfinding {
 
         void readJson(simdjson::ondemand::object json);
 
-        void writeJson(std::ofstream &f) const;
+        void writeJson(std::ostream &f) const;
     };
 
     class Scale {
@@ -64,7 +64,7 @@ namespace ZPathfinding {
 
         void readJson(simdjson::ondemand::object json);
 
-        void writeJson(std::ofstream &f) const;
+        void writeJson(std::ostream &f) const;
     };
 
     class Entity {
@@ -104,7 +104,7 @@ namespace ZPathfinding {
         Scale scale{};
         Rotation rotation{};
 
-        void writeJson(std::ofstream &f) const;
+        void writeJson(std::ostream &f) const;
     };
 
     class Alocs {
@@ -136,7 +136,7 @@ namespace ZPathfinding {
         Rotation rotation{};
         PfBoxType type{};
 
-        void writeJson(std::ofstream &f) const;
+        void writeJson(std::ostream &f) const;
     };
 
     class PfBoxes {
@@ -170,7 +170,7 @@ namespace ZPathfinding {
         Vec3 pos{};
         Rotation rotation{};
 
-        void writeJson(std::ofstream &f);
+        void writeJson(std::ostream &f) const;
     };
 
     class PfSeedPoints {

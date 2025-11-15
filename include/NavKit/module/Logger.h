@@ -19,7 +19,7 @@ public:
         return instance;
     }
 
-    static void log(LogCategory category, const char *message, ...);
+    static void log(LogCategory category, const char *format, ...);
 
     static void logRunner();
 };

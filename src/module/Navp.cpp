@@ -186,12 +186,12 @@ void Navp::renderExclusionBoxesForHitTest() const {
     }
 }
 
-char *Navp::openLoadNavpFileDialog(const char *lastNavpFolder) {
+char *Navp::openLoadNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdLoadDialog(filters, 2);
 }
 
-char *Navp::openSaveNavpFileDialog(char *lastNavpFolder) {
+char *Navp::openSaveNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
@@ -263,7 +263,7 @@ void Navp::setStairsFlags() const {
     }
 }
 
-void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
+void Navp::renderArea(const NavPower::Area &area, const bool selected) {
     if (areaIsStairs(area)) {
         if (!selected) {
             glColor4f(0.5, 0.5, 0.0, 1.0);
@@ -278,15 +278,15 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
         }
     }
     glBegin(GL_POLYGON);
-    for (auto vertex: area.m_edges) {
+    for (const auto vertex: area.m_edges) {
         glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
     }
     glEnd();
     glBegin(GL_LINES);
     bool previousWasPortal = false;
     bool isFirstVertex = true;
-    Vec3 firstVertex{area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Z + 0.01f, -area.m_edges[0]->m_pos.Y};
-    for (auto vertex: area.m_edges) {
+    const Vec3 firstVertex{area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Z + 0.01f, -area.m_edges[0]->m_pos.Y};
+    for (const auto vertex: area.m_edges) {
         if (!isFirstVertex) {
             if (previousWasPortal) {
                 glColor3f(1.0, 1.0, 1.0);
@@ -334,7 +334,7 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
     }
 }
 
-void Navp::setSelectedNavpAreaIndex(int index) {
+void Navp::setSelectedNavpAreaIndex(const int index) {
     if (index == -1 && selectedNavpAreaIndex != -1) {
         Logger::log(NK_INFO, ("Deselected area: " + std::to_string(selectedNavpAreaIndex + 1)).c_str());
     }
@@ -352,7 +352,7 @@ void Navp::setSelectedNavpAreaIndex(int index) {
         snprintf(v, sizeof(v), "%.2f", pos.Z);
         msg += ", " + std::string{v} + ") Edges: [";
         int edgeIndex = 0;
-        for (auto vertex: selectedArea.m_edges) {
+        for (const auto vertex: selectedArea.m_edges) {
             msg += std::to_string(edgeIndex + 1) + ": (";
             snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
             msg += std::string{v};
@@ -363,19 +363,19 @@ void Navp::setSelectedNavpAreaIndex(int index) {
             edgeIndex++;
         }
         msg += "]";
-        Vec3 normal = selectedArea.CalculateNormal();
-        Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
-        float horizontalMagnitude = std::sqrt(
+        const Vec3 normal = selectedArea.CalculateNormal();
+        const Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
+        const float horizontalMagnitude = std::sqrt(
             horizontalProjection.X * horizontalProjection.X + horizontalProjection.Z * horizontalProjection.Z);
         float angleDegrees = 0;
         if (horizontalMagnitude == 0.0f) {
             angleDegrees = 90;
         } else {
-            float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
-            float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
+            const float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
+            const float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
             float cosineAngle = dotProduct / (normalMagnitude * horizontalMagnitude);
             cosineAngle = std::clamp(cosineAngle, -1.0f, 1.0f);
-            float angleRadians = std::acos(cosineAngle);
+            const float angleRadians = std::acos(cosineAngle);
             angleDegrees = angleRadians * 180.0f / M_PI;
         }
         msg += " Angle: " + std::to_string(angleDegrees);
@@ -383,8 +383,8 @@ void Navp::setSelectedNavpAreaIndex(int index) {
     }
 }
 
-void Navp::setSelectedPfSeedPointIndex(int index) {
-    Scene &scene = Scene::getInstance();
+void Navp::setSelectedPfSeedPointIndex(const int index) {
+    const Scene &scene = Scene::getInstance();
 
     if (index == -1 && selectedPfSeedPointIndex != -1) {
         auto &selectedPFSeedPoint = scene.pfSeedPoints[selectedPfSeedPointIndex];
@@ -450,7 +450,7 @@ void Navp::renderNavMesh() {
     if (!loading) {
         int areaIndex = 0;
         for (const NavPower::Area &area: navMesh->m_areas) {
-            renderArea(area, areaIndex == selectedNavpAreaIndex, areaIndex);
+            renderArea(area, areaIndex == selectedNavpAreaIndex);
             areaIndex++;
         }
         Vec3 colorRed = {1.0f, 0.4f, 0.4f};
@@ -635,7 +635,7 @@ void Navp::setLastSaveFileName(const char *fileName) {
 }
 
 void Navp::handleOpenNavpPressed() {
-    char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
+    char *fileName = openLoadNavpFileDialog();
     if (fileName) {
         setLastLoadFileName(fileName);
         std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
@@ -658,34 +658,52 @@ void Navp::handleOpenNavpPressed() {
         }
     }
 }
+void Navp::saveNavMesh(const std::string &fileName, const std::string &extension) {
+    Navp& navp = getInstance();
+    navp.loading = true;
 
-void Navp::handleSaveNavpPressed() {
-    char *fileName = openSaveNavpFileDialog(lastLoadNavpFile.data());
-    if (fileName) {
-        setLastSaveFileName(fileName);
-        std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
-        std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-        std::string msg = "Saving Navp";
-        if (extension == "JSON") {
-            msg += ".Json";
-        }
-        msg += " file: '";
-        msg += fileName;
-        msg += "'...";
-        Logger::log(NK_INFO, msg.data());
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
-        if (extension == "JSON") {
-            OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
-        } else if (extension == "NAVP") {
-            outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-            std::string tempOutputJSONFilename = outputNavpFilename + ".json";
-            OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.data());
-            NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.data());
+    const auto start = std::chrono::high_resolution_clock::now();
+    Logger::log(NK_INFO, "Saving Navp to file: '%s'...", fileName.c_str());
+
+    try {
+        std::string upper_extension = extension;
+        std::ranges::transform(upper_extension, upper_extension.begin(), ::toupper);
+
+        if (upper_extension == "JSON") {
+            OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
+        } else if (upper_extension == "NAVP") {
+            const SceneExtract& sceneExtract = SceneExtract::getInstance();
+            const std::string tempOutputJSONFilename = sceneExtract.lastOutputFolder + "\\temp_save.navp.json";
+
+            OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
+
+            NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.c_str());
             std::swap(*navMesh, newNavMesh);
-            OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
+
+            OutputNavMesh_NAVP_Write(navMesh, fileName.c_str());
             buildAreaMaps();
         }
-        Logger::log(NK_INFO, "Done saving Navp.");
+
+        const auto end = std::chrono::high_resolution_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        Logger::log(NK_INFO, "Finished saving Navp in %lld ms.", duration.count());
+
+    } catch (const std::exception& e) {
+        Logger::log(NK_ERROR, "Error saving Navp file '%s': %s", fileName.c_str(), e.what());
+    } catch (...) {
+        Logger::log(NK_ERROR, "An unknown error occurred while saving Navp file '%s'", fileName.c_str());
+    }
+
+    navp.loading = false;
+}
+
+void Navp::handleSaveNavpPressed() {
+    if (char* fileName = openSaveNavpFileDialog()) {
+        setLastSaveFileName(fileName);
+        std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
+
+        std::thread saveThread(&Navp::saveNavMesh, this, lastSaveNavpFile, extension);
+        saveThread.detach();
     }
 }
 
@@ -702,7 +720,7 @@ void Navp::drawMenu() {
         handleOpenNavpPressed();
     }
     imguiLabel("Save Navp to file");
-    if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
+    if (imguiButton(saveNavpName.c_str(), navpLoaded && !loading && !building)) {
         handleSaveNavpPressed();
     }
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();

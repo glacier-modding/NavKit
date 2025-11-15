@@ -9,7 +9,7 @@ void ZPathfinding::Vec3::readJson(simdjson::ondemand::object json) {
     z = static_cast<float>(static_cast<double>(json["z"]));
 }
 
-void ZPathfinding::Vec3::writeJson(std::ofstream &f) const {
+void ZPathfinding::Vec3::writeJson(std::ostream &f) const {
     f << R"("position":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << "}";
 }
 
@@ -20,7 +20,7 @@ void ZPathfinding::Rotation::readJson(simdjson::ondemand::object json) {
     w = static_cast<float>(static_cast<double>(json["w"]));
 }
 
-void ZPathfinding::Rotation::writeJson(std::ofstream &f) const {
+void ZPathfinding::Rotation::writeJson(std::ostream &f) const {
     f << R"("rotation":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << R"(,"w": )" << w << "}";
 }
 
@@ -29,7 +29,7 @@ void ZPathfinding::PfBoxType::readJson(simdjson::ondemand::object json) {
     data = std::string{std::string_view(json["data"])};
 }
 
-void ZPathfinding::PfBoxType::writeJson(std::ofstream &f) const {
+void ZPathfinding::PfBoxType::writeJson(std::ostream &f) const {
     f << R"("type":{"type":"EPathFinderBoxType","data":")" << data << R"("})";
 }
 
@@ -39,7 +39,7 @@ void ZPathfinding::Scale::readJson(simdjson::ondemand::object json) {
     data.readJson(dataJson);
 }
 
-void ZPathfinding::Scale::writeJson(std::ofstream &f) const {
+void ZPathfinding::Scale::writeJson(std::ostream &f) const {
     f << R"("scale":{"type":"SVector3","data":{"x":)" << data.x << R"(,"y":)" << data.y << R"(,"z": )" << data.z <<
             "}}";
 }
@@ -76,7 +76,7 @@ void ZPathfinding::HashAndEntity::readJson(simdjson::ondemand::object json) {
     entity.readJson(entityJson);
 }
 
-void ZPathfinding::Aloc::writeJson(std::ofstream &f) const {
+void ZPathfinding::Aloc::writeJson(std::ostream &f) const {
     f << R"({"hash":")" << hash <<
             R"(","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
@@ -117,7 +117,7 @@ std::vector<ZPathfinding::Aloc> ZPathfinding::Alocs::readAlocs() const {
     return alocs;
 }
 
-void ZPathfinding::PfBox::writeJson(std::ofstream &f) const {
+void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
     f << R"({"hash":"00724CDE424AFE76","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
@@ -193,7 +193,7 @@ std::vector<ZPathfinding::PfBox> ZPathfinding::PfBoxes::readExclusionBoxes() con
     return exclusionBoxes;
 }
 
-void ZPathfinding::PfSeedPoint::writeJson(std::ofstream &f) {
+void ZPathfinding::PfSeedPoint::writeJson(std::ostream &f) const {
     f << R"({"hash":"00280B8C4462FAC8","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
