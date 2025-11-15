@@ -1,6 +1,8 @@
 #include <chrono>
 #include <queue>
 
+#include <DetourNavMeshQuery.h>
+
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
@@ -158,88 +160,112 @@ void GridGenerator::GenerateWaypointNodes() {
     NavPower::NavMesh *navMesh = navp.navMesh;
     ReasoningGrid *grid = airg.reasoningGrid;
     float spacing = grid->m_Properties.fGridSpacing;
-    int areaIndex = 0;
-    float4 vMappedPos;
+    const float invSpacing = 1.0f / spacing;
 
     waypointCells.clear();
     int areaCount = navMesh->m_areas.size();
-    for (auto area: navMesh->m_areas) {
-        areaIndex++;
-        auto [m_min, m_max] = Pathfinding::calculateBBox(&area);
-        if (areaIndex % 100 == 0) {
-            Vec3 pos = area.m_area->m_pos;
-            char v[16];
-            snprintf(v, sizeof(v), "%.2f", pos.X);
-            std::string msg = "Processing area " + std::to_string(areaIndex) + " / " + std::to_string(areaCount);
-            Logger::log(NK_INFO, (msg).c_str());
-        }
+    const unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
+    std::vector<std::thread> threads;
+    std::mutex waypointCellsMutex; // Mutex to protect shared access to waypointCells
+    const int areas_per_thread = (areaCount + num_threads - 1) / num_threads;
+    Logger::log(NK_INFO, "Generating waypoint nodes using %u threads.", num_threads);
 
-        int minX = floor((m_min.X - grid->m_Properties.vMin.x) / spacing);
-        int minY = floor((m_min.Y - grid->m_Properties.vMin.y) / spacing);
-        int maxX = floor((m_max.X - grid->m_Properties.vMin.x) / spacing);
-        int maxY = floor((m_max.Y - grid->m_Properties.vMin.y) / spacing);
-        for (int yi = minY; yi <= maxY; ++yi) {
-            for (int xi = minX; xi <= maxX; ++xi) {
-                float worldX = xi * spacing + grid->m_Properties.vMin.x;
-                float worldY = yi * spacing + grid->m_Properties.vMin.y;
-                Vec3 normal = area.CalculateNormal();
-                const Vec3 &v1{area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Y, area.m_edges[0]->m_pos.Z};
-                float d = -(v1.X * normal.X + v1.Y * normal.Y + v1.Z * normal.Z);
-                float worldZ = -(worldX * normal.X + worldY * normal.Y + d) / normal.Z;
+    auto worker = [&](int start_index, int end_index, int thread_id) {
+        RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
+        dtNavMeshQuery navQuery;
+        navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
 
-                float4 cellLowerLeft = {worldX, worldY, worldZ, 0.0f}; // Cell upper left is -X, -Y corner
-                vMappedPos = MapToCell(&cellLowerLeft, area);
-                int vMappedPosXIndex = floor((vMappedPos.x - grid->m_Properties.vMin.x) / spacing);
-                int vMappedPosYIndex = floor((vMappedPos.y - grid->m_Properties.vMin.y) / spacing);
+        for (int areaIndex = start_index; areaIndex < end_index; ++areaIndex) {
+            // Use a reference to avoid copying the entire Area object
+            auto& area = navMesh->m_areas[areaIndex];
+            if (areaIndex % 100 == 0) {
+                Logger::log(NK_INFO, "[Thread %d] Processing area %d / %d", thread_id, areaIndex, areaCount);
+            }
+            auto [m_min, m_max] = Pathfinding::calculateBBox(&area);
+            const Vec3 normal = area.CalculateNormal();
+            const Vec3& v1 = {area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Y, area.m_edges[0]->m_pos.Z};
+            const float d = -(v1.X * normal.X + v1.Y * normal.Y + v1.Z * normal.Z);
 
-                bool cellInArea = vMappedPos.w != -1;
+            int minX = floor((m_min.X - grid->m_Properties.vMin.x) * invSpacing);
+            int minY = floor((m_min.Y - grid->m_Properties.vMin.y) * invSpacing);
+            int maxX = floor((m_max.X - grid->m_Properties.vMin.x) * invSpacing);
+            int maxY = floor((m_max.Y - grid->m_Properties.vMin.y) * invSpacing);
+            for (int yi = minY; yi <= maxY; ++yi) {
+                for (int xi = minX; xi <= maxX; ++xi) {
+                    float worldX = xi * spacing + grid->m_Properties.vMin.x;
+                    float worldY = yi * spacing + grid->m_Properties.vMin.y;
+                    if (normal.Z == 0.0f) continue;
+                    float worldZ = -(worldX * normal.X + worldY * normal.Y + d) / normal.Z;
 
-                int offset = vMappedPosXIndex + vMappedPosYIndex * grid->m_Properties.nGridWidth;
-                auto &cells = waypointCells[offset];
+                    float4 cellLowerLeft = {worldX, worldY, worldZ, 0.0f}; // Cell upper left is -X, -Y corner
+                    const float4 vMappedPos = MapToCell(&navQuery, &cellLowerLeft, area);
 
-                float cellZIndex = vMappedPos.z;
+                    bool cellInArea = vMappedPos.w != -1;
 
-                // Always add a new cell for Stairs
-                Pathfinding::ZPFLocation pfLocation;
-                MapLocation(&vMappedPos, &pfLocation);
-                if (cells.empty()) {
-                    // Create a new cell
-                    Pathfinding::SGCell newCell;
-                    newCell.fZ = cellZIndex;
-                    if (cellInArea) {
-                        newCell.m_Points.push_back({vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0});
-                    }
-                    cells.push_back(newCell);
-                } else {
-                    bool shouldAddNewCell = true;
-                    for (auto cell: cells) {
-                        // 2.25 * tan(18) degrees = 0.73
-                        if (abs(cellZIndex - cell.fZ) < 0.73) {
+                    int vMappedPosXIndex = floor((vMappedPos.x - grid->m_Properties.vMin.x) / spacing);
+                    int vMappedPosYIndex = floor((vMappedPos.y - grid->m_Properties.vMin.y) / spacing);
+                    int offset = vMappedPosXIndex + vMappedPosYIndex * grid->m_Properties.nGridWidth;
+                    {
+                        std::lock_guard<std::mutex> lock(waypointCellsMutex);
+                        auto &cells = waypointCells[offset];
+                        float cellZIndex = vMappedPos.z;
+
+                        // Always add a new cell for Stairs
+                        Pathfinding::ZPFLocation pfLocation;
+                        MapLocation(&navQuery, &vMappedPos, &pfLocation);
+                        if (cells.empty()) {
+                            // Create a new cell
+                            Pathfinding::SGCell newCell;
+                            newCell.fZ = cellZIndex;
                             if (cellInArea) {
-                                // Add the point to an existing cell
-                                if (cells.back().m_Points.empty()) {
-                                    cells.back().m_Points.push_back({vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0});
-                                }
-                                shouldAddNewCell = false;
-                                break;
-                            }
-                            shouldAddNewCell = false;
-                        }
-                    }
-                    if (shouldAddNewCell) {
-                        // Create a new cell
-                        Pathfinding::SGCell newCell;
-                        newCell.fZ = cellZIndex;
-                        if (cellInArea) {
-                            if (newCell.m_Points.empty()) {
                                 newCell.m_Points.push_back({vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0});
                             }
+                            cells.push_back(newCell);
+                        } else {
+                            bool shouldAddNewCell = true;
+                            for (auto cell: cells) {
+                                // 2.25 * tan(18) degrees = 0.73
+                                if (abs(cellZIndex - cell.fZ) < 0.73) {
+                                    if (cellInArea) {
+                                        // Add the point to an existing cell
+                                        if (cells.back().m_Points.empty()) {
+                                            cells.back().m_Points.push_back({vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0});
+                                        }
+                                        shouldAddNewCell = false;
+                                        break;
+                                    }
+                                    shouldAddNewCell = false;
+                                }
+                            }
+                            if (shouldAddNewCell) {
+                                // Create a new cell
+                                Pathfinding::SGCell newCell;
+                                newCell.fZ = cellZIndex;
+                                if (cellInArea) {
+                                    if (newCell.m_Points.empty()) {
+                                        newCell.m_Points.push_back({vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0});
+                                    }
+                                }
+                                cells.push_back(newCell);
+                            }
                         }
-                        cells.push_back(newCell);
                     }
                 }
             }
         }
+    };
+    for (unsigned int i = 0; i < num_threads; ++i) {
+        const int start_index = i * areas_per_thread;
+        const int end_index = std::min(start_index + areas_per_thread, areaCount);
+        if (start_index < end_index) {
+            threads.emplace_back(worker, start_index, end_index, i);
+        }
+    }
+
+    // --- JOIN THREADS ---
+    // Wait for all threads to complete their work
+    for (auto& t : threads) {
+        t.join();
     }
     int minX = floor((grid->m_Properties.vMin.x) / spacing);
     int minY = floor((grid->m_Properties.vMin.y) / spacing);
@@ -316,6 +342,9 @@ void GridGenerator::AlignNodes() {
     Airg &airg = Airg::getInstance();
     Logger::log(NK_INFO, "GridGenerator::AlignNodes() -> Aligning nodes.");
     float gridSpacing = airg.reasoningGrid->m_Properties.fGridSpacing;
+    RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
+    dtNavMeshQuery navQuery;
+    navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
     int curWaypoint = 0;
     // Iterate over each waypoint in the active grid
     for (Waypoint &waypoint: airg.reasoningGrid->m_WaypointList) {
@@ -391,9 +420,9 @@ void GridGenerator::AlignNodes() {
 
             float4 cellNavPowerPosition = gridOriginNavPower + float4{cellOffsetX, cellOffsetY, 0.0f, 0.0f};
             Pathfinding::ZPFLocation remappedLocation;
-            MapLocation(&cellNavPowerPosition, &remappedLocation);
+            MapLocation(&navQuery, &cellNavPowerPosition, &remappedLocation);
             float distanceThreshold = static_cast<float>(gridSpacing * 0.2) * 0.33399999;
-            if (IsInside(&remappedLocation)) {
+            if (IsInside(&navQuery, &remappedLocation)) {
                 SVector3 remappedNavPowerPosVec3 = remappedLocation.pos;
                 float4 remappedNavPowerPos{
                     remappedNavPowerPosVec3.x, remappedNavPowerPosVec3.y, remappedNavPowerPosVec3.z, 0.0
@@ -403,13 +432,12 @@ void GridGenerator::AlignNodes() {
                     distance.y < distanceThreshold
                 ) {
                     Navp &navp = Navp::getInstance();
-                    RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
                     auto centroidNavPower = recastAirgAdapter.calculateCentroid(remappedLocation.polyRef);
                     auto area = navp.posToAreaMap.find(centroidNavPower);
                     float radius = 0.1;
                     if ((area != navp.posToAreaMap.end() && area->second->m_area->m_usageFlags ==
                          NavPower::AreaUsageFlags::AREA_STEPS) ||
-                        !NearestOuterEdge(remappedLocation, radius, nullptr, nullptr)) {
+                        !NearestOuterEdge(&navQuery, remappedLocation, radius, nullptr, nullptr)) {
                         waypoint.vPos = {remappedNavPowerPos.x, remappedNavPowerPos.y, remappedNavPowerPos.z, 0.0};
                     }
                 }
@@ -619,6 +647,7 @@ void GridGenerator::GenerateLayerIndices() {
 }
 
 Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
+    dtNavMeshQuery* navQuery,
     Pathfinding::ZPFLocation *result,
     const float4 *vPosNavPower,
     const float fAcceptance,
@@ -630,10 +659,10 @@ Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
     valid = startPolyRef != 0;
 
     if (valid) {
-        closestReachablePolys = recastAirgAdapter.getClosestReachablePolys(
+        closestReachablePolys = recastAirgAdapter.getClosestReachablePolys(navQuery,
             {vPosNavPower->x, vPosNavPower->y, vPosNavPower->z}, startPolyRef, 4);
     } else {
-        closestReachablePolys = recastAirgAdapter.getClosestPolys({vPosNavPower->x, vPosNavPower->y, vPosNavPower->z},
+        closestReachablePolys = recastAirgAdapter.getClosestPolys(navQuery, {vPosNavPower->x, vPosNavPower->y, vPosNavPower->z},
                                                                   20);
     }
 
@@ -693,14 +722,14 @@ Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
     return result;
 }
 
-bool GridGenerator::MapLocation(const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped) {
+bool GridGenerator::MapLocation(dtNavMeshQuery* navQuery, const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped) {
     constexpr float fAcceptance = 2.0;
     Pathfinding::ZPFLocation *pfLocation;
     Pathfinding::ZPFLocation result;
     bool valid = false;
     valid = lMapped->polyRef != 0;
     if (valid) {
-        pfLocation = MapLocation_Internal(&result, vNavPowerPos, fAcceptance, lMapped->polyRef);
+        pfLocation = MapLocation_Internal(navQuery, &result, vNavPowerPos, fAcceptance, lMapped->polyRef);
         lMapped->pos.x = pfLocation->pos.x;
         lMapped->pos.y = pfLocation->pos.y;
         lMapped->pos.z = pfLocation->pos.z;
@@ -712,10 +741,10 @@ bool GridGenerator::MapLocation(const float4 *vNavPowerPos, Pathfinding::ZPFLoca
 
     if (!valid) {
         pfLocation = MapLocation_Internal(
+            navQuery,
             &result,
             vNavPowerPos,
-            fAcceptance,
-            lMapped->polyRef);
+            fAcceptance, lMapped->polyRef);
         lMapped->pos.x = pfLocation->pos.x;
         lMapped->pos.y = pfLocation->pos.y;
         lMapped->pos.z = pfLocation->pos.z;
@@ -725,7 +754,7 @@ bool GridGenerator::MapLocation(const float4 *vNavPowerPos, Pathfinding::ZPFLoca
     return lMapped->polyRef != 0;
 }
 
-float4 GridGenerator::MapToCell(const float4 *vCellNavPowerUpperLeft, const NavPower::Area &area) {
+float4 GridGenerator::MapToCell(dtNavMeshQuery* navQuery, const float4 *vCellNavPowerUpperLeft, const NavPower::Area &area) {
     const Airg &airg = Airg::getInstance();
     Pathfinding::ZPFLocation pfLocation;
 
@@ -748,8 +777,8 @@ float4 GridGenerator::MapToCell(const float4 *vCellNavPowerUpperLeft, const NavP
                                          offsetX * airg.reasoningGrid->m_Properties.fGridSpacing,
                                          offsetY * airg.reasoningGrid->m_Properties.fGridSpacing,
                                          0.0f, 0.0f);
-        MapLocation(&sampleNavPowerPoint, &pfLocation);
-        if (IsInside(&pfLocation) && pfLocation.mapped) {
+        MapLocation(navQuery, &sampleNavPowerPoint, &pfLocation);
+        if (IsInside(navQuery, &pfLocation) && pfLocation.mapped) {
             const float4 candidateNavPowerPoint = {pfLocation.pos.x, pfLocation.pos.y, pfLocation.pos.z, 0.0f};
             const float4 distance = {
                 abs(candidateNavPowerPoint.x - sampleNavPowerPoint.x),
@@ -775,7 +804,7 @@ float4 GridGenerator::MapToCell(const float4 *vCellNavPowerUpperLeft, const NavP
                     }
                 }
                 float radius = 0.1;
-                if (!found && !NearestOuterEdge(pfLocation, radius, nullptr, nullptr)) {
+                if (!found && !NearestOuterEdge(navQuery, pfLocation, radius, nullptr, nullptr)) {
                     found = true;
                     foundNavPowerPos = {pfLocation.pos.x, pfLocation.pos.y, pfLocation.pos.z, 0.0};
                 }
@@ -789,7 +818,7 @@ float4 GridGenerator::MapToCell(const float4 *vCellNavPowerUpperLeft, const NavP
     return {0.0f, 0.0f, 0.0f, -1.0f};
 }
 
-bool GridGenerator::IsInside(Pathfinding::ZPFLocation *location) {
+bool GridGenerator::IsInside(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation *location) {
     // Check if the area is already valid
     if (location->polyRef != 0) {
         return true;
@@ -803,7 +832,7 @@ bool GridGenerator::IsInside(Pathfinding::ZPFLocation *location) {
     // Map the location to the pathfinder grid
     Pathfinding::ZPFLocation remappedLocation;
     float4 navPowerPos{location->pos.x, location->pos.y, location->pos.z, 1.0};
-    MapLocation(&navPowerPos, &remappedLocation);
+    MapLocation(navQuery, &navPowerPos, &remappedLocation);
 
     bool remappedLocationValid = false;
     remappedLocationValid = remappedLocation.polyRef != 0;
@@ -844,6 +873,10 @@ void GridGenerator::GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap
     cellNavPowerOffset.z = 0;
     cellNavPowerOffset.w = 0;
 
+    RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
+    dtNavMeshQuery navQuery;
+    navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
+
     // Iterate through a 5x5 grid of cells around the current cell
     for (int yi = 0; yi < 5; ++yi) {
         constexpr float gridStep = 0.2f;
@@ -855,12 +888,12 @@ void GridGenerator::GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap
             // Map world position to pathfinder coordinates
             Pathfinding::ZPFLocation cellLocation;
 
-            MapLocation(&worldNavPowerPosition, &cellLocation);
+            MapLocation(&navQuery, &worldNavPowerPosition, &cellLocation);
 
             bool isValid;
 
             // Check if cell is within the pathfinder map bounds
-            if (!IsInside(&cellLocation)) {
+            if (!IsInside(&navQuery, &cellLocation)) {
                 isValid = false;
             } else {
                 float4 testNavPowerPosition = {cellLocation.pos.x, cellLocation.pos.y, cellLocation.pos.z, 0.0f};
@@ -882,7 +915,7 @@ void GridGenerator::GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap
                     } else {
                         // Check if cell is blocked by any obstacles
                         float radius = 0.1;
-                        if (NearestOuterEdge(cellLocation, radius, nullptr, nullptr)) {
+                        if (NearestOuterEdge(&navQuery, cellLocation, radius, nullptr, nullptr)) {
                             isValid = false;
                         } else {
                             isValid = true;
@@ -959,10 +992,10 @@ void GridGenerator::CalculateConnectivity(const bool *cellBitmap, int *pCellConn
     }
 }
 
-bool GridGenerator::NearestOuterEdge(Pathfinding::ZPFLocation &lFrom, float fRadius, float4 *edgeNavPowerResult,
+bool GridGenerator::NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation &lFrom, float fRadius, float4 *edgeNavPowerResult,
                                      float4 *edgeNavPowerNormal) {
     // Check if the input location is inside a valid area
-    if (!IsInside(&lFrom)) {
+    if (!IsInside(navQuery, &lFrom)) {
         return false;
     }
 
@@ -970,7 +1003,7 @@ bool GridGenerator::NearestOuterEdge(Pathfinding::ZPFLocation &lFrom, float fRad
     std::vector<dtPolyRef> polys;
     int numAreas = 0;
     RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
-    polys = recastAirgAdapter.getClosestReachablePolys({lFrom.pos.x, lFrom.pos.y, lFrom.pos.z}, lFrom.polyRef, 4);
+    polys = recastAirgAdapter.getClosestReachablePolys(navQuery, {lFrom.pos.x, lFrom.pos.y, lFrom.pos.z}, lFrom.polyRef, 4);
     numAreas = polys.size();
     if (numAreas <= 0) {
         return false;

@@ -842,6 +842,9 @@ Vec3 RecastAdapter::calculateCentroid(const dtPolyRef polyRef) const {
     return {x, y, z};
 }
 
+const dtNavMesh* RecastAdapter::getNavMesh() const {
+    return sample->getNavMesh();
+}
 /**
  * Find up to the maxPolys closest polys within the specified radius of the position which are reachable from the starting area.
  * @param navpowerPos
@@ -850,12 +853,12 @@ Vec3 RecastAdapter::calculateCentroid(const dtPolyRef polyRef) const {
  * @return
  */
 std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
+    dtNavMeshQuery* navQuery,
     Vec3 navpowerPos,
     const dtPolyRef start,
     const int maxPolys) const {
     std::vector<dtPolyRef> polys;
     const dtNavMesh *navMesh = sample->getNavMesh();
-    const dtNavMeshQuery *navQuery = sample->getNavMeshQuery();
     if (!navMesh || !navQuery || start == 0) {
         return polys;
     }
@@ -914,10 +917,9 @@ std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
  * @param maxPolys
  * @return
  */
-std::vector<dtPolyRef> RecastAdapter::getClosestPolys(Vec3 navPowerPos, const int maxPolys) const {
+std::vector<dtPolyRef> RecastAdapter::getClosestPolys(dtNavMeshQuery* navQuery, Vec3 navPowerPos, const int maxPolys) const {
     std::vector<dtPolyRef> polys;
     const dtNavMesh *navMesh = sample->getNavMesh();
-    const dtNavMeshQuery *navQuery = sample->getNavMeshQuery();
     if (!navMesh || !navQuery) {
         return polys;
     }
