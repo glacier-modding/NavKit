@@ -20,10 +20,7 @@ BEGIN
 
     POPUP "&Edit"
     BEGIN
-        POPUP "&Navp Area"
-        BEGIN
-            MENUITEM "&Stairs",                              IDM_EDIT_NAVP_STAIRS
-        END
+        MENUITEM "Navp Area is &Stairs",                     IDM_EDIT_NAVP_STAIRS
     END
 
     POPUP "&Settings"
@@ -35,31 +32,22 @@ BEGIN
     END
     POPUP "&View"
     BEGIN
-        POPUP "&Navp"
-        BEGIN
-            MENUITEM "Show &Navp",                           IDM_VIEW_NAVP_SHOW_NAVP, CHECKED
-            MENUITEM "Show Navp &Indices",                   IDM_VIEW_NAVP_SHOW_INDICES
-            MENUITEM "Show &Exclusion Boxes",                IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, CHECKED
-            MENUITEM "Show &Seed Points",                    IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, CHECKED
-            MENUITEM "Show &Recast Debug Info",              IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO
-        END
-        MENUITEM "Show &Obj",                                IDM_VIEW_OBJ_SHOW_OBJ, CHECKED
-        POPUP "&Airg"
-        BEGIN
-            MENUITEM "Show &Airg",                           IDM_VIEW_AIRG_SHOW_AIRG, CHECKED
-            MENUITEM "Show Airg &Indices",                   IDM_VIEW_AIRG_SHOW_INDICES
-            MENUITEM "Show &Grid",                           IDM_VIEW_AIRG_SHOW_GRID, CHECKED
-            MENUITEM "Show &Recast Debug Info",              IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO
-            MENUITEM SEPARATOR
-            POPUP "Cell Color Data Source"
-            BEGIN
-                MENUITEM "None",                                 IDM_VIEW_AIRG_CELL_COLOR_OFF, CHECKED
-                MENUITEM "Bitmap",                               IDM_VIEW_AIRG_CELL_COLOR_BITMAP
-                MENUITEM "Vision Data",                          IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA
-                MENUITEM "Layer",                                IDM_VIEW_AIRG_CELL_COLOR_LAYER
-            END
-
-        END
+        MENUITEM "Show &Navp",                               IDM_VIEW_NAVP_SHOW_NAVP, CHECKED
+        MENUITEM "Show Navp &Indices",                       IDM_VIEW_NAVP_SHOW_INDICES
+        MENUITEM "Show &Exclusion Boxes",                    IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, CHECKED
+        MENUITEM "Show &Seed Points",                        IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, CHECKED
+        MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO
+        MENUITEM SEPARATOR
+        MENUITEM "Show &Airg",                               IDM_VIEW_AIRG_SHOW_AIRG, CHECKED
+        MENUITEM "Show Airg &Indices",                       IDM_VIEW_AIRG_SHOW_INDICES
+        MENUITEM "Show &Grid",                               IDM_VIEW_AIRG_SHOW_GRID, CHECKED
+        MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO
+        MENUITEM SEPARATOR
+        MENUITEM "None",                                     IDM_VIEW_AIRG_CELL_COLOR_OFF, CHECKED
+        MENUITEM "Bitmap",                                   IDM_VIEW_AIRG_CELL_COLOR_BITMAP
+        MENUITEM "Vision Data",                              IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA
+        MENUITEM "Layer",                                    IDM_VIEW_AIRG_CELL_COLOR_LAYER
+        MENUITEM SEPARATOR
         MENUITEM "Show &Log",                                IDM_VIEW_LOG_SHOW_LOG, CHECKED
     END
 
@@ -72,11 +60,9 @@ BEGIN
 
     POPUP "&Build"
     BEGIN
-        POPUP "&Obj"
-        BEGIN
-            MENUITEM "Build Obj from &Scene",                IDM_BUILD_OBJ_FROM_SCENE
-            MENUITEM "Build Obj from &Navp",                 IDM_BUILD_OBJ_FROM_NAVP
-        END
+        MENUITEM "Build Obj from &Scene",                    IDM_BUILD_OBJ_FROM_SCENE
+        MENUITEM "Build Obj from &Navp",                     IDM_BUILD_OBJ_FROM_NAVP
+        MENUITEM SEPARATOR
         MENUITEM "Build &Navp from Obj and Scene",           IDM_BUILD_NAVP
         MENUITEM "Build &Airg from Navp",                    IDM_BUILD_AIRG
     END
