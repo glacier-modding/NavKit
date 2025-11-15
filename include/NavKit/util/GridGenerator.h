@@ -3,6 +3,7 @@
 #include "../model/ReasoningGrid.h"
 #include "../util/Pathfinding.h"
 #include <DetourNavMesh.h>
+#include <unordered_map>
 
 class Properties;
 
@@ -15,7 +16,7 @@ public:
 
     static bool initRecastAirgAdapter();
 
-    std::map<int, std::vector<int> > m_WaypointMap{};
+    std::unordered_map<int, std::vector<int> > m_WaypointMap{};
     std::map<int, std::vector<Pathfinding::SGCell> > waypointCells{};
 
     static void build();
@@ -36,17 +37,17 @@ public:
 
     void GenerateLayerIndices();
 
-    static Pathfinding::ZPFLocation *MapLocation_Internal(Pathfinding::ZPFLocation *result, const float4 *vPosNavPower,
-                                                   float fAcceptance, dtPolyRef startPolyRef);
+    static Pathfinding::ZPFLocation *MapLocation_Internal(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation *result,
+                                                          const float4 *vPosNavPower, float fAcceptance, dtPolyRef startPolyRef);
 
-    static bool MapLocation(const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped);
+    static bool MapLocation(dtNavMeshQuery *navQuery, const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped);
 
-    static float4 MapToCell(const float4 *vCellNavPowerUpperLeft, const NavPower::Area &area);
+    static float4 MapToCell(dtNavMeshQuery *navQuery, const float4 *vCellNavPowerUpperLeft, const NavPower::Area &area);
 
-    static bool IsInside(Pathfinding::ZPFLocation *location);
+    static bool IsInside(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation *location);
 
-    static bool NearestOuterEdge(Pathfinding::ZPFLocation &location, float tolerance, float4 *edgeNavPowerResult,
-                          float4 *edgeNavPowerNormal);
+    static bool NearestOuterEdge(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation &lFrom, float fRadius,
+                                 float4 *edgeNavPowerResult, float4 *edgeNavPowerNormal);
 
     static void buildVisionAndDeadEndData();
 

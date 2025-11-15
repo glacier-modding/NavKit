@@ -66,7 +66,8 @@ public:
 
     dtPolyRef getPoly(int tileIndex, int polyIndex) const;
 
-    dtStatus findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt, bool includeExcludedAreas) const;
+    dtStatus findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt,
+                             bool includeExcludedAreas) const;
 
     void findPfSeedPointAreas();
 
@@ -112,9 +113,13 @@ public:
 
     Vec3 calculateCentroid(dtPolyRef polyRef) const;
 
-    std::vector<dtPolyRef> getClosestReachablePolys(Vec3 navpowerPos, dtPolyRef navpowerStart, int maxPolys) const;
+    const dtNavMesh *getNavMesh() const;
 
-    std::vector<dtPolyRef> getClosestPolys(Vec3 navPowerPos, int maxPolys) const;
+    std::vector<dtPolyRef> getClosestReachablePolys(
+        dtNavMeshQuery *navQuery, Vec3 navpowerPos, dtPolyRef navpowerStart, int maxPolys) const;
+
+    std::vector<dtPolyRef> getClosestPolys(
+        dtNavMeshQuery *navQuery, Vec3 navPowerPos, int maxPolys) const;
 
     Sample_TileMesh *sample;
     BuildContext *buildContext;
