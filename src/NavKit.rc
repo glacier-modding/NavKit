@@ -20,7 +20,7 @@ BEGIN
 
     POPUP "&Edit"
     BEGIN
-        MENUITEM "Navp Area is &Stairs",                     IDM_EDIT_NAVP_STAIRS
+        MENUITEM "&Stairs Area",                             IDM_EDIT_NAVP_STAIRS
     END
 
     POPUP "&Settings"

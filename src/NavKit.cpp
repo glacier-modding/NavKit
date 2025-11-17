@@ -19,6 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
 */
+#include <csignal>
 #include <SDL.h>
 #include <cpptrace/from_current.hpp>
 #include "../include/NavKit/module/Airg.h"
@@ -47,13 +48,16 @@ int SDL_main(const int argc, char **argv) {
                 return -1;
             }
             SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
+
             UpdateChecker &updateChecker = UpdateChecker::getInstance();
             updateChecker.startUpdateCheck();
+
             SceneExtract &sceneExtract = SceneExtract::getInstance();
             Navp &navp = Navp::getInstance();
             Obj &obj = Obj::getInstance();
             Airg &airg = Airg::getInstance();
             InputHandler &inputHandler = InputHandler::getInstance();
+            InputHandler::updateMenuState();
             Gui &gui = Gui::getInstance();
             bool isRunning = true;
             Logger::log(NK_INFO, "NavKit initialized.");

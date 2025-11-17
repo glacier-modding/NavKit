@@ -1,15 +1,18 @@
 #include <chrono>
 #include <queue>
+#include <thread>
+#include <vector>
 
 #include <DetourNavMeshQuery.h>
 
+#include "../../include/NavKit/util/GridGenerator.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
-#include "../../include/NavKit/util/GridGenerator.h"
 
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/Math.h"
@@ -22,7 +25,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     airg.airgLoaded = false;
     Obj &obj = Obj::getInstance();
     obj.buildObjFromNavp(false);
-    RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
+    const RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
     const SceneExtract &sceneExtract = SceneExtract::getInstance();
     const std::string objFileName = sceneExtract.lastOutputFolder + "\\outputNavp.obj";
@@ -100,6 +103,7 @@ void GridGenerator::build() {
     airg.airgLoaded = true;
     airg.airgBuilding = false;
     Grid::getInstance().loadBoundsFromAirg();
+    InputHandler::updateMenuState();
 }
 
 void GridGenerator::addVisibilityData(ReasoningGrid *grid) {
@@ -165,8 +169,8 @@ void GridGenerator::GenerateWaypointNodes() {
     waypointCells.clear();
     int areaCount = navMesh->m_areas.size();
     const unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
-    std::vector<std::thread> threads;
-    std::mutex waypointCellsMutex; // Mutex to protect shared access to waypointCells
+    std::vector<std::jthread> threads;
+    std::mutex waypointCellsMutex;
     const int areas_per_thread = (areaCount + num_threads - 1) / num_threads;
     Logger::log(NK_INFO, "Generating waypoint nodes using %u threads.", num_threads);
 
@@ -176,7 +180,6 @@ void GridGenerator::GenerateWaypointNodes() {
         navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
 
         for (int areaIndex = start_index; areaIndex < end_index; ++areaIndex) {
-            // Use a reference to avoid copying the entire Area object
             auto& area = navMesh->m_areas[areaIndex];
             if (areaIndex % 100 == 0) {
                 Logger::log(NK_INFO, "[Thread %d] Processing area %d / %d", thread_id, areaIndex, areaCount);
@@ -262,15 +265,10 @@ void GridGenerator::GenerateWaypointNodes() {
         }
     }
 
-    // --- JOIN THREADS ---
-    // Wait for all threads to complete their work
-    for (auto& t : threads) {
-        t.join();
-    }
-    int minX = floor((grid->m_Properties.vMin.x) / spacing);
-    int minY = floor((grid->m_Properties.vMin.y) / spacing);
-    int maxX = floor((grid->m_Properties.vMax.x) / spacing);
-    int maxY = floor((grid->m_Properties.vMax.y) / spacing);
+    const int minX = floor((grid->m_Properties.vMin.x) / spacing);
+    const int minY = floor((grid->m_Properties.vMin.y) / spacing);
+    const int maxX = floor((grid->m_Properties.vMax.x) / spacing);
+    const int maxY = floor((grid->m_Properties.vMax.y) / spacing);
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
             int offset = x + y * grid->m_Properties.nGridWidth;

@@ -6,6 +6,7 @@
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Gui.h"
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
@@ -331,5 +332,6 @@ void Obj::finalizeLoad() {
             Navp::getInstance().updateExclusionBoxConvexVolumes();
         }
         objLoadDone.clear();
+        InputHandler::updateMenuState();
     }
 }

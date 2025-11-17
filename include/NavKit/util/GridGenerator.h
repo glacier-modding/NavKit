@@ -21,7 +21,7 @@ public:
 
     static void build();
 
-    void addVisibilityData(ReasoningGrid *grid);
+    static void addVisibilityData(ReasoningGrid *grid);
 
     void GenerateGrid();
 

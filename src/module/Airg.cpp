@@ -10,6 +10,7 @@
 #include "../../include/NavKit/model/VisionData.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Gui.h"
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
@@ -292,8 +293,7 @@ void Airg::build() {
 }
 
 // Render Layer Index
-void Airg::renderLayerIndices(int waypointIndex, bool selected) {
-    float size = 25;
+void Airg::renderLayerIndices(int waypointIndex) const {
     const Waypoint &waypoint = reasoningGrid->m_WaypointList[waypointIndex];
     float minX = reasoningGrid->m_Properties.vMin.x;
     float minY = reasoningGrid->m_Properties.vMin.y;
@@ -379,14 +379,12 @@ void Airg::renderCellBitmaps(int waypointIndex, bool selected) {
     }
 }
 
-void Airg::renderVisionData(int waypointIndex, bool selected) {
-    float size = visibilityDataSize(reasoningGrid, waypointIndex);
+void Airg::renderVisionData(int waypointIndex, bool selected) const {
+    const float size = visibilityDataSize(reasoningGrid, waypointIndex);
     const Waypoint &waypoint = reasoningGrid->m_WaypointList[waypointIndex];
-    float minX = reasoningGrid->m_Properties.vMin.x;
-    float minY = reasoningGrid->m_Properties.vMin.y;
-    float x = waypoint.vPos.x;
-    float y = waypoint.vPos.y;
-    std::vector<uint8_t> waypointVisionData = reasoningGrid->getWaypointVisionData(waypointIndex);
+    const float x = waypoint.vPos.x;
+    const float y = waypoint.vPos.y;
+    const std::vector<uint8_t> waypointVisionData = reasoningGrid->getWaypointVisionData(waypointIndex);
     glColor4f(0.8, 0.8, 0.8, 0.6);
     glBegin(GL_LINE_LOOP);
     glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
@@ -434,7 +432,7 @@ void Airg::renderAirg() {
             renderVisionData(i, i == selectedWaypointIndex);
         }
         if (cellColorSource == VISION_DATA) {
-            renderLayerIndices(i, i == selectedWaypointIndex);
+            renderLayerIndices(i);
         }
 
         Vec4 color{0, 0, 1, 0.5};
@@ -463,9 +461,9 @@ void Airg::renderAirg() {
     }
 }
 
-void Airg::renderAirgForHitTest() {
+void Airg::renderAirgForHitTest() const {
     if (showAirg) {
-        int numWaypoints = reasoningGrid->m_WaypointList.size();
+        const int numWaypoints = reasoningGrid->m_WaypointList.size();
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
             glColor3ub(61, i / 255, i % 255);
@@ -652,4 +650,5 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
     airg->airgLoading = false;
     airg->airgLoaded = true;
     Grid::getInstance().loadBoundsFromAirg();
+    InputHandler::updateMenuState();
 }

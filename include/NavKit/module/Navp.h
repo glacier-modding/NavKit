@@ -109,6 +109,10 @@ public:
 
     void handleSaveNavpPressed();
 
+    bool stairsAreaSelected() const;
+
+    bool canBuildNavp() const;
+
     void setBBox(const float *pos, const float *scale);
 
     static void updateExclusionBoxConvexVolumes();
@@ -117,6 +121,8 @@ public:
 
     static void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp);
 
+    std::vector<bool> navpBuildDone;
+    bool building;
 private:
     static void buildNavp();
 
@@ -135,6 +141,4 @@ private:
     std::string saveNavpName;
     std::string lastSaveNavpFile;
     std::string outputNavpFilename = "output.navp";
-    std::vector<bool> navpBuildDone;
-    bool building;
 };

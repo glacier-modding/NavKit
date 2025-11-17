@@ -50,17 +50,17 @@ public:
 
     void finalizeSave();
 
-    void build();
+    static void build();
 
-    void renderLayerIndices(int waypointIndex, bool selected);
+    void renderLayerIndices(int waypointIndex) const;
 
     void renderCellBitmaps(int waypointIndex, bool selected);
 
-    void renderVisionData(int waypointIndex, bool selected);
+    void renderVisionData(int waypointIndex, bool selected) const;
 
     void renderAirg();
 
-    void renderAirgForHitTest();
+    void renderAirgForHitTest() const;
 
     void setSelectedAirgWaypointIndex(int index);
 
