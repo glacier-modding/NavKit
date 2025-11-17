@@ -1,5 +1,7 @@
 #pragma once
+#include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 struct Vec3;
@@ -74,6 +76,10 @@ public:
 
     void handleSaveAirgPressed();
 
+    bool canLoad() const;
+
+    bool canSave() const;
+
 private:
     static char *openSaveAirgFileDialog(char *lastAirgFolder);
 
@@ -82,4 +88,5 @@ private:
     static void saveAirg(Airg *airg, std::string fileName, bool isJson);
 
     static void loadAirg(Airg *airg, char *fileName, bool isFromJson);
+    static std::optional<std::jthread> backgroundWorker;
 };

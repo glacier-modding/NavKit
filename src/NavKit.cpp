@@ -19,13 +19,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
 */
-#include <csignal>
 #include <SDL.h>
 #include <cpptrace/from_current.hpp>
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Gui.h"
 #include "../include/NavKit/module/InputHandler.h"
 #include "../include/NavKit/module/Logger.h"
+#include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/Navp.h"
 #include "../include/NavKit/module/Obj.h"
 #include "../include/NavKit/module/Renderer.h"
@@ -39,7 +39,7 @@
 int SDL_main(const int argc, char **argv) {
     CPPTRACE_TRY
         {
-            std::jthread logThread(Logger::logRunner);
+            std::thread logThread(Logger::logRunner);
             logThread.detach();
 
             Settings::Load();
@@ -57,7 +57,7 @@ int SDL_main(const int argc, char **argv) {
             Obj &obj = Obj::getInstance();
             Airg &airg = Airg::getInstance();
             InputHandler &inputHandler = InputHandler::getInstance();
-            InputHandler::updateMenuState();
+            Menu::updateMenuState();
             Gui &gui = Gui::getInstance();
             bool isRunning = true;
             Logger::log(NK_INFO, "NavKit initialized.");

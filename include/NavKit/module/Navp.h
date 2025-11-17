@@ -113,18 +113,20 @@ public:
 
     bool canBuildNavp() const;
 
+    bool canSave() const;
+
     void setBBox(const float *pos, const float *scale);
 
     static void updateExclusionBoxConvexVolumes();
 
     static void loadNavMeshFileData(const std::string &fileName);
 
-    static void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp);
+    void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding);
 
     std::vector<bool> navpBuildDone;
     bool building;
 private:
-    static void buildNavp();
+    void buildNavp();
 
     static void renderArea(const NavPower::Area &area, bool selected);
 
@@ -141,4 +143,5 @@ private:
     std::string saveNavpName;
     std::string lastSaveNavpFile;
     std::string outputNavpFilename = "output.navp";
+    static std::optional<std::jthread> backgroundWorker;
 };

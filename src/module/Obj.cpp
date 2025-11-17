@@ -6,8 +6,8 @@
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Gui.h"
-#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
@@ -40,6 +40,8 @@ Obj::Obj() {
 }
 
 const int Obj::OBJ_MENU_HEIGHT = 174;
+
+std::optional<std::jthread> Obj::backgroundWorker;
 
 void Obj::setBlenderFile(const char *fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
@@ -102,11 +104,13 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
         obj.objLoaded = false;
         obj.blenderObjGenerationDone = true;
         obj.loadObj = true;
+        Menu::updateMenuState();
     }
 }
 
-void Obj::buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder) {
+void Obj::buildObj(const char *blenderPath, const char *sceneFilePath, const char *outputFolder) {
     objLoaded = false;
+    Menu::updateMenuState();
     startedObjGeneration = true;
     Logger::log(NK_INFO, "Generating obj from nav.json file.");
     std::string command = "\"";
@@ -124,15 +128,17 @@ void Obj::buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder) {
     gui.showLog = true;
     generatedObjName = "output.obj";
 
-    std::thread commandThread(CommandRunner::runCommand, command, "Glacier2ObjBlender.log", [this] {
-        Logger::log(NK_INFO, "Finished generating obj from nav.json file.");
-        objLoaded = false;
-        blenderObjGenerationDone = true;
-    }, [this] {
-        objLoaded = false;
-        errorBuilding = true;
-    });
-    commandThread.detach();
+    backgroundWorker.emplace(
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2ObjBlender.log", [this] {
+            Logger::log(NK_INFO, "Finished generating obj from nav.json file.");
+            objLoaded = false;
+            blenderObjGenerationDone = true;
+            Menu::updateMenuState();
+        }, [this] {
+            objLoaded = false;
+            errorBuilding = true;
+            Menu::updateMenuState();
+        });
 }
 
 char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
@@ -176,8 +182,7 @@ void Obj::copyObjFile(const std::string &from, const std::string &to) {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving Obj in %lld ms.", duration.count());
-
-    } catch (const std::filesystem::filesystem_error& e) {
+    } catch (const std::filesystem::filesystem_error &e) {
         Logger::log(NK_ERROR, "Error copying file: %s", e.what());
     }
 }
@@ -187,21 +192,19 @@ void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
     std::string msg = "Saving Obj to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    std::thread saveObjThread(&Obj::copyObjFile, objToCopy, newFileName);
-    saveObjThread.detach();
+    backgroundWorker.emplace(&Obj::copyObjFile, objToCopy, newFileName);
 }
 
-void Obj::loadObjMesh(Obj *obj) {
+void Obj::loadObjMesh() {
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Obj from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     auto start = std::chrono::high_resolution_clock::now();
-
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    if (recastAdapter.loadInputGeom(obj->objToLoad)) {
-        if (obj->objLoadDone.empty()) {
-            obj->objLoadDone.push_back(true);
+    if (recastAdapter.loadInputGeom(objToLoad)) {
+        if (objLoadDone.empty()) {
+            objLoadDone.push_back(true);
             Navp &navp = Navp::getInstance();
             float pos[3] = {
                 navp.bBoxPos[0],
@@ -224,7 +227,7 @@ void Obj::loadObjMesh(Obj *obj) {
     } else {
         Logger::log(NK_ERROR, "Error loading obj.");
     }
-    obj->objToLoad.clear();
+    objToLoad.clear();
 }
 
 void Obj::renderObj() {
@@ -262,6 +265,7 @@ void Obj::handleOpenObjPressed() {
         objLoaded = false;
         objToLoad = fileName;
         loadObj = true;
+        Menu::updateMenuState();
     }
 }
 
@@ -275,6 +279,10 @@ void Obj::handleSaveObjPressed() {
     }
 }
 
+bool Obj::canLoad() const {
+    return objToLoad.empty();
+}
+
 void Obj::drawMenu() {
     Gui &gui = Gui::getInstance();
     Renderer &renderer = Renderer::getInstance();
@@ -285,14 +293,6 @@ void Obj::drawMenu() {
         gui.mouseOverMenu = true;
     }
 
-    imguiLabel("Load Obj file");
-    if (imguiButton(loadObjName.c_str(), objToLoad.empty())) {
-        handleOpenObjPressed();
-    }
-    imguiLabel("Save Obj file");
-    if (imguiButton(saveObjName.c_str(), objLoaded)) {
-        handleSaveObjPressed();
-    }
     SceneExtract &sceneExtract = SceneExtract::getInstance();
     if (Scene &scene = Scene::getInstance(); imguiButton("Build obj from NavKit Scene",
                                                          sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
@@ -319,8 +319,7 @@ void Obj::finalizeLoad() {
         msg += objToLoad;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        std::thread loadObjThread(&Obj::loadObjMesh, this);
-        loadObjThread.detach();
+        backgroundWorker.emplace(&Obj::loadObjMesh, this);
         loadObj = false;
     }
 
@@ -332,6 +331,6 @@ void Obj::finalizeLoad() {
             Navp::getInstance().updateExclusionBoxConvexVolumes();
         }
         objLoadDone.clear();
-        InputHandler::updateMenuState();
+        Menu::updateMenuState();
     }
 }

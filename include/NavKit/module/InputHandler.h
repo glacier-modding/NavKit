@@ -1,8 +1,5 @@
 #pragma once
-#include <SDL_events.h>
 #include <SDL_syswm.h>
-#include <csignal>
-#include "Airg.h"
 
 class InputHandler {
     explicit InputHandler();
@@ -13,21 +10,10 @@ public:
         return instance;
     }
 
-    static int handleMenuClicked(const SDL_SysWMmsg * wmMsg);
-
     int handleInput();
 
     void hitTest() const;
 
-    static void setMenuItemEnabled(UINT menuId, bool isEnabled);
-
-    static void handleCheckboxMenuItem(UINT menuId, bool &stateVariable, const char *itemName);
-
-    static void handleCellColorDataRadioMenuItem(int selectedMenuId);
-
-    static void updateMenuState();
-
-    static void setMenuItemChecked(UINT menuId, bool isChecked, const char *itemName);
 
     void handleMovement(float dt, const double *modelviewMatrix);
 
@@ -49,7 +35,7 @@ public:
     float moveUp;
     float moveDown;
 
-    static const int QUIT;
+    static constexpr int QUIT = 1;
     static constexpr float BASE_KEYBOARD_SPEED = 22.0f;
     static constexpr float SHIFT_SPEED_MULTIPLIER = 4.0f;
     static constexpr float CTRL_SPEED_DIVISOR = 4.0f;

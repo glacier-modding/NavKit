@@ -19,7 +19,7 @@ public:
     std::unordered_map<int, std::vector<int> > m_WaypointMap{};
     std::map<int, std::vector<Pathfinding::SGCell> > waypointCells{};
 
-    static void build();
+    void build();
 
     static void addVisibilityData(ReasoningGrid *grid);
 
@@ -54,4 +54,6 @@ public:
     static void CalculateConnectivity(const bool *cellBitmap, int *pCellConnectivity);
 
     static void GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap);
+private:
+    static std::optional<std::jthread> backgroundWorker;
 };

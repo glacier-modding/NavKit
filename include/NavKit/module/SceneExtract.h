@@ -47,4 +47,5 @@ private:
     void extractAlocs();
 
     static void extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback);
+    static std::optional<std::jthread> backgroundWorker;
 };

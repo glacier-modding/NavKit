@@ -17,16 +17,14 @@ public:
 
     void setLastSaveFileName(char *file_name);
 
-    static void loadScene(std::string fileName, const std::function<void()> &callback,
+    void loadScene(const std::string &fileName, const std::function<void()> &callback,
                           const std::function<void()> &errorCallback);
 
-    static void saveScene(char *fileName);
+    void saveScene(char *fileName);
 
     void handleOpenScenePressed();
 
     void handleSaveScenePressed();
-
-    void drawMenu();
 
     static Scene &getInstance() {
         static Scene instance;
@@ -45,4 +43,5 @@ private:
     int sceneScroll;
     std::string loadSceneName;
     std::string saveSceneName;
+    static std::optional<std::jthread> backgroundWorker;
 };

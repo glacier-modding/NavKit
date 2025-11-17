@@ -40,6 +40,8 @@ const int SceneExtract::SCENE_EXTRACT_MENU_HEIGHT = 83;
 
 SceneExtract::~SceneExtract() = default;
 
+std::optional<std::jthread> SceneExtract::backgroundWorker;
+
 void SceneExtract::setHitmanFolder(const char *folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
@@ -123,7 +125,7 @@ void SceneExtract::extractScene() {
     GameConnection &gameConnection = GameConnection::getInstance();
     extractingFromGame = true;
 
-    std::thread extractFromGameThread(extractFromGame, [this] {
+    std::jthread extractFromGameThread(extractFromGame, [this] {
         Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
         extractingFromGame = false;
         doneExtractingFromGame = true;
@@ -133,7 +135,6 @@ void SceneExtract::extractScene() {
         if (gameConnection.closeConnection()) {
         }
     });
-    extractFromGameThread.detach();
 }
 
 void SceneExtract::extractAlocs() {
@@ -172,14 +173,15 @@ void SceneExtract::extractAlocs() {
     command += alocFolder;
     command += "\"";
     extractingAlocs = true;
-    std::thread commandThread(CommandRunner::runCommand, command, "Glacier2ObjExtract.log", [this] {
-        Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
-        extractingAlocs = false;
-        doneExtractingAlocs = true;
-    }, [this] {
-        errorExtracting = true;
-    });
-    commandThread.detach();
+    std::jthread commandThread(
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command,
+        "Glacier2ObjExtract.log", [this] {
+            Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
+            extractingAlocs = false;
+            doneExtractingAlocs = true;
+        }, [this] {
+            errorExtracting = true;
+        });
 }
 
 void SceneExtract::finalizeExtract() {
@@ -188,33 +190,32 @@ void SceneExtract::finalizeExtract() {
         doneExtractingAlocs = false;
         std::string sceneFile = lastOutputFolder;
         sceneFile += "\\output.nav.json";
-        auto loadSceneThread =
-                std::thread(
-                    Scene::loadScene,
-                    sceneFile,
-                    [sceneFile]() {
-                        Scene &sceneScoped = Scene::getInstance();
-                        SceneExtract &sceneExtract = getInstance();
-                        Obj &objScoped = Obj::getInstance();
-                        sceneScoped.sceneLoaded = true;
-                        std::string fileNameString = sceneFile;
-                        sceneExtract.extractingAlocs = false;
-                        sceneScoped.lastLoadSceneFile = sceneFile;
-                        if (sceneExtract.alsoBuildObj && !objScoped.startedObjGeneration) {
-                            objScoped.buildObj(objScoped.lastBlenderFile.data(), fileNameString.data(),
-                                               sceneExtract.lastOutputFolder.data());
-                        }
-                        Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
-                    }, []() {
-                        SceneExtract &sceneExtract = getInstance();
-                        Obj &objScoped = Obj::getInstance();
-                        Logger::log(NK_ERROR, "Error loading scene file.");
-                        sceneExtract.errorExtracting = false;
-                        objScoped.startedObjGeneration = false;
-                        sceneExtract.extractingFromGame = false;
-                        sceneExtract.extractingAlocs = false;
-                    });
-        loadSceneThread.detach();
+        backgroundWorker.emplace(
+            &Scene::loadScene,
+            Scene::getInstance(),
+            sceneFile,
+            [sceneFile]() {
+                Scene &sceneScoped = Scene::getInstance();
+                SceneExtract &sceneExtract = getInstance();
+                Obj &objScoped = Obj::getInstance();
+                sceneScoped.sceneLoaded = true;
+                std::string fileNameString = sceneFile;
+                sceneExtract.extractingAlocs = false;
+                sceneScoped.lastLoadSceneFile = sceneFile;
+                if (sceneExtract.alsoBuildObj && !objScoped.startedObjGeneration) {
+                    objScoped.buildObj(objScoped.lastBlenderFile.data(), fileNameString.data(),
+                                       sceneExtract.lastOutputFolder.data());
+                }
+                Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
+            }, []() {
+                SceneExtract &sceneExtract = getInstance();
+                Obj &objScoped = Obj::getInstance();
+                Logger::log(NK_ERROR, "Error loading scene file.");
+                sceneExtract.errorExtracting = false;
+                objScoped.startedObjGeneration = false;
+                sceneExtract.extractingFromGame = false;
+                sceneExtract.extractingAlocs = false;
+            });
     }
     if (errorExtracting) {
         errorExtracting = false;

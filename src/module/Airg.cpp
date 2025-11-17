@@ -10,8 +10,8 @@
 #include "../../include/NavKit/model/VisionData.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Gui.h"
-#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
@@ -52,6 +52,8 @@ const int Airg::AIRG_MENU_HEIGHT = 310;
 
 Airg::~Airg() = default;
 
+std::optional<std::jthread> Airg::backgroundWorker;
+
 void Airg::resetDefaults() {
     Grid &grid = Grid::getInstance();
     grid.spacing = 2.25;
@@ -64,6 +66,7 @@ void Airg::setLastLoadFileName(const char *fileName) {
         airgName = fileName;
         lastLoadAirgFile = airgName;
         airgLoaded = false;
+                        Menu::updateMenuState();
         airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
     }
 }
@@ -88,8 +91,7 @@ void Airg::handleOpenAirgPressed() {
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            std::thread loadAirgThread(&Airg::loadAirg, this, fileName, true);
-            loadAirgThread.detach();
+            backgroundWorker.emplace(&Airg::loadAirg, this, fileName, true);
         } else if (extension == "AIRG") {
             delete reasoningGrid;
             reasoningGrid = new ReasoningGrid();
@@ -97,8 +99,7 @@ void Airg::handleOpenAirgPressed() {
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            std::thread loadAirgThread(&Airg::loadAirg, this, fileName, false);
-            loadAirgThread.detach();
+            backgroundWorker.emplace(&Airg::loadAirg, this, fileName, false);
         }
     }
 }
@@ -118,9 +119,16 @@ void Airg::handleSaveAirgPressed() {
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        std::thread saveAirgThread(&Airg::saveAirg, this, fileName, extension == "JSON");
-        saveAirgThread.detach();
+        backgroundWorker.emplace(&Airg::saveAirg, this, fileName, extension == "JSON");
     }
+}
+
+bool Airg::canLoad() const {
+    return !airgLoading && airgSaveState.empty();
+}
+
+bool Airg::canSave() const {
+    return airgLoaded && airgSaveState.empty();
 }
 
 void Airg::drawMenu() {
@@ -137,19 +145,12 @@ void Airg::drawMenu() {
                              airgMenuHeight, &airgScroll))
         gui.mouseOverMenu = true;
 
-    imguiLabel("Load Airg from file");
-    if (imguiButton(airgName.c_str(), !airgLoading && airgSaveState.empty())) {
-        handleOpenAirgPressed();
-    }
-    imguiLabel("Save Airg to file");
-    if (imguiButton(saveAirgName.c_str(), airgLoaded && airgSaveState.empty())) {
-        handleSaveAirgPressed();
-    }
     Navp &navp = Navp::getInstance();
 
     if (imguiButton("Build Airg from Navp",
                     navp.navpLoaded && !airgLoading && airgSaveState.empty() && !airgBuilding)) {
         airgLoaded = false;
+                        Menu::updateMenuState();
         airgBuilding = true;
         delete reasoningGrid;
         reasoningGrid = new ReasoningGrid();
@@ -166,11 +167,6 @@ void Airg::drawMenu() {
         std::string msg = "Entering Connect Waypoint mode. Start waypoint: " + std::to_string(selectedWaypointIndex);
         Logger::log(NK_INFO, msg.data());
     }
-    char selectedWaypointText[64];
-    snprintf(selectedWaypointText, 64,
-             selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
-             selectedWaypointIndex);
-    imguiValue(selectedWaypointText);
     // imguiLabel("Cell color data source");
     // imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
     float lastSpacing = grid.spacing;
@@ -288,8 +284,7 @@ int visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
 }
 
 void Airg::build() {
-    std::jthread buildAirgThread(&GridGenerator::build);
-    buildAirgThread.detach();
+    backgroundWorker.emplace(&GridGenerator::build, GridGenerator::getInstance());
 }
 
 // Render Layer Index
@@ -569,6 +564,8 @@ void Airg::saveAirg(Airg *airg, std::string fileName, bool isJson) {
 void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
     airg->airgLoading = true;
     airg->airgLoaded = false;
+
+    Menu::updateMenuState();
     std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Airg from file at ";
     msg += std::ctime(&start_time);
@@ -650,5 +647,5 @@ void Airg::loadAirg(Airg *airg, char *fileName, bool isFromJson) {
     airg->airgLoading = false;
     airg->airgLoaded = true;
     Grid::getInstance().loadBoundsFromAirg();
-    InputHandler::updateMenuState();
+    Menu::updateMenuState();
 }
