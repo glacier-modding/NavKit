@@ -40,8 +40,6 @@ const int SceneExtract::SCENE_EXTRACT_MENU_HEIGHT = 83;
 
 SceneExtract::~SceneExtract() = default;
 
-std::optional<std::jthread> SceneExtract::backgroundWorker;
-
 void SceneExtract::setHitmanFolder(const char *folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
@@ -192,7 +190,7 @@ void SceneExtract::finalizeExtract() {
         sceneFile += "\\output.nav.json";
         backgroundWorker.emplace(
             &Scene::loadScene,
-            Scene::getInstance(),
+            &Scene::getInstance(),
             sceneFile,
             [sceneFile]() {
                 Scene &sceneScoped = Scene::getInstance();

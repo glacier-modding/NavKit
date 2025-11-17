@@ -22,8 +22,6 @@ const int Scene::SCENE_MENU_HEIGHT = 125;
 Scene::~Scene() {
 }
 
-std::optional<std::jthread> Scene::backgroundWorker;
-
 char *Scene::openLoadSceneFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Nav.json files", "nav.json"}};
     return FileUtil::openNfdLoadDialog(filters, 1);

@@ -78,8 +78,6 @@ Navp::Navp()
 
 Navp::~Navp() = default;
 
-std::optional<std::jthread> Navp::backgroundWorker;
-
 void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
         Renderer &renderer = Renderer::getInstance();
@@ -198,19 +196,18 @@ char *Navp::openSaveNavpFileDialog() {
 }
 
 void Navp::setBBox(const float *pos, const float *scale) {
-    Navp &navp = getInstance();
     bBoxPos[0] = pos[0];
-    navp.bBoxPosX = pos[0];
+    bBoxPosX = pos[0];
     bBoxPos[1] = pos[1];
-    navp.bBoxPosY = pos[1];
+    bBoxPosY = pos[1];
     bBoxPos[2] = pos[2];
-    navp.bBoxPosZ = pos[2];
+    bBoxPosZ = pos[2];
     bBoxScale[0] = scale[0];
-    navp.bBoxScaleX = scale[0];
+    bBoxScaleX = scale[0];
     bBoxScale[1] = scale[1];
-    navp.bBoxScaleY = scale[1];
+    bBoxScaleY = scale[1];
     bBoxScale[2] = scale[2];
-    navp.bBoxScaleZ = scale[2];
+    bBoxScaleZ = scale[2];
     const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     const float bBoxMin[3] = {
         bBoxPos[0] - bBoxScale[0] / 2,
@@ -526,7 +523,7 @@ void Navp::loadNavMeshFileData(const std::string &fileName) {
 
     s_FileStream.close();
 
-    getInstance().navMeshFileData = s_FileData;
+    navMeshFileData = s_FileData;
 }
 
 void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding) {
@@ -596,6 +593,7 @@ void Navp::buildNavp() {
     RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     updateExclusionBoxConvexVolumes();
     building = true;
+    Menu::updateMenuState();
     Logger::log(NK_INFO, "Beginning Recast build...");
     if (recastAdapter.handleBuild()) {
         Logger::log(NK_INFO, "Done with Recast build.");
@@ -606,16 +604,18 @@ void Navp::buildNavp() {
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        navpBuildDone.push_back(true);
+        navpBuildDone.store(true);
         msg = "Finished building Navp in ";
         msg += std::to_string(duration.count());
         msg += " seconds";
         Logger::log(NK_INFO, msg.data());
         setSelectedNavpAreaIndex(-1);
+        Menu::updateMenuState();
     } else {
         Logger::log(NK_ERROR, "Error building Navp");
         building = false;
-        navpBuildDone.clear();
+        navpBuildDone.store(false);
+        Menu::updateMenuState();
     }
 }
 
@@ -713,7 +713,7 @@ bool Navp::stairsAreaSelected() const {
 bool Navp::canBuildNavp() const {
     const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     const Obj &obj = Obj::getInstance();
-    return navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded && !
+    return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
            Airg::getInstance().airgBuilding;
 }
 
@@ -729,11 +729,6 @@ void Navp::drawMenu() {
                              &navpScroll)) {
         gui.mouseOverMenu = true;
     }
-    if (imguiButton("Build Navp from Obj and Scene",
-                    canBuildNavp())) {
-        backgroundWorker.emplace(&Navp::buildNavp, this);
-    }
-
     if (imguiCheck("Stairs",
                    stairsAreaSelected(),
                    selectedNavpAreaIndex != -1)) {
@@ -825,14 +820,14 @@ void Navp::buildAreaMaps() {
 }
 
 void Navp::finalizeBuild() {
-    if (!navpBuildDone.empty()) {
+    if (navpBuildDone) {
         navpLoaded = true;
         RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         SceneExtract &sceneExtract = SceneExtract::getInstance();
         outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename.data(), true, true);
-        navpBuildDone.clear();
+        navpBuildDone.store(false);
         building = false;
         Menu::updateMenuState();
     }

@@ -52,8 +52,6 @@ const int Airg::AIRG_MENU_HEIGHT = 310;
 
 Airg::~Airg() = default;
 
-std::optional<std::jthread> Airg::backgroundWorker;
-
 void Airg::resetDefaults() {
     Grid &grid = Grid::getInstance();
     grid.spacing = 2.25;
@@ -284,7 +282,7 @@ int visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
 }
 
 void Airg::build() {
-    backgroundWorker.emplace(&GridGenerator::build, GridGenerator::getInstance());
+    backgroundWorker.emplace(&GridGenerator::build, &GridGenerator::getInstance());
 }
 
 // Render Layer Index

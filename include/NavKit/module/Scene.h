@@ -38,10 +38,10 @@ public:
     ZPathfinding::PfBox includeBox;
     std::vector<ZPathfinding::PfBox> exclusionBoxes;
     std::vector<ZPathfinding::PfSeedPoint> pfSeedPoints;
+    std::optional<std::jthread> backgroundWorker;
 
 private:
     int sceneScroll;
     std::string loadSceneName;
     std::string saveSceneName;
-    static std::optional<std::jthread> backgroundWorker;
 };

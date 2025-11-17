@@ -119,6 +119,7 @@ void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const cha
 }
 
 int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
+    Navp &navp = Navp::getInstance();
     if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
         if (wmMsg->msg.win.msg == WM_COMMAND) {
             switch (LOWORD(wmMsg->msg.win.wParam)) {
@@ -217,6 +218,9 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     handleCellColorDataRadioMenuItem(LOWORD(wmMsg->msg.win.wParam));
                     break;
 
+                case IDM_BUILD_NAVP:
+                    navp.backgroundWorker.emplace(&Navp::buildNavp, &navp);
+                    break;
                 case IDM_HELP_ABOUT: {
                     const std::string currentVersionStr =
                             std::string(NavKit_VERSION_MAJOR) + "." +

@@ -40,6 +40,7 @@ public:
     static char *openHitmanFolderDialog(char *lastHitmanFolder);
 
     static char *openOutputFolderDialog(char *lastOutputFolder);
+    std::optional<std::jthread> backgroundWorker;
 
 private:
     void extractScene();
@@ -47,5 +48,4 @@ private:
     void extractAlocs();
 
     static void extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback);
-    static std::optional<std::jthread> backgroundWorker;
 };

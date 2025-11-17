@@ -41,8 +41,6 @@ Obj::Obj() {
 
 const int Obj::OBJ_MENU_HEIGHT = 174;
 
-std::optional<std::jthread> Obj::backgroundWorker;
-
 void Obj::setBlenderFile(const char *fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         blenderSet = true;

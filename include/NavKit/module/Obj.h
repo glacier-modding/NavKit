@@ -47,7 +47,7 @@ public:
 
     static void copyObjFile(const std::string &from, const std::string &to);
 
-    static void saveObjMesh(char *objToCopy, char *newFileName);
+    void saveObjMesh(char *objToCopy, char *newFileName);
 
     void setBlenderFile(const char *fileName);
 
@@ -77,6 +77,5 @@ public:
 
     void finalizeLoad();
 
-private:
-    static std::optional<std::jthread> backgroundWorker;
+    std::optional<std::jthread> backgroundWorker;
 };

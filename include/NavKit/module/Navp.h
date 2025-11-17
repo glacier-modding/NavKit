@@ -119,14 +119,15 @@ public:
 
     static void updateExclusionBoxConvexVolumes();
 
-    static void loadNavMeshFileData(const std::string &fileName);
+    void loadNavMeshFileData(const std::string &fileName);
 
     void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding);
 
-    std::vector<bool> navpBuildDone;
+    std::atomic<bool> navpBuildDone{false};
     bool building;
-private:
+    std::optional<std::jthread> backgroundWorker;
     void buildNavp();
+private:
 
     static void renderArea(const NavPower::Area &area, bool selected);
 
@@ -143,5 +144,4 @@ private:
     std::string saveNavpName;
     std::string lastSaveNavpFile;
     std::string outputNavpFilename = "output.navp";
-    static std::optional<std::jthread> backgroundWorker;
 };

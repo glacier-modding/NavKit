@@ -18,8 +18,6 @@
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/NavKit/util/Pathfinding.h"
 
-std::optional<std::jthread> GridGenerator::backgroundWorker;
-
 bool GridGenerator::initRecastAirgAdapter() {
     Logger::log(NK_INFO, "Generating Obj from current navmesh...");
     Airg &airg = Airg::getInstance();
@@ -76,7 +74,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     std::string outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
     recastAirgAdapter.save(outputNavpFilename);
 
-    backgroundWorker.emplace(&Navp::loadNavMesh, Navp::getAirgInstance(), outputNavpFilename.data(), true, true);
+    backgroundWorker.emplace(&Navp::loadNavMesh, &Navp::getAirgInstance(), outputNavpFilename.data(), true, true);
 
     return false;
 }
