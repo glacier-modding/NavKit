@@ -97,11 +97,10 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
     f.close();
     Logger::log(NK_INFO, "Done Building obj from loaded navp.");
     if (alsoLoadIntoUi) {
-        Obj &obj = getInstance();
-        obj.generatedObjName = "outputNavp.obj";
-        obj.objLoaded = false;
-        obj.blenderObjGenerationDone = true;
-        obj.loadObj = true;
+        generatedObjName = "outputNavp.obj";
+        objLoaded = false;
+        blenderObjGenerationDone = true;
+        loadObj = true;
         Menu::updateMenuState();
     }
 }
@@ -281,6 +280,30 @@ bool Obj::canLoad() const {
     return objToLoad.empty();
 }
 
+bool Obj::canBuildObjFromNavp() const {
+    const SceneExtract &sceneExtract = SceneExtract::getInstance();
+    const Navp &navp = Navp::getInstance();
+    return sceneExtract.outputSet && blenderSet && navp.navpLoaded;
+}
+
+bool Obj::canBuildObjFromScene() const {
+    const SceneExtract &sceneExtract = SceneExtract::getInstance();
+    const Scene &scene = Scene::getInstance();
+    return sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
+           sceneExtract.extractingAlocs && !blenderObjStarted && !
+           blenderObjGenerationDone;
+}
+
+void Obj::handleBuildObjFromSceneClicked() {
+    const SceneExtract &sceneExtract = SceneExtract::getInstance();
+    const Scene &scene = Scene::getInstance();
+    return buildObj(lastBlenderFile.data(), scene.lastLoadSceneFile.data(), sceneExtract.lastOutputFolder.data());
+}
+
+void Obj::handleBuildObjFromNavpClicked() {
+    return buildObjFromNavp(true);
+}
+
 void Obj::drawMenu() {
     Gui &gui = Gui::getInstance();
     Renderer &renderer = Renderer::getInstance();
@@ -291,17 +314,12 @@ void Obj::drawMenu() {
         gui.mouseOverMenu = true;
     }
 
-    SceneExtract &sceneExtract = SceneExtract::getInstance();
-    if (Scene &scene = Scene::getInstance(); imguiButton("Build obj from NavKit Scene",
-                                                         sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
-                                                         sceneExtract.extractingAlocs && !blenderObjStarted && !
-                                                         blenderObjGenerationDone)) {
-        buildObj(lastBlenderFile.data(), scene.lastLoadSceneFile.data(), sceneExtract.lastOutputFolder.data());
+    if (imguiButton("Build obj from NavKit Scene", canBuildObjFromScene())) {
+        handleBuildObjFromSceneClicked();
     }
-    Navp &navp = Navp::getInstance();
     if (imguiButton("Build obj from Navp",
-                    sceneExtract.outputSet && blenderSet && navp.navpLoaded)) {
-        buildObjFromNavp(true);
+                    canBuildObjFromNavp())) {
+        handleBuildObjFromNavpClicked();
     }
     imguiEndScrollArea();
 }

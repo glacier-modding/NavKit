@@ -721,6 +721,22 @@ bool Navp::canSave() const {
     return navpLoaded && !loading && !building;
 }
 
+void Navp::handleEditStairsClicked() const {
+    if (selectedNavpAreaIndex != -1) {
+        NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+                                            NavPower::AreaUsageFlags::AREA_STEPS)
+                                               ? NavPower::AreaUsageFlags::AREA_FLAT
+                                               : NavPower::AreaUsageFlags::AREA_STEPS;
+        std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+                                     NavPower::AreaUsageFlags::AREA_STEPS)
+                                        ? "AREA_FLAT"
+                                        : "AREA_STEPS";
+        Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
+        navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
+        Menu::updateMenuState();
+    }
+}
+
 void Navp::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
@@ -729,27 +745,23 @@ void Navp::drawMenu() {
                              &navpScroll)) {
         gui.mouseOverMenu = true;
     }
+    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    Obj &obj = Obj::getInstance();
+    if (imguiButton("Build Navp from Obj and Scene",
+                    !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
+                    Airg::getInstance().airgBuilding)) {
+        std::thread buildNavpThread(&Navp::buildNavp, this);
+        buildNavpThread.detach();
+                    }
     if (imguiCheck("Stairs",
                    stairsAreaSelected(),
                    selectedNavpAreaIndex != -1)) {
-        if (selectedNavpAreaIndex != -1) {
-            NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
-                                                NavPower::AreaUsageFlags::AREA_STEPS)
-                                                   ? NavPower::AreaUsageFlags::AREA_FLAT
-                                                   : NavPower::AreaUsageFlags::AREA_STEPS;
-            std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
-                                         NavPower::AreaUsageFlags::AREA_STEPS)
-                                            ? "AREA_FLAT"
-                                            : "AREA_STEPS";
-            Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
-            navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
-        }
+        handleEditStairsClicked();
     }
 
     imguiLabel("PFSeedPoint Pruning Mode");
     imguiSlider("Off             Delete             Debug", &pruningMode, 0.0f, 2.0f, 1.0f);
 
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     recastAdapter.handleCommonSettings();
 
     imguiLabel("Bounding Box");

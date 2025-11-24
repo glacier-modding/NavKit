@@ -51,7 +51,7 @@ public:
 
     void setBlenderFile(const char *fileName);
 
-    static void buildObjFromNavp(bool alsoLoadIntoUi);
+    void buildObjFromNavp(bool alsoLoadIntoUi);
 
     void buildObj(const char *blenderPath, const char *sceneFilePath, const char *outputFolder);
 
@@ -72,6 +72,14 @@ public:
     void handleSaveObjPressed();
 
     bool canLoad() const;
+
+    bool canBuildObjFromNavp() const;
+
+    bool canBuildObjFromScene() const;
+
+    void handleBuildObjFromSceneClicked();
+
+    void handleBuildObjFromNavpClicked();
 
     void drawMenu();
 

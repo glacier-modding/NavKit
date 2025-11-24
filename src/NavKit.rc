@@ -43,10 +43,12 @@ BEGIN
         MENUITEM "Show &Grid",                               IDM_VIEW_AIRG_SHOW_GRID, CHECKED
         MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO
         MENUITEM SEPARATOR
-        MENUITEM "None",                                     IDM_VIEW_AIRG_CELL_COLOR_OFF, CHECKED
-        MENUITEM "Bitmap",                                   IDM_VIEW_AIRG_CELL_COLOR_BITMAP
-        MENUITEM "Vision Data",                              IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA
-        MENUITEM "Layer",                                    IDM_VIEW_AIRG_CELL_COLOR_LAYER
+        MENUITEM "Airg Cell: None",                          IDM_VIEW_AIRG_CELL_COLOR_OFF, CHECKED
+        MENUITEM "Airg Cell: Area Bitmap",                   IDM_VIEW_AIRG_CELL_COLOR_BITMAP
+        MENUITEM "Airg Cell: Vision Data",                   IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA
+        MENUITEM "Airg Cell: Layer",                         IDM_VIEW_AIRG_CELL_COLOR_LAYER
+        MENUITEM SEPARATOR
+        MENUITEM "Show &Obj",                                IDM_VIEW_OBJ_SHOW_OBJ, CHECKED
         MENUITEM SEPARATOR
         MENUITEM "Show &Log",                                IDM_VIEW_LOG_SHOW_LOG, CHECKED
     END

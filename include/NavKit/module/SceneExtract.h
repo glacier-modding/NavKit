@@ -30,6 +30,8 @@ public:
 
     void setOutputFolder(const char *folderName);
 
+    void handleExtractFromGameClicked();
+
     int extractScroll;
     std::string hitmanFolderName;
     bool hitmanSet;
@@ -41,9 +43,9 @@ public:
 
     static char *openOutputFolderDialog(char *lastOutputFolder);
     std::optional<std::jthread> backgroundWorker;
+    void extractScene();
 
 private:
-    void extractScene();
 
     void extractAlocs();
 

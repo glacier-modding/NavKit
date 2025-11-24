@@ -12,6 +12,7 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/module/SceneExtract.h"
 
 
 void Menu::setMenuItemEnabled(const UINT menuId, const bool isEnabled) {
@@ -97,8 +98,8 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
     setMenuItemEnabled(IDM_BUILD_AIRG, isNavpLoaded);
-    setMenuItemEnabled(IDM_BUILD_OBJ_FROM_SCENE, isSceneLoaded);
-    setMenuItemEnabled(IDM_BUILD_OBJ_FROM_NAVP, isNavpLoaded);
+    setMenuItemEnabled(IDM_BUILD_OBJ_FROM_SCENE, obj.canBuildObjFromScene());
+    setMenuItemEnabled(IDM_BUILD_OBJ_FROM_NAVP, obj.canBuildObjFromNavp());
 
 
     bool isStairs = false;
@@ -120,6 +121,10 @@ void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const cha
 
 int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
     Navp &navp = Navp::getInstance();
+    Obj &obj = Obj::getInstance();
+    Airg &airg = Airg::getInstance();
+    Scene &scene = Scene::getInstance();
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
     if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
         if (wmMsg->msg.win.msg == WM_COMMAND) {
             switch (LOWORD(wmMsg->msg.win.wParam)) {
@@ -158,6 +163,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
 
                 case IDM_FILE_EXIT:
                     return InputHandler::QUIT;
+
+                case IDM_EDIT_NAVP_STAIRS:
+                    navp.handleEditStairsClicked();
+                    break;
 
                 case IDM_VIEW_NAVP_SHOW_NAVP:
                     handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_NAVP, Navp::getInstance().showNavp, "Show Navp");
@@ -218,9 +227,29 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     handleCellColorDataRadioMenuItem(LOWORD(wmMsg->msg.win.wParam));
                     break;
 
-                case IDM_BUILD_NAVP:
-                    navp.backgroundWorker.emplace(&Navp::buildNavp, &navp);
+                case IDM_BUILD_OBJ_FROM_NAVP:
+                    obj.handleBuildObjFromNavpClicked();
                     break;
+                case IDM_BUILD_OBJ_FROM_SCENE:
+                    obj.handleBuildObjFromSceneClicked();
+                    break;
+                case IDM_BUILD_NAVP:
+                    // navp.backgroundWorker.emplace(&Navp::buildNavp, &navp);
+                    break;
+                case IDM_BUILD_AIRG:
+                    // airg.backgroundWorker.emplace(&Airg::build, &navp);
+                    break;
+
+                case IDM_EXTRACT_SCENE:
+                    sceneExtract.handleExtractFromGameClicked();
+                    break;
+                case IDM_EXTRACT_SCENE_AND_BUILD_OBJ:
+                    // sceneExtract.backgroundWorker.emplace(&SceneExtract::extract, &sceneExtract);
+                    break;
+                case IDM_EXTRACT_SCENE_AND_BUILD_ALL:
+                    // sceneExtract.backgroundWorker.emplace(&Navp::buildNavp, &navp);
+                    break;
+
                 case IDM_HELP_ABOUT: {
                     const std::string currentVersionStr =
                             std::string(NavKit_VERSION_MAJOR) + "." +

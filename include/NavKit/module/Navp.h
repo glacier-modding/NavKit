@@ -115,6 +115,8 @@ public:
 
     bool canSave() const;
 
+    void handleEditStairsClicked() const;
+
     void setBBox(const float *pos, const float *scale);
 
     static void updateExclusionBoxConvexVolumes();

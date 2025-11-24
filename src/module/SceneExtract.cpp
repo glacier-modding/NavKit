@@ -68,6 +68,13 @@ void SceneExtract::setOutputFolder(const char *folderName) {
     }
 }
 
+void SceneExtract::handleExtractFromGameClicked() {
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
+    alsoBuildObj = false;
+    extractScene();
+}
+
 void SceneExtract::drawMenu() {
     if (const Renderer &renderer = Renderer::getInstance();
         imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
@@ -79,10 +86,7 @@ void SceneExtract::drawMenu() {
         Gui::getInstance().mouseOverMenu = true;
     }
     if (imguiButton("Extract from game", hitmanSet && outputSet && !extractingFromGame && !extractingAlocs)) {
-        Gui &gui = Gui::getInstance();
-        gui.showLog = true;
-        alsoBuildObj = false;
-        extractScene();
+        handleExtractFromGameClicked();
     }
     if (const Obj &obj = Obj::getInstance();
         imguiButton("Extract from game and build obj",
@@ -123,7 +127,7 @@ void SceneExtract::extractScene() {
     GameConnection &gameConnection = GameConnection::getInstance();
     extractingFromGame = true;
 
-    std::jthread extractFromGameThread(extractFromGame, [this] {
+    backgroundWorker.emplace(extractFromGame, [this] {
         Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
         extractingFromGame = false;
         doneExtractingFromGame = true;
@@ -131,6 +135,7 @@ void SceneExtract::extractScene() {
     }, [this, &gameConnection] {
         errorExtracting = true;
         if (gameConnection.closeConnection()) {
+            Logger::log(NK_ERROR, "Error closing connection to game.");
         }
     });
 }
