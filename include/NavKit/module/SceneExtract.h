@@ -13,8 +13,6 @@ public:
         return instance;
     }
 
-    void drawMenu();
-
     void finalizeExtract();
 
     std::string lastHitmanFolder;
@@ -31,6 +29,12 @@ public:
     void setOutputFolder(const char *folderName);
 
     void handleExtractFromGameClicked();
+
+    bool canExtractFromGame() const;
+
+    bool canExtractFromGameAndBuildObj() const;
+
+    void handleExtractFromGameAndBuildObjClicked();
 
     int extractScroll;
     std::string hitmanFolderName;

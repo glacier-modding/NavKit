@@ -64,7 +64,7 @@ void Airg::setLastLoadFileName(const char *fileName) {
         airgName = fileName;
         lastLoadAirgFile = airgName;
         airgLoaded = false;
-                        Menu::updateMenuState();
+        Menu::updateMenuState();
         airgName = airgName.substr(airgName.find_last_of("/\\") + 1);
     }
 }
@@ -129,34 +129,39 @@ bool Airg::canSave() const {
     return airgLoaded && airgSaveState.empty();
 }
 
+bool Airg::canBuildAirg() const {
+    const Navp &navp = Navp::getInstance();
+    return navp.navpLoaded && !airgLoading && airgSaveState.empty() && !airgBuilding;
+}
+
+void Airg::handleBuildAirgClicked() {
+    airgLoaded = false;
+    Menu::updateMenuState();
+    airgBuilding = true;
+    delete reasoningGrid;
+    reasoningGrid = new ReasoningGrid();
+    std::string msg = "Building Airg from Navp";
+    Logger::log(NK_INFO, msg.data());
+    build();
+}
+
 void Airg::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
     Grid &grid = Grid::getInstance();
-    int airgMenuHeight = std::min(AIRG_MENU_HEIGHT,
-                                  renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
-                                  SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - Obj::OBJ_MENU_HEIGHT - 20 - 10);
+    const int airgMenuHeight = std::min(AIRG_MENU_HEIGHT,
+                                        renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT
+                                        -
+                                        10);
 
     if (imguiBeginScrollArea("Airg menu", renderer.width - 250 - 10,
                              renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
-                             SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - Obj::OBJ_MENU_HEIGHT - airgMenuHeight - 20, 250,
+                             airgMenuHeight - 20, 250,
                              airgMenuHeight, &airgScroll))
         gui.mouseOverMenu = true;
 
-    Navp &navp = Navp::getInstance();
-
-    if (imguiButton("Build Airg from Navp",
-                    navp.navpLoaded && !airgLoading && airgSaveState.empty() && !airgBuilding)) {
-        airgLoaded = false;
-                        Menu::updateMenuState();
-        airgBuilding = true;
-        delete reasoningGrid;
-        reasoningGrid = new ReasoningGrid();
-        std::string msg = "Building Airg from Navp";
-        Logger::log(NK_INFO, msg.data());
-        build();
-    }
-    if (imguiButton("Load grid bounds from Navp", navp.navpLoaded && !airgLoading && airgSaveState.empty())) {
+    if (const Navp &navp = Navp::getInstance(); imguiButton("Load grid bounds from Navp",
+                                                            navp.navpLoaded && !airgLoading && airgSaveState.empty())) {
         Logger::log(NK_INFO, "Loading Airg grid bounds from Navp");
         grid.loadBoundsFromNavp();
     }
@@ -167,20 +172,20 @@ void Airg::drawMenu() {
     }
     // imguiLabel("Cell color data source");
     // imguiSlider("Off   Bitmap    Vision Data    Layer", &cellColorSource, 0.0f, 3.0f, 1.0f);
-    float lastSpacing = grid.spacing;
+    const float lastSpacing = grid.spacing;
     if (imguiSlider("Spacing", &grid.spacing, 0.1f, 4.0f, 0.05f)) {
         if (lastSpacing != grid.spacing) {
             grid.saveSpacing(grid.spacing);
             Logger::log(NK_INFO, ("Setting spacing to: " + std::to_string(grid.spacing)).c_str());
         }
     }
-    float lastXOffset = grid.xOffset;
+    const float lastXOffset = grid.xOffset;
     if (imguiSlider("X Offset", &grid.xOffset, -grid.spacing, grid.spacing, 0.05f)) {
         if (lastXOffset != grid.xOffset) {
             Logger::log(NK_INFO, ("Setting X offset to: " + std::to_string(grid.xOffset)).c_str());
         }
     }
-    float lastZOffset = grid.yOffset;
+    const float lastZOffset = grid.yOffset;
     if (imguiSlider("Z Offset", &grid.yOffset, -grid.spacing, grid.spacing, 0.05f)) {
         if (lastZOffset != grid.yOffset) {
             Logger::log(NK_INFO, ("Setting Z offset to: " + std::to_string(grid.yOffset)).c_str());

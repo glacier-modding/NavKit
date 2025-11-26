@@ -74,8 +74,6 @@ void Gui::drawGui() {
         Settings &settings = Settings::getInstance();
         navp.drawMenu();
         airg.drawMenu();
-        obj.drawMenu();
-        sceneExtract.drawMenu();
         settings.drawMenu();
 
         const int consoleHeight = showLog ? 220 : 60;

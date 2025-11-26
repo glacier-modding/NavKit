@@ -81,8 +81,6 @@ public:
 
     void handleBuildObjFromNavpClicked();
 
-    void drawMenu();
-
     void finalizeLoad();
 
     std::optional<std::jthread> backgroundWorker;

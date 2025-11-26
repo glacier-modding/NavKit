@@ -60,7 +60,7 @@ public:
     void setSelectedExclusionBoxIndex(int index);
 
     NavPower::NavMesh *navMesh{};
-    void *navMeshFileData{};
+    std::vector<char> navMeshFileData{};
     std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap;
     std::map<Vec3, NavPower::Area *> posToAreaMap;
     int selectedNavpAreaIndex;
@@ -116,6 +116,8 @@ public:
     bool canSave() const;
 
     void handleEditStairsClicked() const;
+
+    void handleBuildNavpClicked();
 
     void setBBox(const float *pos, const float *scale);
 

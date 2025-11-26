@@ -39,8 +39,6 @@ Obj::Obj() {
     doObjHitTest = false;
 }
 
-const int Obj::OBJ_MENU_HEIGHT = 174;
-
 void Obj::setBlenderFile(const char *fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         blenderSet = true;
@@ -302,26 +300,6 @@ void Obj::handleBuildObjFromSceneClicked() {
 
 void Obj::handleBuildObjFromNavpClicked() {
     return buildObjFromNavp(true);
-}
-
-void Obj::drawMenu() {
-    Gui &gui = Gui::getInstance();
-    Renderer &renderer = Renderer::getInstance();
-    if (imguiBeginScrollArea("Obj menu", renderer.width - 250 - 10,
-                             renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
-                             SceneExtract::SCENE_EXTRACT_MENU_HEIGHT - OBJ_MENU_HEIGHT - 15, 250, OBJ_MENU_HEIGHT,
-                             &objScroll)) {
-        gui.mouseOverMenu = true;
-    }
-
-    if (imguiButton("Build obj from NavKit Scene", canBuildObjFromScene())) {
-        handleBuildObjFromSceneClicked();
-    }
-    if (imguiButton("Build obj from Navp",
-                    canBuildObjFromNavp())) {
-        handleBuildObjFromNavpClicked();
-    }
-    imguiEndScrollArea();
 }
 
 void Obj::finalizeLoad() {

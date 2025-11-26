@@ -80,6 +80,10 @@ public:
 
     bool canSave() const;
 
+    bool canBuildAirg() const;
+
+    void handleBuildAirgClicked();
+
     std::optional<std::jthread> backgroundWorker;
 private:
     static char *openSaveAirgFileDialog(char *lastAirgFolder);

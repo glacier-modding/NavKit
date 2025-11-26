@@ -77,6 +77,7 @@ void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
 
 void Menu::updateMenuState() {
     const Scene &scene = Scene::getInstance();
+    const SceneExtract &sceneExtract = SceneExtract::getInstance();
     const Airg &airg = Airg::getInstance();
     const Navp &navp = Navp::getInstance();
     const Obj &obj = Obj::getInstance();
@@ -97,10 +98,12 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_EDIT_NAVP_STAIRS, isAreaSelected);
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
-    setMenuItemEnabled(IDM_BUILD_AIRG, isNavpLoaded);
+    setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
     setMenuItemEnabled(IDM_BUILD_OBJ_FROM_SCENE, obj.canBuildObjFromScene());
     setMenuItemEnabled(IDM_BUILD_OBJ_FROM_NAVP, obj.canBuildObjFromNavp());
 
+    setMenuItemEnabled(IDM_EXTRACT_SCENE, sceneExtract.canExtractFromGame());
+    setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_OBJ, sceneExtract.canExtractFromGameAndBuildObj());
 
     bool isStairs = false;
     if (isAreaSelected) {
@@ -234,17 +237,17 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     obj.handleBuildObjFromSceneClicked();
                     break;
                 case IDM_BUILD_NAVP:
-                    // navp.backgroundWorker.emplace(&Navp::buildNavp, &navp);
+                    navp.handleBuildNavpClicked();
                     break;
                 case IDM_BUILD_AIRG:
-                    // airg.backgroundWorker.emplace(&Airg::build, &navp);
+                    airg.handleBuildAirgClicked();
                     break;
 
                 case IDM_EXTRACT_SCENE:
                     sceneExtract.handleExtractFromGameClicked();
                     break;
                 case IDM_EXTRACT_SCENE_AND_BUILD_OBJ:
-                    // sceneExtract.backgroundWorker.emplace(&SceneExtract::extract, &sceneExtract);
+                    sceneExtract.handleExtractFromGameAndBuildObjClicked();
                     break;
                 case IDM_EXTRACT_SCENE_AND_BUILD_ALL:
                     // sceneExtract.backgroundWorker.emplace(&Navp::buildNavp, &navp);

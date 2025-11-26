@@ -14,6 +14,7 @@
 
 #include <fstream>
 
+#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
@@ -35,8 +36,6 @@ SceneExtract::SceneExtract() {
     extractingFromGame = false;
     alsoBuildObj = false;
 }
-
-const int SceneExtract::SCENE_EXTRACT_MENU_HEIGHT = 83;
 
 SceneExtract::~SceneExtract() = default;
 
@@ -75,30 +74,22 @@ void SceneExtract::handleExtractFromGameClicked() {
     extractScene();
 }
 
-void SceneExtract::drawMenu() {
-    if (const Renderer &renderer = Renderer::getInstance();
-        imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
-                             renderer.height - 10 -
-                             Settings::SETTINGS_MENU_HEIGHT -
-                             Scene::SCENE_MENU_HEIGHT -
-                             SCENE_EXTRACT_MENU_HEIGHT - 10, 250,
-                             SCENE_EXTRACT_MENU_HEIGHT, &extractScroll)) {
-        Gui::getInstance().mouseOverMenu = true;
-    }
-    if (imguiButton("Extract from game", hitmanSet && outputSet && !extractingFromGame && !extractingAlocs)) {
-        handleExtractFromGameClicked();
-    }
-    if (const Obj &obj = Obj::getInstance();
-        imguiButton("Extract from game and build obj",
-                    hitmanSet && obj.blenderSet && outputSet && !extractingFromGame
-                    && !extractingAlocs && !obj.blenderObjStarted && !obj.blenderObjGenerationDone)) {
-        Gui &gui = Gui::getInstance();
-        gui.showLog = true;
-        alsoBuildObj = true;
-        Obj::getInstance().objLoaded = false;
-        extractScene();
-    }
-    imguiEndScrollArea();
+bool SceneExtract::canExtractFromGame() const {
+    return hitmanSet && outputSet && !extractingFromGame && !extractingAlocs;
+}
+
+bool SceneExtract::canExtractFromGameAndBuildObj() const {
+    const Obj &obj = Obj::getInstance();
+    return canExtractFromGame()
+           && obj.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+}
+
+void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
+    alsoBuildObj = true;
+    Obj::getInstance().objLoaded = false;
+    extractScene();
 }
 
 void SceneExtract::extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback) {
@@ -131,9 +122,11 @@ void SceneExtract::extractScene() {
         Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
         extractingFromGame = false;
         doneExtractingFromGame = true;
+        Menu::updateMenuState();
         extractAlocs();
     }, [this, &gameConnection] {
         errorExtracting = true;
+        Menu::updateMenuState();
         if (gameConnection.closeConnection()) {
             Logger::log(NK_ERROR, "Error closing connection to game.");
         }
@@ -176,14 +169,17 @@ void SceneExtract::extractAlocs() {
     command += alocFolder;
     command += "\"";
     extractingAlocs = true;
+    Menu::updateMenuState();
     std::jthread commandThread(
         &CommandRunner::runCommand, CommandRunner::getInstance(), command,
         "Glacier2ObjExtract.log", [this] {
             Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
             extractingAlocs = false;
             doneExtractingAlocs = true;
+            Menu::updateMenuState();
         }, [this] {
             errorExtracting = true;
+            Menu::updateMenuState();
         });
 }
 
@@ -210,6 +206,7 @@ void SceneExtract::finalizeExtract() {
                                        sceneExtract.lastOutputFolder.data());
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
+                Menu::updateMenuState();
             }, []() {
                 SceneExtract &sceneExtract = getInstance();
                 Obj &objScoped = Obj::getInstance();
@@ -218,6 +215,7 @@ void SceneExtract::finalizeExtract() {
                 objScoped.startedObjGeneration = false;
                 sceneExtract.extractingFromGame = false;
                 sceneExtract.extractingAlocs = false;
+                Menu::updateMenuState();
             });
     }
     if (errorExtracting) {
@@ -225,6 +223,7 @@ void SceneExtract::finalizeExtract() {
         obj.startedObjGeneration = false;
         extractingFromGame = false;
         extractingAlocs = false;
+        Menu::updateMenuState();
     }
 }
 

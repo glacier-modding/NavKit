@@ -272,7 +272,7 @@ void Navp::renderArea(const NavPower::Area &area, const bool selected) {
         if (!selected) {
             glColor4f(0.0, 0.5, 0.0, 1.0);
         } else {
-            glColor4f(0.0, 0.5, 0.5, 1.0);
+            glColor4f(0.0, 0.9, 0.0, 1.0);
         }
     }
     glBegin(GL_POLYGON);
@@ -507,7 +507,6 @@ void Navp::loadNavMeshFileData(const std::string &fileName) {
     if (!std::filesystem::is_regular_file(fileName))
         throw std::runtime_error("Input path is not a regular file.");
 
-    // Read the entire file to memory.
     const long s_FileSize = std::filesystem::file_size(fileName);
 
     if (s_FileSize < sizeof(NavPower::NavMesh))
@@ -518,20 +517,17 @@ void Navp::loadNavMeshFileData(const std::string &fileName) {
     if (!s_FileStream)
         throw std::runtime_error("Error creating input file stream.");
 
-    void *s_FileData = malloc(s_FileSize);
-    s_FileStream.read(static_cast<char *>(s_FileData), s_FileSize);
+    navMeshFileData.resize(s_FileSize);
 
-    s_FileStream.close();
-
-    navMeshFileData = s_FileData;
+    s_FileStream.read(navMeshFileData.data(), s_FileSize);
 }
 
 void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding) {
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.c_str());
-    auto start = std::chrono::high_resolution_clock::now();
+    const auto start = std::chrono::high_resolution_clock::now();
     loading = true;
     CPPTRACE_TRY
         {
@@ -539,7 +535,7 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
                                                ? LoadNavMeshFromJson(fileName.c_str())
                                                : LoadNavMeshFromBinary(fileName.c_str());
             std::swap(*navMesh, newNavMesh);
-            SceneExtract &sceneExtract = SceneExtract::getInstance();
+            const SceneExtract &sceneExtract = SceneExtract::getInstance();
             if (isFromBuilding) {
                 setStairsFlags();
                 outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
@@ -645,13 +641,13 @@ void Navp::handleOpenNavpPressed() {
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile.data(), true, false);
+            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false);
         } else if (extension == "NAVP") {
             std::string msg = "Loading Navp file: '";
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile.data(), false, false);
+            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false);
         }
     }
 }
@@ -713,8 +709,9 @@ bool Navp::stairsAreaSelected() const {
 bool Navp::canBuildNavp() const {
     const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
     const Obj &obj = Obj::getInstance();
+    const Scene &scene = Scene::getInstance();
     return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
-           Airg::getInstance().airgBuilding;
+           Airg::getInstance().airgBuilding && scene.sceneLoaded;
 }
 
 bool Navp::canSave() const {
@@ -737,27 +734,19 @@ void Navp::handleEditStairsClicked() const {
     }
 }
 
+void Navp::handleBuildNavpClicked() {
+    backgroundWorker.emplace(&Navp::buildNavp, this);
+}
+
 void Navp::drawMenu() {
-    Renderer &renderer = Renderer::getInstance();
+    const Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
-    int navpMenuHeight = std::min(1190, renderer.height - 20);
-    if (imguiBeginScrollArea("Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
-                             &navpScroll)) {
+    if (auto navpMenuHeight = std::min(1190, renderer.height - 20); imguiBeginScrollArea(
+        "Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
+        &navpScroll)) {
         gui.mouseOverMenu = true;
     }
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    Obj &obj = Obj::getInstance();
-    if (imguiButton("Build Navp from Obj and Scene",
-                    !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
-                    Airg::getInstance().airgBuilding)) {
-        std::thread buildNavpThread(&Navp::buildNavp, this);
-        buildNavpThread.detach();
-                    }
-    if (imguiCheck("Stairs",
-                   stairsAreaSelected(),
-                   selectedNavpAreaIndex != -1)) {
-        handleEditStairsClicked();
-    }
+    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
 
     imguiLabel("PFSeedPoint Pruning Mode");
     imguiSlider("Off             Delete             Debug", &pruningMode, 0.0f, 2.0f, 1.0f);
@@ -834,11 +823,11 @@ void Navp::buildAreaMaps() {
 void Navp::finalizeBuild() {
     if (navpBuildDone) {
         navpLoaded = true;
-        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        const SceneExtract &sceneExtract = SceneExtract::getInstance();
         outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
-        backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename.data(), true, true);
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true);
         navpBuildDone.store(false);
         building = false;
         Menu::updateMenuState();
