@@ -29,7 +29,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     const RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
     const SceneExtract &sceneExtract = SceneExtract::getInstance();
-    const std::string objFileName = sceneExtract.lastOutputFolder + "\\outputNavp.obj";
+    const std::string objFileName = sceneExtract.outputFolder + "\\outputNavp.obj";
     Logger::log(NK_INFO, "Loading navmesh Obj into Recast...");
     if (!recastAirgAdapter.loadInputGeom(objFileName)) {
         airg.airgLoaded = false;
@@ -71,7 +71,7 @@ bool GridGenerator::initRecastAirgAdapter() {
         Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
         return true;
     }
-    const std::string outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
+    const std::string outputNavpFilename = sceneExtract.outputFolder + "\\output.navp.json";
     recastAirgAdapter.save(outputNavpFilename);
 
     Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, true);

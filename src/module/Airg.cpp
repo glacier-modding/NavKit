@@ -149,14 +149,10 @@ void Airg::drawMenu() {
     Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
     Grid &grid = Grid::getInstance();
-    const int airgMenuHeight = std::min(AIRG_MENU_HEIGHT,
-                                        renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT
-                                        -
-                                        10);
+    const int airgMenuHeight = std::min(AIRG_MENU_HEIGHT, renderer.height - 10 - 10);
 
     if (imguiBeginScrollArea("Airg menu", renderer.width - 250 - 10,
-                             renderer.height - 10 - Settings::SETTINGS_MENU_HEIGHT - Scene::SCENE_MENU_HEIGHT -
-                             airgMenuHeight - 20, 250,
+                             renderer.height - 10 - airgMenuHeight - 20, 250,
                              airgMenuHeight, &airgScroll))
         gui.mouseOverMenu = true;
 

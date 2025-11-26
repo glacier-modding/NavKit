@@ -19,14 +19,10 @@
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
-#include "../../include/RecastDemo/imgui.h"
-
 SceneExtract::SceneExtract() {
-    hitmanFolderName = "Choose Hitman folder";
-    lastHitmanFolder = hitmanFolderName;
+    hitmanFolder = "";
     hitmanSet = false;
-    outputFolderName = "Choose Output folder";
-    lastOutputFolder = outputFolderName;
+    outputFolder = "";
     outputSet = false;
     extractScroll = 0;
     errorExtracting = false;
@@ -39,31 +35,27 @@ SceneExtract::SceneExtract() {
 
 SceneExtract::~SceneExtract() = default;
 
-void SceneExtract::setHitmanFolder(const char *folderName) {
+void SceneExtract::setHitmanFolder(const std::string &folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
-        lastHitmanFolder = folderName;
-        hitmanFolderName = folderName;
-        hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
-        Logger::log(NK_INFO, ("Setting Hitman folder to: " + lastHitmanFolder).c_str());
+        hitmanFolder = folderName;
+        Logger::log(NK_INFO, ("Setting Hitman folder to: " + hitmanFolder).c_str());
         Settings::setValue("Paths", "hitman", folderName);
         Settings::save();
     } else {
-        Logger::log(NK_WARN, ("Could not find Hitman folder: " + lastHitmanFolder).c_str());
+        Logger::log(NK_WARN, ("Could not find Hitman folder: " + hitmanFolder).c_str());
     }
 }
 
-void SceneExtract::setOutputFolder(const char *folderName) {
+void SceneExtract::setOutputFolder(const std::string &folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         outputSet = true;
-        lastOutputFolder = folderName;
-        outputFolderName = folderName;
-        outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
-        Logger::log(NK_INFO, ("Setting output folder to: " + lastOutputFolder).c_str());
+        outputFolder = folderName;
+        Logger::log(NK_INFO, ("Setting output folder to: " + outputFolder).c_str());
         Settings::setValue("Paths", "output", folderName);
         Settings::save();
     } else {
-        Logger::log(NK_WARN, ("Could not find output folder: " + lastOutputFolder).c_str());
+        Logger::log(NK_WARN, ("Could not find output folder: " + outputFolder).c_str());
     }
 }
 
@@ -94,7 +86,7 @@ void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
 
 void SceneExtract::extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback) {
     GameConnection &gameConnection = GameConnection::getInstance();
-    std::ofstream f(getInstance().lastOutputFolder + "\\output.nav.json");
+    std::ofstream f(getInstance().outputFolder + "\\output.nav.json");
     f.clear();
     f.close();
 
@@ -135,17 +127,17 @@ void SceneExtract::extractScene() {
 
 void SceneExtract::extractAlocs() {
     std::string retailFolder = "\"";
-    retailFolder += lastHitmanFolder;
+    retailFolder += hitmanFolder;
     retailFolder += "\\Retail\"";
     std::string gameVersion = "HM3";
     std::string navJsonFilePath = "\"";
-    navJsonFilePath += lastOutputFolder;
+    navJsonFilePath += outputFolder;
     navJsonFilePath += "\\output.nav.json\"";
     std::string runtimeFolder = "\"";
-    runtimeFolder += lastHitmanFolder;
+    runtimeFolder += hitmanFolder;
     runtimeFolder += "\\Runtime\"";
     std::string alocFolder;
-    alocFolder += lastOutputFolder;
+    alocFolder += outputFolder;
     alocFolder += "\\aloc";
 
     struct stat folderExists{};
@@ -187,7 +179,7 @@ void SceneExtract::finalizeExtract() {
     Obj &obj = Obj::getInstance();
     if (doneExtractingAlocs) {
         doneExtractingAlocs = false;
-        std::string sceneFile = lastOutputFolder;
+        std::string sceneFile = outputFolder;
         sceneFile += "\\output.nav.json";
         backgroundWorker.emplace(
             &Scene::loadScene,
@@ -202,8 +194,8 @@ void SceneExtract::finalizeExtract() {
                 sceneExtract.extractingAlocs = false;
                 sceneScoped.lastLoadSceneFile = sceneFile;
                 if (sceneExtract.alsoBuildObj && !objScoped.startedObjGeneration) {
-                    objScoped.buildObj(objScoped.lastBlenderFile.data(), fileNameString.data(),
-                                       sceneExtract.lastOutputFolder.data());
+                    objScoped.buildObj(objScoped.blenderPath.data(), fileNameString.data(),
+                                       sceneExtract.outputFolder.data());
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();

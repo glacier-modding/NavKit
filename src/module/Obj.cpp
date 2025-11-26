@@ -16,7 +16,6 @@
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
-#include "../../include/RecastDemo/imgui.h"
 
 Obj::Obj() {
     loadObjName = "Load Obj";
@@ -28,8 +27,7 @@ Obj::Obj() {
     objToLoad = "";
     loadObj = false;
     objScroll = 0;
-    lastBlenderFile = R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")";
-    blenderName = "Choose Blender app";
+    blenderPath = R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")";
     blenderSet = false;
     startedObjGeneration = false;
     glacier2ObjDebugLogsEnabled = false;
@@ -39,23 +37,21 @@ Obj::Obj() {
     doObjHitTest = false;
 }
 
-void Obj::setBlenderFile(const char *fileName) {
+void Obj::setBlenderFile(const std::string& fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         blenderSet = true;
-        lastBlenderFile = fileName;
-        blenderName = fileName;
-        blenderName = blenderName.substr(blenderName.find_last_of("/\\") + 1);
-        Logger::log(NK_INFO, ("Setting Blender exe to: " + lastBlenderFile).c_str());
+        blenderPath = fileName;
+        Logger::log(NK_INFO, ("Setting Blender exe path to: " + blenderPath).c_str());
         Settings::setValue("Paths", "blender", fileName);
         Settings::save();
     } else {
-        Logger::log(NK_WARN, ("Could not find Blender exe: " + lastBlenderFile).c_str());
+        Logger::log(NK_WARN, ("Could not find Blender exe path: " + blenderPath).c_str());
     }
 }
 
 void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
     SceneExtract &sceneExtract = SceneExtract::getInstance();
-    std::string fileName = sceneExtract.lastOutputFolder + "\\outputNavp.obj";
+    std::string fileName = sceneExtract.outputFolder + "\\outputNavp.obj";
     Gui &gui = Gui::getInstance();
     gui.showLog = true;
 
@@ -146,10 +142,10 @@ void Obj::finalizeObjBuild() {
         Obj &obj = getInstance();
         startedObjGeneration = false;
         const SceneExtract &sceneExtract = SceneExtract::getInstance();
-        obj.objToLoad = sceneExtract.lastOutputFolder;
+        obj.objToLoad = sceneExtract.outputFolder;
         obj.objToLoad += "\\" + generatedObjName;
         obj.loadObj = true;
-        obj.lastObjFileName = sceneExtract.lastOutputFolder;
+        obj.lastObjFileName = sceneExtract.outputFolder;
         obj.lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
@@ -295,7 +291,7 @@ bool Obj::canBuildObjFromScene() const {
 void Obj::handleBuildObjFromSceneClicked() {
     const SceneExtract &sceneExtract = SceneExtract::getInstance();
     const Scene &scene = Scene::getInstance();
-    return buildObj(lastBlenderFile.data(), scene.lastLoadSceneFile.data(), sceneExtract.lastOutputFolder.data());
+    return buildObj(blenderPath.data(), scene.lastLoadSceneFile.data(), sceneExtract.outputFolder.data());
 }
 
 void Obj::handleBuildObjFromNavpClicked() {

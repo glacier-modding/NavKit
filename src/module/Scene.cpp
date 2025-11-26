@@ -16,9 +16,6 @@ Scene::Scene()
       , saveSceneName("Save NavKit Scene")
 {}
 
-const int Scene::SCENE_MENU_HEIGHT = 125;
-
-
 Scene::~Scene() {
 }
 

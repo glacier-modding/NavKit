@@ -538,7 +538,7 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
             const SceneExtract &sceneExtract = SceneExtract::getInstance();
             if (isFromBuilding) {
                 setStairsFlags();
-                outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
+                outputNavpFilename = sceneExtract.outputFolder + "\\output.navp";
                 OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
                 NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
                 std::swap(*navMesh, reloadedNavMesh);
@@ -666,7 +666,7 @@ void Navp::saveNavMesh(const std::string &fileName, const std::string &extension
             OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
         } else if (upper_extension == "NAVP") {
             const SceneExtract &sceneExtract = SceneExtract::getInstance();
-            const std::string tempOutputJSONFilename = sceneExtract.lastOutputFolder + "\\temp_save.navp.json";
+            const std::string tempOutputJSONFilename = sceneExtract.outputFolder + "\\temp_save.navp.json";
 
             OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
 
@@ -825,7 +825,7 @@ void Navp::finalizeBuild() {
         navpLoaded = true;
         const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         const SceneExtract &sceneExtract = SceneExtract::getInstance();
-        outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
+        outputNavpFilename = sceneExtract.outputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true);
         navpBuildDone.store(false);

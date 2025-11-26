@@ -2,6 +2,8 @@
 #include <SimpleIni.h>
 
 class Settings {
+    static INT_PTR SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
     explicit Settings();
 
     CSimpleIniA ini;
@@ -21,7 +23,9 @@ public:
 
     static void Load();
 
-    static const int SETTINGS_MENU_HEIGHT;
+    void showSettingsDialog();
 
-    void drawMenu();
+    static HWND hSettingsDialog;
+
+    static const int SETTINGS_MENU_HEIGHT;
 };

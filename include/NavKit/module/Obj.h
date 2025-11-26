@@ -32,10 +32,9 @@ public:
     bool blenderObjStarted;
     bool blenderObjGenerationDone;
     bool glacier2ObjDebugLogsEnabled;
-    std::string blenderName;
     bool blenderSet;
     bool errorBuilding;
-    std::string lastBlenderFile;
+    std::string blenderPath;
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
 
@@ -49,7 +48,7 @@ public:
 
     void saveObjMesh(char *objToCopy, char *newFileName);
 
-    void setBlenderFile(const char *fileName);
+    void setBlenderFile(const std::string &fileName);
 
     void buildObjFromNavp(bool alsoLoadIntoUi);
 

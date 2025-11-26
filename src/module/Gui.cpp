@@ -15,7 +15,6 @@
 #include <GL/glew.h>
 #include <GL/glu.h>
 
-#include "../../include/NavKit/module/Obj.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
 
@@ -68,13 +67,9 @@ void Gui::drawGui() {
                  airg.selectedWaypointIndex);
         imguiDrawText(280, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
-        Obj &obj = Obj::getInstance();
         Scene::getInstance();
-        Settings &settings = Settings::getInstance();
         navp.drawMenu();
         airg.drawMenu();
-        settings.drawMenu();
 
         const int consoleHeight = showLog ? 220 : 60;
         const int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;

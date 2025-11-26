@@ -31,7 +31,7 @@ void setup() {
     SceneExtract &sceneExtract = SceneExtract::getInstance();
     std::string navpFileName = std::filesystem::current_path().string() + "\\rectangles.navp";
     Navp::loadNavMesh(navpFileName.data(), false, false, false);
-    sceneExtract.lastOutputFolder = std::filesystem::current_path().string();
+    sceneExtract.outputFolder = std::filesystem::current_path().string();
 }
 
 TEST_CASE("GridGenerator::build generates the correct number of nodes and connects them", "[GridGenerator][build]") {

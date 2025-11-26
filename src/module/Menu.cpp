@@ -13,6 +13,7 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/Settings.h"
 
 
 void Menu::setMenuItemEnabled(const UINT menuId, const bool isEnabled) {
@@ -260,8 +261,13 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                             std::string(NavKit_VERSION_PATCH);
                     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About",
                                              ("NavKit version " + currentVersionStr).data(), nullptr);
+                    break;
                 }
-                break;
+
+                case IDM_SETTINGS_NAVKIT:
+                    Settings::getInstance().showSettingsDialog();
+                    Logger::log(NK_DEBUG, "Settings -> NavKit Settings clicked");
+                    break;
 
                 default:
                     break;

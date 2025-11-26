@@ -15,8 +15,8 @@ public:
 
     void finalizeExtract();
 
-    std::string lastHitmanFolder;
-    std::string lastOutputFolder;
+    std::string hitmanFolder;
+    std::string outputFolder;
     bool outputSet;
     bool extractingAlocs;
     bool doneExtractingAlocs;
@@ -24,9 +24,9 @@ public:
     bool doneExtractingFromGame;
     static const int SCENE_EXTRACT_MENU_HEIGHT;
 
-    void setHitmanFolder(const char *folderName);
+    void setHitmanFolder(const std::string &folderName);
 
-    void setOutputFolder(const char *folderName);
+    void setOutputFolder(const std::string &folderName);
 
     void handleExtractFromGameClicked();
 
@@ -37,9 +37,7 @@ public:
     void handleExtractFromGameAndBuildObjClicked();
 
     int extractScroll;
-    std::string hitmanFolderName;
     bool hitmanSet;
-    std::string outputFolderName;
     bool errorExtracting;
     bool alsoBuildObj;
 

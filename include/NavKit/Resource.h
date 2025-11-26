@@ -36,7 +36,7 @@
 #define IDM_BUILD_OBJ_FROM_SCENE                1500
 #define IDM_BUILD_OBJ_FROM_NAVP                 1501
 #define IDM_BUILD_NAVP                          1510
-#define IDM_BUILD_AIRG                           1520
+#define IDM_BUILD_AIRG                          1520
 #define IDM_HELP_ABOUT                          1600
 
 #define IDD_ERROR_DIALOG                        20000
@@ -44,3 +44,18 @@
 #define IDC_COPY_BUTTON                         20002
 #define IDD_UPDATE_DIALOG                       20010
 #define IDC_UPDATE_TEXT                         20011
+
+#define IDD_SETTINGS                            30000
+
+#define IDC_SLIDER_BG_COLOR                     30001
+#define IDC_BUTTON_BROWSE_HITMAN                30002
+#define IDC_BUTTON_BROWSE_OUTPUT                30003
+#define IDC_BUTTON_BROWSE_BLENDER               30004
+#define IDC_APPLY                               30005
+#define IDC_EDIT_HITMAN_PATH                    30006
+#define IDC_EDIT_OUTPUT_PATH                    30007
+#define IDC_EDIT_BLENDER_PATH                   30008
+#define IDC_BG_COLOR_TEXT                       30010
+#define IDC_HITMAN_DIR_TEXT                     30011
+#define IDC_OUTPUT_DIR_TEXT                     30012
+#define IDC_BLENDER_PATH_TEXT                   30013

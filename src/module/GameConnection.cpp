@@ -113,10 +113,10 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
     std::thread writer_thread([&] {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
-        std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
+        std::ofstream f(SceneExtract::getInstance().outputFolder + "\\output.nav.json", std::ios::app);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
-                        (SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json").c_str());
+                        (SceneExtract::getInstance().outputFolder + "\\output.nav.json").c_str());
             return;
         }
 

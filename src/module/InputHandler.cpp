@@ -5,6 +5,7 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Settings.h"
 #include "../../include/RecastDemo/imgui.h"
 
 #include <algorithm>
@@ -117,6 +118,11 @@ int InputHandler::handleInput() {
                 done = true;
                 break;
             case SDL_SYSWMEVENT:
+                if (SDL_SysWMmsg *wmMsg = event.syswm.msg;
+                    Settings::hSettingsDialog &&
+                    IsDialogMessage(Settings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) {
+                    continue;
+                }
                 if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
                     done = true;
                 }
