@@ -68,14 +68,16 @@ void Gui::drawGui() {
         imguiDrawText(280, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
         Scene::getInstance();
-        navp.drawMenu();
+        navp.drawSceneMenu();
+        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        recastAdapter.drawMenu();
 
         const int consoleHeight = showLog ? 220 : 60;
         const int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;
         if (showLog) {
-            if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
+            if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll)) {
                 mouseOverMenu = true;
-            const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+            }
             std::lock_guard lock(recastAdapter.getLogMutex());
 
             const std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
@@ -88,7 +90,6 @@ void Gui::drawGui() {
                 lastLogCount = logCount;
             }
         }
-
         imguiEndScrollArea();
     }
 

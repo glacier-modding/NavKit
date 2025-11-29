@@ -38,8 +38,6 @@ public:
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
 
-    static const int OBJ_MENU_HEIGHT;
-
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 
     void loadObjMesh();

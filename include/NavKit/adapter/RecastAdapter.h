@@ -38,6 +38,8 @@ public:
 
     void log(int category, const std::string &message) const;
 
+    void drawMenu();
+
     void drawInputGeom() const;
 
     [[nodiscard]] bool loadInputGeom(const std::string &fileName) const;
@@ -135,4 +137,5 @@ public:
 
 private:
     std::vector<dtPolyRef> pfSeedPointAreas;
+    int recastScroll;
 };

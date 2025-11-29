@@ -54,8 +54,6 @@ Airg::Airg()
       , buildingVisionAndDeadEndData(false) {
 }
 
-const int Airg::AIRG_MENU_HEIGHT = 310;
-
 Airg::~Airg() = default;
 
 static std::string format_float(float val) {
@@ -126,7 +124,7 @@ void Airg::showAirgDialog() {
     }
 
     HINSTANCE hInstance = GetModuleHandle(NULL);
-    HWND hParentWnd = Renderer::getInstance().hwnd;
+    HWND hParentWnd = Renderer::hwnd;
 
     hAirgDialog = CreateDialogParam(
         hInstance,

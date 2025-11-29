@@ -28,7 +28,7 @@ BEGIN
     BEGIN
         MENUITEM "&NavKit Settings",                         IDM_SETTINGS_NAVKIT
         MENUITEM "&Scene Settings",                          IDM_SETTINGS_SCENE
-        MENUITEM "&Navp Settings",                           IDM_SETTINGS_NAVP
+        MENUITEM "&Recast Settings",                         IDM_SETTINGS_RECAST
         MENUITEM "&Airg Settings",                           IDM_SETTINGS_AIRG
     END
     POPUP "&View"
@@ -141,4 +141,36 @@ BEGIN
     LTEXT           "0.00",IDC_STATIC_ZOFFSET_VAL,215,52,40,8
 
     PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,190,75,65,14
+END
+
+IDD_SCENE_MENU DIALOGEX 0, 0, 260, 155
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Scene Properties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "BBox Pos X:",IDC_STATIC,7,12,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_POS_X,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,10,150,15
+    LTEXT           "0.00",IDC_STATIC_BBOX_POS_X_VAL,215,12,40,8
+
+    LTEXT           "BBox Pos Y:",IDC_STATIC,7,32,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_POS_Y,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,30,150,15
+    LTEXT           "0.00",IDC_STATIC_BBOX_POS_Y_VAL,215,32,40,8
+
+    LTEXT           "BBox Pos Z:",IDC_STATIC,7,52,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_POS_Z,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,50,150,15
+    LTEXT           "0.00",IDC_STATIC_BBOX_POS_Z_VAL,215,52,40,8
+
+    LTEXT           "BBox Scale X:",IDC_STATIC,7,72,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_SCALE_X,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,70,150,15
+    LTEXT           "1000.00",IDC_STATIC_BBOX_SCALE_X_VAL,215,72,40,8
+
+    LTEXT           "BBox Scale Y:",IDC_STATIC,7,92,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_SCALE_Y,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,90,150,15
+    LTEXT           "300.00",IDC_STATIC_BBOX_SCALE_Y_VAL,215,92,40,8
+
+    LTEXT           "BBox Scale Z:",IDC_STATIC,7,112,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_SCALE_Z,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,110,150,15
+    LTEXT           "1000.00",IDC_STATIC_BBOX_SCALE_Z_VAL,215,112,40,8
+
+    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_BBOX_RESET,190,135,65,14
 END

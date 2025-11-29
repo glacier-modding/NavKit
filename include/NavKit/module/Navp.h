@@ -47,7 +47,7 @@ public:
 
     void renderNavMeshForHitTest() const;
 
-    void drawMenu();
+    void drawSceneMenu();
 
     void finalizeBuild();
 
@@ -118,8 +118,6 @@ public:
     void handleEditStairsClicked() const;
 
     void handleBuildNavpClicked();
-
-    void drawRecastSettings();
 
     void setBBox(const float *pos, const float *scale);
 

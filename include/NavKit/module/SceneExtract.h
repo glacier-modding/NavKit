@@ -22,7 +22,6 @@ public:
     bool doneExtractingAlocs;
     bool extractingFromGame;
     bool doneExtractingFromGame;
-    static const int SCENE_EXTRACT_MENU_HEIGHT;
 
     void setHitmanFolder(const std::string &folderName);
 

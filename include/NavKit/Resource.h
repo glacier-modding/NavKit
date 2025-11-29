@@ -16,7 +16,7 @@
 #define IDM_EDIT_AIRG_CONNECT_WAYPOINT          1101
 #define IDM_SETTINGS_NAVKIT                     1200
 #define IDM_SETTINGS_SCENE                      1201
-#define IDM_SETTINGS_NAVP                       1202
+#define IDM_SETTINGS_RECAST                     1202
 #define IDM_SETTINGS_AIRG                       1203
 #define IDM_VIEW_NAVP_SHOW_NAVP                 1300
 #define IDM_VIEW_NAVP_SHOW_INDICES              1301
@@ -61,12 +61,27 @@
 #define IDC_HITMAN_DIR_TEXT                     30011
 #define IDC_OUTPUT_DIR_TEXT                     30012
 #define IDC_BLENDER_PATH_TEXT                   30013
+#define IDC_BUTTON_RESET_DEFAULTS               30014
 
 #define IDD_AIRG_MENU                           30100
 #define IDC_SLIDER_SPACING                      30101
 #define IDC_SLIDER_XOFFSET                      30102
 #define IDC_SLIDER_ZOFFSET                      30103
-#define IDC_BUTTON_RESET_DEFAULTS               30104
-#define IDC_STATIC_SPACING_VAL                  30105
-#define IDC_STATIC_XOFFSET_VAL                  30106
-#define IDC_STATIC_ZOFFSET_VAL                  30107
+#define IDC_STATIC_SPACING_VAL                  30104
+#define IDC_STATIC_XOFFSET_VAL                  30105
+#define IDC_STATIC_ZOFFSET_VAL                  30106
+
+#define IDD_SCENE_MENU                          30200
+#define IDC_SLIDER_BBOX_POS_X                   30201
+#define IDC_SLIDER_BBOX_POS_Y                   30202
+#define IDC_SLIDER_BBOX_POS_Z                   30203
+#define IDC_SLIDER_BBOX_SCALE_X                 30204
+#define IDC_SLIDER_BBOX_SCALE_Y                 30205
+#define IDC_SLIDER_BBOX_SCALE_Z                 30206
+#define IDC_BUTTON_BBOX_RESET                   30207
+#define IDC_STATIC_BBOX_POS_X_VAL               30208
+#define IDC_STATIC_BBOX_POS_Y_VAL               30209
+#define IDC_STATIC_BBOX_POS_Z_VAL               30210
+#define IDC_STATIC_BBOX_SCALE_X_VAL             30211
+#define IDC_STATIC_BBOX_SCALE_Y_VAL             30212
+#define IDC_STATIC_BBOX_SCALE_Z_VAL             30213

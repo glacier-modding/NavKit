@@ -5,8 +5,6 @@ class Scene {
 public:
     explicit Scene();
 
-    static const int SCENE_MENU_HEIGHT;
-
     ~Scene();
 
     static char *openLoadSceneFileDialog();

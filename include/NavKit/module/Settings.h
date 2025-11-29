@@ -26,6 +26,4 @@ public:
     void showSettingsDialog();
 
     static HWND hSettingsDialog;
-
-    static const int SETTINGS_MENU_HEIGHT;
 };

@@ -46,7 +46,6 @@ public:
     int selectedWaypointIndex;
     bool doAirgHitTest;
     bool buildingVisionAndDeadEndData;
-    static const int AIRG_MENU_HEIGHT;
 
     static void resetDefaults();
 
