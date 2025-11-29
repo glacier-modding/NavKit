@@ -153,7 +153,7 @@ void Settings::showSettingsDialog() {
     HWND hParentWnd = Renderer::getInstance().hwnd;
     hSettingsDialog = CreateDialogParam(
         hInstance,
-        MAKEINTRESOURCE(IDD_SETTINGS),
+        MAKEINTRESOURCE(IDD_NAVKIT_SETTINGS),
         hParentWnd,
         SettingsDialogProc,
         (LPARAM) this // Pass a pointer to this Settings instance

@@ -1,5 +1,7 @@
 #pragma once
 
+#define IDC_STATIC                              (-1)
+
 #define IDR_NAVKITMENU                          10000
 #define IDM_FILE_OPEN_SCENE                     1000
 #define IDM_FILE_OPEN_OBJ                       1001
@@ -11,6 +13,7 @@
 #define IDM_FILE_SAVE_AIRG                      1013
 #define IDM_FILE_EXIT                           1020
 #define IDM_EDIT_NAVP_STAIRS                    1100
+#define IDM_EDIT_AIRG_CONNECT_WAYPOINT          1101
 #define IDM_SETTINGS_NAVKIT                     1200
 #define IDM_SETTINGS_SCENE                      1201
 #define IDM_SETTINGS_NAVP                       1202
@@ -45,8 +48,7 @@
 #define IDD_UPDATE_DIALOG                       20010
 #define IDC_UPDATE_TEXT                         20011
 
-#define IDD_SETTINGS                            30000
-
+#define IDD_NAVKIT_SETTINGS                     30000
 #define IDC_SLIDER_BG_COLOR                     30001
 #define IDC_BUTTON_BROWSE_HITMAN                30002
 #define IDC_BUTTON_BROWSE_OUTPUT                30003
@@ -59,3 +61,12 @@
 #define IDC_HITMAN_DIR_TEXT                     30011
 #define IDC_OUTPUT_DIR_TEXT                     30012
 #define IDC_BLENDER_PATH_TEXT                   30013
+
+#define IDD_AIRG_MENU                           30100
+#define IDC_SLIDER_SPACING                      30101
+#define IDC_SLIDER_XOFFSET                      30102
+#define IDC_SLIDER_ZOFFSET                      30103
+#define IDC_BUTTON_RESET_DEFAULTS               30104
+#define IDC_STATIC_SPACING_VAL                  30105
+#define IDC_STATIC_XOFFSET_VAL                  30106
+#define IDC_STATIC_ZOFFSET_VAL                  30107

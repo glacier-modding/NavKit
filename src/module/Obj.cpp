@@ -249,7 +249,7 @@ void Obj::setLastSaveFileName(const char *fileName) {
     loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
 }
 
-void Obj::handleOpenObjPressed() {
+void Obj::handleOpenObjClicked() {
     char *fileName = openLoadObjFileDialog(loadObjName.data());
     if (fileName) {
         setLastLoadFileName(fileName);
@@ -260,7 +260,7 @@ void Obj::handleOpenObjPressed() {
     }
 }
 
-void Obj::handleSaveObjPressed() {
+void Obj::handleSaveObjClicked() {
     char *fileName = openSaveObjFileDialog(loadObjName.data());
     if (fileName) {
         loadObjName = fileName;

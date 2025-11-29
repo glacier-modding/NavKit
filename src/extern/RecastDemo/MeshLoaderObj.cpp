@@ -15,6 +15,8 @@
 //    misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 //
+// This source has been modified from the original by Daniel Bierek for use
+// in NavKit.
 
 #include "../../include/RecastDemo/MeshLoaderObj.h"
 #include <stdio.h>

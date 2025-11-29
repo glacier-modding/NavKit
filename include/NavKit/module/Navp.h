@@ -103,11 +103,11 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
-    void handleOpenNavpPressed();
+    void handleOpenNavpClicked();
 
     void saveNavMesh(const std::string &fileName, const std::string &extension);
 
-    void handleSaveNavpPressed();
+    void handleSaveNavpClicked();
 
     bool stairsAreaSelected() const;
 
@@ -118,6 +118,8 @@ public:
     void handleEditStairsClicked() const;
 
     void handleBuildNavpClicked();
+
+    void drawRecastSettings();
 
     void setBBox(const float *pos, const float *scale);
 

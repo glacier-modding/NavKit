@@ -86,11 +86,11 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
     callback();
 }
 
-void Scene::saveScene(char* fileName) {
+void Scene::saveScene(char* fileName) const {
     std::stringstream ss;
 
     ss << R"({"alocs":[)";
-    const char* separator = "";
+    auto separator = "";
     for (const auto& aloc : alocs) {
         ss << separator;
         aloc.writeJson(ss);
@@ -123,7 +123,7 @@ void Scene::saveScene(char* fileName) {
     }
 }
 
-void Scene::handleOpenScenePressed() {
+void Scene::handleOpenSceneClicked() {
     if (char *fileName = openLoadSceneFileDialog()) {
         setLastLoadFileName(fileName);
         std::string msg = "Loading nav.json file: '";
@@ -148,7 +148,7 @@ void Scene::handleOpenScenePressed() {
     }
 }
 
-void Scene::handleSaveScenePressed() {
+void Scene::handleSaveSceneClicked() {
     if (char *fileName = openSaveSceneFileDialog()) {
         setLastSaveFileName(fileName);
         std::string msg = "Saving NavKit Scene file: '";

@@ -1,3 +1,4 @@
+#pragma once
 #include <direct.h>
 #include <string>
 #include <vector>

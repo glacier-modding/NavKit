@@ -629,7 +629,7 @@ void Navp::setLastSaveFileName(const char *fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
-void Navp::handleOpenNavpPressed() {
+void Navp::handleOpenNavpClicked() {
     char *fileName = openLoadNavpFileDialog();
     if (fileName) {
         setLastLoadFileName(fileName);
@@ -689,7 +689,7 @@ void Navp::saveNavMesh(const std::string &fileName, const std::string &extension
     loading = false;
 }
 
-void Navp::handleSaveNavpPressed() {
+void Navp::handleSaveNavpClicked() {
     if (char *fileName = openSaveNavpFileDialog()) {
         setLastSaveFileName(fileName);
         std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
@@ -738,7 +738,130 @@ void Navp::handleBuildNavpClicked() {
     backgroundWorker.emplace(&Navp::buildNavp, this);
 }
 
+// From Recast
+inline unsigned int ilog2(unsigned int v)
+{
+    unsigned int r;
+    unsigned int shift;
+    r = (v > 0xffff) << 4; v >>= r;
+    shift = (v > 0xff) << 3; v >>= shift; r |= shift;
+    shift = (v > 0xf) << 2; v >>= shift; r |= shift;
+    shift = (v > 0x3) << 1; v >>= shift; r |= shift;
+    r |= (v >> 1);
+    return r;
+}
+
+// From Recast
+inline unsigned int nextPow2(unsigned int v)
+{
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+void Navp::drawRecastSettings() {
+    const Renderer &renderer = Renderer::getInstance();
+    Gui &gui = Gui::getInstance();
+    if (auto navpMenuHeight = std::min(1190, renderer.height - 20); imguiBeginScrollArea(
+        "Recast menu", renderer.width - 260, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
+        &navpScroll)) {
+        gui.mouseOverMenu = true;
+    }
+    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const auto sample = recastAdapter.sample;
+    // From Recast
+    imguiLabel("Rasterization");
+	imguiSlider("Cell Size", &sample->m_cellSize, 0.01f, 0.4f, 0.01f);
+	imguiSlider("Cell Height", &sample->m_cellHeight, 0.01f, 0.4f, 0.01f);
+
+	imguiSeparator();
+	imguiLabel("Agent");
+	imguiSlider("Height", &sample->m_agentHeight, 0.01f, 3.0f, 0.01f);
+	imguiSlider("Radius", &sample->m_agentRadius, 0.00f, 1.0f, 0.01f);
+	imguiSlider("Max Climb", &sample->m_agentMaxClimb, 0.01f, 1.0f, 0.01f);
+	imguiSlider("Max Slope", &sample->m_agentMaxSlope, 0.0f, 90.0f, 1.0f);
+
+	imguiSeparator();
+	imguiLabel("Region");
+	imguiSlider("Min Region Size", &sample->m_regionMinSize, 0.0f, 50.0f, 1.0f);
+	imguiSlider("Merged Region Size", &sample->m_regionMergeSize, 0.0f, 550.0f, 1.0f);
+
+	imguiSeparator();
+	imguiLabel("Partitioning");
+	if (imguiCheck("Watershed", sample->m_partitionType == SAMPLE_PARTITION_WATERSHED))
+		sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
+	if (imguiCheck("Monotone", sample->m_partitionType == SAMPLE_PARTITION_MONOTONE))
+		sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
+	if (imguiCheck("Layers", sample->m_partitionType == SAMPLE_PARTITION_LAYERS))
+		sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
+
+	imguiSeparator();
+	imguiLabel("Filtering");
+	if (imguiCheck("Low Hanging Obstacles", sample->m_filterLowHangingObstacles))
+		sample->m_filterLowHangingObstacles = !sample->m_filterLowHangingObstacles;
+	if (imguiCheck("Ledge Spans", sample->m_filterLedgeSpans))
+		sample->m_filterLedgeSpans= !sample->m_filterLedgeSpans;
+	if (imguiCheck("Walkable Low Height Spans", sample->m_filterWalkableLowHeightSpans))
+		sample->m_filterWalkableLowHeightSpans = !sample->m_filterWalkableLowHeightSpans;
+
+	imguiSeparator();
+	imguiLabel("Polygonization");
+	imguiSlider("Max Edge Length", &sample->m_edgeMaxLen, 0.1f, 50.0f, 0.1f);
+	imguiSlider("Max Edge Error", &sample->m_edgeMaxError, 0.01f, 3.0f, 0.01f);
+	imguiSlider("Verts Per Poly", &sample->m_vertsPerPoly, 3.0f, 12.0f, 1.0f);
+
+	imguiSeparator();
+	imguiLabel("Detail Mesh");
+	imguiSlider("Sample Distance", &sample->m_detailSampleDist, 0.9f, 16.0f, 0.1f);
+	imguiSlider("Max Sample Error", &sample->m_detailSampleMaxError, 0.01f, 16.0f, 0.01f);
+
+	imguiSeparator();
+	imguiLabel("Tiling");
+	imguiSlider("TileSize", &sample->m_tileSize, 16.0f, 1024.0f, 16.0f);
+
+	if (sample->m_geom)
+	{
+		char text[64];
+		int gw = 0, gh = 0;
+		const float* bmin = sample->m_geom->getNavMeshBoundsMin();
+		const float* bmax = sample->m_geom->getNavMeshBoundsMax();
+		rcCalcGridSize(bmin, bmax, sample->m_cellSize, &gw, &gh);
+		const int ts = (int)sample->m_tileSize;
+		const int tw = (gw + ts-1) / ts;
+		const int th = (gh + ts-1) / ts;
+		snprintf(text, 64, "Tiles  %d x %d", tw, th);
+		imguiValue(text);
+
+		// Max tiles and max polys affect how the tile IDs are calculated.
+		// There are 22 bits available for identifying a tile and a polygon.
+		int tileBits = rcMin((int)ilog2(nextPow2(tw*th)), 14);
+		if (tileBits > 14) tileBits = 14;
+		int polyBits = 22 - tileBits;
+		sample->m_maxTiles = 1 << tileBits;
+		sample->m_maxPolysPerTile = 1 << polyBits;
+		snprintf(text, 64, "Max Tiles  %d", sample->m_maxTiles);
+		imguiValue(text);
+		snprintf(text, 64, "Max Polys  %d", sample->m_maxPolysPerTile);
+		imguiValue(text);
+	}
+	else
+	{
+		sample->m_maxTiles = 0;
+		sample->m_maxPolysPerTile = 0;
+	}
+    imguiEndScrollArea();
+    if (imguiButton("Reset Defaults")) {
+        recastAdapter.resetCommonSettings();
+    }
+}
+
 void Navp::drawMenu() {
+    drawRecastSettings();
     const Renderer &renderer = Renderer::getInstance();
     Gui &gui = Gui::getInstance();
     if (auto navpMenuHeight = std::min(1190, renderer.height - 20); imguiBeginScrollArea(
@@ -747,12 +870,6 @@ void Navp::drawMenu() {
         gui.mouseOverMenu = true;
     }
     const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-
-    imguiLabel("PFSeedPoint Pruning Mode");
-    imguiSlider("Off             Delete             Debug", &pruningMode, 0.0f, 2.0f, 1.0f);
-
-    recastAdapter.handleCommonSettings();
-
     imguiLabel("Bounding Box");
 
     bool bboxChanged = false;
@@ -794,7 +911,6 @@ void Navp::drawMenu() {
     }
     if (imguiButton("Reset Defaults")) {
         resetDefaults();
-        recastAdapter.resetCommonSettings();
         float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
         float bBoxScale[3] = {bBoxScaleX, bBoxScaleY, bBoxScaleZ};
         setBBox(bBoxPos, bBoxScale);

@@ -66,9 +66,9 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
-    void handleOpenObjPressed();
+    void handleOpenObjClicked();
 
-    void handleSaveObjPressed();
+    void handleSaveObjClicked();
 
     bool canLoad() const;
 

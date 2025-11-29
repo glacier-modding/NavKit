@@ -19,15 +19,6 @@ Grid::Grid() {
     showGrid = true;
 }
 
-void Grid::loadBoundsFromNavp() {
-    const Navp &navp = Navp::getInstance();
-    xMin = navp.navMesh->m_graphHdr->m_bbox.m_min.X;
-    yMin = navp.navMesh->m_graphHdr->m_bbox.m_min.Y;
-    xMax = navp.navMesh->m_graphHdr->m_bbox.m_max.X;
-    yMax = navp.navMesh->m_graphHdr->m_bbox.m_max.Y;
-    gridWidth = std::ceil((xMax - xMin) / spacing);
-}
-
 void Grid::loadBoundsFromAirg() {
     Airg &airg = Airg::getInstance();
     ReasoningGrid *reasoningGrid = airg.reasoningGrid;

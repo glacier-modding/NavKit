@@ -20,11 +20,11 @@ public:
     void loadScene(const std::string &fileName, const std::function<void()> &callback,
                           const std::function<void()> &errorCallback);
 
-    void saveScene(char *fileName);
+    void saveScene(char *fileName) const;
 
-    void handleOpenScenePressed();
+    void handleOpenSceneClicked();
 
-    void handleSaveScenePressed();
+    void handleSaveSceneClicked();
 
     static Scene &getInstance() {
         static Scene instance;

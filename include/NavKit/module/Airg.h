@@ -3,6 +3,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 struct Vec3;
 struct ResourceConverter;
@@ -48,8 +50,6 @@ public:
 
     static void resetDefaults();
 
-    void drawMenu();
-
     void finalizeSave();
 
     void build();
@@ -66,31 +66,44 @@ public:
 
     void setSelectedAirgWaypointIndex(int index);
 
-    void connectWaypoints(int startWaypointIndex, int endWaypointIndex) const;
+    void connectWaypoints(int startWaypointIndex, int endWaypointIndex);
 
     void setLastLoadFileName(const char *fileName);
 
     void setLastSaveFileName(const char *fileName);
 
-    void handleOpenAirgPressed();
+    void handleOpenAirgClicked();
 
-    void handleSaveAirgPressed();
+    void handleSaveAirgClicked();
 
-    bool canLoad() const;
+    [[nodiscard]] bool canLoad() const;
 
-    bool canSave() const;
+    [[nodiscard]] bool canSave() const;
 
-    bool canBuildAirg() const;
+    [[nodiscard]] bool canBuildAirg() const;
 
     void handleBuildAirgClicked();
 
+    [[nodiscard]] bool canEnterConnectWaypointMode() const;
+
+    void handleConnectWaypointClicked();
+
     std::optional<std::jthread> backgroundWorker;
+
+    void showAirgDialog();
+
+    static void UpdateDialogControls(HWND hDlg);
+
+    static HWND hAirgDialog;
+
 private:
+    static INT_PTR CALLBACK AirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
     static char *openSaveAirgFileDialog(char *lastAirgFolder);
 
     static char *openAirgFileDialog(const char *lastAirgFolder);
 
     static void saveAirg(Airg *airg, std::string fileName, bool isJson);
 
-    static void loadAirg(Airg *airg, char *fileName, bool isFromJson);
+    static void loadAirg(Airg *airg, const std::string& fileName, bool isFromJson);
 };

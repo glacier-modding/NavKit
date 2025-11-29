@@ -12,6 +12,7 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
+#include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Scene.h"
 
@@ -118,9 +119,9 @@ int InputHandler::handleInput() {
                 done = true;
                 break;
             case SDL_SYSWMEVENT:
-                if (SDL_SysWMmsg *wmMsg = event.syswm.msg;
-                    Settings::hSettingsDialog &&
-                    IsDialogMessage(Settings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) {
+                if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
+                    (Settings::hSettingsDialog && IsDialogMessage(Settings::hSettingsDialog, LPMSG(&wmMsg->msg.win.msg))) ||
+                    (Airg::hAirgDialog && IsDialogMessage(Airg::hAirgDialog, LPMSG(&wmMsg->msg.win.msg)))) {
                     continue;
                 }
                 if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
@@ -208,14 +209,12 @@ void InputHandler::hitTest() const {
             } else if (hitTestResult.type == AIRG_WAYPOINT) {
                 if (hitTestResult.selectedIndex == airg.selectedWaypointIndex) {
                     airg.setSelectedAirgWaypointIndex(-1);
-                    airg.connectWaypointModeEnabled = false;
                 } else {
                     if (airg.connectWaypointModeEnabled) {
                         airg.connectWaypoints(airg.selectedWaypointIndex, hitTestResult.selectedIndex);
                     } else {
                         airg.setSelectedAirgWaypointIndex(hitTestResult.selectedIndex);
                     }
-                    airg.connectWaypointModeEnabled = false;
                 }
             } else if (hitTestResult.type == PF_SEED_POINT) {
                 if (hitTestResult.selectedIndex == navp.selectedPfSeedPointIndex) {
@@ -243,4 +242,5 @@ void InputHandler::hitTest() const {
             obj.doObjHitTest = false;
         }
     }
+    Menu::updateMenuState();
 }

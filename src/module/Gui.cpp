@@ -61,7 +61,7 @@ void Gui::drawGui() {
         imguiDrawText(280, renderer.height - 80, IMGUI_ALIGN_LEFT, selectedNavpText,
                       imguiRGBA(255, 255, 255, 128));
         char selectedAirgText[64];
-        Airg &airg = Airg::getInstance();
+        const Airg &airg = Airg::getInstance();
         snprintf(selectedAirgText, sizeof selectedAirgText,
                  airg.selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
                  airg.selectedWaypointIndex);
@@ -69,7 +69,6 @@ void Gui::drawGui() {
                       imguiRGBA(255, 255, 255, 128));
         Scene::getInstance();
         navp.drawMenu();
-        airg.drawMenu();
 
         const int consoleHeight = showLog ? 220 : 60;
         const int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;

@@ -97,6 +97,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_SAVE_OBJ, isObjLoaded);
 
     setMenuItemEnabled(IDM_EDIT_NAVP_STAIRS, isAreaSelected);
+    setMenuItemEnabled(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.canEnterConnectWaypointMode());
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
     setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
@@ -111,6 +112,7 @@ void Menu::updateMenuState() {
         isStairs = navp.stairsAreaSelected();
     }
     setMenuItemChecked(IDM_EDIT_NAVP_STAIRS, isStairs, "Stairs Area");
+    setMenuItemChecked(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
 }
 
 void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const char *itemName) {
@@ -127,41 +129,40 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
     Navp &navp = Navp::getInstance();
     Obj &obj = Obj::getInstance();
     Airg &airg = Airg::getInstance();
-    Scene &scene = Scene::getInstance();
     SceneExtract &sceneExtract = SceneExtract::getInstance();
     if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
         if (wmMsg->msg.win.msg == WM_COMMAND) {
             switch (LOWORD(wmMsg->msg.win.wParam)) {
                 case IDM_FILE_OPEN_SCENE:
-                    Scene::getInstance().handleOpenScenePressed();
+                    Scene::getInstance().handleOpenSceneClicked();
                     Logger::log(NK_DEBUG, "File -> Open Scene clicked");
                     break;
                 case IDM_FILE_OPEN_OBJ:
-                    Obj::getInstance().handleOpenObjPressed();
+                    Obj::getInstance().handleOpenObjClicked();
                     Logger::log(NK_DEBUG, "File -> Open Obj clicked");
                     break;
                 case IDM_FILE_OPEN_NAVP:
-                    Navp::getInstance().handleOpenNavpPressed();
+                    Navp::getInstance().handleOpenNavpClicked();
                     Logger::log(NK_DEBUG, "File -> Open Navp clicked");
                     break;
                 case IDM_FILE_OPEN_AIRG:
-                    Airg::getInstance().handleOpenAirgPressed();
+                    Airg::getInstance().handleOpenAirgClicked();
                     Logger::log(NK_DEBUG, "File -> Open Airg clicked");
                     break;
                 case IDM_FILE_SAVE_SCENE:
-                    Scene::getInstance().handleSaveScenePressed();
+                    Scene::getInstance().handleSaveSceneClicked();
                     Logger::log(NK_DEBUG, "File -> Save Scene clicked");
                     break;
                 case IDM_FILE_SAVE_OBJ:
-                    Obj::getInstance().handleSaveObjPressed();
+                    Obj::getInstance().handleSaveObjClicked();
                     Logger::log(NK_DEBUG, "File -> Save Obj clicked");
                     break;
                 case IDM_FILE_SAVE_NAVP:
-                    Navp::getInstance().handleSaveNavpPressed();
+                    Navp::getInstance().handleSaveNavpClicked();
                     Logger::log(NK_DEBUG, "File -> Save Navp clicked");
                     break;
                 case IDM_FILE_SAVE_AIRG:
-                    Airg::getInstance().handleSaveAirgPressed();
+                    Airg::getInstance().handleSaveAirgClicked();
                     Logger::log(NK_DEBUG, "File -> Save Airg clicked");
                     break;
 
@@ -170,6 +171,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
 
                 case IDM_EDIT_NAVP_STAIRS:
                     navp.handleEditStairsClicked();
+                    break;
+
+                case IDM_EDIT_AIRG_CONNECT_WAYPOINT:
+                    airg.handleConnectWaypointClicked();
                     break;
 
                 case IDM_VIEW_NAVP_SHOW_NAVP:
@@ -267,6 +272,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                 case IDM_SETTINGS_NAVKIT:
                     Settings::getInstance().showSettingsDialog();
                     Logger::log(NK_DEBUG, "Settings -> NavKit Settings clicked");
+                    break;
+                case IDM_SETTINGS_AIRG:
+                    Airg::getInstance().showAirgDialog();
+                    Logger::log(NK_DEBUG, "Settings -> Airg Settings clicked");
                     break;
 
                 default:

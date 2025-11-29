@@ -291,15 +291,7 @@ void RecastAdapter::excludeNonReachableAreas() {
     std::map<dtPolyRef, bool> pathFoundForPoly;
     const dtNavMesh *cmesh = sample->getNavMesh();
     dtNavMesh *mesh = sample->getNavMesh();
-    SamplePolyFlags pruneFlagType;
-    Navp &navp = Navp::getInstance();
-    if (navp.pruningMode == 1.0) {
-        Logger::log(NK_INFO, "Using Delete PF Seed Point pruning mode.");
-        pruneFlagType = SAMPLE_POLYFLAGS_DISABLED;
-    } else {
-        Logger::log(NK_INFO, "Using Debug PF Seed Point pruning mode.");
-        pruneFlagType = SAMPLE_POLYFLAGS_SWIM;
-    }
+    constexpr SamplePolyFlags pruneFlagType = SAMPLE_POLYFLAGS_DISABLED;
     if (!mesh) {
         return;
     }
