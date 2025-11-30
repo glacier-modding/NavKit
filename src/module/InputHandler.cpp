@@ -121,8 +121,9 @@ int InputHandler::handleInput() {
                 if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
                     (Settings::hSettingsDialog && IsDialogMessage(Settings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                     (Airg::hAirgDialog && IsDialogMessage(Airg::hAirgDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                    (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
-                    continue;
+                    (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (RecastAdapter::hRecastDialog && IsDialogMessage(RecastAdapter::hRecastDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
+                   continue;
                 }
                 if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
                     done = true;

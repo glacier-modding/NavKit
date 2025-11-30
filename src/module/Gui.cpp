@@ -67,9 +67,7 @@ void Gui::drawGui() {
                  airg.selectedWaypointIndex);
         imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
-        Scene::getInstance();
-        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        recastAdapter.drawMenu();
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
 
         const int consoleHeight = showLog ? 220 : 60;
         const int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;

@@ -5,6 +5,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #include "../../RecastDemo/Sample_TileMesh.h"
 
@@ -38,7 +40,7 @@ public:
 
     void log(int category, const std::string &message) const;
 
-    void drawMenu();
+    void showRecastDialog();
 
     void drawInputGeom() const;
 
@@ -135,7 +137,8 @@ public:
     float markerPosition[3]{};
     std::string selectedObject;
 
+    static HWND hRecastDialog;
 private:
     std::vector<dtPolyRef> pfSeedPointAreas;
-    int recastScroll;
+    static INT_PTR CALLBACK RecastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

@@ -281,6 +281,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     Airg::getInstance().showAirgDialog();
                     Logger::log(NK_DEBUG, "Settings -> Airg Settings clicked");
                     break;
+                case IDM_SETTINGS_RECAST:
+                    RecastAdapter::getInstance().showRecastDialog();
+                    Logger::log(NK_DEBUG, "Settings -> Recast Settings clicked");
+                    break;
 
                 default:
                     break;

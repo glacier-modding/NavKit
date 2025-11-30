@@ -9,7 +9,6 @@
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/VisionData.h"
 #include "../../include/NavKit/module/Grid.h"
-#include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
@@ -20,7 +19,6 @@
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/GridGenerator.h"
 #include "../../include/NavKit/Resource.h"
-#include "../../include/RecastDemo/imgui.h"
 #include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceGenerator.h"
@@ -135,6 +133,10 @@ void Airg::showAirgDialog() {
     );
 
     if (hAirgDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hAirgDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hAirgDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
         RECT parentRect, dialogRect;
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hAirgDialog, &dialogRect);

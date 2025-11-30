@@ -2,6 +2,7 @@
 
 #include <CommCtrl.h>
 #include <filesystem>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/module/Airg.h"
@@ -83,8 +84,8 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
                     obj.setBlenderFile(tempSettings->blenderPath);
 
                     settings->backgroundColor = tempSettings->backgroundColor;
-                    settings->setValue("Colors", "backgroundColor", std::to_string(settings->backgroundColor));
-                    settings->save();
+                    setValue("Colors", "backgroundColor", std::to_string(settings->backgroundColor));
+                    save();
                 }
                 if (commandId == IDOK) {
                     DestroyWindow(hDlg);
@@ -98,7 +99,7 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
         }
 
         case WM_CLOSE: {
-            EndDialog(hDlg, IDCANCEL);
+            DestroyWindow(hDlg);
             return TRUE;
         }
 
@@ -154,6 +155,10 @@ void Settings::showSettingsDialog() {
     );
 
     if (hSettingsDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hSettingsDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hSettingsDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
         RECT parentRect, dialogRect;
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hSettingsDialog, &dialogRect);

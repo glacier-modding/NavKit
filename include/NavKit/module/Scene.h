@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "../model/ZPathfinding.h"
 

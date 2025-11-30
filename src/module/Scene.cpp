@@ -305,6 +305,10 @@ void Scene::showSceneDialog() {
     hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, SceneDialogProc, (LPARAM)this);
 
     if (hSceneDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hSceneDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hSceneDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
         RECT parentRect, dialogRect;
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hSceneDialog, &dialogRect);

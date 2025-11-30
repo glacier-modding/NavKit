@@ -10,12 +10,15 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/RecastDemo/InputGeom.h"
-#include "../../include/RecastDemo/imgui.h"
 
 #include <queue>
 #include <SDL_keyboard.h>
+#include <CommCtrl.h>
+#include <iomanip>
+#include <sstream>
 
 #include <GL/glu.h>
 
@@ -52,26 +55,35 @@ RecastAdapter::RecastAdapter() {
     markerPosition[2] = 0;
 }
 
-void RecastAdapter::log(const int category, const std::string &message) const {
-    buildContext->log(static_cast<rcLogCategory>(category), message.c_str());
+HWND RecastAdapter::hRecastDialog = nullptr;
+
+static std::string format_recast_float(float val, int precision) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(precision) << val;
+    return ss.str();
 }
 
 // From Recast
-inline unsigned int ilog2(unsigned int v)
-{
+inline unsigned int ilog2(unsigned int v) {
     unsigned int r;
     unsigned int shift;
-    r = (v > 0xffff) << 4; v >>= r;
-    shift = (v > 0xff) << 3; v >>= shift; r |= shift;
-    shift = (v > 0xf) << 2; v >>= shift; r |= shift;
-    shift = (v > 0x3) << 1; v >>= shift; r |= shift;
+    r = (v > 0xffff) << 4;
+    v >>= r;
+    shift = (v > 0xff) << 3;
+    v >>= shift;
+    r |= shift;
+    shift = (v > 0xf) << 2;
+    v >>= shift;
+    r |= shift;
+    shift = (v > 0x3) << 1;
+    v >>= shift;
+    r |= shift;
     r |= (v >> 1);
     return r;
 }
 
 // From Recast
-inline unsigned int nextPow2(unsigned int v)
-{
+inline unsigned int nextPow2(unsigned int v) {
     v--;
     v |= v >> 1;
     v |= v >> 2;
@@ -82,98 +94,220 @@ inline unsigned int nextPow2(unsigned int v)
     return v;
 }
 
-void RecastAdapter::drawMenu() {
-    const Renderer &renderer = Renderer::getInstance();
-    Gui &gui = Gui::getInstance();
-    if (auto recastMenuHeight = std::min(1190, renderer.height - 20); imguiBeginScrollArea(
-        "Recast menu", renderer.width - 260, renderer.height - recastMenuHeight - 10, 250, recastMenuHeight,
-        &recastScroll)) {
-        gui.mouseOverMenu = true;
+static void UpdateRecastDialogControls(HWND hDlg) {
+    RecastAdapter &adapter = RecastAdapter::getInstance();
+    Sample_TileMesh *sample = adapter.sample;
+    if (!sample) return;
+
+    auto set_slider = [&](int sliderId, int textId, float value, float min_val, float step, int num_steps,
+                          int precision) {
+        int pos = static_cast<int>((value - min_val) / step);
+        SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETRANGE, TRUE, MAKELONG(0, num_steps));
+        SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETPOS, TRUE, pos);
+        SetDlgItemTextA(hDlg, textId, format_recast_float(value, precision).c_str());
+    };
+
+    set_slider(IDC_SLIDER_CELL_SIZE, IDC_STATIC_CELL_SIZE_VAL, sample->m_cellSize, 0.01f, 0.01f, 39, 2);
+    // Range: 0.01 to 0.40
+    set_slider(IDC_SLIDER_CELL_HEIGHT, IDC_STATIC_CELL_HEIGHT_VAL, sample->m_cellHeight, 0.01f, 0.01f, 39, 2);
+    // Range: 0.01 to 0.40
+
+    set_slider(IDC_SLIDER_AGENT_HEIGHT, IDC_STATIC_AGENT_HEIGHT_VAL, sample->m_agentHeight, 0.1f, 0.1f, 49, 2);
+    // Range: 0.1 to 5.0
+    set_slider(IDC_SLIDER_AGENT_RADIUS, IDC_STATIC_AGENT_RADIUS_VAL, sample->m_agentRadius, 0.0f, 0.1f, 20, 2);
+    // Range: 0.0 to 2.0
+    set_slider(IDC_SLIDER_AGENT_MAX_CLIMB, IDC_STATIC_AGENT_MAX_CLIMB_VAL, sample->m_agentMaxClimb, 0.0f, 0.1f, 50,
+               2); // Range: 0.0 to 5.0
+    set_slider(IDC_SLIDER_AGENT_MAX_SLOPE, IDC_STATIC_AGENT_MAX_SLOPE_VAL, sample->m_agentMaxSlope, 0.0f, 1.0f, 90,
+               0); // Range: 0 to 90
+
+    set_slider(IDC_SLIDER_REGION_MIN_SIZE, IDC_STATIC_REGION_MIN_SIZE_VAL, sample->m_regionMinSize, 0.0f, 1.0f, 150,
+               0); // Range: 0 to 150
+    set_slider(IDC_SLIDER_REGION_MERGE_SIZE, IDC_STATIC_REGION_MERGE_SIZE_VAL, sample->m_regionMergeSize, 0.0f, 1.0f,
+               150, 0); // Range: 0 to 150
+
+    set_slider(IDC_SLIDER_POLY_MAX_EDGE_LEN, IDC_STATIC_POLY_MAX_EDGE_LEN_VAL, sample->m_edgeMaxLen, 0.0f, 1.0f, 50,
+               1); // Range: 0.0 to 50.0
+    set_slider(IDC_SLIDER_POLY_MAX_EDGE_ERR, IDC_STATIC_POLY_MAX_EDGE_ERR_VAL, sample->m_edgeMaxError, 0.1f, 0.1f, 29,
+               2); // Range: 0.1 to 3.0
+    set_slider(IDC_SLIDER_POLY_VERTS_PER_POLY, IDC_STATIC_POLY_VERTS_PER_POLY_VAL, sample->m_vertsPerPoly, 3.0f, 1.0f,
+               9, 0); // Range: 3 to 12
+
+    set_slider(IDC_SLIDER_DETAIL_SAMPLE_DIST, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, sample->m_detailSampleDist, 0.0f, 1.0f,
+               16, 1); // Range: 0.0 to 16.0
+    set_slider(IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL, sample->m_detailSampleMaxError,
+               0.0f, 1.0f, 16, 1); // Range: 0.0 to 16.0
+
+    set_slider(IDC_SLIDER_TILING_TILE_SIZE, IDC_STATIC_TILING_TILE_SIZE_VAL, sample->m_tileSize, 16.0f, 16.0f, 15,
+               0); // Range: 16 to 256
+
+    if (sample->m_partitionType == SAMPLE_PARTITION_WATERSHED) {
+        CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS,
+                         IDC_RADIO_PARTITION_WATERSHED);
+    } else if (sample->m_partitionType == SAMPLE_PARTITION_MONOTONE) {
+        CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_MONOTONE);
+    } else {
+        CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_LAYERS);
     }
-    // From Recast
-    imguiLabel("Rasterization");
-	imguiSlider("Cell Size", &sample->m_cellSize, 0.01f, 0.4f, 0.01f);
-	imguiSlider("Cell Height", &sample->m_cellHeight, 0.01f, 0.4f, 0.01f);
 
-	imguiSeparator();
-	imguiLabel("Agent");
-	imguiSlider("Height", &sample->m_agentHeight, 0.01f, 3.0f, 0.01f);
-	imguiSlider("Radius", &sample->m_agentRadius, 0.00f, 1.0f, 0.01f);
-	imguiSlider("Max Climb", &sample->m_agentMaxClimb, 0.01f, 1.0f, 0.01f);
-	imguiSlider("Max Slope", &sample->m_agentMaxSlope, 0.0f, 90.0f, 1.0f);
+    CheckDlgButton(hDlg, IDC_CHECK_FILTER_LOW_HANGING,
+                   sample->m_filterLowHangingObstacles ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_FILTER_LEDGE_SPANS, sample->m_filterLedgeSpans ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_FILTER_WALKABLE_LOW,
+                   sample->m_filterWalkableLowHeightSpans ? BST_CHECKED : BST_UNCHECKED);
 
-	imguiSeparator();
-	imguiLabel("Region");
-	imguiSlider("Min Region Size", &sample->m_regionMinSize, 0.0f, 50.0f, 1.0f);
-	imguiSlider("Merged Region Size", &sample->m_regionMergeSize, 0.0f, 550.0f, 1.0f);
+    if (sample->m_geom) {
+        char text[64];
+        int gw = 0, gh = 0;
+        const float *bmin = sample->m_geom->getNavMeshBoundsMin();
+        const float *bmax = sample->m_geom->getNavMeshBoundsMax();
+        rcCalcGridSize(bmin, bmax, sample->m_cellSize, &gw, &gh);
+        const int ts = (int) sample->m_tileSize;
+        const int tw = (gw + ts - 1) / ts;
+        const int th = (gh + ts - 1) / ts;
+        snprintf(text, 64, "Tiles: %d x %d", tw, th);
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_TILES, text);
 
-	imguiSeparator();
-	imguiLabel("Partitioning");
-	if (imguiCheck("Watershed", sample->m_partitionType == SAMPLE_PARTITION_WATERSHED))
-		sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
-	if (imguiCheck("Monotone", sample->m_partitionType == SAMPLE_PARTITION_MONOTONE))
-		sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
-	if (imguiCheck("Layers", sample->m_partitionType == SAMPLE_PARTITION_LAYERS))
-		sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
-
-	imguiSeparator();
-	imguiLabel("Filtering");
-	if (imguiCheck("Low Hanging Obstacles", sample->m_filterLowHangingObstacles))
-		sample->m_filterLowHangingObstacles = !sample->m_filterLowHangingObstacles;
-	if (imguiCheck("Ledge Spans", sample->m_filterLedgeSpans))
-		sample->m_filterLedgeSpans= !sample->m_filterLedgeSpans;
-	if (imguiCheck("Walkable Low Height Spans", sample->m_filterWalkableLowHeightSpans))
-		sample->m_filterWalkableLowHeightSpans = !sample->m_filterWalkableLowHeightSpans;
-
-	imguiSeparator();
-	imguiLabel("Polygonization");
-	imguiSlider("Max Edge Length", &sample->m_edgeMaxLen, 0.1f, 50.0f, 0.1f);
-	imguiSlider("Max Edge Error", &sample->m_edgeMaxError, 0.01f, 3.0f, 0.01f);
-	imguiSlider("Verts Per Poly", &sample->m_vertsPerPoly, 3.0f, 12.0f, 1.0f);
-
-	imguiSeparator();
-	imguiLabel("Detail Mesh");
-	imguiSlider("Sample Distance", &sample->m_detailSampleDist, 0.9f, 16.0f, 0.1f);
-	imguiSlider("Max Sample Error", &sample->m_detailSampleMaxError, 0.01f, 16.0f, 0.01f);
-
-	imguiSeparator();
-	imguiLabel("Tiling");
-	imguiSlider("TileSize", &sample->m_tileSize, 16.0f, 1024.0f, 16.0f);
-
-	if (sample->m_geom)
-	{
-		char text[64];
-		int gw = 0, gh = 0;
-		const float* bmin = sample->m_geom->getNavMeshBoundsMin();
-		const float* bmax = sample->m_geom->getNavMeshBoundsMax();
-		rcCalcGridSize(bmin, bmax, sample->m_cellSize, &gw, &gh);
-		const int ts = (int)sample->m_tileSize;
-		const int tw = (gw + ts-1) / ts;
-		const int th = (gh + ts-1) / ts;
-		snprintf(text, 64, "Tiles  %d x %d", tw, th);
-		imguiValue(text);
-
-		// Max tiles and max polys affect how the tile IDs are calculated.
-		// There are 22 bits available for identifying a tile and a polygon.
-		int tileBits = rcMin((int)ilog2(nextPow2(tw*th)), 14);
-		if (tileBits > 14) tileBits = 14;
-		int polyBits = 22 - tileBits;
-		sample->m_maxTiles = 1 << tileBits;
-		sample->m_maxPolysPerTile = 1 << polyBits;
-		snprintf(text, 64, "Max Tiles  %d", sample->m_maxTiles);
-		imguiValue(text);
-		snprintf(text, 64, "Max Polys  %d", sample->m_maxPolysPerTile);
-		imguiValue(text);
-	}
-	else
-	{
-		sample->m_maxTiles = 0;
-		sample->m_maxPolysPerTile = 0;
-	}
-    if (imguiButton("Reset Defaults")) {
-        resetCommonSettings();
+        int tileBits = rcMin((int) ilog2(nextPow2(tw * th)), 14);
+        if (tileBits > 14) tileBits = 14;
+        int polyBits = 22 - tileBits;
+        sample->m_maxTiles = 1 << tileBits;
+        sample->m_maxPolysPerTile = 1 << polyBits;
+        snprintf(text, 64, "Max Tiles: %d", sample->m_maxTiles);
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_TILES, text);
+        snprintf(text, 64, "Max Polys: %d", sample->m_maxPolysPerTile);
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_POLYS, text);
+    } else {
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_TILES, "Tiles: N/A");
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_TILES, "Max Tiles: N/A");
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_POLYS, "Max Polys: N/A");
     }
-    imguiEndScrollArea();
+}
+
+INT_PTR CALLBACK RecastAdapter::RecastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    Sample_TileMesh *sample = getInstance().sample;
+    if (!sample) return (INT_PTR) FALSE;
+
+    switch (message) {
+        case WM_INITDIALOG: {
+            UpdateRecastDialogControls(hDlg);
+            return (INT_PTR) TRUE;
+        }
+        case WM_HSCROLL: {
+            HWND hSlider = (HWND) lParam;
+            int pos = SendMessage(hSlider, TBM_GETPOS, 0, 0);
+            bool needs_tiling_update = false;
+
+            auto update_float_slider = [&](float &value, float min_val, float step, int textId, int precision) {
+                value = min_val + (pos * step);
+                SetDlgItemTextA(hDlg, textId, format_recast_float(value, precision).c_str());
+            };
+
+            auto update_int_slider = [&](float &value, int min_val, int step, int textId) {
+                value = static_cast<float>(min_val + (pos * step));
+                SetDlgItemTextA(hDlg, textId, std::to_string(static_cast<int>(value)).c_str());
+            };
+
+            if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_CELL_SIZE)) {
+                update_float_slider(sample->m_cellSize, 0.01f, 0.01f, IDC_STATIC_CELL_SIZE_VAL, 2);
+                needs_tiling_update = true;
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_CELL_HEIGHT)) {
+                update_float_slider(sample->m_cellHeight, 0.01f, 0.01f, IDC_STATIC_CELL_HEIGHT_VAL, 2);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_HEIGHT)) {
+                update_float_slider(sample->m_agentHeight, 0.1f, 0.1f, IDC_STATIC_AGENT_HEIGHT_VAL, 2);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_RADIUS)) {
+                update_float_slider(sample->m_agentRadius, 0.0f, 0.1f, IDC_STATIC_AGENT_RADIUS_VAL, 2);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_MAX_CLIMB)) {
+                update_float_slider(sample->m_agentMaxClimb, 0.0f, 0.1f, IDC_STATIC_AGENT_MAX_CLIMB_VAL, 2);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_MAX_SLOPE)) {
+                update_int_slider(sample->m_agentMaxSlope, 0, 1, IDC_STATIC_AGENT_MAX_SLOPE_VAL);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_REGION_MIN_SIZE)) {
+                update_int_slider(sample->m_regionMinSize, 0, 1, IDC_STATIC_REGION_MIN_SIZE_VAL);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_REGION_MERGE_SIZE)) {
+                update_int_slider(sample->m_regionMergeSize, 0, 1, IDC_STATIC_REGION_MERGE_SIZE_VAL);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_POLY_MAX_EDGE_LEN)) {
+                update_float_slider(sample->m_edgeMaxLen, 0.0f, 1.0f, IDC_STATIC_POLY_MAX_EDGE_LEN_VAL, 1);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_POLY_MAX_EDGE_ERR)) {
+                update_float_slider(sample->m_edgeMaxError, 0.1f, 0.1f, IDC_STATIC_POLY_MAX_EDGE_ERR_VAL, 2);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_POLY_VERTS_PER_POLY)) {
+                update_int_slider(sample->m_vertsPerPoly, 3, 1, IDC_STATIC_POLY_VERTS_PER_POLY_VAL);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_DETAIL_SAMPLE_DIST)) {
+                update_float_slider(sample->m_detailSampleDist, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, 1);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR)) {
+                update_float_slider(sample->m_detailSampleMaxError, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL,
+                                    1);
+            } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_TILING_TILE_SIZE)) {
+                update_int_slider(sample->m_tileSize, 16, 16, IDC_STATIC_TILING_TILE_SIZE_VAL);
+                needs_tiling_update = true;
+            }
+
+            if (needs_tiling_update) {
+                UpdateRecastDialogControls(hDlg);
+            }
+            return (INT_PTR) TRUE;
+        }
+        case WM_COMMAND: {
+            WORD commandId = LOWORD(wParam);
+            if (commandId >= IDC_RADIO_PARTITION_WATERSHED && commandId <= IDC_RADIO_PARTITION_LAYERS) {
+                if (commandId == IDC_RADIO_PARTITION_WATERSHED) sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
+                else if (commandId == IDC_RADIO_PARTITION_MONOTONE) sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
+                else if (commandId == IDC_RADIO_PARTITION_LAYERS) sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
+            } else if (commandId >= IDC_CHECK_FILTER_LOW_HANGING && commandId <= IDC_CHECK_FILTER_WALKABLE_LOW) {
+                bool checked = IsDlgButtonChecked(hDlg, commandId) == BST_CHECKED;
+                if (commandId == IDC_CHECK_FILTER_LOW_HANGING) sample->m_filterLowHangingObstacles = checked;
+                else if (commandId == IDC_CHECK_FILTER_LEDGE_SPANS) sample->m_filterLedgeSpans = checked;
+                else if (commandId == IDC_CHECK_FILTER_WALKABLE_LOW) sample->m_filterWalkableLowHeightSpans = checked;
+            } else if (commandId == IDC_BUTTON_RECAST_RESET) {
+                getInstance().resetCommonSettings();
+                UpdateRecastDialogControls(hDlg);
+            }
+            return (INT_PTR) TRUE;
+        }
+        case WM_CLOSE:
+            DestroyWindow(hDlg);
+            return (INT_PTR) TRUE;
+        case WM_DESTROY:
+            hRecastDialog = nullptr;
+            return (INT_PTR) TRUE;
+    }
+    return (INT_PTR) FALSE;
+}
+
+void RecastAdapter::showRecastDialog() {
+    if (hRecastDialog) {
+        SetForegroundWindow(hRecastDialog);
+        return;
+    }
+    const HINSTANCE hInstance = GetModuleHandle(NULL);
+    const HWND hParentWnd = Renderer::hwnd;
+    hRecastDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, RecastDialogProc,
+                                      (LPARAM) this);
+
+    if (hRecastDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hRecastDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hRecastDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
+        RECT parentRect, dialogRect;
+        GetWindowRect(hParentWnd, &parentRect);
+        GetWindowRect(hRecastDialog, &dialogRect);
+
+        int parentWidth = parentRect.right - parentRect.left;
+        int parentHeight = parentRect.bottom - parentRect.top;
+        int dialogWidth = dialogRect.right - dialogRect.left;
+        int dialogHeight = dialogRect.bottom - dialogRect.top;
+
+        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+
+        SetWindowPos(hRecastDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+        ShowWindow(hRecastDialog, SW_SHOW);
+    }
+}
+
+void RecastAdapter::log(const int category, const std::string &message) const {
+    buildContext->log(static_cast<rcLogCategory>(category), message.c_str());
 }
 
 void RecastAdapter::drawInputGeom() const {
@@ -311,7 +445,7 @@ void RecastAdapter::renderRecastNavmesh(bool isAirgInstance) {
         glVertex3f(max.X, 0, max.Z);
         glVertex3f(min.X, 0, max.Z);
         glEnd();
-        renderer.drawText(std::to_string(tileIndex + 1), { min.X, 0, min.Z }, color);
+        renderer.drawText(std::to_string(tileIndex + 1), {min.X, 0, min.Z}, color);
         const Vec3 tealColor = {0.8, 0.0, 0.0};
         const Vec3 greyColor = {0.8, 0.8, 0.8};
         const Vec3 polyColor = isAirgInstance ? tealColor : greyColor;
@@ -325,9 +459,9 @@ void RecastAdapter::renderRecastNavmesh(bool isAirgInstance) {
             glVertex3f(edges[1].X, edges[1].Y, edges[1].Z);
             glVertex3f(edges[2].X, edges[2].Y, edges[2].Z);
             glEnd();
-            auto centroid = calculateCentroid(polyRef); 
-            renderer.drawText(("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex)).c_str(), { centroid.X, centroid.Y, centroid.Z }, color);
-
+            auto centroid = calculateCentroid(polyRef);
+            renderer.drawText(("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex)).c_str(),
+                              {centroid.X, centroid.Y, centroid.Z}, color);
         }
     }
 }
@@ -366,7 +500,8 @@ dtPolyRef RecastAdapter::getPoly(const int tileIndex, const int polyIndex) const
     return mesh->encodePolyId(tile->salt, tileIndex, polyIndex);
 }
 
-dtStatus RecastAdapter::findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt, bool includeExcludedAreas = false) const {
+dtStatus RecastAdapter::findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt,
+                                        bool includeExcludedAreas = false) const {
     const dtNavMesh *navMesh = sample->getNavMesh();
     const dtNavMeshQuery *navQuery = sample->getNavMeshQuery();
     if (!navMesh) {
@@ -374,7 +509,9 @@ dtStatus RecastAdapter::findNearestPoly(const float *recastPos, dtPolyRef *polyR
     }
     constexpr float halfExtents[3] = {2, 4, 2};
     if (navQuery) {
-        const dtStatus result = navQuery->findNearestPoly(recastPos, halfExtents, includeExcludedAreas ? filterWithExcluded : filter, polyRef, nearestPt);
+        const dtStatus result = navQuery->findNearestPoly(recastPos, halfExtents,
+                                                          includeExcludedAreas ? filterWithExcluded : filter, polyRef,
+                                                          nearestPt);
         return result;
     }
     return DT_FAILURE;
@@ -431,7 +568,7 @@ void RecastAdapter::excludeNonReachableAreas() {
         totalAreaCount += count;
     }
     int validPathsFound = 0;
-    std::queue<std::pair<dtPolyRef, bool>> polyAndOverrideExcludeQueue;
+    std::queue<std::pair<dtPolyRef, bool> > polyAndOverrideExcludeQueue;
     for (const dtPolyRef pfSeedPointRef: pfSeedPointAreas) {
         const unsigned int tileIndex = mesh->decodePolyIdTile(pfSeedPointRef);
         const unsigned int polyIndex = mesh->decodePolyIdPoly(pfSeedPointRef);
@@ -796,9 +933,9 @@ dtPolyRef RecastAdapter::getAdjacentPoly(const dtPolyRef polyRef, const int edge
         if (link.edge == edgeIndex) {
             return getPolyRefForLink(link);
         }
-//        if (link.edge > edgeIndex) { // TODO: Check if this was needed. I think it was just an optimization
-//            break;
-//        }
+        //        if (link.edge > edgeIndex) { // TODO: Check if this was needed. I think it was just an optimization
+        //            break;
+        //        }
     }
     return 0;
 }
@@ -956,9 +1093,10 @@ Vec3 RecastAdapter::calculateCentroid(const dtPolyRef polyRef) const {
     return {x, y, z};
 }
 
-const dtNavMesh* RecastAdapter::getNavMesh() const {
+const dtNavMesh *RecastAdapter::getNavMesh() const {
     return sample->getNavMesh();
 }
+
 /**
  * Find up to the maxPolys closest polys within the specified radius of the position which are reachable from the starting area.
  * @param navpowerPos
@@ -967,7 +1105,7 @@ const dtNavMesh* RecastAdapter::getNavMesh() const {
  * @return
  */
 std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
-    dtNavMeshQuery* navQuery,
+    dtNavMeshQuery *navQuery,
     Vec3 navpowerPos,
     const dtPolyRef start,
     const int maxPolys) const {
@@ -1031,7 +1169,8 @@ std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
  * @param maxPolys
  * @return
  */
-std::vector<dtPolyRef> RecastAdapter::getClosestPolys(dtNavMeshQuery* navQuery, Vec3 navPowerPos, const int maxPolys) const {
+std::vector<dtPolyRef> RecastAdapter::getClosestPolys(dtNavMeshQuery *navQuery, Vec3 navPowerPos,
+                                                      const int maxPolys) const {
     std::vector<dtPolyRef> polys;
     const dtNavMesh *navMesh = sample->getNavMesh();
     if (!navMesh || !navQuery) {
