@@ -13,10 +13,13 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/Scene.h"
 
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/NavKit/util/Pathfinding.h"
+
+class Scene;
 
 bool GridGenerator::initRecastAirgAdapter() {
     Logger::log(NK_INFO, "Generating Obj from current navmesh...");
@@ -40,25 +43,17 @@ bool GridGenerator::initRecastAirgAdapter() {
         return true;
     }
     recastAirgAdapter.handleMeshChanged();
-    Navp &navp = Navp::getInstance();
-    float bBoxPos[3];
-    float bBoxScale[3];
-    bBoxPos[0] = navp.bBoxPosX;
-    bBoxPos[1] = navp.bBoxPosY;
-    bBoxPos[2] = navp.bBoxPosZ;
-    bBoxScale[0] = navp.bBoxScaleX;
-    bBoxScale[1] = navp.bBoxScaleY;
-    bBoxScale[2] = navp.bBoxScaleZ;
+    Scene &scene = Scene::getInstance();
 
     const float bBoxMin[3] = {
-        bBoxPos[0] - bBoxScale[0] / 2,
-        bBoxPos[1] - bBoxScale[1] / 2,
-        bBoxPos[2] - bBoxScale[2] / 2
+        scene.bBoxPos[0] - scene.bBoxScale[0] / 2,
+        scene.bBoxPos[1] - scene.bBoxScale[1] / 2,
+        scene.bBoxPos[2] - scene.bBoxScale[2] / 2
     };
     const float bBoxMax[3] = {
-        bBoxPos[0] + bBoxScale[0] / 2,
-        bBoxPos[1] + bBoxScale[1] / 2,
-        bBoxPos[2] + bBoxScale[2] / 2
+        scene.bBoxPos[0] + scene.bBoxScale[0] / 2,
+        scene.bBoxPos[1] + scene.bBoxScale[1] / 2,
+        scene.bBoxPos[2] + scene.bBoxScale[2] / 2
     };
     recastAirgAdapter.setMeshBBox(bBoxMin, bBoxMax);
     Logger::log(NK_INFO, "Building Recast detour navmesh from navmesh Obj...");

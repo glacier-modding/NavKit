@@ -196,18 +196,18 @@ void Obj::loadObjMesh() {
     if (recastAdapter.loadInputGeom(objToLoad)) {
         if (objLoadDone.empty()) {
             objLoadDone.push_back(true);
-            Navp &navp = Navp::getInstance();
+            Scene &scene = Scene::getInstance();
             float pos[3] = {
-                navp.bBoxPos[0],
-                navp.bBoxPos[1],
-                navp.bBoxPos[2]
+                scene.bBoxPos[0],
+                scene.bBoxPos[1],
+                scene.bBoxPos[2]
             };
             float size[3] = {
-                navp.bBoxScale[0],
-                navp.bBoxScale[1],
-                navp.bBoxScale[2]
+                scene.bBoxScale[0],
+                scene.bBoxScale[1],
+                scene.bBoxScale[2]
             };
-            navp.setBBox(pos, size);
+            scene.setBBox(pos, size);
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
             msg = "Finished loading Obj in ";

@@ -273,6 +273,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     Settings::getInstance().showSettingsDialog();
                     Logger::log(NK_DEBUG, "Settings -> NavKit Settings clicked");
                     break;
+                case IDM_SETTINGS_SCENE:
+                    Scene::getInstance().showSceneDialog();
+                    Logger::log(NK_DEBUG, "Settings -> Scene Settings clicked");
+                    break;
                 case IDM_SETTINGS_AIRG:
                     Airg::getInstance().showAirgDialog();
                     Logger::log(NK_DEBUG, "Settings -> Airg Settings clicked");

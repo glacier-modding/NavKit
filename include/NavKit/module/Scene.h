@@ -1,5 +1,7 @@
 #pragma once
 #include <functional>
+#include <windows.h>
+#include "../model/ZPathfinding.h"
 
 class Scene {
 public:
@@ -24,6 +26,10 @@ public:
 
     void handleSaveSceneClicked();
 
+    void showSceneDialog();
+    void setBBox(const float* pos, const float* scale);
+    void resetBBoxDefaults();
+
     static Scene &getInstance() {
         static Scene instance;
         return instance;
@@ -37,9 +43,13 @@ public:
     std::vector<ZPathfinding::PfBox> exclusionBoxes;
     std::vector<ZPathfinding::PfSeedPoint> pfSeedPoints;
     std::optional<std::jthread> backgroundWorker;
+    float bBoxPos[3]{};
+    float bBoxScale[3]{};
+    static HWND hSceneDialog;
 
 private:
     int sceneScroll;
     std::string loadSceneName;
     std::string saveSceneName;
+    static INT_PTR CALLBACK SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

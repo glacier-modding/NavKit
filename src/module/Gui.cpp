@@ -42,33 +42,32 @@ void Gui::drawGui() {
     if (showMenu) {
         constexpr char msg[] =
                 "W/S/A/D/Q/E: Move  LMB: Select / Deselect RMB: Rotate  Tab: Show / Hide UI  Ctrl: Slow camera movement  Shift: Fast camera movement";
-        imguiDrawText(280, renderer.height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
+        imguiDrawText(10, renderer.height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
         char cameraPosMessage[128];
         snprintf(cameraPosMessage, sizeof cameraPosMessage, "Camera position: %f, %f, %f",
                  renderer.cameraPos[0], renderer.cameraPos[1], renderer.cameraPos[2]);
-        imguiDrawText(280, renderer.height - 40, IMGUI_ALIGN_LEFT, cameraPosMessage,
+        imguiDrawText(10, renderer.height - 40, IMGUI_ALIGN_LEFT, cameraPosMessage,
                       imguiRGBA(255, 255, 255, 128));
         char cameraAngleMessage[128];
         snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f",
                  renderer.cameraEulers[0], renderer.cameraEulers[1]);
-        imguiDrawText(280, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
+        imguiDrawText(10, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
                       imguiRGBA(255, 255, 255, 128));
         char selectedNavpText[64];
         Navp &navp = Navp::getInstance();
         snprintf(selectedNavpText, sizeof selectedNavpText,
                  navp.selectedNavpAreaIndex != -1 ? "Selected Area Index: %d" : "Selected Area Index: None",
                  navp.selectedNavpAreaIndex + 1);
-        imguiDrawText(280, renderer.height - 80, IMGUI_ALIGN_LEFT, selectedNavpText,
+        imguiDrawText(10, renderer.height - 80, IMGUI_ALIGN_LEFT, selectedNavpText,
                       imguiRGBA(255, 255, 255, 128));
         char selectedAirgText[64];
         const Airg &airg = Airg::getInstance();
         snprintf(selectedAirgText, sizeof selectedAirgText,
                  airg.selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
                  airg.selectedWaypointIndex);
-        imguiDrawText(280, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
+        imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
         Scene::getInstance();
-        navp.drawSceneMenu();
         RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         recastAdapter.drawMenu();
 

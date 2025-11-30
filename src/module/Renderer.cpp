@@ -251,12 +251,12 @@ void Renderer::renderFrame() {
     if (Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showAirg) {
         airg.renderAirg();
     }
-    if (Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showRecastDebugInfo) {
+    if (const Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showRecastDebugInfo) {
         RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
         recastAirgAdapter.renderRecastNavmesh(true);
     }
-    if (Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
-        obj.renderObj();
+    if (const Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
+        Obj::renderObj();
     }
     // Marker
     GLdouble x, y, z;
@@ -267,9 +267,9 @@ void Renderer::renderFrame() {
         glBegin(GL_LINE_LOOP);
         const float r = 0.5f;
         for (int i = 0; i < 20; ++i) {
-            const float a = (float) i / 20.0f * std::numbers::pi * 2;
+            const float a = static_cast<float>(i) / 20.0f * std::numbers::pi * 2;
             glVertex3f(recastAdapter.markerPosition[0] + cosf(a) * r,
-                       (GLdouble) recastAdapter.markerPosition[1],
+                       recastAdapter.markerPosition[1],
                        (GLdouble) recastAdapter.markerPosition[2] + sinf(a) * r);
         }
         glEnd();
@@ -300,11 +300,11 @@ void drawLine(const Vec3 s, const Vec3 e, const Vec3 color = {-1, -1, -1}) {
     glDepthMask(GL_TRUE);
 }
 
-void Renderer::drawBounds() const {
+void Renderer::drawBounds() {
     glDepthMask(GL_FALSE);
-    Navp &navp = Navp::getInstance();
-    float *p = navp.bBoxPos;
-    float *s = navp.bBoxScale;
+    Scene &scene = Scene::getInstance();
+    float *p = scene.bBoxPos;
+    float *s = scene.bBoxScale;
     float l = p[0] - s[0] / 2;
     float r = p[0] + s[0] / 2;
     float u = p[2] + s[2] / 2;

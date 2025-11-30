@@ -29,51 +29,28 @@
 
 
 Navp::Navp()
-    : navMesh(new NavPower::NavMesh())
-      , selectedNavpAreaIndex(-1)
-      , selectedPfSeedPointIndex(-1)
-      , selectedExclusionBoxIndex(-1)
-      , navpLoaded(false)
-      , showNavp(true)
-      , showNavpIndices(false)
-      , showPfExclusionBoxes(true)
-      , showPfSeedPoints(true)
-      , showRecastDebugInfo(false)
-      , doNavpHitTest(false)
-      , doNavpExclusionBoxHitTest(false)
-      , doNavpPfSeedPointHitTest(false)
-      , navpScroll(0)
-      , loading(false)
-      , bBoxPosX(0.0)
-      , bBoxPosY(0.0)
-      , bBoxPosZ(0.0)
-      , bBoxScaleX(1000.0)
-      , bBoxScaleY(300.0)
-      , bBoxScaleZ(1000.0)
-      , lastBBoxPosX(0.0)
-      , lastBBoxPosY(0.0)
-      , lastBBoxPosZ(0.0)
-      , lastBBoxScaleX(1000.0)
-      , lastBBoxScaleY(300.0)
-      , lastBBoxScaleZ(1000.0)
-      , stairsCheckboxValue(false)
-      , pruningMode(1.0f)
-      , loadNavpName("Load Navp")
-      , lastLoadNavpFile(loadNavpName)
-      , saveNavpName("Save Navp")
-      , lastSaveNavpFile(saveNavpName)
-      , building(false) {
-    bBoxPos[0] = 0;
-    bBoxPos[1] = 0;
-    bBoxPos[2] = 0;
-    bBoxScale[0] = 1000;
-    bBoxScale[1] = 300;
-    bBoxScale[2] = 1000;
-    Logger::log(NK_INFO,
-                ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " +
-                 std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxScale[0]) + ", " + std::to_string(bBoxScale[1])
-                 +
-                 ", " + std::to_string(bBoxScale[2]) + ")").c_str());
+    : navMesh(new NavPower::NavMesh()),
+      selectedNavpAreaIndex(-1),
+      selectedPfSeedPointIndex(-1),
+      selectedExclusionBoxIndex(-1),
+      navpLoaded(false),
+      showNavp(true),
+      showNavpIndices(false),
+      showPfExclusionBoxes(true),
+      showPfSeedPoints(true),
+      showRecastDebugInfo(false),
+      doNavpHitTest(false),
+      doNavpExclusionBoxHitTest(false),
+      doNavpPfSeedPointHitTest(false),
+      navpScroll(0),
+      loading(false),
+      stairsCheckboxValue(false),
+      pruningMode(1.0f),
+      building(false),
+      loadNavpName("Load Navp"),
+      lastLoadNavpFile(loadNavpName),
+      saveNavpName("Save Navp"),
+      lastSaveNavpFile(saveNavpName) {
 }
 
 Navp::~Navp() = default;
@@ -122,21 +99,6 @@ void Navp::renderPfSeedPointsForHitTest() const {
             i++;
         }
     }
-}
-
-void Navp::resetDefaults() {
-    bBoxPosX = 0.0;
-    bBoxPosY = 0.0;
-    bBoxPosZ = 0.0;
-    bBoxScaleX = 1000.0;
-    bBoxScaleY = 300.0;
-    bBoxScaleZ = 1000.0;
-    lastBBoxPosX = 0.0;
-    lastBBoxPosY = 0.0;
-    lastBBoxPosZ = 0.0;
-    lastBBoxScaleX = 1000.0;
-    lastBBoxScaleY = 300.0;
-    lastBBoxScaleZ = 1000.0;
 }
 
 void Navp::renderExclusionBoxes() const {
@@ -193,37 +155,6 @@ char *Navp::openLoadNavpFileDialog() {
 char *Navp::openSaveNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdSaveDialog(filters, 2, "output");
-}
-
-void Navp::setBBox(const float *pos, const float *scale) {
-    bBoxPos[0] = pos[0];
-    bBoxPosX = pos[0];
-    bBoxPos[1] = pos[1];
-    bBoxPosY = pos[1];
-    bBoxPos[2] = pos[2];
-    bBoxPosZ = pos[2];
-    bBoxScale[0] = scale[0];
-    bBoxScaleX = scale[0];
-    bBoxScale[1] = scale[1];
-    bBoxScaleY = scale[1];
-    bBoxScale[2] = scale[2];
-    bBoxScaleZ = scale[2];
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    const float bBoxMin[3] = {
-        bBoxPos[0] - bBoxScale[0] / 2,
-        bBoxPos[1] - bBoxScale[1] / 2,
-        bBoxPos[2] - bBoxScale[2] / 2
-    };
-    const float bBoxMax[3] = {
-        bBoxPos[0] + bBoxScale[0] / 2,
-        bBoxPos[1] + bBoxScale[1] / 2,
-        bBoxPos[2] + bBoxScale[2] / 2
-    };
-    recastAdapter.setMeshBBox(bBoxMin, bBoxMax);
-    Logger::log(NK_INFO,
-                ("Setting bbox to (" + std::to_string(pos[0]) + ", " + std::to_string(pos[1]) + ", " +
-                 std::to_string(pos[2]) + ") (" + std::to_string(scale[0]) + ", " + std::to_string(scale[1]) + ", " +
-                 std::to_string(scale[2]) + ")").c_str());
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {
@@ -736,69 +667,6 @@ void Navp::handleEditStairsClicked() const {
 
 void Navp::handleBuildNavpClicked() {
     backgroundWorker.emplace(&Navp::buildNavp, this);
-}
-
-void Navp::drawSceneMenu() {
-    const Renderer &renderer = Renderer::getInstance();
-    Gui &gui = Gui::getInstance();
-    if (auto navpMenuHeight = std::min(1190, renderer.height - 20); imguiBeginScrollArea(
-        "Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
-        &navpScroll)) {
-        gui.mouseOverMenu = true;
-    }
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    imguiLabel("Bounding Box");
-
-    bool bboxChanged = false;
-    if (imguiSlider("Bounding Box Origin X", &bBoxPosX, -500.0f, 500.0f, 1.0f)) {
-        if (lastBBoxPosX != bBoxPosX) {
-            bboxChanged = true;
-            lastBBoxPosX = bBoxPosX;
-        }
-    }
-    if (imguiSlider("Bounding Box Origin Y", &bBoxPosY, -500.0f, 500.0f, 1.0f)) {
-        if (lastBBoxPosY != bBoxPosY) {
-            bboxChanged = true;
-            lastBBoxPosY = bBoxPosY;
-        }
-    }
-    if (imguiSlider("Bounding Box Origin Z", &bBoxPosZ, -500.0f, 500.0f, 1.0f)) {
-        if (lastBBoxPosZ != bBoxPosZ) {
-            bboxChanged = true;
-            lastBBoxPosZ = bBoxPosZ;
-        }
-    }
-    if (imguiSlider("Bounding Box Scale X", &bBoxScaleX, 1.0f, 800.0f, 1.0f)) {
-        if (lastBBoxScaleX != bBoxScaleX) {
-            bboxChanged = true;
-            lastBBoxScaleX = bBoxScaleX;
-        }
-    }
-    if (imguiSlider("Bounding Box Scale Y", &bBoxScaleY, 1.0f, 800.0f, 1.0f)) {
-        if (lastBBoxScaleY != bBoxScaleY) {
-            bboxChanged = true;
-            lastBBoxScaleY = bBoxScaleY;
-        }
-    }
-    if (imguiSlider("Bounding Box Scale Z", &bBoxScaleZ, 1.0f, 800.0f, 1.0f)) {
-        if (lastBBoxScaleZ != bBoxScaleZ) {
-            bboxChanged = true;
-            lastBBoxScaleZ = bBoxScaleZ;
-        }
-    }
-    if (imguiButton("Reset Defaults")) {
-        resetDefaults();
-        float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
-        float bBoxScale[3] = {bBoxScaleX, bBoxScaleY, bBoxScaleZ};
-        setBBox(bBoxPos, bBoxScale);
-    }
-
-    if (bboxChanged) {
-        float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
-        float bBoxScale[3] = {bBoxScaleX, bBoxScaleY, bBoxScaleZ};
-        setBBox(bBoxPos, bBoxScale);
-    }
-    imguiEndScrollArea();
 }
 
 void Navp::buildAreaMaps() {

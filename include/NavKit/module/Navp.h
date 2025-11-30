@@ -47,8 +47,6 @@ public:
 
     void renderNavMeshForHitTest() const;
 
-    void drawSceneMenu();
-
     void finalizeBuild();
 
     void buildAreaMaps();
@@ -78,24 +76,8 @@ public:
     int navpScroll;
     bool loading;
 
-    float bBoxPosX;
-    float bBoxPosY;
-    float bBoxPosZ;
-    float bBoxScaleX;
-    float bBoxScaleY;
-    float bBoxScaleZ;
-
-    float lastBBoxPosX;
-    float lastBBoxPosY;
-    float lastBBoxPosZ;
-    float lastBBoxScaleX;
-    float lastBBoxScaleY;
-    float lastBBoxScaleZ;
-
     bool stairsCheckboxValue;
 
-    float bBoxPos[3]{};
-    float bBoxScale[3]{};
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
     float pruningMode;
 
@@ -118,8 +100,6 @@ public:
     void handleEditStairsClicked() const;
 
     void handleBuildNavpClicked();
-
-    void setBBox(const float *pos, const float *scale);
 
     static void updateExclusionBoxConvexVolumes();
 
