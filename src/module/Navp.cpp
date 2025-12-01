@@ -43,7 +43,6 @@ Navp::Navp()
       navpScroll(0),
       loading(false),
       stairsCheckboxValue(false),
-      pruningMode(1.0f),
       building(false),
       loadNavpName("Load Navp"),
       lastLoadNavpFile(loadNavpName),
@@ -451,7 +450,7 @@ void Navp::loadNavMeshFileData(const std::string &fileName) {
     s_FileStream.read(navMeshFileData.data(), s_FileSize);
 }
 
-void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding) {
+void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
@@ -465,9 +464,9 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
                                                : LoadNavMeshFromBinary(fileName.c_str());
             std::swap(*navMesh, newNavMesh);
             const SceneExtract &sceneExtract = SceneExtract::getInstance();
-            if (isFromBuilding) {
+            if (isFromBuildingNavp || isFromBuildingAirg) {
                 setStairsFlags();
-                outputNavpFilename = sceneExtract.outputFolder + "\\output.navp";
+                outputNavpFilename = sceneExtract.outputFolder + (isFromBuildingNavp ? "\\output.navp" : "\\outputForAirg.navp");
                 OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
                 NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
                 std::swap(*navMesh, reloadedNavMesh);
@@ -507,40 +506,53 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     navpLoaded = true;
     Menu::updateMenuState();
     buildAreaMaps();
+    if (Airg &airg = Airg::getInstance(); SceneExtract::getInstance().alsoBuildAll && airg.canBuildAirg()) {
+        airg.handleBuildAirgClicked();
+    }
 }
 
 void Navp::buildNavp() {
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Building Navp at ";
-    msg += std::ctime(&start_time);
-    Logger::log(NK_INFO, msg.data());
-    auto start = std::chrono::high_resolution_clock::now();
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    updateExclusionBoxConvexVolumes();
-    building = true;
-    Menu::updateMenuState();
-    Logger::log(NK_INFO, "Beginning Recast build...");
-    if (recastAdapter.handleBuild()) {
-        Logger::log(NK_INFO, "Done with Recast build.");
-        if (pruningMode != 0.0) {
+    CPPTRACE_TRY
+    {
+        std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::string msg = "Building Navp at ";
+        msg += std::ctime(&start_time);
+        Logger::log(NK_INFO, msg.data());
+        auto start = std::chrono::high_resolution_clock::now();
+        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        updateExclusionBoxConvexVolumes();
+        building = true;
+        Menu::updateMenuState();
+        Logger::log(NK_INFO, "Beginning Recast build...");
+        if (recastAdapter.handleBuild()) {
+            Logger::log(NK_INFO, "Done with Recast build.");
             Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
             recastAdapter.findPfSeedPointAreas();
             recastAdapter.excludeNonReachableAreas();
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+            navpBuildDone.store(true);
+            msg = "Finished building Navp in ";
+            msg += std::to_string(duration.count());
+            msg += " seconds";
+            Logger::log(NK_INFO, msg.data());
+            setSelectedNavpAreaIndex(-1);
+            Menu::updateMenuState();
+        } else {
+            Logger::log(NK_ERROR, "Error building Navp");
+            building = false;
+            navpBuildDone.store(false);
+            Menu::updateMenuState();
         }
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        navpBuildDone.store(true);
-        msg = "Finished building Navp in ";
-        msg += std::to_string(duration.count());
-        msg += " seconds";
-        Logger::log(NK_INFO, msg.data());
-        setSelectedNavpAreaIndex(-1);
-        Menu::updateMenuState();
-    } else {
-        Logger::log(NK_ERROR, "Error building Navp");
-        building = false;
-        navpBuildDone.store(false);
-        Menu::updateMenuState();
+    }
+    CPPTRACE_CATCH(const std::exception& e) {
+        std::string msg = "Error building Navp: ";
+        msg += e.what();
+        msg += " Stack trace: ";
+        msg += cpptrace::from_current_exception().to_string();
+        Logger::log(NK_ERROR, msg.c_str());
+    } catch (...) {
+        Logger::log(NK_ERROR, "Error building Navp.");
     }
 }
 
@@ -570,13 +582,13 @@ void Navp::handleOpenNavpClicked() {
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false);
+            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
         } else if (extension == "NAVP") {
             std::string msg = "Loading Navp file: '";
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false);
+            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
         }
     }
 }
@@ -686,7 +698,7 @@ void Navp::finalizeBuild() {
         const SceneExtract &sceneExtract = SceneExtract::getInstance();
         outputNavpFilename = sceneExtract.outputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
-        backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true);
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
         navpBuildDone.store(false);
         building = false;
         Menu::updateMenuState();

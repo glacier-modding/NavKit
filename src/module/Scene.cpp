@@ -10,6 +10,7 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/module/Obj.h"
 
 #include "../../include/NavKit/util/FileUtil.h"
 
@@ -78,7 +79,11 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
         errorCallback();
     }
     pfBoxes.readPathfindingBBoxes();
-    if (includeBox.scale.x != -1) {
+    if (includeBox.id == ZPathfinding::PfBoxes::NO_EXCLUDE_BOX_FOUND) {
+        if (Obj::getInstance().objLoaded) {
+            RecastAdapter::getInstance().setSceneBBoxToMesh();
+        }
+    } else {
         // Swap Y and Z to go from Hitman's Z+ = Up coordinates to Recast's Y+ = Up coordinates
         // Negate Y position to go from Hitman's Z+ = North to Recast's Y- = North
         const float pos[3] = {includeBox.pos.x, includeBox.pos.z, -includeBox.pos.y};
@@ -171,7 +176,7 @@ void Scene::handleSaveSceneClicked() {
     }
 }
 
-void Scene::setBBox(const float* pos, const float* scale) {
+void Scene::setBBox(const float *pos, const float *scale) {
     bBoxPos[0] = pos[0];
     bBoxPos[1] = pos[1];
     bBoxPos[2] = pos[2];
@@ -202,95 +207,95 @@ void Scene::resetBBoxDefaults() {
 }
 
 static void UpdateSceneDialogControls(HWND hDlg) {
-    Scene& scene = Scene::getInstance();
+    Scene &scene = Scene::getInstance();
     // Position Sliders (-500 to 500)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, (int)(scene.bBoxPos[0] + 500.0f));
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, (int) (scene.bBoxPos[0] + 500.0f));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, (int)(scene.bBoxPos[1] + 500.0f));
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, (int) (scene.bBoxPos[1] + 500.0f));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, (int)(scene.bBoxPos[2] + 500.0f));
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, (int) (scene.bBoxPos[2] + 500.0f));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
 
     // Scale Sliders (1 to 800)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, (int)scene.bBoxScale[0]);
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, (int) scene.bBoxScale[0]);
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, (int)scene.bBoxScale[1]);
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, (int) scene.bBoxScale[1]);
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, (int)scene.bBoxScale[2]);
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, (int) scene.bBoxScale[2]);
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
 }
 
 INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    Scene& scene = Scene::getInstance();
+    Scene &scene = Scene::getInstance();
 
     switch (message) {
-    case WM_INITDIALOG:
-        UpdateSceneDialogControls(hDlg);
-        return (INT_PTR)TRUE;
-
-    case WM_HSCROLL: {
-        bool changed = false;
-        int pos = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
-
-        if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X)) {
-            scene.bBoxPos[0] = (float)pos - 500.0f;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y)) {
-            scene.bBoxPos[1] = (float)pos - 500.0f;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z)) {
-            scene.bBoxPos[2] = (float)pos - 500.0f;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X)) {
-            scene.bBoxScale[0] = (float)pos;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y)) {
-            scene.bBoxScale[1] = (float)pos;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z)) {
-            scene.bBoxScale[2] = (float)pos;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
-            changed = true;
-        }
-
-        if (changed) {
-            scene.setBBox(scene.bBoxPos, scene.bBoxScale);
-        }
-        return (INT_PTR)TRUE;
-    }
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDC_BUTTON_BBOX_RESET) {
-            scene.resetBBoxDefaults();
+        case WM_INITDIALOG:
             UpdateSceneDialogControls(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_HSCROLL: {
+            bool changed = false;
+            int pos = SendMessage((HWND) lParam, TBM_GETPOS, 0, 0);
+
+            if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X)) {
+                scene.bBoxPos[0] = (float) pos - 500.0f;
+                SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
+                changed = true;
+            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y)) {
+                scene.bBoxPos[1] = (float) pos - 500.0f;
+                SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
+                changed = true;
+            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z)) {
+                scene.bBoxPos[2] = (float) pos - 500.0f;
+                SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
+                changed = true;
+            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X)) {
+                scene.bBoxScale[0] = (float) pos;
+                SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
+                changed = true;
+            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y)) {
+                scene.bBoxScale[1] = (float) pos;
+                SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
+                changed = true;
+            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z)) {
+                scene.bBoxScale[2] = (float) pos;
+                SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
+                changed = true;
+            }
+
+            if (changed) {
+                scene.setBBox(scene.bBoxPos, scene.bBoxScale);
+            }
+            return (INT_PTR) TRUE;
         }
-        return (INT_PTR)TRUE;
 
-    case WM_CLOSE:
-        DestroyWindow(hDlg);
-        return (INT_PTR)TRUE;
+        case WM_COMMAND:
+            if (LOWORD(wParam) == IDC_BUTTON_BBOX_RESET) {
+                scene.resetBBoxDefaults();
+                UpdateSceneDialogControls(hDlg);
+            }
+            return (INT_PTR) TRUE;
 
-    case WM_DESTROY:
-        hSceneDialog = nullptr;
-        return (INT_PTR)TRUE;
-    default: ;
+        case WM_CLOSE:
+            DestroyWindow(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_DESTROY:
+            hSceneDialog = nullptr;
+            return (INT_PTR) TRUE;
+        default: ;
     }
-    return (INT_PTR)FALSE;
+    return (INT_PTR) FALSE;
 }
 
 void Scene::showSceneDialog() {
@@ -302,7 +307,8 @@ void Scene::showSceneDialog() {
     HINSTANCE hInstance = GetModuleHandle(NULL);
     HWND hParentWnd = Renderer::getInstance().hwnd;
 
-    hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, SceneDialogProc, (LPARAM)this);
+    hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, SceneDialogProc,
+                                     (LPARAM) this);
 
     if (hSceneDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {

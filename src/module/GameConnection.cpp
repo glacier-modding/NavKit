@@ -145,6 +145,10 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
                 done = true;
                 return;
             }
+            if (message == R"({"type":"entityTreeRebuilt"})") {
+                Logger::log(NK_INFO, "Received entityTreeRebuilt message");
+                return;
+            }
             if (message == "Rebuilding tree.") {
                 Logger::log(NK_INFO, "Rebuilding Entity Tree...");
                 return;

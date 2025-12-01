@@ -66,16 +66,22 @@ bool GridGenerator::initRecastAirgAdapter() {
         Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
         return true;
     }
-    const std::string outputNavpFilename = sceneExtract.outputFolder + "\\output.navp.json";
+    const std::string outputNavpFilename = sceneExtract.outputFolder + "\\outputForAirg.navp.json";
     recastAirgAdapter.save(outputNavpFilename);
 
-    Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, true);
+    Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, false, true);
     return false;
 }
 
 void GridGenerator::build() {
-    Logger::log(NK_INFO, "Started building Airg at {:%c %Z}", std::chrono::system_clock::now());
-    const auto start = std::chrono::high_resolution_clock::now();
+    const auto now = std::chrono::system_clock::now();
+    const auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm buf{};
+    localtime_s(&buf, &in_time_t); // Use localtime_s for thread-safety on Windows
+
+    char time_str[256];
+    std::strftime(time_str, sizeof(time_str), "%c %Z", &buf);
+    Logger::log(NK_INFO, "Started building Airg at %s", time_str);    const auto start = std::chrono::high_resolution_clock::now();
 
     if (initRecastAirgAdapter()) return;
 
@@ -84,15 +90,13 @@ void GridGenerator::build() {
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    std::string msg = "Finished building Airg in ";
-    msg += std::to_string(duration.count());
-    msg += " seconds";
-    Logger::log(NK_INFO, msg.data());
-
+    Logger::log(NK_INFO, "Finished building Airg in %lld seconds", duration.count());
     Airg &airg = Airg::getInstance();
     airg.airgLoading = false;
     airg.airgLoaded = true;
     airg.airgBuilding = false;
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
+    sceneExtract.alsoBuildAll = false;
     Grid::getInstance().loadBoundsFromAirg();
     Menu::updateMenuState();
 }

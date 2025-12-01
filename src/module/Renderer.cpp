@@ -122,7 +122,7 @@ bool Renderer::initWindowAndRenderer() {
         printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
         return false;
     }
-    SDL_SetWindowMinimumSize(window, 1024, 768);
+    SDL_SetWindowMinimumSize(window, 200, 100);
     initFrameBuffer(width, height);
 
     if (!window) {

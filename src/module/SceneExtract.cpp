@@ -32,6 +32,7 @@ SceneExtract::SceneExtract() {
     doneExtractingFromGame = false;
     extractingFromGame = false;
     alsoBuildObj = false;
+    alsoBuildAll = false;
 }
 
 SceneExtract::~SceneExtract() = default;
@@ -64,6 +65,7 @@ void SceneExtract::handleExtractFromGameClicked() {
     Gui &gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildObj = false;
+    alsoBuildAll = false;
     extractScene();
 }
 
@@ -77,10 +79,24 @@ bool SceneExtract::canExtractFromGameAndBuildObj() const {
            && obj.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
 }
 
+bool SceneExtract::canExtractFromGameAndBuildAll() const {
+    const Obj &obj = Obj::getInstance();
+    return canExtractFromGame()
+           && obj.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+}
+
 void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
     Gui &gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildObj = true;
+    Obj::getInstance().objLoaded = false;
+    extractScene();
+}
+
+void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
+    alsoBuildAll = true;
     Obj::getInstance().objLoaded = false;
     extractScene();
 }
@@ -191,16 +207,16 @@ void SceneExtract::finalizeExtract() {
                 SceneExtract &sceneExtract = getInstance();
                 Obj &objScoped = Obj::getInstance();
                 sceneScoped.sceneLoaded = true;
-                std::string fileNameString = sceneFile;
+                const std::string& fileNameString = sceneFile;
                 sceneExtract.extractingAlocs = false;
                 sceneScoped.lastLoadSceneFile = sceneFile;
-                if (sceneExtract.alsoBuildObj && !objScoped.startedObjGeneration) {
+                if ((sceneExtract.alsoBuildObj || sceneExtract.alsoBuildAll) && !objScoped.startedObjGeneration) {
                     objScoped.buildObj(objScoped.blenderPath.data(), fileNameString.data(),
                                        sceneExtract.outputFolder.data());
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();
-            }, []() {
+            }, [] {
                 SceneExtract &sceneExtract = getInstance();
                 Obj &objScoped = Obj::getInstance();
                 Logger::log(NK_ERROR, "Error loading scene file.");
@@ -208,6 +224,8 @@ void SceneExtract::finalizeExtract() {
                 objScoped.startedObjGeneration = false;
                 sceneExtract.extractingFromGame = false;
                 sceneExtract.extractingAlocs = false;
+                sceneExtract.alsoBuildAll = false;
+                sceneExtract.alsoBuildObj = false;
                 Menu::updateMenuState();
             });
     }

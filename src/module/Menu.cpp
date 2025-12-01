@@ -106,6 +106,7 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_EXTRACT_SCENE, sceneExtract.canExtractFromGame());
     setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_OBJ, sceneExtract.canExtractFromGameAndBuildObj());
+    setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_ALL, sceneExtract.canExtractFromGameAndBuildAll());
 
     bool isStairs = false;
     if (isAreaSelected) {
@@ -256,7 +257,7 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     sceneExtract.handleExtractFromGameAndBuildObjClicked();
                     break;
                 case IDM_EXTRACT_SCENE_AND_BUILD_ALL:
-                    // sceneExtract.backgroundWorker.emplace(&Navp::buildNavp, &navp);
+                    sceneExtract.handleExtractFromGameAndBuildAllClicked();
                     break;
 
                 case IDM_HELP_ABOUT: {

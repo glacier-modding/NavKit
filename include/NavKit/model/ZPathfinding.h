@@ -147,6 +147,8 @@ namespace ZPathfinding {
         static inline const std::string INCLUDE_TYPE = "PFBT_INCLUDE_MESH_COLLISION";
         static inline const std::string EXCLUDE_TYPE = "PFBT_EXCLUDE_MESH_COLLISION";
 
+        static inline const std::string NO_EXCLUDE_BOX_FOUND = "NO_EXCLUDE_BOX_FOUND";
+
         PfBoxes(std::string fileName);
 
         void readPathfindingBBoxes();

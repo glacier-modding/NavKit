@@ -22,8 +22,6 @@
 
 #include <GL/glu.h>
 
-#include "../../include/NavKit/module/Gui.h"
-
 RecastAdapter::RecastAdapter() {
     buildContext = new BuildContext();
     sample = new Sample_TileMesh();
@@ -165,14 +163,14 @@ static void UpdateRecastDialogControls(HWND hDlg) {
         const int ts = (int) sample->m_tileSize;
         const int tw = (gw + ts - 1) / ts;
         const int th = (gh + ts - 1) / ts;
-        snprintf(text, 64, "Tiles: %d x %d", tw, th);
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_TILES, text);
 
         int tileBits = rcMin((int) ilog2(nextPow2(tw * th)), 14);
         if (tileBits > 14) tileBits = 14;
         int polyBits = 22 - tileBits;
         sample->m_maxTiles = 1 << tileBits;
         sample->m_maxPolysPerTile = 1 << polyBits;
+        snprintf(text, 64, "Tiles: %d x %d", tw, th);
+        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_TILES, text);
         snprintf(text, 64, "Max Tiles: %d", sample->m_maxTiles);
         SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_TILES, text);
         snprintf(text, 64, "Max Polys: %d", sample->m_maxPolysPerTile);
@@ -349,8 +347,40 @@ std::pair<int, int> RecastAdapter::getGridSize() const {
     return {gw, gh};
 }
 
+void RecastAdapter::setSceneBBoxToMesh() const {
+    float meshBMin[3], meshBMax[3];
+    rcCalcBounds(inputGeom->getMesh()->getVerts(), inputGeom->getMesh()->getVertCount(), meshBMin, meshBMax);
+    const float pos[3] = {
+        (meshBMin[0] + meshBMax[0]) / 2, (meshBMin[1] + meshBMax[1]) / 2, (meshBMin[2] + meshBMax[2]) / 2
+    };
+    const float scale[3] = {
+        (meshBMax[0] - meshBMin[0]) * 1.1f,
+        (meshBMax[1] - meshBMin[1]) * 1.1f,
+        (meshBMax[2] - meshBMin[2]) * 1.1f
+    };
+    Scene &scene = Scene::getInstance();
+    scene.setBBox(pos, scale);
+
+    int gw = 0, gh = 0;
+    rcCalcGridSize(meshBMin, meshBMax, sample->m_cellSize, &gw, &gh);
+    const int ts = (int) sample->m_tileSize;
+    const int tw = (gw + ts - 1) / ts;
+    const int th = (gh + ts - 1) / ts;
+
+    int tileBits = rcMin((int) ilog2(nextPow2(tw * th)), 14);
+    if (tileBits > 14) tileBits = 14;
+    int polyBits = 22 - tileBits;
+    sample->m_maxTiles = 1 << tileBits;
+    sample->m_maxPolysPerTile = 1 << polyBits;
+}
+
 void RecastAdapter::handleMeshChanged() const {
     sample->handleMeshChanged(inputGeom);
+    if (const Scene &scene = Scene::getInstance();
+        !scene.sceneLoaded ||
+        scene.includeBox.id == ZPathfinding::PfBoxes::NO_EXCLUDE_BOX_FOUND) {
+        setSceneBBoxToMesh();
+    }
 }
 
 void RecastAdapter::cleanup() const {
@@ -363,46 +393,16 @@ bool RecastAdapter::handleBuild() const {
 }
 
 bool RecastAdapter::handleBuildForAirg() const {
-    float cellSize = sample->m_cellSize;
-    float cellHeight = sample->m_cellHeight;
-    float agentHeight = sample->m_agentHeight;
     float agentRadius = sample->m_agentRadius;
-    float agentMaxClimb = sample->m_agentMaxClimb;
     float agentMaxSlope = sample->m_agentMaxSlope;
-    float regionMinSize = sample->m_regionMinSize;
-    float regionMergeSize = sample->m_regionMergeSize;
-    float edgeMaxLen = sample->m_edgeMaxLen;
-    float edgeMaxError = sample->m_edgeMaxError;
-    float vertsPerPoly = sample->m_vertsPerPoly;
-    float detailSampleDist = sample->m_detailSampleDist;
     float detailSampleMaxError = sample->m_detailSampleMaxError;
-    sample->m_cellSize = cellSize;
-    sample->m_cellHeight = cellHeight;
-    sample->m_agentHeight = agentHeight;
     sample->m_agentRadius = 0;
-    sample->m_agentMaxClimb = agentMaxClimb;
     sample->m_agentMaxSlope = agentMaxSlope + 1;
-    sample->m_regionMinSize = regionMinSize;
-    sample->m_regionMergeSize = regionMergeSize;
-    sample->m_edgeMaxLen = edgeMaxLen;
-    sample->m_edgeMaxError = edgeMaxError;
-    sample->m_vertsPerPoly = vertsPerPoly;
-    sample->m_detailSampleDist = detailSampleDist;
     // sample->m_detailSampleMaxError = 0.1;
     sample->handleTileSettingsWithNoUI();
     bool success = sample->handleBuild();
-    sample->m_cellSize = cellSize;
-    sample->m_cellHeight = cellHeight;
-    sample->m_agentHeight = agentHeight;
     sample->m_agentRadius = agentRadius;
-    sample->m_agentMaxClimb = agentMaxClimb;
     sample->m_agentMaxSlope = agentMaxSlope;
-    sample->m_regionMinSize = regionMinSize;
-    sample->m_regionMergeSize = regionMergeSize;
-    sample->m_edgeMaxLen = edgeMaxLen;
-    sample->m_edgeMaxError = edgeMaxError;
-    sample->m_vertsPerPoly = vertsPerPoly;
-    sample->m_detailSampleDist = detailSampleDist;
     sample->m_detailSampleMaxError = detailSampleMaxError;
     return success;
 }
@@ -416,7 +416,7 @@ void RecastAdapter::resetCommonSettings() const {
     sample->m_tileSize = 64;
 }
 
-void RecastAdapter::renderRecastNavmesh(bool isAirgInstance) {
+void RecastAdapter::renderRecastNavmesh(bool isAirgInstance) const {
     const dtNavMesh *mesh = sample->getNavMesh();
     if (!mesh) {
         return;

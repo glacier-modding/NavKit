@@ -178,7 +178,7 @@ void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
         Vec3 pos(0, 0, 0);
         Vec3 scale(1000, 1000, 1000);
         Rotation r;
-        std::string id;
+        std::string id = NO_EXCLUDE_BOX_FOUND;
         std::string name;
         std::string tblu;
         PfBoxType type;

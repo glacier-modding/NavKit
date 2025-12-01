@@ -138,10 +138,10 @@ char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
 }
 
 void Obj::finalizeObjBuild() {
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
     if (blenderObjGenerationDone) {
         Obj &obj = getInstance();
         startedObjGeneration = false;
-        const SceneExtract &sceneExtract = SceneExtract::getInstance();
         obj.objToLoad = sceneExtract.outputFolder;
         obj.objToLoad += "\\" + generatedObjName;
         obj.loadObj = true;
@@ -149,12 +149,15 @@ void Obj::finalizeObjBuild() {
         obj.lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
+        sceneExtract.alsoBuildObj = false;
     }
     if (errorBuilding) {
         errorBuilding = false;
         startedObjGeneration = false;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
+        sceneExtract.alsoBuildAll = false;
+        sceneExtract.alsoBuildObj = false;
     }
 }
 
@@ -318,9 +321,13 @@ void Obj::finalizeLoad() {
         RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         if (recastAdapter.inputGeom) {
             recastAdapter.handleMeshChanged();
-            Navp::getInstance().updateExclusionBoxConvexVolumes();
+            Navp::updateExclusionBoxConvexVolumes();
         }
         objLoadDone.clear();
         Menu::updateMenuState();
+        if (Navp &navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
+            Logger::log(NK_INFO, "Obj load complete, building Navp...");
+            navp.handleBuildNavpClicked();
+        }
     }
 }

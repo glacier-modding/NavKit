@@ -454,6 +454,7 @@ struct PolyInfo {
 	int tilePolyIndex;
 	int totalPolyIndex;
 };
+
 void Sample::saveAll(const char* s_OutputFileName)
 {
 	const dtNavMesh* mesh = m_navMesh;

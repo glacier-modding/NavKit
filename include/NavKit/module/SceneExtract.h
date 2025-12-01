@@ -33,12 +33,17 @@ public:
 
     bool canExtractFromGameAndBuildObj() const;
 
+    bool canExtractFromGameAndBuildAll() const;
+
     void handleExtractFromGameAndBuildObjClicked();
+
+    void handleExtractFromGameAndBuildAllClicked();
 
     int extractScroll;
     bool hitmanSet;
     bool errorExtracting;
     bool alsoBuildObj;
+    bool alsoBuildAll;
 
     static char *openHitmanFolderDialog(char *lastHitmanFolder);
 

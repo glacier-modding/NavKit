@@ -69,10 +69,13 @@ void Gui::drawGui() {
                       imguiRGBA(255, 255, 255, 128));
         const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
 
-        const int consoleHeight = showLog ? 220 : 60;
-        const int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;
         if (showLog) {
-            if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll)) {
+            if (imguiBeginScrollArea("Log", 20, 20,
+                                     renderer.width - 40,
+                                     renderer.height > 440
+                                         ? 220
+                                         : static_cast<int>(static_cast<double>(renderer.height) * 0.2),
+                                     &logScroll)) {
                 mouseOverMenu = true;
             }
             std::lock_guard lock(recastAdapter.getLogMutex());
@@ -86,8 +89,8 @@ void Gui::drawGui() {
                 logScroll = std::max(0, logCount * 20 - 160);
                 lastLogCount = logCount;
             }
+            imguiEndScrollArea();
         }
-        imguiEndScrollArea();
     }
 
     imguiEndFrame();

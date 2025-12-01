@@ -79,7 +79,6 @@ public:
     bool stairsCheckboxValue;
 
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
-    float pruningMode;
 
     void setLastLoadFileName(const char *fileName);
 
@@ -105,7 +104,7 @@ public:
 
     void loadNavMeshFileData(const std::string &fileName);
 
-    void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding);
+    void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
     std::atomic<bool> navpBuildDone{false};
     bool building;

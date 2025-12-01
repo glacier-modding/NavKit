@@ -54,6 +54,8 @@ public:
 
     [[nodiscard]] std::pair<int, int> getGridSize() const;
 
+    void setSceneBBoxToMesh() const;
+
     void handleMeshChanged() const;
 
     [[nodiscard]] bool handleBuild() const;
@@ -66,7 +68,7 @@ public:
 
     void resetCommonSettings() const;
 
-    void renderRecastNavmesh(bool isAirgInstance);
+    void renderRecastNavmesh(bool isAirgInstance) const;
 
     dtPolyRef getPoly(int tileIndex, int polyIndex) const;
 
