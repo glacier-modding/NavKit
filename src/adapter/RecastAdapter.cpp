@@ -319,6 +319,20 @@ bool RecastAdapter::loadInputGeom(const std::string &fileName) const {
     return inputGeom->load(buildContext, fileName);
 }
 
+void RecastAdapter::setTileSettings(const float *bBoxMin, const float *bBoxMax) const {
+    int gw = 0, gh = 0;
+    rcCalcGridSize(bBoxMin, bBoxMax, sample->m_cellSize, &gw, &gh);
+    const int ts = (int) sample->m_tileSize;
+    const int tw = (gw + ts - 1) / ts;
+    const int th = (gh + ts - 1) / ts;
+
+    int tileBits = rcMin((int) ilog2(nextPow2(tw * th)), 14);
+    if (tileBits > 14) tileBits = 14;
+    int polyBits = 22 - tileBits;
+    sample->m_maxTiles = 1 << tileBits;
+    sample->m_maxPolysPerTile = 1 << polyBits;
+}
+
 void RecastAdapter::setMeshBBox(const float *bBoxMin, const float *bBoxMax) const {
     if (inputGeom == nullptr) {
         return;
@@ -329,6 +343,7 @@ void RecastAdapter::setMeshBBox(const float *bBoxMin, const float *bBoxMax) cons
     inputGeom->m_meshBMax[0] = bBoxMax[0];
     inputGeom->m_meshBMax[1] = bBoxMax[1];
     inputGeom->m_meshBMax[2] = bBoxMax[2];
+    setTileSettings(bBoxMin, bBoxMax);
 }
 
 const float *RecastAdapter::getBBoxMin() const {
@@ -360,18 +375,7 @@ void RecastAdapter::setSceneBBoxToMesh() const {
     };
     Scene &scene = Scene::getInstance();
     scene.setBBox(pos, scale);
-
-    int gw = 0, gh = 0;
-    rcCalcGridSize(meshBMin, meshBMax, sample->m_cellSize, &gw, &gh);
-    const int ts = (int) sample->m_tileSize;
-    const int tw = (gw + ts - 1) / ts;
-    const int th = (gh + ts - 1) / ts;
-
-    int tileBits = rcMin((int) ilog2(nextPow2(tw * th)), 14);
-    if (tileBits > 14) tileBits = 14;
-    int polyBits = 22 - tileBits;
-    sample->m_maxTiles = 1 << tileBits;
-    sample->m_maxPolysPerTile = 1 << polyBits;
+    setTileSettings(meshBMin, meshBMax);
 }
 
 void RecastAdapter::handleMeshChanged() const {

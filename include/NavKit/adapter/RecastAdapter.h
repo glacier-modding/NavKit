@@ -46,6 +46,8 @@ public:
 
     [[nodiscard]] bool loadInputGeom(const std::string &fileName) const;
 
+    void setTileSettings(const float *bBoxMin, const float *bBoxMax) const;
+
     void setMeshBBox(const float *bBoxMin, const float *bBoxMax) const;
 
     [[nodiscard]] const float *getBBoxMin() const;
