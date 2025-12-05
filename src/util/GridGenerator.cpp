@@ -1,59 +1,59 @@
 #include <chrono>
 #include <queue>
+#include <thread>
+#include <vector>
 
 #include <DetourNavMeshQuery.h>
 
+#include "../../include/NavKit/util/GridGenerator.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
-#include "../../include/NavKit/util/GridGenerator.h"
+#include "../../include/NavKit/module/Scene.h"
 
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/NavKit/util/Pathfinding.h"
+
+class Scene;
 
 bool GridGenerator::initRecastAirgAdapter() {
     Logger::log(NK_INFO, "Generating Obj from current navmesh...");
     Airg &airg = Airg::getInstance();
     airg.airgLoading = true;
     airg.airgLoaded = false;
+    Menu::updateMenuState();
     Obj &obj = Obj::getInstance();
     obj.buildObjFromNavp(false);
-    RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
+    const RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
     const SceneExtract &sceneExtract = SceneExtract::getInstance();
-    const std::string objFileName = sceneExtract.lastOutputFolder + "\\outputNavp.obj";
+    const std::string objFileName = sceneExtract.outputFolder + "\\outputNavp.obj";
     Logger::log(NK_INFO, "Loading navmesh Obj into Recast...");
     if (!recastAirgAdapter.loadInputGeom(objFileName)) {
         airg.airgLoaded = false;
         airg.airgLoading = false;
         airg.airgBuilding = false;
+        Menu::updateMenuState();
         Logger::log(NK_ERROR, "Error loading navmesh Obj into Recast...");
         return true;
     }
     recastAirgAdapter.handleMeshChanged();
-    Navp &navp = Navp::getInstance();
-    float bBoxPos[3];
-    float bBoxScale[3];
-    bBoxPos[0] = navp.bBoxPosX;
-    bBoxPos[1] = navp.bBoxPosY;
-    bBoxPos[2] = navp.bBoxPosZ;
-    bBoxScale[0] = navp.bBoxScaleX;
-    bBoxScale[1] = navp.bBoxScaleY;
-    bBoxScale[2] = navp.bBoxScaleZ;
+    Scene &scene = Scene::getInstance();
 
     const float bBoxMin[3] = {
-        bBoxPos[0] - bBoxScale[0] / 2,
-        bBoxPos[1] - bBoxScale[1] / 2,
-        bBoxPos[2] - bBoxScale[2] / 2
+        scene.bBoxPos[0] - scene.bBoxScale[0] / 2,
+        scene.bBoxPos[1] - scene.bBoxScale[1] / 2,
+        scene.bBoxPos[2] - scene.bBoxScale[2] / 2
     };
     const float bBoxMax[3] = {
-        bBoxPos[0] + bBoxScale[0] / 2,
-        bBoxPos[1] + bBoxScale[1] / 2,
-        bBoxPos[2] + bBoxScale[2] / 2
+        scene.bBoxPos[0] + scene.bBoxScale[0] / 2,
+        scene.bBoxPos[1] + scene.bBoxScale[1] / 2,
+        scene.bBoxPos[2] + scene.bBoxScale[2] / 2
     };
     recastAirgAdapter.setMeshBBox(bBoxMin, bBoxMax);
     Logger::log(NK_INFO, "Building Recast detour navmesh from navmesh Obj...");
@@ -61,45 +61,44 @@ bool GridGenerator::initRecastAirgAdapter() {
         airg.airgLoading = false;
         airg.airgLoaded = false;
         airg.airgBuilding = false;
+        Menu::updateMenuState();
 
         Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
         return true;
     }
-    std::string outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
+    const std::string outputNavpFilename = sceneExtract.outputFolder + "\\outputForAirg.navp.json";
     recastAirgAdapter.save(outputNavpFilename);
-    std::thread loadNavMeshThread(&Navp::loadNavMesh, outputNavpFilename.data(), true, true, true);
-    loadNavMeshThread.join();
 
+    Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, false, true);
     return false;
 }
 
 void GridGenerator::build() {
-    const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Started building Airg at ";
-    char timeBuffer[26];
-    ctime_s(timeBuffer, sizeof(timeBuffer), &start_time);
-    msg += timeBuffer;
-    Logger::log(NK_INFO, msg.data());
-    const auto start = std::chrono::high_resolution_clock::now();
+    const auto now = std::chrono::system_clock::now();
+    const auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm buf{};
+    localtime_s(&buf, &in_time_t); // Use localtime_s for thread-safety on Windows
+
+    char time_str[256];
+    std::strftime(time_str, sizeof(time_str), "%c %Z", &buf);
+    Logger::log(NK_INFO, "Started building Airg at %s", time_str);    const auto start = std::chrono::high_resolution_clock::now();
 
     if (initRecastAirgAdapter()) return;
 
     Logger::log(NK_INFO, "Building waypoints within areas...");
-    GridGenerator &gridGenerator = getInstance();
-    gridGenerator.GenerateGrid();
+    GenerateGrid();
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    msg = "Finished building Airg in ";
-    msg += std::to_string(duration.count());
-    msg += " seconds";
-    Logger::log(NK_INFO, msg.data());
-
+    Logger::log(NK_INFO, "Finished building Airg in %lld seconds", duration.count());
     Airg &airg = Airg::getInstance();
     airg.airgLoading = false;
     airg.airgLoaded = true;
     airg.airgBuilding = false;
+    SceneExtract &sceneExtract = SceneExtract::getInstance();
+    sceneExtract.alsoBuildAll = false;
     Grid::getInstance().loadBoundsFromAirg();
+    Menu::updateMenuState();
 }
 
 void GridGenerator::addVisibilityData(ReasoningGrid *grid) {
@@ -109,8 +108,7 @@ void GridGenerator::addVisibilityData(ReasoningGrid *grid) {
     grid->m_HighVisibilityBits.m_nSize = 0;
     grid->m_LowVisibilityBits.m_nSize = 0;
     grid->m_deadEndData.m_nSize = grid->m_nNodeCount;
-    std::vector<uint8_t> deadEndData;
-    grid->m_deadEndData.m_aBytes = deadEndData;
+    grid->m_deadEndData.m_aBytes.clear();
 }
 
 void GridGenerator::GenerateGrid() {
@@ -165,25 +163,28 @@ void GridGenerator::GenerateWaypointNodes() {
     waypointCells.clear();
     int areaCount = navMesh->m_areas.size();
     const unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
-    std::vector<std::thread> threads;
-    std::mutex waypointCellsMutex; // Mutex to protect shared access to waypointCells
+    std::vector<std::jthread> threads;
+    std::mutex waypointCellsMutex;
     const int areas_per_thread = (areaCount + num_threads - 1) / num_threads;
     Logger::log(NK_INFO, "Generating waypoint nodes using %u threads.", num_threads);
 
+    std::atomic processed_area_count{0};
+
     auto worker = [&](int start_index, int end_index, int thread_id) {
-        RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
+        RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
         dtNavMeshQuery navQuery;
         navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
 
         for (int areaIndex = start_index; areaIndex < end_index; ++areaIndex) {
-            // Use a reference to avoid copying the entire Area object
-            auto& area = navMesh->m_areas[areaIndex];
-            if (areaIndex % 100 == 0) {
-                Logger::log(NK_INFO, "[Thread %d] Processing area %d / %d", thread_id, areaIndex, areaCount);
+            if (const int current_total_processed = processed_area_count.fetch_add(1) + 1;
+                current_total_processed > 0 && current_total_processed % 100 == 0) {
+                Logger::log(NK_INFO, "[Thread %d] Progress: %d / %d areas processed...", thread_id,
+                            current_total_processed, areaCount);
             }
+            auto &area = navMesh->m_areas[areaIndex];
             auto [m_min, m_max] = Pathfinding::calculateBBox(&area);
             const Vec3 normal = area.CalculateNormal();
-            const Vec3& v1 = {area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Y, area.m_edges[0]->m_pos.Z};
+            const Vec3 &v1 = {area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Y, area.m_edges[0]->m_pos.Z};
             const float d = -(v1.X * normal.X + v1.Y * normal.Y + v1.Z * normal.Z);
 
             int minX = floor((m_min.X - grid->m_Properties.vMin.x) * invSpacing);
@@ -204,8 +205,7 @@ void GridGenerator::GenerateWaypointNodes() {
 
                     int vMappedPosXIndex = floor((vMappedPos.x - grid->m_Properties.vMin.x) / spacing);
                     int vMappedPosYIndex = floor((vMappedPos.y - grid->m_Properties.vMin.y) / spacing);
-                    int offset = vMappedPosXIndex + vMappedPosYIndex * grid->m_Properties.nGridWidth;
-                    {
+                    int offset = vMappedPosXIndex + vMappedPosYIndex * grid->m_Properties.nGridWidth; {
                         std::lock_guard<std::mutex> lock(waypointCellsMutex);
                         auto &cells = waypointCells[offset];
                         float cellZIndex = vMappedPos.z;
@@ -229,7 +229,9 @@ void GridGenerator::GenerateWaypointNodes() {
                                     if (cellInArea) {
                                         // Add the point to an existing cell
                                         if (cells.back().m_Points.empty()) {
-                                            cells.back().m_Points.push_back({vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0});
+                                            cells.back().m_Points.push_back({
+                                                vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0
+                                            });
                                         }
                                         shouldAddNewCell = false;
                                         break;
@@ -262,15 +264,10 @@ void GridGenerator::GenerateWaypointNodes() {
         }
     }
 
-    // --- JOIN THREADS ---
-    // Wait for all threads to complete their work
-    for (auto& t : threads) {
-        t.join();
-    }
-    int minX = floor((grid->m_Properties.vMin.x) / spacing);
-    int minY = floor((grid->m_Properties.vMin.y) / spacing);
-    int maxX = floor((grid->m_Properties.vMax.x) / spacing);
-    int maxY = floor((grid->m_Properties.vMax.y) / spacing);
+    const int minX = floor((grid->m_Properties.vMin.x) / spacing);
+    const int minY = floor((grid->m_Properties.vMin.y) / spacing);
+    const int maxX = floor((grid->m_Properties.vMax.x) / spacing);
+    const int maxY = floor((grid->m_Properties.vMax.y) / spacing);
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
             int offset = x + y * grid->m_Properties.nGridWidth;
@@ -308,8 +305,8 @@ void GridGenerator::GenerateWaypointConnectivityMap() {
                 const float4 vMin = {vMinVec4.x, vMinVec4.y, vMinVec4.z, 0.0};
                 const int nGridWidth = airg.reasoningGrid->m_Properties.nGridWidth;
 
-                const int x = floor(floor((vPos.x - vMin.x) / fGridSpacing));
-                const int y = floor(floor((vPos.y - vMin.y) / fGridSpacing));
+                const int x = floor((vPos.x - vMin.x) / fGridSpacing);
+                const int y = floor((vPos.y - vMin.y) / fGridSpacing);
                 waypoint.xi = x;
                 waypoint.yi = y;
                 waypoint.zi = floor(vPos.z - vMin.z);
@@ -342,7 +339,7 @@ void GridGenerator::AlignNodes() {
     Airg &airg = Airg::getInstance();
     Logger::log(NK_INFO, "GridGenerator::AlignNodes() -> Aligning nodes.");
     float gridSpacing = airg.reasoningGrid->m_Properties.fGridSpacing;
-    RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
+    RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
     dtNavMeshQuery navQuery;
     navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
     int curWaypoint = 0;
@@ -647,7 +644,7 @@ void GridGenerator::GenerateLayerIndices() {
 }
 
 Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
-    dtNavMeshQuery* navQuery,
+    dtNavMeshQuery *navQuery,
     Pathfinding::ZPFLocation *result,
     const float4 *vPosNavPower,
     const float fAcceptance,
@@ -660,10 +657,14 @@ Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
 
     if (valid) {
         closestReachablePolys = recastAirgAdapter.getClosestReachablePolys(navQuery,
-            {vPosNavPower->x, vPosNavPower->y, vPosNavPower->z}, startPolyRef, 4);
+                                                                           {
+                                                                               vPosNavPower->x, vPosNavPower->y,
+                                                                               vPosNavPower->z
+                                                                           }, startPolyRef, 4);
     } else {
-        closestReachablePolys = recastAirgAdapter.getClosestPolys(navQuery, {vPosNavPower->x, vPosNavPower->y, vPosNavPower->z},
-                                                                  20);
+        closestReachablePolys = recastAirgAdapter.getClosestPolys(
+            navQuery, {vPosNavPower->x, vPosNavPower->y, vPosNavPower->z},
+            20);
     }
 
     if (closestReachablePolys.size() <= 0) {
@@ -722,7 +723,8 @@ Pathfinding::ZPFLocation *GridGenerator::MapLocation_Internal(
     return result;
 }
 
-bool GridGenerator::MapLocation(dtNavMeshQuery* navQuery, const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped) {
+bool GridGenerator::MapLocation(dtNavMeshQuery *navQuery, const float4 *vNavPowerPos,
+                                Pathfinding::ZPFLocation *lMapped) {
     constexpr float fAcceptance = 2.0;
     Pathfinding::ZPFLocation *pfLocation;
     Pathfinding::ZPFLocation result;
@@ -754,7 +756,8 @@ bool GridGenerator::MapLocation(dtNavMeshQuery* navQuery, const float4 *vNavPowe
     return lMapped->polyRef != 0;
 }
 
-float4 GridGenerator::MapToCell(dtNavMeshQuery* navQuery, const float4 *vCellNavPowerUpperLeft, const NavPower::Area &area) {
+float4 GridGenerator::MapToCell(dtNavMeshQuery *navQuery, const float4 *vCellNavPowerUpperLeft,
+                                const NavPower::Area &area) {
     const Airg &airg = Airg::getInstance();
     Pathfinding::ZPFLocation pfLocation;
 
@@ -789,22 +792,22 @@ float4 GridGenerator::MapToCell(dtNavMeshQuery* navQuery, const float4 *vCellNav
             if (distance.x <= distanceThreshold.x &&
                 distance.y <= distanceThreshold.y &&
                 distance.z <= distanceThreshold.z) {
-                Vec3 centroidNavPower;
                 RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
-                centroidNavPower = RecastAdapter::convertFromRecastToNavPower(
+                const Vec3 centroidNavPower = RecastAdapter::convertFromRecastToNavPower(
                     recastAirgAdapter.calculateCentroid(pfLocation.polyRef));
                 if (const auto areaNavPowerPos = area.m_area->m_pos;
-                    abs(centroidNavPower.X - areaNavPowerPos.X) < 0.1 && abs(centroidNavPower.Y - areaNavPowerPos.Y) <
-                    0.1 && abs(
-                        centroidNavPower.X - areaNavPowerPos.Z) < 0.1) {
+                    abs(centroidNavPower.X - areaNavPowerPos.X) < 0.1 &&
+                    abs(centroidNavPower.Y - areaNavPowerPos.Y) < 0.1 &&
+                    abs(centroidNavPower.Z - areaNavPowerPos.Z) < 0.1) {
                     if (area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) {
                         found = true;
                         foundNavPowerPos = {pfLocation.pos.x, pfLocation.pos.y, pfLocation.pos.z, 0.0};
                         break;
                     }
                 }
-                float radius = 0.1;
-                if (!found && !NearestOuterEdge(navQuery, pfLocation, radius, nullptr, nullptr)) {
+                if (constexpr float radius = 0.1;
+                    !found &&
+                    !NearestOuterEdge(navQuery, pfLocation, radius, nullptr, nullptr)) {
                     found = true;
                     foundNavPowerPos = {pfLocation.pos.x, pfLocation.pos.y, pfLocation.pos.z, 0.0};
                 }
@@ -818,7 +821,7 @@ float4 GridGenerator::MapToCell(dtNavMeshQuery* navQuery, const float4 *vCellNav
     return {0.0f, 0.0f, 0.0f, -1.0f};
 }
 
-bool GridGenerator::IsInside(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation *location) {
+bool GridGenerator::IsInside(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation *location) {
     // Check if the area is already valid
     if (location->polyRef != 0) {
         return true;
@@ -873,7 +876,7 @@ void GridGenerator::GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap
     cellNavPowerOffset.z = 0;
     cellNavPowerOffset.w = 0;
 
-    RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
+    RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
     dtNavMeshQuery navQuery;
     navQuery.init(recastAirgAdapter.getNavMesh(), 2048);
 
@@ -992,7 +995,8 @@ void GridGenerator::CalculateConnectivity(const bool *cellBitmap, int *pCellConn
     }
 }
 
-bool GridGenerator::NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation &lFrom, float fRadius, float4 *edgeNavPowerResult,
+bool GridGenerator::NearestOuterEdge(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation &lFrom, float fRadius,
+                                     float4 *edgeNavPowerResult,
                                      float4 *edgeNavPowerNormal) {
     // Check if the input location is inside a valid area
     if (!IsInside(navQuery, &lFrom)) {
@@ -1003,7 +1007,8 @@ bool GridGenerator::NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFL
     std::vector<dtPolyRef> polys;
     int numAreas = 0;
     RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
-    polys = recastAirgAdapter.getClosestReachablePolys(navQuery, {lFrom.pos.x, lFrom.pos.y, lFrom.pos.z}, lFrom.polyRef, 4);
+    polys = recastAirgAdapter.getClosestReachablePolys(navQuery, {lFrom.pos.x, lFrom.pos.y, lFrom.pos.z}, lFrom.polyRef,
+                                                       4);
     numAreas = polys.size();
     if (numAreas <= 0) {
         return false;

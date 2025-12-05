@@ -1,3 +1,4 @@
+#pragma once
 #include <direct.h>
 #include <string>
 #include <vector>
@@ -14,18 +15,15 @@
 
 #include <fstream>
 
+#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
-#include "../../include/RecastDemo/imgui.h"
-
 SceneExtract::SceneExtract() {
-    hitmanFolderName = "Choose Hitman folder";
-    lastHitmanFolder = hitmanFolderName;
+    hitmanFolder = "";
     hitmanSet = false;
-    outputFolderName = "Choose Output folder";
-    lastOutputFolder = outputFolderName;
+    outputFolder = "";
     outputSet = false;
     extractScroll = 0;
     errorExtracting = false;
@@ -34,72 +32,78 @@ SceneExtract::SceneExtract() {
     doneExtractingFromGame = false;
     extractingFromGame = false;
     alsoBuildObj = false;
+    alsoBuildAll = false;
 }
-
-const int SceneExtract::SCENE_EXTRACT_MENU_HEIGHT = 83;
 
 SceneExtract::~SceneExtract() = default;
 
-void SceneExtract::setHitmanFolder(const char *folderName) {
+void SceneExtract::setHitmanFolder(const std::string &folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
-        lastHitmanFolder = folderName;
-        hitmanFolderName = folderName;
-        hitmanFolderName = hitmanFolderName.substr(hitmanFolderName.find_last_of("/\\") + 1);
-        Logger::log(NK_INFO, ("Setting Hitman folder to: " + lastHitmanFolder).c_str());
+        hitmanFolder = folderName;
+        Logger::log(NK_INFO, ("Setting Hitman folder to: " + hitmanFolder).c_str());
         Settings::setValue("Paths", "hitman", folderName);
         Settings::save();
     } else {
-        Logger::log(NK_WARN, ("Could not find Hitman folder: " + lastHitmanFolder).c_str());
+        Logger::log(NK_WARN, ("Could not find Hitman folder: " + hitmanFolder).c_str());
     }
 }
 
-void SceneExtract::setOutputFolder(const char *folderName) {
+void SceneExtract::setOutputFolder(const std::string &folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         outputSet = true;
-        lastOutputFolder = folderName;
-        outputFolderName = folderName;
-        outputFolderName = outputFolderName.substr(outputFolderName.find_last_of("/\\") + 1);
-        Logger::log(NK_INFO, ("Setting output folder to: " + lastOutputFolder).c_str());
+        outputFolder = folderName;
+        Logger::log(NK_INFO, ("Setting output folder to: " + outputFolder).c_str());
         Settings::setValue("Paths", "output", folderName);
         Settings::save();
     } else {
-        Logger::log(NK_WARN, ("Could not find output folder: " + lastOutputFolder).c_str());
+        Logger::log(NK_WARN, ("Could not find output folder: " + outputFolder).c_str());
     }
 }
 
-void SceneExtract::drawMenu() {
-    if (const Renderer &renderer = Renderer::getInstance();
-        imguiBeginScrollArea("Extract menu", renderer.width - 250 - 10,
-                             renderer.height - 10 -
-                             Settings::SETTINGS_MENU_HEIGHT -
-                             Scene::SCENE_MENU_HEIGHT -
-                             SCENE_EXTRACT_MENU_HEIGHT - 10, 250,
-                             SCENE_EXTRACT_MENU_HEIGHT, &extractScroll)) {
-        Gui::getInstance().mouseOverMenu = true;
-    }
-    if (imguiButton("Extract from game", hitmanSet && outputSet && !extractingFromGame && !extractingAlocs)) {
-        Gui &gui = Gui::getInstance();
-        gui.showLog = true;
-        alsoBuildObj = false;
-        extractScene();
-    }
-    if (const Obj &obj = Obj::getInstance();
-        imguiButton("Extract from game and build obj",
-                    hitmanSet && obj.blenderSet && outputSet && !extractingFromGame
-                    && !extractingAlocs && !obj.blenderObjStarted && !obj.blenderObjGenerationDone)) {
-        Gui &gui = Gui::getInstance();
-        gui.showLog = true;
-        alsoBuildObj = true;
-        Obj::getInstance().objLoaded = false;
-        extractScene();
-    }
-    imguiEndScrollArea();
+void SceneExtract::handleExtractFromGameClicked() {
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
+    alsoBuildObj = false;
+    alsoBuildAll = false;
+    extractScene();
+}
+
+bool SceneExtract::canExtractFromGame() const {
+    return hitmanSet && outputSet && !extractingFromGame && !extractingAlocs;
+}
+
+bool SceneExtract::canExtractFromGameAndBuildObj() const {
+    const Obj &obj = Obj::getInstance();
+    return canExtractFromGame()
+           && obj.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+}
+
+bool SceneExtract::canExtractFromGameAndBuildAll() const {
+    const Obj &obj = Obj::getInstance();
+    return canExtractFromGame()
+           && obj.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+}
+
+void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
+    alsoBuildObj = true;
+    Obj::getInstance().objLoaded = false;
+    extractScene();
+}
+
+void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
+    Gui &gui = Gui::getInstance();
+    gui.showLog = true;
+    alsoBuildAll = true;
+    Obj::getInstance().objLoaded = false;
+    extractScene();
 }
 
 void SceneExtract::extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback) {
     GameConnection &gameConnection = GameConnection::getInstance();
-    std::ofstream f(getInstance().lastOutputFolder + "\\output.nav.json");
+    std::ofstream f(getInstance().outputFolder + "\\output.nav.json");
     f.clear();
     f.close();
 
@@ -123,32 +127,34 @@ void SceneExtract::extractScene() {
     GameConnection &gameConnection = GameConnection::getInstance();
     extractingFromGame = true;
 
-    std::thread extractFromGameThread(extractFromGame, [this] {
+    backgroundWorker.emplace(extractFromGame, [this] {
         Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
         extractingFromGame = false;
         doneExtractingFromGame = true;
+        Menu::updateMenuState();
         extractAlocs();
     }, [this, &gameConnection] {
         errorExtracting = true;
+        Menu::updateMenuState();
         if (gameConnection.closeConnection()) {
+            Logger::log(NK_ERROR, "Error closing connection to game.");
         }
     });
-    extractFromGameThread.detach();
 }
 
 void SceneExtract::extractAlocs() {
     std::string retailFolder = "\"";
-    retailFolder += lastHitmanFolder;
+    retailFolder += hitmanFolder;
     retailFolder += "\\Retail\"";
     std::string gameVersion = "HM3";
     std::string navJsonFilePath = "\"";
-    navJsonFilePath += lastOutputFolder;
+    navJsonFilePath += outputFolder;
     navJsonFilePath += "\\output.nav.json\"";
     std::string runtimeFolder = "\"";
-    runtimeFolder += lastHitmanFolder;
+    runtimeFolder += hitmanFolder;
     runtimeFolder += "\\Runtime\"";
     std::string alocFolder;
-    alocFolder += lastOutputFolder;
+    alocFolder += outputFolder;
     alocFolder += "\\aloc";
 
     struct stat folderExists{};
@@ -172,55 +178,63 @@ void SceneExtract::extractAlocs() {
     command += alocFolder;
     command += "\"";
     extractingAlocs = true;
-    std::thread commandThread(CommandRunner::runCommand, command, "Glacier2ObjExtract.log", [this] {
-        Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
-        extractingAlocs = false;
-        doneExtractingAlocs = true;
-    }, [this] {
-        errorExtracting = true;
-    });
-    commandThread.detach();
+    Menu::updateMenuState();
+    std::jthread commandThread(
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command,
+        "Glacier2ObjExtract.log", [this] {
+            Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
+            extractingAlocs = false;
+            doneExtractingAlocs = true;
+            Menu::updateMenuState();
+        }, [this] {
+            errorExtracting = true;
+            Menu::updateMenuState();
+        });
 }
 
 void SceneExtract::finalizeExtract() {
     Obj &obj = Obj::getInstance();
     if (doneExtractingAlocs) {
         doneExtractingAlocs = false;
-        std::string sceneFile = lastOutputFolder;
+        std::string sceneFile = outputFolder;
         sceneFile += "\\output.nav.json";
-        auto loadSceneThread =
-                std::thread(
-                    Scene::loadScene,
-                    sceneFile,
-                    [sceneFile]() {
-                        Scene &sceneScoped = Scene::getInstance();
-                        SceneExtract &sceneExtract = getInstance();
-                        Obj &objScoped = Obj::getInstance();
-                        sceneScoped.sceneLoaded = true;
-                        std::string fileNameString = sceneFile;
-                        sceneExtract.extractingAlocs = false;
-                        sceneScoped.lastLoadSceneFile = sceneFile;
-                        if (sceneExtract.alsoBuildObj && !objScoped.startedObjGeneration) {
-                            objScoped.buildObj(objScoped.lastBlenderFile.data(), fileNameString.data(),
-                                               sceneExtract.lastOutputFolder.data());
-                        }
-                        Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
-                    }, []() {
-                        SceneExtract &sceneExtract = getInstance();
-                        Obj &objScoped = Obj::getInstance();
-                        Logger::log(NK_ERROR, "Error loading scene file.");
-                        sceneExtract.errorExtracting = false;
-                        objScoped.startedObjGeneration = false;
-                        sceneExtract.extractingFromGame = false;
-                        sceneExtract.extractingAlocs = false;
-                    });
-        loadSceneThread.detach();
+        backgroundWorker.emplace(
+            &Scene::loadScene,
+            &Scene::getInstance(),
+            sceneFile,
+            [sceneFile]() {
+                Scene &sceneScoped = Scene::getInstance();
+                SceneExtract &sceneExtract = getInstance();
+                Obj &objScoped = Obj::getInstance();
+                sceneScoped.sceneLoaded = true;
+                const std::string& fileNameString = sceneFile;
+                sceneExtract.extractingAlocs = false;
+                sceneScoped.lastLoadSceneFile = sceneFile;
+                if ((sceneExtract.alsoBuildObj || sceneExtract.alsoBuildAll) && !objScoped.startedObjGeneration) {
+                    objScoped.buildObj(objScoped.blenderPath.data(), fileNameString.data(),
+                                       sceneExtract.outputFolder.data());
+                }
+                Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
+                Menu::updateMenuState();
+            }, [] {
+                SceneExtract &sceneExtract = getInstance();
+                Obj &objScoped = Obj::getInstance();
+                Logger::log(NK_ERROR, "Error loading scene file.");
+                sceneExtract.errorExtracting = false;
+                objScoped.startedObjGeneration = false;
+                sceneExtract.extractingFromGame = false;
+                sceneExtract.extractingAlocs = false;
+                sceneExtract.alsoBuildAll = false;
+                sceneExtract.alsoBuildObj = false;
+                Menu::updateMenuState();
+            });
     }
     if (errorExtracting) {
         errorExtracting = false;
         obj.startedObjGeneration = false;
         extractingFromGame = false;
         extractingAlocs = false;
+        Menu::updateMenuState();
     }
 }
 

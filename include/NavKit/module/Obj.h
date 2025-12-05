@@ -1,6 +1,8 @@
 #pragma once
 #include <map>
+#include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 
@@ -30,28 +32,25 @@ public:
     bool blenderObjStarted;
     bool blenderObjGenerationDone;
     bool glacier2ObjDebugLogsEnabled;
-    std::string blenderName;
     bool blenderSet;
     bool errorBuilding;
-    std::string lastBlenderFile;
-    std::map<std::string, std::pair<int, int>> objectTriangleRanges;
+    std::string blenderPath;
+    std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
-
-    static const int OBJ_MENU_HEIGHT;
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 
-    static void loadObjMesh(Obj *obj);
+    void loadObjMesh();
 
     static void copyObjFile(const std::string &from, const std::string &to);
 
-    static void saveObjMesh(char *objToCopy, char *newFileName);
+    void saveObjMesh(char *objToCopy, char *newFileName);
 
-    void setBlenderFile(const char *fileName);
+    void setBlenderFile(const std::string &fileName);
 
-    static void buildObjFromNavp(bool alsoLoadIntoUi);
+    void buildObjFromNavp(bool alsoLoadIntoUi);
 
-    void buildObj(char *blenderPath, char *sceneFilePath, char *outputFolder);
+    void buildObj(const char *blenderPath, const char *sceneFilePath, const char *outputFolder);
 
     void finalizeObjBuild();
 
@@ -65,7 +64,21 @@ public:
 
     void setLastSaveFileName(const char *fileName);
 
-    void drawMenu();
+    void handleOpenObjClicked();
+
+    void handleSaveObjClicked();
+
+    bool canLoad() const;
+
+    bool canBuildObjFromNavp() const;
+
+    bool canBuildObjFromScene() const;
+
+    void handleBuildObjFromSceneClicked();
+
+    void handleBuildObjFromNavpClicked();
 
     void finalizeLoad();
+
+    std::optional<std::jthread> backgroundWorker;
 };

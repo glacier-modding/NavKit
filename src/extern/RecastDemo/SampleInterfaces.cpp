@@ -1,3 +1,5 @@
+// This source has been modified from the original by Daniel Bierek for use
+// in NavKit.
 #include <math.h>
 #include <stdio.h>
 #include <stdarg.h>

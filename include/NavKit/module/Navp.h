@@ -47,8 +47,6 @@ public:
 
     void renderNavMeshForHitTest() const;
 
-    void drawMenu();
-
     void finalizeBuild();
 
     void buildAreaMaps();
@@ -60,7 +58,7 @@ public:
     void setSelectedExclusionBoxIndex(int index);
 
     NavPower::NavMesh *navMesh{};
-    void *navMeshFileData{};
+    std::vector<char> navMeshFileData{};
     std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap;
     std::map<Vec3, NavPower::Area *> posToAreaMap;
     int selectedNavpAreaIndex;
@@ -78,58 +76,55 @@ public:
     int navpScroll;
     bool loading;
 
-    float bBoxPosX;
-    float bBoxPosY;
-    float bBoxPosZ;
-    float bBoxScaleX;
-    float bBoxScaleY;
-    float bBoxScaleZ;
-
-    float lastBBoxPosX;
-    float lastBBoxPosY;
-    float lastBBoxPosZ;
-    float lastBBoxScaleX;
-    float lastBBoxScaleY;
-    float lastBBoxScaleZ;
-
     bool stairsCheckboxValue;
 
-    float bBoxPos[3]{};
-    float bBoxScale[3]{};
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
-    float pruningMode;
 
     void setLastLoadFileName(const char *fileName);
 
     void setLastSaveFileName(const char *fileName);
 
-    void setBBox(const float *pos, const float *size);
+    void handleOpenNavpClicked();
+
+    void saveNavMesh(const std::string &fileName, const std::string &extension);
+
+    void handleSaveNavpClicked();
+
+    bool stairsAreaSelected() const;
+
+    bool canBuildNavp() const;
+
+    bool canSave() const;
+
+    void handleEditStairsClicked() const;
+
+    void handleBuildNavpClicked();
 
     static void updateExclusionBoxConvexVolumes();
 
-    static void loadNavMeshFileData(const std::string &fileName);
+    void loadNavMeshFileData(const std::string &fileName);
 
-    static void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp);
+    void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
+    std::atomic<bool> navpBuildDone{false};
+    bool building;
+    std::optional<std::jthread> backgroundWorker;
+    void buildNavp();
 private:
-    static void buildNavp();
 
-    void renderArea(NavPower::Area area, bool selected, int areaIndex);
+    static void renderArea(const NavPower::Area &area, bool selected);
 
     static bool areaIsStairs(const NavPower::Area &area);
 
     void setStairsFlags() const;
 
-    static char *openLoadNavpFileDialog(const char *lastNavpFolder);
+    static char *openLoadNavpFileDialog();
 
-    static char *openSaveNavpFileDialog(char *lastNavpFolder);
+    static char *openSaveNavpFileDialog();
 
     std::string loadNavpName;
     std::string lastLoadNavpFile;
     std::string saveNavpName;
     std::string lastSaveNavpFile;
     std::string outputNavpFilename = "output.navp";
-    std::vector<bool> navpLoadDone;
-    std::vector<bool> navpBuildDone;
-    bool building;
 };

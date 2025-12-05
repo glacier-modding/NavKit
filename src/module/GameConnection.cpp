@@ -4,6 +4,10 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <chrono>
+#include <memory>
+#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include "../../extern/simdjson/simdjson.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/SceneExtract.h"
@@ -105,18 +109,44 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
             NK_ERROR, "GameConnection: listAlocPfBoxAndSeedPointEntities failed because the socket is not open.");
         return 1;
     }
-    std::ofstream f(SceneExtract::getInstance().lastOutputFolder + "\\output.nav.json", std::ios::app);
+    auto file_write_queue = std::make_unique<rsj::ConcurrentQueue<std::string> >();
+    const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
+    std::thread writer_thread([&] {
+        Logger::log(NK_INFO, "Writer thread started. Opening file...");
+        std::ofstream f(SceneExtract::getInstance().outputFolder + "\\output.nav.json", std::ios::app);
+        if (!f.is_open()) {
+            Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
+                        (SceneExtract::getInstance().outputFolder + "\\output.nav.json").c_str());
+            return;
+        }
+
+        while (true) {
+            if (auto message_to_write = file_write_queue->try_pop(); message_to_write.has_value()) {
+                if (message_to_write.value() == SENTINEL_MESSAGE) {
+                    break;
+                }
+                f << message_to_write.value();
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+
+        f.close();
+        Logger::log(NK_INFO, "Writer thread finished writing.");
+    });
+
     bool done = false;
     int messagesReceived = 0;
     while (!done) {
-        ws->poll();
+        ws->poll(10);
         ws->dispatch([&](const std::string &message) {
             messagesReceived++;
-            if (messagesReceived % 100 == 0) {
-                Logger::log(NK_INFO, ("Entities found: " + std::to_string(messagesReceived)).c_str());
-            }
             if (message == "Done sending entities.") {
                 done = true;
+                return;
+            }
+            if (message == R"({"type":"entityTreeRebuilt"})") {
+                Logger::log(NK_INFO, "Received entityTreeRebuilt message");
                 return;
             }
             if (message == "Rebuilding tree.") {
@@ -128,56 +158,30 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
             }
             if (message.find("Unknown editor message type: listAlocPfBoxAndSeedPointEntities") != -1) {
                 Logger::log(NK_ERROR,
-                            "Failed to get ALOCs from game. Is the included Editor.dll in the Retail/mods folder?");
+                            "Failed to get ALOCs from game. Is ZHMModSDK up to date?");
                 done = true;
                 return;
             }
-            f << message;
+
+            file_write_queue->push(message);
+
+            if (messagesReceived % 1000 == 0) {
+                Logger::log(NK_INFO, "Entities received: %d", messagesReceived);
+            }
         });
     }
-    f.close();
+
+    Logger::log(NK_INFO, "Received all entities (%d). Signaling writer thread to finish.", messagesReceived);
+    file_write_queue->push(SENTINEL_MESSAGE);
+
+    writer_thread.join();
+
+    Logger::log(NK_INFO, "Saved entities to file.");
     return 0;
 }
 
 void GameConnection::sendHelloMessage() const {
     ws->send(R"({"type":"hello","identifier":"NavKit"})");
-}
-
-void GameConnection::sendNavp(NavPower::NavMesh *navMesh) const {
-    if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: Send Navp failed because the socket is not open.");
-        return;
-    }
-    constexpr int chunkSize = 30;
-    auto chunkHead = navMesh->m_areas.begin();
-    const int areaCount = navMesh->m_areas.size();
-    int chunkCount = (areaCount % chunkSize == 0) ? (areaCount / chunkSize) : ((areaCount / chunkSize) + 1);
-    for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-        int curChunkSize = (chunkIndex < (chunkCount - 1)) ? chunkSize : (areaCount % chunkSize);
-        std::vector<NavPower::Area> areas = std::vector<NavPower::Area>(chunkHead, chunkHead + curChunkSize);
-        sendChunk(areas, chunkIndex, chunkCount);
-        chunkHead += curChunkSize;
-    }
-    if (!ws) {
-        Logger::log(NK_ERROR, "GameConnection: HandleMessages failed because the socket is not open.");
-        return;
-    }
-    while (ws->getReadyState() != WebSocket::CLOSED) {
-        WebSocket::pointer wsp = &*ws;
-        ws->poll();
-        ws->dispatch([&](const std::string &message) {
-            Logger::log(NK_INFO, ("Received message: " + message).c_str());
-            if (message == "Done loading Navp." || message == "Done sending entities." || message ==
-                R"({"type":"entityTreeRebuilt"})") {
-                wsp->close();
-            }
-            if (message.find("Unknown editor message type: loadNavp") != -1) {
-                Logger::log(NK_ERROR,
-                            "Failed to send Navp to game. Is the included Editor.dll in the Retail/mods folder?");
-                wsp->close();
-            }
-        });
-    }
 }
 
 void GameConnection::sendChunk(const std::vector<NavPower::Area> &areas, int chunkIndex, int chunkCount) const {

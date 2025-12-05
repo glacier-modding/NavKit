@@ -13,36 +13,45 @@ public:
         return instance;
     }
 
-    void drawMenu();
-
     void finalizeExtract();
 
-    std::string lastHitmanFolder;
-    std::string lastOutputFolder;
+    std::string hitmanFolder;
+    std::string outputFolder;
     bool outputSet;
     bool extractingAlocs;
     bool doneExtractingAlocs;
     bool extractingFromGame;
     bool doneExtractingFromGame;
-    static const int SCENE_EXTRACT_MENU_HEIGHT;
 
-    void setHitmanFolder(const char *folderName);
+    void setHitmanFolder(const std::string &folderName);
 
-    void setOutputFolder(const char *folderName);
+    void setOutputFolder(const std::string &folderName);
+
+    void handleExtractFromGameClicked();
+
+    bool canExtractFromGame() const;
+
+    bool canExtractFromGameAndBuildObj() const;
+
+    bool canExtractFromGameAndBuildAll() const;
+
+    void handleExtractFromGameAndBuildObjClicked();
+
+    void handleExtractFromGameAndBuildAllClicked();
 
     int extractScroll;
-    std::string hitmanFolderName;
     bool hitmanSet;
-    std::string outputFolderName;
     bool errorExtracting;
     bool alsoBuildObj;
+    bool alsoBuildAll;
 
     static char *openHitmanFolderDialog(char *lastHitmanFolder);
 
     static char *openOutputFolderDialog(char *lastOutputFolder);
+    std::optional<std::jthread> backgroundWorker;
+    void extractScene();
 
 private:
-    void extractScene();
 
     void extractAlocs();
 

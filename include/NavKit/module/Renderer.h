@@ -57,7 +57,7 @@ public:
 
     void finalizeFrame() const;
 
-    void drawBounds() const;
+    static void drawBounds();
 
     void drawAxes();
 

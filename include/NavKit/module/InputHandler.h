@@ -1,4 +1,5 @@
 #pragma once
+#include <SDL_syswm.h>
 
 class InputHandler {
     explicit InputHandler();
@@ -11,15 +12,14 @@ public:
 
     int handleInput();
 
-    void hitTest();
+    void hitTest() const;
 
-    void handleMovement(float dt, double *modelviewMatrix);
+
+    void handleMovement(float dt, const double *modelviewMatrix);
 
     int mousePos[2]{};
     int origMousePos[2]{};
     int mouseScroll;
-    bool resized;
-    bool moved;
 
     float scrollZoom;
     bool rotate;
@@ -35,5 +35,9 @@ public:
     float moveUp;
     float moveDown;
 
-    static const int QUIT;
+    static constexpr int QUIT = 1;
+    static constexpr float BASE_KEYBOARD_SPEED = 22.0f;
+    static constexpr float SHIFT_SPEED_MULTIPLIER = 4.0f;
+    static constexpr float CTRL_SPEED_DIVISOR = 4.0f;
+    static constexpr float CAMERA_ROTATION_SENSITIVITY = 0.25f;
 };

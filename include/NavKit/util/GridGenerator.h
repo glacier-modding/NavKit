@@ -14,14 +14,14 @@ public:
         return instance;
     }
 
-    static bool initRecastAirgAdapter();
+    bool initRecastAirgAdapter();
 
     std::unordered_map<int, std::vector<int> > m_WaypointMap{};
     std::map<int, std::vector<Pathfinding::SGCell> > waypointCells{};
 
-    static void build();
+    void build();
 
-    void addVisibilityData(ReasoningGrid *grid);
+    static void addVisibilityData(ReasoningGrid *grid);
 
     void GenerateGrid();
 
@@ -54,4 +54,6 @@ public:
     static void CalculateConnectivity(const bool *cellBitmap, int *pCellConnectivity);
 
     static void GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap);
+
+    std::optional<std::jthread> backgroundWorker;
 };

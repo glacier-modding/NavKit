@@ -5,6 +5,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #include "../../RecastDemo/Sample_TileMesh.h"
 
@@ -38,9 +40,13 @@ public:
 
     void log(int category, const std::string &message) const;
 
+    void showRecastDialog();
+
     void drawInputGeom() const;
 
     [[nodiscard]] bool loadInputGeom(const std::string &fileName) const;
+
+    void setTileSettings(const float *bBoxMin, const float *bBoxMax) const;
 
     void setMeshBBox(const float *bBoxMin, const float *bBoxMax) const;
 
@@ -49,6 +55,8 @@ public:
     [[nodiscard]] const float *getBBoxMax() const;
 
     [[nodiscard]] std::pair<int, int> getGridSize() const;
+
+    void setSceneBBoxToMesh() const;
 
     void handleMeshChanged() const;
 
@@ -62,7 +70,7 @@ public:
 
     void resetCommonSettings() const;
 
-    void renderRecastNavmesh(bool isAirgInstance);
+    void renderRecastNavmesh(bool isAirgInstance) const;
 
     dtPolyRef getPoly(int tileIndex, int polyIndex) const;
 
@@ -133,6 +141,8 @@ public:
     float markerPosition[3]{};
     std::string selectedObject;
 
+    static HWND hRecastDialog;
 private:
     std::vector<dtPolyRef> pfSeedPointAreas;
+    static INT_PTR CALLBACK RecastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

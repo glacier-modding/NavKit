@@ -15,7 +15,6 @@
 #include <GL/glew.h>
 #include <GL/glu.h>
 
-#include "../../include/NavKit/module/Obj.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
 
@@ -23,7 +22,6 @@ Gui::Gui() {
     showMenu = true;
     showLog = true;
     logScroll = 0;
-    collapsedLogScroll = 0;
     lastLogCount = -1;
     mouseOverMenu = false;
 }
@@ -33,8 +31,8 @@ void Gui::drawGui() {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    InputHandler &inputHandler = InputHandler::getInstance();
-    Renderer &renderer = Renderer::getInstance();
+    const InputHandler &inputHandler = InputHandler::getInstance();
+    const Renderer &renderer = Renderer::getInstance();
     gluOrtho2D(0, renderer.width, 0, renderer.height);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -42,63 +40,57 @@ void Gui::drawGui() {
     imguiBeginFrame(inputHandler.mousePos[0], inputHandler.mousePos[1],
                     inputHandler.mouseButtonMask, inputHandler.mouseScroll);
     if (showMenu) {
-        const char msg[] =
+        constexpr char msg[] =
                 "W/S/A/D/Q/E: Move  LMB: Select / Deselect RMB: Rotate  Tab: Show / Hide UI  Ctrl: Slow camera movement  Shift: Fast camera movement";
-        imguiDrawText(280, renderer.height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
+        imguiDrawText(10, renderer.height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
         char cameraPosMessage[128];
         snprintf(cameraPosMessage, sizeof cameraPosMessage, "Camera position: %f, %f, %f",
                  renderer.cameraPos[0], renderer.cameraPos[1], renderer.cameraPos[2]);
-        imguiDrawText(280, renderer.height - 40, IMGUI_ALIGN_LEFT, cameraPosMessage,
+        imguiDrawText(10, renderer.height - 40, IMGUI_ALIGN_LEFT, cameraPosMessage,
                       imguiRGBA(255, 255, 255, 128));
         char cameraAngleMessage[128];
         snprintf(cameraAngleMessage, sizeof cameraAngleMessage, "Camera angles: %f, %f",
                  renderer.cameraEulers[0], renderer.cameraEulers[1]);
-        imguiDrawText(280, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
+        imguiDrawText(10, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
                       imguiRGBA(255, 255, 255, 128));
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
+        char selectedNavpText[64];
         Navp &navp = Navp::getInstance();
-        Airg &airg = Airg::getInstance();
-        Obj &obj = Obj::getInstance();
-        Scene &scene = Scene::getInstance();
-        Settings &settings = Settings::getInstance();
-        navp.drawMenu();
-        airg.drawMenu();
-        obj.drawMenu();
-        sceneExtract.drawMenu();
-        scene.drawMenu();
-        settings.drawMenu();
+        snprintf(selectedNavpText, sizeof selectedNavpText,
+                 navp.selectedNavpAreaIndex != -1 ? "Selected Area Index: %d" : "Selected Area Index: None",
+                 navp.selectedNavpAreaIndex + 1);
+        imguiDrawText(10, renderer.height - 80, IMGUI_ALIGN_LEFT, selectedNavpText,
+                      imguiRGBA(255, 255, 255, 128));
+        char selectedAirgText[64];
+        const Airg &airg = Airg::getInstance();
+        snprintf(selectedAirgText, sizeof selectedAirgText,
+                 airg.selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
+                 airg.selectedWaypointIndex);
+        imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
+                      imguiRGBA(255, 255, 255, 128));
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
 
-        int consoleHeight = showLog ? 220 : 60;
-        int consoleWidth = showLog ? renderer.width - 310 - 250 : 100;
-        if (imguiBeginScrollArea("Log", 250 + 20, 20, consoleWidth, consoleHeight, &logScroll))
-            mouseOverMenu = true;
         if (showLog) {
-            RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+            if (imguiBeginScrollArea("Log", 20, 20,
+                                     renderer.width - 40,
+                                     renderer.height > 440
+                                         ? 220
+                                         : static_cast<int>(static_cast<double>(renderer.height) * 0.2),
+                                     &logScroll)) {
+                mouseOverMenu = true;
+            }
             std::lock_guard lock(recastAdapter.getLogMutex());
 
-            std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
+            const std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
             for (auto it = logBuffer.cbegin();
                  it != logBuffer.cend(); ++it) {
                 imguiLabel(it->c_str());
             }
-            const int logCount = recastAdapter.getLogCount();
-            if (lastLogCount != logCount) {
+            if (const int logCount = recastAdapter.getLogCount(); lastLogCount != logCount) {
                 logScroll = std::max(0, logCount * 20 - 160);
                 lastLogCount = logCount;
             }
+            imguiEndScrollArea();
         }
-        if (imguiCheck("Show Log", showLog)) {
-            if (showLog) {
-                showLog = false;
-                collapsedLogScroll = logScroll;
-                logScroll = 0;
-            } else {
-                showLog = true;
-                logScroll = collapsedLogScroll;
-            }
-        }
-
-        imguiEndScrollArea();
     }
 
     imguiEndFrame();

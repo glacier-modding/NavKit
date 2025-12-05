@@ -25,6 +25,7 @@
 #include "../include/NavKit/module/Gui.h"
 #include "../include/NavKit/module/InputHandler.h"
 #include "../include/NavKit/module/Logger.h"
+#include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/Navp.h"
 #include "../include/NavKit/module/Obj.h"
 #include "../include/NavKit/module/Renderer.h"
@@ -46,27 +47,23 @@ int SDL_main(const int argc, char **argv) {
             if (!renderer.initWindowAndRenderer()) {
                 return -1;
             }
+            SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 
             UpdateChecker &updateChecker = UpdateChecker::getInstance();
             updateChecker.startUpdateCheck();
+
             SceneExtract &sceneExtract = SceneExtract::getInstance();
             Navp &navp = Navp::getInstance();
             Obj &obj = Obj::getInstance();
             Airg &airg = Airg::getInstance();
             InputHandler &inputHandler = InputHandler::getInstance();
+            Menu::updateMenuState();
             Gui &gui = Gui::getInstance();
+            bool isRunning = true;
             Logger::log(NK_INFO, "NavKit initialized.");
-            while (true) {
+            while (isRunning) {
                 if (inputHandler.handleInput() == InputHandler::QUIT) {
-                    break;
-                }
-                if (inputHandler.resized) {
-                    renderer.handleResize();
-                    inputHandler.resized = false;
-                }
-                if (inputHandler.moved) {
-                    renderer.updateFrameRate();
-                    inputHandler.moved = false;
+                    isRunning = false;
                 }
                 renderer.renderFrame();
                 inputHandler.hitTest();

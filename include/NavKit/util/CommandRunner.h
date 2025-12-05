@@ -14,7 +14,7 @@ public:
         return instance;
     }
 
-    static void runCommand(std::string command, std::string logFileName, std::function<void()> callback,
+    void runCommand(std::string command, std::string logFileName, std::function<void()> callback,
                            std::function<void()> errorCallback);
 
     bool closing;

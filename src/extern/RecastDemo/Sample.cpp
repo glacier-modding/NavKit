@@ -15,6 +15,8 @@
 //    misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 //
+// This source has been modified from the original by Daniel Bierek for use
+// in NavKit.
 
 #include <math.h>
 #include <stdio.h>
@@ -452,6 +454,7 @@ struct PolyInfo {
 	int tilePolyIndex;
 	int totalPolyIndex;
 };
+
 void Sample::saveAll(const char* s_OutputFileName)
 {
 	const dtNavMesh* mesh = m_navMesh;
@@ -515,9 +518,6 @@ void Sample::saveAll(const char* s_OutputFileName)
 			}
 			f << "{";
 			f << R"("Area":{"Index":)" << indexToPolyInfo[totalIndex].totalPolyIndex;
-			if (poly.flags == SAMPLE_POLYFLAGS_SWIM) { // Debug way to check pruned areas
-				f << R"(,"Type": "Steps")";
-			}
 			f << "},";
 			f << "\"Edges\":[";
 

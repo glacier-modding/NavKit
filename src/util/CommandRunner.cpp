@@ -1,3 +1,4 @@
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <filesystem>
 
@@ -22,10 +23,9 @@ CommandRunner::~CommandRunner() {
 
 void CommandRunner::runCommand(std::string command, std::string logFileName, std::function<void()> callback,
                                std::function<void()> errorCallback) {
-    CommandRunner &commandRunner = getInstance();
-    int commandIndex = commandRunner.commandsRun;
-    commandRunner.commandsRun++;
-    commandRunner.handles.emplace(std::pair<int, std::vector<HANDLE> >(commandIndex, {}));
+    int commandIndex = commandsRun;
+    commandsRun++;
+    handles.emplace(std::pair<int, std::vector<HANDLE> >(commandIndex, {}));
     SECURITY_ATTRIBUTES saAttr = {sizeof(saAttr), nullptr, TRUE};
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
@@ -65,12 +65,12 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
     std::vector<char> output;
     char buffer[4096];
     DWORD bytesRead;
-    commandRunner.handles[commandIndex].push_back(hReadPipe);
-    commandRunner.handles[commandIndex].push_back(pi.hProcess);
-    commandRunner.handles[commandIndex].push_back(pi.hThread);
+    handles[commandIndex].push_back(hReadPipe);
+    handles[commandIndex].push_back(pi.hProcess);
+    handles[commandIndex].push_back(pi.hThread);
 
     while (true) {
-        if (commandRunner.closing) {
+        if (closing) {
             return;
         }
         if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0)) {
@@ -99,9 +99,9 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             CloseHandle(hReadPipe);
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
-            commandRunner.handles[commandIndex].pop_back();
-            commandRunner.handles[commandIndex].pop_back();
-            commandRunner.handles[commandIndex].pop_back();
+            handles[commandIndex].pop_back();
+            handles[commandIndex].pop_back();
+            handles[commandIndex].pop_back();
             errorCallback();
             return;
         }
@@ -119,9 +119,9 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             CloseHandle(hReadPipe);
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
-            commandRunner.handles[commandIndex].pop_back();
-            commandRunner.handles[commandIndex].pop_back();
-            commandRunner.handles[commandIndex].pop_back();
+            handles[commandIndex].pop_back();
+            handles[commandIndex].pop_back();
+            handles[commandIndex].pop_back();
             std::string errorMessage = lastOutput.data();
             errorMessage += output.data();
             errorMessage +=
@@ -150,7 +150,7 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
         }
     }
 
-    if (commandRunner.closing) {
+    if (closing) {
         return;
     }
 
@@ -159,9 +159,9 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
     CloseHandle(hReadPipe);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    commandRunner.handles[commandIndex].pop_back();
-    commandRunner.handles[commandIndex].pop_back();
-    commandRunner.handles[commandIndex].pop_back();
+    handles[commandIndex].pop_back();
+    handles[commandIndex].pop_back();
+    handles[commandIndex].pop_back();
 
     callback();
 }

@@ -9,9 +9,9 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
 #include "../../include/NavKit/module/Airg.h"
-#include "../../include/NavKit/module/GameConnection.h"
-#include "../../include/NavKit/module/Gui.h"
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
@@ -20,7 +20,6 @@
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
-#include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/InputGeom.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceLib.h"
@@ -28,51 +27,27 @@
 
 
 Navp::Navp()
-    : navMesh(new NavPower::NavMesh())
-      , selectedNavpAreaIndex(-1)
-      , selectedPfSeedPointIndex(-1)
-      , selectedExclusionBoxIndex(-1)
-      , navpLoaded(false)
-      , showNavp(true)
-      , showNavpIndices(false)
-      , showPfExclusionBoxes(true)
-      , showPfSeedPoints(true)
-      , showRecastDebugInfo(false)
-      , doNavpHitTest(false)
-      , doNavpExclusionBoxHitTest(false)
-      , doNavpPfSeedPointHitTest(false)
-      , navpScroll(0)
-      , loading(false)
-      , bBoxPosX(0.0)
-      , bBoxPosY(0.0)
-      , bBoxPosZ(0.0)
-      , bBoxScaleX(1000.0)
-      , bBoxScaleY(300.0)
-      , bBoxScaleZ(1000.0)
-      , lastBBoxPosX(0.0)
-      , lastBBoxPosY(0.0)
-      , lastBBoxPosZ(0.0)
-      , lastBBoxScaleX(1000.0)
-      , lastBBoxScaleY(300.0)
-      , lastBBoxScaleZ(1000.0)
-      , stairsCheckboxValue(false)
-      , pruningMode(1.0f)
-      , loadNavpName("Load Navp")
-      , lastLoadNavpFile(loadNavpName)
-      , saveNavpName("Save Navp")
-      , lastSaveNavpFile(saveNavpName)
-      , building(false) {
-    bBoxPos[0] = 0;
-    bBoxPos[1] = 0;
-    bBoxPos[2] = 0;
-    bBoxScale[0] = 1000;
-    bBoxScale[1] = 300;
-    bBoxScale[2] = 1000;
-    Logger::log(NK_INFO,
-                ("Setting bbox to (" + std::to_string(bBoxPos[0]) + ", " + std::to_string(bBoxPos[1]) + ", " +
-                 std::to_string(bBoxPos[2]) + ") (" + std::to_string(bBoxScale[0]) + ", " + std::to_string(bBoxScale[1])
-                 +
-                 ", " + std::to_string(bBoxScale[2]) + ")").c_str());
+    : navMesh(new NavPower::NavMesh()),
+      selectedNavpAreaIndex(-1),
+      selectedPfSeedPointIndex(-1),
+      selectedExclusionBoxIndex(-1),
+      navpLoaded(false),
+      showNavp(true),
+      showNavpIndices(false),
+      showPfExclusionBoxes(true),
+      showPfSeedPoints(true),
+      showRecastDebugInfo(false),
+      doNavpHitTest(false),
+      doNavpExclusionBoxHitTest(false),
+      doNavpPfSeedPointHitTest(false),
+      navpScroll(0),
+      loading(false),
+      stairsCheckboxValue(false),
+      building(false),
+      loadNavpName("Load Navp"),
+      lastLoadNavpFile(loadNavpName),
+      saveNavpName("Save Navp"),
+      lastSaveNavpFile(saveNavpName) {
 }
 
 Navp::~Navp() = default;
@@ -123,21 +98,6 @@ void Navp::renderPfSeedPointsForHitTest() const {
     }
 }
 
-void Navp::resetDefaults() {
-    bBoxPosX = 0.0;
-    bBoxPosY = 0.0;
-    bBoxPosZ = 0.0;
-    bBoxScaleX = 1000.0;
-    bBoxScaleY = 300.0;
-    bBoxScaleZ = 1000.0;
-    lastBBoxPosX = 0.0;
-    lastBBoxPosY = 0.0;
-    lastBBoxPosZ = 0.0;
-    lastBBoxScaleX = 1000.0;
-    lastBBoxScaleY = 300.0;
-    lastBBoxScaleZ = 1000.0;
-}
-
 void Navp::renderExclusionBoxes() const {
     if (showPfExclusionBoxes) {
         Renderer &renderer = Renderer::getInstance();
@@ -184,46 +144,14 @@ void Navp::renderExclusionBoxesForHitTest() const {
     }
 }
 
-char *Navp::openLoadNavpFileDialog(const char *lastNavpFolder) {
+char *Navp::openLoadNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
-    return FileUtil::openNfdLoadDialog(filters, 2, lastNavpFolder);
+    return FileUtil::openNfdLoadDialog(filters, 2);
 }
 
-char *Navp::openSaveNavpFileDialog(char *lastNavpFolder) {
+char *Navp::openSaveNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 2, "output", lastNavpFolder);
-}
-
-void Navp::setBBox(const float *pos, const float *scale) {
-    Navp &navp = getInstance();
-    bBoxPos[0] = pos[0];
-    navp.bBoxPosX = pos[0];
-    bBoxPos[1] = pos[1];
-    navp.bBoxPosY = pos[1];
-    bBoxPos[2] = pos[2];
-    navp.bBoxPosZ = pos[2];
-    bBoxScale[0] = scale[0];
-    navp.bBoxScaleX = scale[0];
-    bBoxScale[1] = scale[1];
-    navp.bBoxScaleY = scale[1];
-    bBoxScale[2] = scale[2];
-    navp.bBoxScaleZ = scale[2];
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    const float bBoxMin[3] = {
-        bBoxPos[0] - bBoxScale[0] / 2,
-        bBoxPos[1] - bBoxScale[1] / 2,
-        bBoxPos[2] - bBoxScale[2] / 2
-    };
-    const float bBoxMax[3] = {
-        bBoxPos[0] + bBoxScale[0] / 2,
-        bBoxPos[1] + bBoxScale[1] / 2,
-        bBoxPos[2] + bBoxScale[2] / 2
-    };
-    recastAdapter.setMeshBBox(bBoxMin, bBoxMax);
-    Logger::log(NK_INFO,
-                ("Setting bbox to (" + std::to_string(pos[0]) + ", " + std::to_string(pos[1]) + ", " +
-                 std::to_string(pos[2]) + ") (" + std::to_string(scale[0]) + ", " + std::to_string(scale[1]) + ", " +
-                 std::to_string(scale[2]) + ")").c_str());
+    return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {
@@ -261,7 +189,7 @@ void Navp::setStairsFlags() const {
     }
 }
 
-void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
+void Navp::renderArea(const NavPower::Area &area, const bool selected) {
     if (areaIsStairs(area)) {
         if (!selected) {
             glColor4f(0.5, 0.5, 0.0, 1.0);
@@ -272,19 +200,19 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
         if (!selected) {
             glColor4f(0.0, 0.5, 0.0, 1.0);
         } else {
-            glColor4f(0.0, 0.5, 0.5, 1.0);
+            glColor4f(0.0, 0.9, 0.0, 1.0);
         }
     }
     glBegin(GL_POLYGON);
-    for (auto vertex: area.m_edges) {
+    for (const auto vertex: area.m_edges) {
         glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
     }
     glEnd();
     glBegin(GL_LINES);
     bool previousWasPortal = false;
     bool isFirstVertex = true;
-    Vec3 firstVertex{area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Z + 0.01f, -area.m_edges[0]->m_pos.Y};
-    for (auto vertex: area.m_edges) {
+    const Vec3 firstVertex{area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Z + 0.01f, -area.m_edges[0]->m_pos.Y};
+    for (const auto vertex: area.m_edges) {
         if (!isFirstVertex) {
             if (previousWasPortal) {
                 glColor3f(1.0, 1.0, 1.0);
@@ -332,7 +260,7 @@ void Navp::renderArea(NavPower::Area area, bool selected, int areaIndex) {
     }
 }
 
-void Navp::setSelectedNavpAreaIndex(int index) {
+void Navp::setSelectedNavpAreaIndex(const int index) {
     if (index == -1 && selectedNavpAreaIndex != -1) {
         Logger::log(NK_INFO, ("Deselected area: " + std::to_string(selectedNavpAreaIndex + 1)).c_str());
     }
@@ -350,7 +278,7 @@ void Navp::setSelectedNavpAreaIndex(int index) {
         snprintf(v, sizeof(v), "%.2f", pos.Z);
         msg += ", " + std::string{v} + ") Edges: [";
         int edgeIndex = 0;
-        for (auto vertex: selectedArea.m_edges) {
+        for (const auto vertex: selectedArea.m_edges) {
             msg += std::to_string(edgeIndex + 1) + ": (";
             snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
             msg += std::string{v};
@@ -361,28 +289,29 @@ void Navp::setSelectedNavpAreaIndex(int index) {
             edgeIndex++;
         }
         msg += "]";
-        Vec3 normal = selectedArea.CalculateNormal();
-        Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
-        float horizontalMagnitude = std::sqrt(
+        const Vec3 normal = selectedArea.CalculateNormal();
+        const Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
+        const float horizontalMagnitude = std::sqrt(
             horizontalProjection.X * horizontalProjection.X + horizontalProjection.Z * horizontalProjection.Z);
         float angleDegrees = 0;
         if (horizontalMagnitude == 0.0f) {
             angleDegrees = 90;
         } else {
-            float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
-            float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
+            const float dotProduct = normal.X * horizontalProjection.X + normal.Z * horizontalProjection.Z;
+            const float normalMagnitude = std::sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
             float cosineAngle = dotProduct / (normalMagnitude * horizontalMagnitude);
             cosineAngle = std::clamp(cosineAngle, -1.0f, 1.0f);
-            float angleRadians = std::acos(cosineAngle);
+            const float angleRadians = std::acos(cosineAngle);
             angleDegrees = angleRadians * 180.0f / M_PI;
         }
         msg += " Angle: " + std::to_string(angleDegrees);
         Logger::log(NK_INFO, (msg).c_str());
     }
+    Menu::updateMenuState();
 }
 
-void Navp::setSelectedPfSeedPointIndex(int index) {
-    Scene &scene = Scene::getInstance();
+void Navp::setSelectedPfSeedPointIndex(const int index) {
+    const Scene &scene = Scene::getInstance();
 
     if (index == -1 && selectedPfSeedPointIndex != -1) {
         auto &selectedPFSeedPoint = scene.pfSeedPoints[selectedPfSeedPointIndex];
@@ -448,7 +377,7 @@ void Navp::renderNavMesh() {
     if (!loading) {
         int areaIndex = 0;
         for (const NavPower::Area &area: navMesh->m_areas) {
-            renderArea(area, areaIndex == selectedNavpAreaIndex, areaIndex);
+            renderArea(area, areaIndex == selectedNavpAreaIndex);
             areaIndex++;
         }
         Vec3 colorRed = {1.0f, 0.4f, 0.4f};
@@ -506,7 +435,6 @@ void Navp::loadNavMeshFileData(const std::string &fileName) {
     if (!std::filesystem::is_regular_file(fileName))
         throw std::runtime_error("Input path is not a regular file.");
 
-    // Read the entire file to memory.
     const long s_FileSize = std::filesystem::file_size(fileName);
 
     if (s_FileSize < sizeof(NavPower::NavMesh))
@@ -517,42 +445,40 @@ void Navp::loadNavMeshFileData(const std::string &fileName) {
     if (!s_FileStream)
         throw std::runtime_error("Error creating input file stream.");
 
-    void *s_FileData = malloc(s_FileSize);
-    s_FileStream.read(static_cast<char *>(s_FileData), s_FileSize);
+    navMeshFileData.resize(s_FileSize);
 
-    s_FileStream.close();
-
-    getInstance().navMeshFileData = s_FileData;
+    s_FileStream.read(navMeshFileData.data(), s_FileSize);
 }
 
-void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuilding, bool loadAirgNavp) {
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg) {
+    const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.c_str());
-    auto start = std::chrono::high_resolution_clock::now();
-    Navp &navp = loadAirgNavp ? getAirgInstance() : getInstance();
-    navp.loading = true;
-    CPPTRACE_TRY {
-        NavPower::NavMesh newNavMesh = isFromJson
-                                           ? LoadNavMeshFromJson(fileName.c_str())
-                                           : LoadNavMeshFromBinary(fileName.c_str());
-        std::swap(*navp.navMesh, newNavMesh);
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
-        if (isFromBuilding) {
-            navp.setStairsFlags();
-            navp.outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-            OutputNavMesh_JSON_Write(navp.navMesh, (navp.outputNavpFilename + ".json").c_str());
-            NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((navp.outputNavpFilename + ".json").c_str());
-            std::swap(*navp.navMesh, reloadedNavMesh);
+    const auto start = std::chrono::high_resolution_clock::now();
+    loading = true;
+    CPPTRACE_TRY
+        {
+            NavPower::NavMesh newNavMesh = isFromJson
+                                               ? LoadNavMeshFromJson(fileName.c_str())
+                                               : LoadNavMeshFromBinary(fileName.c_str());
+            std::swap(*navMesh, newNavMesh);
+            const SceneExtract &sceneExtract = SceneExtract::getInstance();
+            if (isFromBuildingNavp || isFromBuildingAirg) {
+                setStairsFlags();
+                outputNavpFilename = sceneExtract.outputFolder + (isFromBuildingNavp ? "\\output.navp" : "\\outputForAirg.navp");
+                OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
+                NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
+                std::swap(*navMesh, reloadedNavMesh);
+            }
+            if (isFromJson) {
+                OutputNavMesh_NAVP_Write(navMesh, outputNavpFilename.c_str());
+                loadNavMeshFileData(outputNavpFilename);
+            } else {
+                loadNavMeshFileData(fileName);
+            }
         }
-        if (isFromJson) {
-            OutputNavMesh_NAVP_Write(navp.navMesh, navp.outputNavpFilename.c_str());
-            loadNavMeshFileData(navp.outputNavpFilename);
-        } else {
-            loadNavMeshFileData(fileName);
-        }
-    } CPPTRACE_CATCH(const std::exception& e) {
+    CPPTRACE_CATCH(const std::exception& e) {
         msg = "Error loading Navp file '";
         msg += fileName;
         msg += "': ";
@@ -575,42 +501,58 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     msg += std::to_string(duration.count());
     msg += " seconds";
     Logger::log(NK_INFO, msg.c_str());
-    navp.setSelectedNavpAreaIndex(-1);
-    navp.loading = false;
-    navp.navpLoaded = true;
-    navp.buildAreaMaps();
+    setSelectedNavpAreaIndex(-1);
+    loading = false;
+    navpLoaded = true;
+    Menu::updateMenuState();
+    buildAreaMaps();
+    if (Airg &airg = Airg::getInstance(); SceneExtract::getInstance().alsoBuildAll && airg.canBuildAirg()) {
+        airg.handleBuildAirgClicked();
+    }
 }
 
 void Navp::buildNavp() {
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Building Navp at ";
-    msg += std::ctime(&start_time);
-    Logger::log(NK_INFO, msg.data());
-    auto start = std::chrono::high_resolution_clock::now();
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    Navp &navp = getInstance();
-    navp.updateExclusionBoxConvexVolumes();
-    navp.building = true;
-    Logger::log(NK_INFO, "Beginning Recast build...");
-    if (recastAdapter.handleBuild()) {
-        Logger::log(NK_INFO, "Done with Recast build.");
-        if (navp.pruningMode != 0.0) {
+    CPPTRACE_TRY
+    {
+        std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::string msg = "Building Navp at ";
+        msg += std::ctime(&start_time);
+        Logger::log(NK_INFO, msg.data());
+        auto start = std::chrono::high_resolution_clock::now();
+        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        updateExclusionBoxConvexVolumes();
+        building = true;
+        Menu::updateMenuState();
+        Logger::log(NK_INFO, "Beginning Recast build...");
+        if (recastAdapter.handleBuild()) {
+            Logger::log(NK_INFO, "Done with Recast build.");
             Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
             recastAdapter.findPfSeedPointAreas();
             recastAdapter.excludeNonReachableAreas();
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+            navpBuildDone.store(true);
+            msg = "Finished building Navp in ";
+            msg += std::to_string(duration.count());
+            msg += " seconds";
+            Logger::log(NK_INFO, msg.data());
+            setSelectedNavpAreaIndex(-1);
+            Menu::updateMenuState();
+        } else {
+            Logger::log(NK_ERROR, "Error building Navp");
+            building = false;
+            navpBuildDone.store(false);
+            Menu::updateMenuState();
         }
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        navp.navpBuildDone.push_back(true);
-        msg = "Finished building Navp in ";
-        msg += std::to_string(duration.count());
-        msg += " seconds";
-        Logger::log(NK_INFO, msg.data());
-        navp.setSelectedNavpAreaIndex(-1);
-    } else {
-        Logger::log(NK_ERROR, "Error building Navp");
-        navp.building = false;
-        navp.navpBuildDone.clear();
+    }
+    CPPTRACE_CATCH(const std::exception& e) {
+        std::string msg = "Error building Navp: ";
+        msg += e.what();
+        msg += " Stack trace: ";
+        msg += cpptrace::from_current_exception().to_string();
+        Logger::log(NK_ERROR, msg.c_str());
+    } catch (...) {
+        Logger::log(NK_ERROR, "Error building Navp.");
     }
 }
 
@@ -628,176 +570,113 @@ void Navp::setLastSaveFileName(const char *fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
-void Navp::drawMenu() {
-    Renderer &renderer = Renderer::getInstance();
-    Gui &gui = Gui::getInstance();
-    int navpMenuHeight = std::min(1310, renderer.height - 20);
-    if (imguiBeginScrollArea("Navp menu", 10, renderer.height - navpMenuHeight - 10, 250, navpMenuHeight,
-                             &navpScroll))
-        gui.mouseOverMenu = true;
-    if (imguiCheck("Show Navp", showNavp))
-        showNavp = !showNavp;
-    if (imguiCheck("Show Navp Indices", showNavpIndices))
-        showNavpIndices = !showNavpIndices;
-    if (imguiCheck("Show Pathfinding Exclusion Boxes", showPfExclusionBoxes))
-        showPfExclusionBoxes = !showPfExclusionBoxes;
-    if (imguiCheck("Show Pathfinding Seed Points", showPfSeedPoints))
-        showPfSeedPoints = !showPfSeedPoints;
-    if (imguiCheck("Show Recast Debug info", showRecastDebugInfo))
-        showRecastDebugInfo = !showRecastDebugInfo;
-    imguiLabel("Load Navp from file");
-    if (imguiButton(loadNavpName.c_str(), navpLoadDone.empty())) {
-        char *fileName = openLoadNavpFileDialog(lastLoadNavpFile.data());
-        if (fileName) {
-            setLastLoadFileName(fileName);
-            std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
-            std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+void Navp::handleOpenNavpClicked() {
+    char *fileName = openLoadNavpFileDialog();
+    if (fileName) {
+        setLastLoadFileName(fileName);
+        std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
-            if (extension == "JSON") {
-                std::string msg = "Loading Navp.json file: '";
-                msg += fileName;
-                msg += "'...";
-                Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), true, false, false);
-                loadNavMeshThread.detach();
-            } else if (extension == "NAVP") {
-                std::string msg = "Loading Navp file: '";
-                msg += fileName;
-                msg += "'...";
-                Logger::log(NK_INFO, msg.data());
-                std::thread loadNavMeshThread(&Navp::loadNavMesh, lastLoadNavpFile.data(), false, false, false);
-                loadNavMeshThread.detach();
-            }
-        }
-    }
-    imguiLabel("Save Navp to file");
-    if (imguiButton(saveNavpName.c_str(), navpLoaded)) {
-        char *fileName = openSaveNavpFileDialog(lastLoadNavpFile.data());
-        if (fileName) {
-            setLastSaveFileName(fileName);
-            std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
-            std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-            std::string msg = "Saving Navp";
-            if (extension == "JSON") {
-                msg += ".Json";
-            }
-            msg += " file: '";
+        if (extension == "JSON") {
+            std::string msg = "Loading Navp.json file: '";
             msg += fileName;
             msg += "'...";
             Logger::log(NK_INFO, msg.data());
-            SceneExtract &sceneExtract = SceneExtract::getInstance();
-            if (extension == "JSON") {
-                OutputNavMesh_JSON_Write(navMesh, lastSaveNavpFile.data());
-            } else if (extension == "NAVP") {
-                outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp";
-                std::string tempOutputJSONFilename = outputNavpFilename + ".json";
-                OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.data());
-                NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.data());
-                std::swap(*navMesh, newNavMesh);
-                OutputNavMesh_NAVP_Write(navMesh, lastSaveNavpFile.data());
-                buildAreaMaps();
-            }
-            Logger::log(NK_INFO, "Done saving Navp.");
+            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
+        } else if (extension == "NAVP") {
+            std::string msg = "Loading Navp file: '";
+            msg += fileName;
+            msg += "'...";
+            Logger::log(NK_INFO, msg.data());
+            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
         }
     }
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    Obj &obj = Obj::getInstance();
-    if (imguiButton("Build Navp from Obj and Scene",
-                    navpBuildDone.empty() && !building && recastAdapter.inputGeom && obj.objLoaded && !
-                    Airg::getInstance().airgBuilding)) {
-        std::thread buildNavpThread(&Navp::buildNavp);
-        buildNavpThread.detach();
-    }
-    if (imguiButton("Send Navp to game", navpLoaded)) {
-        GameConnection &gameConnection = GameConnection::getInstance();
-        gameConnection.connectToGame();
-        gameConnection.sendNavp(navMesh);
-    }
-    imguiLabel("Selected Area");
-    char selectedNavpText[64];
-    snprintf(selectedNavpText, 64, selectedNavpAreaIndex != -1 ? "Area Index: %d" : "Area Index: None",
-             selectedNavpAreaIndex + 1);
-    imguiValue(selectedNavpText);
+}
 
-    if (imguiCheck("Stairs",
-                   selectedNavpAreaIndex == -1
-                       ? false
-                       : (selectedNavpAreaIndex < navMesh->m_areas.size()
-                              ? areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex])
-                              : false),
-                   selectedNavpAreaIndex != -1)) {
-        if (selectedNavpAreaIndex != -1) {
-            NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
-                                                NavPower::AreaUsageFlags::AREA_STEPS)
-                                                   ? NavPower::AreaUsageFlags::AREA_FLAT
-                                                   : NavPower::AreaUsageFlags::AREA_STEPS;
-            std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
-                                         NavPower::AreaUsageFlags::AREA_STEPS)
-                                            ? "AREA_FLAT"
-                                            : "AREA_STEPS";
-            Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
-            navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
+void Navp::saveNavMesh(const std::string &fileName, const std::string &extension) {
+    loading = true;
+
+    const auto start = std::chrono::high_resolution_clock::now();
+    Logger::log(NK_INFO, "Saving Navp to file: '%s'...", fileName.c_str());
+
+    try {
+        std::string upper_extension = extension;
+        std::ranges::transform(upper_extension, upper_extension.begin(), ::toupper);
+
+        if (upper_extension == "JSON") {
+            OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
+        } else if (upper_extension == "NAVP") {
+            const SceneExtract &sceneExtract = SceneExtract::getInstance();
+            const std::string tempOutputJSONFilename = sceneExtract.outputFolder + "\\temp_save.navp.json";
+
+            OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
+
+            NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.c_str());
+            std::swap(*navMesh, newNavMesh);
+
+            OutputNavMesh_NAVP_Write(navMesh, fileName.c_str());
+            buildAreaMaps();
         }
+
+        const auto end = std::chrono::high_resolution_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        Logger::log(NK_INFO, "Finished saving Navp in %lld ms.", duration.count());
+    } catch (const std::exception &e) {
+        Logger::log(NK_ERROR, "Error saving Navp file '%s': %s", fileName.c_str(), e.what());
+    } catch (...) {
+        Logger::log(NK_ERROR, "An unknown error occurred while saving Navp file '%s'", fileName.c_str());
     }
 
-    imguiLabel("PFSeedPoint Pruning Mode");
-    imguiSlider("Off             Delete             Debug", &pruningMode, 0.0f, 2.0f, 1.0f);
+    loading = false;
+}
 
-    recastAdapter.handleCommonSettings();
+void Navp::handleSaveNavpClicked() {
+    if (char *fileName = openSaveNavpFileDialog()) {
+        setLastSaveFileName(fileName);
+        std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
 
-    imguiLabel("Bounding Box");
+        backgroundWorker.emplace(&Navp::saveNavMesh, this, lastSaveNavpFile, extension);
+    }
+}
 
-    bool bboxChanged = false;
-    if (imguiSlider("Bounding Box Origin X", &bBoxPosX, -500.0f, 500.0f, 1.0f)) {
-        if (lastBBoxPosX != bBoxPosX) {
-            bboxChanged = true;
-            lastBBoxPosX = bBoxPosX;
-        }
-    }
-    if (imguiSlider("Bounding Box Origin Y", &bBoxPosY, -500.0f, 500.0f, 1.0f)) {
-        if (lastBBoxPosY != bBoxPosY) {
-            bboxChanged = true;
-            lastBBoxPosY = bBoxPosY;
-        }
-    }
-    if (imguiSlider("Bounding Box Origin Z", &bBoxPosZ, -500.0f, 500.0f, 1.0f)) {
-        if (lastBBoxPosZ != bBoxPosZ) {
-            bboxChanged = true;
-            lastBBoxPosZ = bBoxPosZ;
-        }
-    }
-    if (imguiSlider("Bounding Box Scale X", &bBoxScaleX, 1.0f, 800.0f, 1.0f)) {
-        if (lastBBoxScaleX != bBoxScaleX) {
-            bboxChanged = true;
-            lastBBoxScaleX = bBoxScaleX;
-        }
-    }
-    if (imguiSlider("Bounding Box Scale Y", &bBoxScaleY, 1.0f, 800.0f, 1.0f)) {
-        if (lastBBoxScaleY != bBoxScaleY) {
-            bboxChanged = true;
-            lastBBoxScaleY = bBoxScaleY;
-        }
-    }
-    if (imguiSlider("Bounding Box Scale Z", &bBoxScaleZ, 1.0f, 800.0f, 1.0f)) {
-        if (lastBBoxScaleZ != bBoxScaleZ) {
-            bboxChanged = true;
-            lastBBoxScaleZ = bBoxScaleZ;
-        }
-    }
-    if (imguiButton("Reset Defaults")) {
-        resetDefaults();
-        recastAdapter.resetCommonSettings();
-        float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
-        float bBoxScale[3] = {bBoxScaleX, bBoxScaleY, bBoxScaleZ};
-        setBBox(bBoxPos, bBoxScale);
-    }
+bool Navp::stairsAreaSelected() const {
+    return selectedNavpAreaIndex == -1
+               ? false
+               : selectedNavpAreaIndex < navMesh->m_areas.size()
+                     ? areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex])
+                     : false;
+}
 
-    if (bboxChanged) {
-        float bBoxPos[3] = {bBoxPosX, bBoxPosY, bBoxPosZ};
-        float bBoxScale[3] = {bBoxScaleX, bBoxScaleY, bBoxScaleZ};
-        setBBox(bBoxPos, bBoxScale);
+bool Navp::canBuildNavp() const {
+    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const Obj &obj = Obj::getInstance();
+    const Scene &scene = Scene::getInstance();
+    return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
+           Airg::getInstance().airgBuilding && scene.sceneLoaded;
+}
+
+bool Navp::canSave() const {
+    return navpLoaded && !loading && !building;
+}
+
+void Navp::handleEditStairsClicked() const {
+    if (selectedNavpAreaIndex != -1) {
+        NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+                                            NavPower::AreaUsageFlags::AREA_STEPS)
+                                               ? NavPower::AreaUsageFlags::AREA_FLAT
+                                               : NavPower::AreaUsageFlags::AREA_STEPS;
+        std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+                                     NavPower::AreaUsageFlags::AREA_STEPS)
+                                        ? "AREA_FLAT"
+                                        : "AREA_STEPS";
+        Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
+        navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
+        Menu::updateMenuState();
     }
-    imguiEndScrollArea();
+}
+
+void Navp::handleBuildNavpClicked() {
+    backgroundWorker.emplace(&Navp::buildNavp, this);
 }
 
 void Navp::buildAreaMaps() {
@@ -813,15 +692,15 @@ void Navp::buildAreaMaps() {
 }
 
 void Navp::finalizeBuild() {
-    if (!navpBuildDone.empty()) {
+    if (navpBuildDone) {
         navpLoaded = true;
-        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
-        outputNavpFilename = sceneExtract.lastOutputFolder + "\\output.navp.json";
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        const SceneExtract &sceneExtract = SceneExtract::getInstance();
+        outputNavpFilename = sceneExtract.outputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
-        std::thread loadNavMeshThread(&Navp::loadNavMesh, outputNavpFilename.data(), true, true, false);
-        loadNavMeshThread.detach();
-        navpBuildDone.clear();
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
+        navpBuildDone.store(false);
         building = false;
+        Menu::updateMenuState();
     }
 }

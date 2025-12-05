@@ -38,9 +38,13 @@ void UpdateChecker::performUpdateCheck() {
     httplib::Client cli("https://api.github.com");
     try {
         auto res = cli.Get("/repos/glacier-modding/NavKit/releases/latest");
+        if (res == nullptr) {
+            Logger::log(NK_ERROR, "GitHub API request failed");
+            return;
+        }
         if (res->status != 200) {
-            throw std::runtime_error(
-                "GitHub API request failed with status: " + std::to_string(res->status) + " and error: ");
+            Logger::log(NK_ERROR, "GitHub API request failed with status: %s", std::to_string(res->status));
+            return;
         }
         updateChecker.responseBody = res->body;
         simdjson::ondemand::parser parser;

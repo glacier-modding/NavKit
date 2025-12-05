@@ -1,5 +1,84 @@
 #include "../include/NavKit/Resource.h"
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+IDI_APPICON ICON                                             "resource/NavKitLogo.ico"
+
+IDR_NAVKITMENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "Open &Scene",                              IDM_FILE_OPEN_SCENE
+        MENUITEM "Open &Obj",                                IDM_FILE_OPEN_OBJ
+        MENUITEM "Open &Navp",                               IDM_FILE_OPEN_NAVP
+        MENUITEM "Open &Airg",                               IDM_FILE_OPEN_AIRG
+        MENUITEM SEPARATOR
+        MENUITEM "Save &Scene",                              IDM_FILE_SAVE_SCENE
+        MENUITEM "Save &Obj",                                IDM_FILE_SAVE_OBJ
+        MENUITEM "Save &Navp",                               IDM_FILE_SAVE_NAVP
+        MENUITEM "Save &Airg",                               IDM_FILE_SAVE_AIRG
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                                    IDM_FILE_EXIT
+    END
+
+    POPUP "&Edit"
+    BEGIN
+        MENUITEM "&Stairs Area",                             IDM_EDIT_NAVP_STAIRS
+        MENUITEM "&Connect Airg Waypoint Mode",              IDM_EDIT_AIRG_CONNECT_WAYPOINT
+    END
+
+    POPUP "&Settings"
+    BEGIN
+        MENUITEM "&NavKit Settings",                         IDM_SETTINGS_NAVKIT
+        MENUITEM "&Scene Settings",                          IDM_SETTINGS_SCENE
+        MENUITEM "&Recast Settings",                         IDM_SETTINGS_RECAST
+        MENUITEM "&Airg Settings",                           IDM_SETTINGS_AIRG
+    END
+    POPUP "&View"
+    BEGIN
+        MENUITEM "Show &Navp",                               IDM_VIEW_NAVP_SHOW_NAVP, CHECKED
+        MENUITEM "Show Navp &Indices",                       IDM_VIEW_NAVP_SHOW_INDICES
+        MENUITEM "Show &Exclusion Boxes",                    IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, CHECKED
+        MENUITEM "Show &Seed Points",                        IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, CHECKED
+        MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO
+        MENUITEM SEPARATOR
+        MENUITEM "Show &Airg",                               IDM_VIEW_AIRG_SHOW_AIRG, CHECKED
+        MENUITEM "Show Airg &Indices",                       IDM_VIEW_AIRG_SHOW_INDICES
+        MENUITEM "Show &Grid",                               IDM_VIEW_AIRG_SHOW_GRID, CHECKED
+        MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO
+        MENUITEM SEPARATOR
+        MENUITEM "Airg Cell: None",                          IDM_VIEW_AIRG_CELL_COLOR_OFF, CHECKED
+        MENUITEM "Airg Cell: Area Bitmap",                   IDM_VIEW_AIRG_CELL_COLOR_BITMAP
+        MENUITEM "Airg Cell: Vision Data",                   IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA
+        MENUITEM "Airg Cell: Layer",                         IDM_VIEW_AIRG_CELL_COLOR_LAYER
+        MENUITEM SEPARATOR
+        MENUITEM "Show &Obj",                                IDM_VIEW_OBJ_SHOW_OBJ, CHECKED
+        MENUITEM SEPARATOR
+        MENUITEM "Show &Log",                                IDM_VIEW_LOG_SHOW_LOG, CHECKED
+    END
+
+    POPUP "&Extract"
+    BEGIN
+        MENUITEM "Extract &Scene from game",                 IDM_EXTRACT_SCENE
+        MENUITEM "Extract Scene from game and build &Obj",   IDM_EXTRACT_SCENE_AND_BUILD_OBJ
+        MENUITEM "Extract Scene from game and build &all",   IDM_EXTRACT_SCENE_AND_BUILD_ALL
+    END
+
+    POPUP "&Build"
+    BEGIN
+        MENUITEM "Build Obj from &Scene",                    IDM_BUILD_OBJ_FROM_SCENE
+        MENUITEM "Build Obj from &Navp",                     IDM_BUILD_OBJ_FROM_NAVP
+        MENUITEM SEPARATOR
+        MENUITEM "Build &Navp from Obj and Scene",           IDM_BUILD_NAVP
+        MENUITEM SEPARATOR
+        MENUITEM "Build &Airg from Navp",                    IDM_BUILD_AIRG
+    END
+
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About",                                   IDM_HELP_ABOUT
+    END
+END
 
 IDD_ERROR_DIALOG DIALOGEX 300, 0, 500, 400
 STYLE DS_CENTER | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
@@ -10,6 +89,7 @@ BEGIN
     PUSHBUTTON      "Copy",IDC_COPY_BUTTON,450,380,40,14
     EDITTEXT        IDC_ERROR_TEXT,10,10,480,360,ES_MULTILINE | ES_READONLY | WS_VSCROLL
 END
+
 IDD_UPDATE_DIALOG DIALOGEX 300, 0, 300, 100
 STYLE DS_CENTER | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Update Now?"
@@ -19,4 +99,148 @@ BEGIN
     PUSHBUTTON      "No",IDNO,250,80,40,14
     CTEXT           "Update text",IDC_UPDATE_TEXT,10,10,280,60
 END
-IDI_ICON1               ICON    DISCARDABLE     "resource/NavKitLogo.ico"
+
+IDD_NAVKIT_SETTINGS DIALOGEX 0, 0, 480, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "NavKit Settings"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Background Color:",IDC_BG_COLOR_TEXT,7,12,70,8
+    CONTROL         "",IDC_SLIDER_BG_COLOR,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,85,10,388,15
+
+    LTEXT           "Hitman Directory:",IDC_HITMAN_DIR_TEXT,7,37,70,8
+    EDITTEXT        IDC_EDIT_HITMAN_PATH,85,35,340,12,ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Browse...",IDC_BUTTON_BROWSE_HITMAN,430,34,45,14
+
+    LTEXT           "Output Directory:",IDC_OUTPUT_DIR_TEXT,7,57,70,8
+    EDITTEXT        IDC_EDIT_OUTPUT_PATH,85,55,340,12,ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Browse...",IDC_BUTTON_BROWSE_OUTPUT,430,54,45,14
+
+    LTEXT           "Blender Executable:",IDC_BLENDER_PATH_TEXT,7,77,75,8
+    EDITTEXT        IDC_EDIT_BLENDER_PATH,85,75,340,12,ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Browse...",IDC_BUTTON_BROWSE_BLENDER,430,74,45,14
+
+    DEFPUSHBUTTON   "OK",IDOK,310,128,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,365,128,50,14
+    PUSHBUTTON      "Apply",IDC_APPLY,425,128,50,14
+END
+
+IDD_AIRG_MENU DIALOGEX 0, 0, 260, 95
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Airg Properties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Spacing:",IDC_STATIC,7,12,45,8
+    CONTROL         "",IDC_SLIDER_SPACING,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,10,150,15
+    LTEXT           "2.25",IDC_STATIC_SPACING_VAL,215,12,40,8
+
+    LTEXT           "X Offset:",IDC_STATIC,7,32,45,8
+    CONTROL         "",IDC_SLIDER_XOFFSET,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,30,150,15
+    LTEXT           "0.00",IDC_STATIC_XOFFSET_VAL,215,32,40,8
+
+    LTEXT           "Z Offset:",IDC_STATIC,7,52,45,8
+    CONTROL         "",IDC_SLIDER_ZOFFSET,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,50,150,15
+    LTEXT           "0.00",IDC_STATIC_ZOFFSET_VAL,215,52,40,8
+
+    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,190,75,65,14
+END
+
+IDD_SCENE_MENU DIALOGEX 0, 0, 260, 155
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Scene Properties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "BBox Pos X:",IDC_STATIC,7,12,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_POS_X,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,10,150,15
+    LTEXT           "0.00",IDC_STATIC_BBOX_POS_X_VAL,215,12,40,8
+
+    LTEXT           "BBox Pos Y:",IDC_STATIC,7,32,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_POS_Y,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,30,150,15
+    LTEXT           "0.00",IDC_STATIC_BBOX_POS_Y_VAL,215,32,40,8
+
+    LTEXT           "BBox Pos Z:",IDC_STATIC,7,52,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_POS_Z,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,50,150,15
+    LTEXT           "0.00",IDC_STATIC_BBOX_POS_Z_VAL,215,52,40,8
+
+    LTEXT           "BBox Scale X:",IDC_STATIC,7,72,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_SCALE_X,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,70,150,15
+    LTEXT           "1000.00",IDC_STATIC_BBOX_SCALE_X_VAL,215,72,40,8
+
+    LTEXT           "BBox Scale Y:",IDC_STATIC,7,92,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_SCALE_Y,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,90,150,15
+    LTEXT           "300.00",IDC_STATIC_BBOX_SCALE_Y_VAL,215,92,40,8
+
+    LTEXT           "BBox Scale Z:",IDC_STATIC,7,112,50,8
+    CONTROL         "",IDC_SLIDER_BBOX_SCALE_Z,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,60,110,150,15
+    LTEXT           "1000.00",IDC_STATIC_BBOX_SCALE_Z_VAL,215,112,40,8
+
+    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_BBOX_RESET,190,135,65,14
+END
+
+IDD_RECAST_MENU DIALOGEX 0, 0, 260, 515
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Recast Properties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    // Groupboxes and controls as defined in the thought process...
+    GROUPBOX        "Rasterization",IDC_STATIC,7,7,246,50
+    LTEXT           "Cell Size:",IDC_STATIC,14,22,60,8
+    CONTROL         "",IDC_SLIDER_CELL_SIZE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,20,130,15
+    LTEXT           "0.30",IDC_STATIC_CELL_SIZE_VAL,210,22,40,8
+    LTEXT           "Cell Height:",IDC_STATIC,14,42,60,8
+    CONTROL         "",IDC_SLIDER_CELL_HEIGHT,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,40,130,15
+    LTEXT           "0.20",IDC_STATIC_CELL_HEIGHT_VAL,210,42,40,8
+    GROUPBOX        "Agent",IDC_STATIC,7,62,246,90
+    LTEXT           "Height:",IDC_STATIC,14,77,60,8
+    CONTROL         "",IDC_SLIDER_AGENT_HEIGHT,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,75,130,15
+    LTEXT           "2.00",IDC_STATIC_AGENT_HEIGHT_VAL,210,77,40,8
+    LTEXT           "Radius:",IDC_STATIC,14,97,60,8
+    CONTROL         "",IDC_SLIDER_AGENT_RADIUS,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,95,130,15
+    LTEXT           "0.60",IDC_STATIC_AGENT_RADIUS_VAL,210,97,40,8
+    LTEXT           "Max Climb:",IDC_STATIC,14,117,60,8
+    CONTROL         "",IDC_SLIDER_AGENT_MAX_CLIMB,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,115,130,15
+    LTEXT           "0.90",IDC_STATIC_AGENT_MAX_CLIMB_VAL,210,117,40,8
+    LTEXT           "Max Slope:",IDC_STATIC,14,137,60,8
+    CONTROL         "",IDC_SLIDER_AGENT_MAX_SLOPE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,135,130,15
+    LTEXT           "45",IDC_STATIC_AGENT_MAX_SLOPE_VAL,210,137,40,8
+    GROUPBOX        "Region",IDC_STATIC,7,157,246,50
+    LTEXT           "Min Region Size:",IDC_STATIC,14,167,60,8
+    CONTROL         "",IDC_SLIDER_REGION_MIN_SIZE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,165,130,15
+    LTEXT           "8",IDC_STATIC_REGION_MIN_SIZE_VAL,210,167,40,8
+    LTEXT           "Merged Size:",IDC_STATIC,14,187,60,8
+    CONTROL         "",IDC_SLIDER_REGION_MERGE_SIZE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,185,130,15
+    LTEXT           "20",IDC_STATIC_REGION_MERGE_SIZE_VAL,210,187,40,8
+    GROUPBOX        "Partitioning",IDC_STATIC,7,207,246,25
+    CONTROL         "Watershed",IDC_RADIO_PARTITION_WATERSHED,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,218,60,10
+    CONTROL         "Monotone",IDC_RADIO_PARTITION_MONOTONE,"Button",BS_AUTORADIOBUTTON,84,218,60,10
+    CONTROL         "Layers",IDC_RADIO_PARTITION_LAYERS,"Button",BS_AUTORADIOBUTTON,154,218,60,10
+    GROUPBOX        "Filtering",IDC_STATIC,7,237,246,55
+    CONTROL         "Low Hanging Obstacles",IDC_CHECK_FILTER_LOW_HANGING,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,248,120,10
+    CONTROL         "Ledge Spans",IDC_CHECK_FILTER_LEDGE_SPANS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,263,120,10
+    CONTROL         "Walkable Low Height Spans",IDC_CHECK_FILTER_WALKABLE_LOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,278,140,10
+    GROUPBOX        "Polygonization",IDC_STATIC,7,292,246,65
+    LTEXT           "Max Edge Len:",IDC_STATIC,14,307,60,8
+    CONTROL         "",IDC_SLIDER_POLY_MAX_EDGE_LEN,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,305,130,15
+    LTEXT           "12.0",IDC_STATIC_POLY_MAX_EDGE_LEN_VAL,210,307,40,8
+    LTEXT           "Max Edge Err:",IDC_STATIC,14,323,60,8
+    CONTROL         "",IDC_SLIDER_POLY_MAX_EDGE_ERR,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,323,130,15
+    LTEXT           "1.30",IDC_STATIC_POLY_MAX_EDGE_ERR_VAL,210,323,40,8
+    LTEXT           "Verts Per Poly:",IDC_STATIC,14,339,60,8
+    CONTROL         "",IDC_SLIDER_POLY_VERTS_PER_POLY,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,337,130,15
+    LTEXT           "6",IDC_STATIC_POLY_VERTS_PER_POLY_VAL,210,339,40,8
+    GROUPBOX        "Detail Mesh",IDC_STATIC,7,362,246,50
+    LTEXT           "Sample Dist:",IDC_STATIC,14,377,60,8
+    CONTROL         "",IDC_SLIDER_DETAIL_SAMPLE_DIST,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,375,130,15
+    LTEXT           "6.0",IDC_STATIC_DETAIL_SAMPLE_DIST_VAL,210,377,40,8
+    LTEXT           "Max Sample Err:",IDC_STATIC,14,397,60,8
+    CONTROL         "",IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,395,130,15
+    LTEXT           "1.0",IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL,210,397,40,8
+    GROUPBOX        "Tiling",IDC_STATIC,7,417,246,65
+    LTEXT           "Tile Size:",IDC_STATIC,14,432,60,8
+    CONTROL         "",IDC_SLIDER_TILING_TILE_SIZE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,430,130,15
+    LTEXT           "64",IDC_STATIC_TILING_TILE_SIZE_VAL,210,432,40,8
+    LTEXT           "",IDC_STATIC_TILING_INFO_TILES,14,447,230,8
+    LTEXT           "",IDC_STATIC_TILING_INFO_MAX_TILES,14,457,230,8
+    LTEXT           "",IDC_STATIC_TILING_INFO_MAX_POLYS,14,467,230,8
+    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RECAST_RESET,188,490,65,14
+END

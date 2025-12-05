@@ -23,6 +23,7 @@ set(MODULE_SOURCES
         module/Gui.cpp
         module/InputHandler.cpp
         module/Logger.cpp
+        module/Menu.cpp
         module/Navp.cpp
         module/Obj.cpp
         module/Renderer.cpp

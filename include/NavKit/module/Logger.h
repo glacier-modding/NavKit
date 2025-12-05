@@ -5,13 +5,16 @@
 enum LogCategory {
     NK_INFO = 1,
     NK_WARN,
-    NK_ERROR
+    NK_ERROR,
+    NK_DEBUG
 };
 
 class Logger {
     explicit Logger();
 
-    rsj::ConcurrentQueue<std::pair<LogCategory, std::string> > *logQueue;
+    std::unique_ptr<rsj::ConcurrentQueue<std::pair<LogCategory, std::string> > > logQueue;
+
+    bool debugLogsEnabled;
 
 public:
     static Logger &getInstance() {
@@ -19,7 +22,7 @@ public:
         return instance;
     }
 
-    static void log(LogCategory category, const char *message, ...);
+    static void log(LogCategory category, const char *format, ...);
 
     static void logRunner();
 };
