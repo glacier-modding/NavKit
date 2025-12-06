@@ -7,8 +7,6 @@ class Settings {
     explicit Settings();
 
     CSimpleIniA ini;
-    int settingsScroll;
-
 public:
     static Settings &getInstance() {
         static Settings instance;
@@ -16,12 +14,24 @@ public:
     }
 
     float backgroundColor;
+    bool hitmanSet;
+    bool outputSet;
+    bool blenderSet;
+    std::string hitmanFolder;
+    std::string outputFolder;
+    std::string blenderPath;
 
-    static void setValue(const std::string &folder, const std::string &key, const std::string &value);
+    void setValue(const std::string &folder, const std::string &key, const std::string &value);
 
-    static void save();
+    void setHitmanFolder(const std::string &folderName);
 
-    static void Load();
+    void setOutputFolder(const std::string &folderName);
+
+    void setBlenderFile(const std::string &fileName);
+
+    void save() const;
+
+    void load();
 
     void showSettingsDialog();
 

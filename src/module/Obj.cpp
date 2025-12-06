@@ -1,8 +1,10 @@
 #include "../../include/NavKit/module/Obj.h"
 
+#include <direct.h>
 #include <filesystem>
 #include <fstream>
 #include <thread>
+#include <vector>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Gui.h"
@@ -26,9 +28,9 @@ Obj::Obj() {
     showObj = true;
     objToLoad = "";
     loadObj = false;
-    objScroll = 0;
-    blenderPath = R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")";
-    blenderSet = false;
+    errorExtracting = false;
+    doneExtractingAlocs = false;
+    extractingAlocs = false;
     startedObjGeneration = false;
     glacier2ObjDebugLogsEnabled = false;
     blenderObjStarted = false;
@@ -37,21 +39,9 @@ Obj::Obj() {
     doObjHitTest = false;
 }
 
-void Obj::setBlenderFile(const std::string& fileName) {
-    if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-        blenderSet = true;
-        blenderPath = fileName;
-        Logger::log(NK_INFO, ("Setting Blender exe path to: " + blenderPath).c_str());
-        Settings::setValue("Paths", "blender", fileName);
-        Settings::save();
-    } else {
-        Logger::log(NK_WARN, ("Could not find Blender exe path: " + blenderPath).c_str());
-    }
-}
-
 void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
-    SceneExtract &sceneExtract = SceneExtract::getInstance();
-    std::string fileName = sceneExtract.outputFolder + "\\outputNavp.obj";
+    Settings &settings = Settings::getInstance();
+    std::string fileName = settings.outputFolder + "\\outputNavp.obj";
     Gui &gui = Gui::getInstance();
     gui.showLog = true;
 
@@ -99,17 +89,19 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
     }
 }
 
-void Obj::buildObj(const char *blenderPath, const char *sceneFilePath, const char *outputFolder) {
+void Obj::buildObj() {
+    Settings &settings = Settings::getInstance();
+    Scene &scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
     startedObjGeneration = true;
     Logger::log(NK_INFO, "Generating obj from nav.json file.");
     std::string command = "\"";
-    command += blenderPath;
+    command += settings.blenderPath;
     command += "\" -b --factory-startup -P glacier2obj.py -- \""; //--debug-all
-    command += sceneFilePath;
+    command += scene.lastLoadSceneFile;
     command += "\" \"";
-    command += outputFolder;
+    command += settings.outputFolder;
     command += "\\output.obj\"";
     if (glacier2ObjDebugLogsEnabled) {
         command += " True";
@@ -132,20 +124,90 @@ void Obj::buildObj(const char *blenderPath, const char *sceneFilePath, const cha
         });
 }
 
+void Obj::extractAlocs() {
+    Settings &settings = Settings::getInstance();
+    std::string retailFolder = "\"";
+    retailFolder += settings.hitmanFolder;
+    retailFolder += "\\Retail\"";
+    std::string gameVersion = "HM3";
+    std::string navJsonFilePath = "\"";
+    navJsonFilePath += settings.outputFolder;
+    navJsonFilePath += "\\output.nav.json\"";
+    std::string runtimeFolder = "\"";
+    runtimeFolder += settings.hitmanFolder;
+    runtimeFolder += "\\Runtime\"";
+    std::string alocFolder;
+    alocFolder += settings.outputFolder;
+    alocFolder += "\\aloc";
+
+    struct stat folderExists{};
+    if (int statRC = stat(alocFolder.data(), &folderExists); statRC != 0) {
+        if (errno == ENOENT) {
+            if (int status = _mkdir(alocFolder.c_str()); status != 0) {
+                Logger::log(NK_ERROR, "Error creating prim folder");
+            }
+        }
+    }
+
+    std::string command = "Glacier2Obj.exe ";
+    command += retailFolder;
+    command += " ";
+    command += gameVersion;
+    command += " ";
+    command += navJsonFilePath;
+    command += " ";
+    command += runtimeFolder;
+    command += " \"";
+    command += alocFolder;
+    command += "\"";
+    extractingAlocs = true;
+    Menu::updateMenuState();
+    std::jthread commandThread(
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command,
+        "Glacier2ObjExtract.log", [this] {
+            Logger::log(NK_INFO, "Finished extracting Alocs from Rpkg files file.");
+            extractingAlocs = false;
+            doneExtractingAlocs = true;
+            Menu::updateMenuState();
+        }, [this] {
+            errorExtracting = true;
+            Menu::updateMenuState();
+        });
+}
+
 char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
     nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
+void Obj::finalizeExtractAlocs() {
+    Settings &settings = Settings::getInstance();
+    if (doneExtractingAlocs) {
+        doneExtractingAlocs = false;
+
+        std::string sceneFile = settings.outputFolder;
+        sceneFile += "\\output.nav.json";
+        Scene &scene = Scene::getInstance();
+        const std::string &fileNameString = sceneFile;
+        extractingAlocs = false;
+        scene.lastLoadSceneFile = sceneFile;
+        buildObj();
+        Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
+        errorExtracting = false;
+        extractingAlocs = false;
+        Menu::updateMenuState();
+    }
+}
 void Obj::finalizeObjBuild() {
     SceneExtract &sceneExtract = SceneExtract::getInstance();
+    Settings &settings = Settings::getInstance();
     if (blenderObjGenerationDone) {
         Obj &obj = getInstance();
         startedObjGeneration = false;
-        obj.objToLoad = sceneExtract.outputFolder;
+        obj.objToLoad = settings.outputFolder;
         obj.objToLoad += "\\" + generatedObjName;
         obj.loadObj = true;
-        obj.lastObjFileName = sceneExtract.outputFolder;
+        obj.lastObjFileName = settings.outputFolder;
         obj.lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
@@ -277,24 +339,21 @@ bool Obj::canLoad() const {
     return objToLoad.empty();
 }
 
-bool Obj::canBuildObjFromNavp() const {
-    const SceneExtract &sceneExtract = SceneExtract::getInstance();
+bool Obj::canBuildObjFromNavp() {
     const Navp &navp = Navp::getInstance();
-    return sceneExtract.outputSet && blenderSet && navp.navpLoaded;
+    const Settings &settings = Settings::getInstance();
+    return settings.outputSet && settings.blenderSet && navp.navpLoaded;
 }
 
 bool Obj::canBuildObjFromScene() const {
-    const SceneExtract &sceneExtract = SceneExtract::getInstance();
+    const Settings &settings = Settings::getInstance();
     const Scene &scene = Scene::getInstance();
-    return sceneExtract.outputSet && blenderSet && scene.sceneLoaded && !
-           sceneExtract.extractingAlocs && !blenderObjStarted && !
-           blenderObjGenerationDone;
+    return settings.hitmanSet && settings.outputSet && !extractingAlocs && settings.blenderSet &&
+           scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone;
 }
 
 void Obj::handleBuildObjFromSceneClicked() {
-    const SceneExtract &sceneExtract = SceneExtract::getInstance();
-    const Scene &scene = Scene::getInstance();
-    return buildObj(blenderPath.data(), scene.lastLoadSceneFile.data(), sceneExtract.outputFolder.data());
+    backgroundWorker.emplace(&Obj::extractAlocs, this);
 }
 
 void Obj::handleBuildObjFromNavpClicked() {

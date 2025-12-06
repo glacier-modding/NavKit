@@ -11,6 +11,7 @@
 #include "../../extern/simdjson/simdjson.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 // 46735 is a phoneword for HMSDK
@@ -113,10 +114,11 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
     std::thread writer_thread([&] {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
-        std::ofstream f(SceneExtract::getInstance().outputFolder + "\\output.nav.json", std::ios::app);
+        const std::string outputFolder = Settings::getInstance().outputFolder;
+        std::ofstream f(outputFolder + "\\output.nav.json", std::ios::app);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
-                        (SceneExtract::getInstance().outputFolder + "\\output.nav.json").c_str());
+                        (outputFolder + "\\output.nav.json").c_str());
             return;
         }
 

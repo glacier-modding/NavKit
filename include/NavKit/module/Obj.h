@@ -27,14 +27,14 @@ public:
     const std::string meshesFolder = "Obj";
     std::string objToLoad;
     std::vector<bool> objLoadDone;
-    int objScroll;
     bool startedObjGeneration;
     bool blenderObjStarted;
     bool blenderObjGenerationDone;
     bool glacier2ObjDebugLogsEnabled;
-    bool blenderSet;
     bool errorBuilding;
-    std::string blenderPath;
+    bool errorExtracting;
+    bool extractingAlocs;
+    bool doneExtractingAlocs;
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
 
@@ -46,11 +46,9 @@ public:
 
     void saveObjMesh(char *objToCopy, char *newFileName);
 
-    void setBlenderFile(const std::string &fileName);
-
     void buildObjFromNavp(bool alsoLoadIntoUi);
 
-    void buildObj(const char *blenderPath, const char *sceneFilePath, const char *outputFolder);
+    void buildObj();
 
     void finalizeObjBuild();
 
@@ -70,7 +68,7 @@ public:
 
     bool canLoad() const;
 
-    bool canBuildObjFromNavp() const;
+    static bool canBuildObjFromNavp();
 
     bool canBuildObjFromScene() const;
 
@@ -81,4 +79,8 @@ public:
     void finalizeLoad();
 
     std::optional<std::jthread> backgroundWorker;
+
+    void finalizeExtractAlocs();
+private:
+    void extractAlocs();
 };

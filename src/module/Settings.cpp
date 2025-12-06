@@ -25,8 +25,6 @@ struct DialogSettings {
 
 INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     auto settings = reinterpret_cast<Settings *>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
-    SceneExtract &sceneExtract = SceneExtract::getInstance();
-    Obj &obj = Obj::getInstance();
 
     switch (message) {
         case WM_INITDIALOG: {
@@ -35,18 +33,18 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
 
             auto tempSettings = new DialogSettings();
             tempSettings->backgroundColor = settings->backgroundColor;
-            tempSettings->hitmanFolder = sceneExtract.hitmanFolder;
-            tempSettings->outputFolder = sceneExtract.outputFolder;
-            tempSettings->blenderPath = obj.blenderPath;
+            tempSettings->hitmanFolder = settings->hitmanFolder;
+            tempSettings->outputFolder = settings->outputFolder;
+            tempSettings->blenderPath = settings->blenderPath;
             SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(tempSettings));
 
             const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
             SendMessage(hSlider, TBM_SETRANGE, (WPARAM) TRUE, (LPARAM) MAKELONG(0, 100)); // Range 0-100
             SendMessage(hSlider, TBM_SETPOS, (WPARAM) TRUE, (LPARAM) (tempSettings->backgroundColor * 100.0f));
 
-            SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, sceneExtract.hitmanFolder.c_str());
-            SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, sceneExtract.outputFolder.c_str());
-            SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, obj.blenderPath.c_str());
+            SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, settings->hitmanFolder.c_str());
+            SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, settings->outputFolder.c_str());
+            SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, settings->blenderPath.c_str());
 
             return TRUE;
         }
@@ -63,29 +61,29 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
             const auto tempSettings = reinterpret_cast<DialogSettings *>(GetWindowLongPtr(hDlg, DWLP_USER));
 
             if (UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_BROWSE_HITMAN) {
-                if (const char *folderName = SceneExtract::openHitmanFolderDialog(sceneExtract.hitmanFolder.data())) {
+                if (const char *folderName = SceneExtract::openHitmanFolderDialog(settings->hitmanFolder.data())) {
                     tempSettings->hitmanFolder = folderName;
                     SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings->hitmanFolder.c_str());
                 }
             } else if (commandId == IDC_BUTTON_BROWSE_OUTPUT) {
-                if (const char *folderName = SceneExtract::openOutputFolderDialog(sceneExtract.outputFolder.data())) {
+                if (const char *folderName = SceneExtract::openOutputFolderDialog(settings->outputFolder.data())) {
                     tempSettings->outputFolder = folderName;
                     SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
                 }
             } else if (commandId == IDC_BUTTON_BROWSE_BLENDER) {
-                if (const char *blenderFileName = Obj::openSetBlenderFileDialog(obj.blenderPath.data())) {
+                if (const char *blenderFileName = Obj::openSetBlenderFileDialog(settings->blenderPath.data())) {
                     tempSettings->blenderPath = blenderFileName;
                     SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings->blenderPath.c_str());
                 }
             } else if (commandId == IDOK || commandId == IDC_APPLY) {
                 if (tempSettings) {
-                    sceneExtract.setHitmanFolder(tempSettings->hitmanFolder);
-                    sceneExtract.setOutputFolder(tempSettings->outputFolder);
-                    obj.setBlenderFile(tempSettings->blenderPath);
+                   settings->setHitmanFolder(tempSettings->hitmanFolder);
+                   settings->setOutputFolder(tempSettings->outputFolder);
+                    settings->setBlenderFile(tempSettings->blenderPath);
 
                     settings->backgroundColor = tempSettings->backgroundColor;
-                    setValue("Colors", "backgroundColor", std::to_string(settings->backgroundColor));
-                    save();
+                    settings->setValue("Colors", "backgroundColor", std::to_string(settings->backgroundColor));
+                    settings->save();
                 }
                 if (commandId == IDOK) {
                     DestroyWindow(hDlg);
@@ -114,14 +112,20 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
     return FALSE;
 }
 
-Settings::Settings(): ini(CSimpleIniA()), settingsScroll(0), backgroundColor(0.30f) {
+Settings::Settings() :
+    ini(CSimpleIniA()),
+    backgroundColor(0.30f),
+    blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")"),
+    hitmanFolder(""),
+    hitmanSet(false),
+    outputFolder(""),
+    outputSet(false),
+    blenderSet(false) {
 }
 
-void Settings::Load() {
+void Settings::load() {
     CSimpleIni &ini = getInstance().ini;
     ini.SetUnicode();
-    SceneExtract &sceneExtract = SceneExtract::getInstance();
-    Obj &obj = Obj::getInstance();
     Renderer &renderer = Renderer::getInstance();
 
     if (const SI_Error rc = ini.LoadFile("NavKit.ini"); rc < 0) {
@@ -129,9 +133,9 @@ void Settings::Load() {
     } else {
         Logger::log(NK_INFO, "Loading settings from NavKit.ini...");
 
-        sceneExtract.setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
-        sceneExtract.setOutputFolder(ini.GetValue("Paths", "output", "default"));
-        obj.setBlenderFile(ini.GetValue("Paths", "blender", "default"));
+        setHitmanFolder(ini.GetValue("Paths", "hitman", "default"));
+        setOutputFolder(ini.GetValue("Paths", "output", "default"));
+        setBlenderFile(ini.GetValue("Paths", "blender", "default"));
         Grid &grid = Grid::getInstance();
         grid.saveSpacing(static_cast<float>(atof(ini.GetValue("Airg", "spacing", "2.0f"))));
         renderer.initFrameRate(static_cast<float>(atof(ini.GetValue("Renderer", "frameRate", "-1.0f"))));
@@ -177,14 +181,50 @@ void Settings::showSettingsDialog() {
     }
 }
 
-void Settings::save() {
-    if (getInstance().ini.SaveFile("NavKit.ini") == SI_FAIL) {
+void Settings::save() const {
+    if (ini.SaveFile("NavKit.ini") == SI_FAIL) {
         Logger::log(NK_ERROR, "Error saving settings file");
     }
 }
 
 void Settings::setValue(const std::string &folder, const std::string &key, const std::string &value) {
-    if (getInstance().ini.SetValue(folder.c_str(), key.c_str(), value.c_str()) == SI_FAIL) {
+    if (ini.SetValue(folder.c_str(), key.c_str(), value.c_str()) == SI_FAIL) {
         Logger::log(NK_ERROR, "Error updating setting");
+    }
+}
+
+void Settings::setHitmanFolder(const std::string &folderName) {
+    if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
+        hitmanSet = true;
+        hitmanFolder = folderName;
+        Logger::log(NK_INFO, ("Setting Hitman folder to: " + hitmanFolder).c_str());
+        setValue("Paths", "hitman", folderName);
+        save();
+    } else {
+        Logger::log(NK_WARN, ("Could not find Hitman folder: " + hitmanFolder).c_str());
+    }
+}
+
+void Settings::setOutputFolder(const std::string &folderName) {
+    if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
+        outputSet = true;
+        outputFolder = folderName;
+        Logger::log(NK_INFO, ("Setting output folder to: " + outputFolder).c_str());
+        setValue("Paths", "output", folderName);
+        save();
+    } else {
+        Logger::log(NK_WARN, ("Could not find output folder: " + outputFolder).c_str());
+    }
+}
+
+void Settings::setBlenderFile(const std::string& fileName) {
+    if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
+        blenderSet = true;
+        blenderPath = fileName;
+        Logger::log(NK_INFO, ("Setting Blender exe path to: " + blenderPath).c_str());
+        setValue("Paths", "blender", fileName);
+        save();
+    } else {
+        Logger::log(NK_WARN, ("Could not find Blender exe path: " + blenderPath).c_str());
     }
 }
