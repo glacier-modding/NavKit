@@ -7,6 +7,7 @@ class Settings {
     explicit Settings();
 
     CSimpleIniA ini;
+
 public:
     static Settings &getInstance() {
         static Settings instance;
@@ -20,6 +21,7 @@ public:
     std::string hitmanFolder;
     std::string outputFolder;
     std::string blenderPath;
+    static HWND hSettingsDialog;
 
     void setValue(const std::string &folder, const std::string &key, const std::string &value);
 
@@ -34,6 +36,4 @@ public:
     void load();
 
     void showSettingsDialog();
-
-    static HWND hSettingsDialog;
 };

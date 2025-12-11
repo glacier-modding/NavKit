@@ -46,7 +46,6 @@ Airg::Airg()
       , airgResourceConverter(HM3_GetConverterForResource("AIRG"))
       , airgResourceGenerator(HM3_GetGeneratorForResource("AIRG"))
       , reasoningGrid(new ReasoningGrid())
-      , airgScroll(0)
       , selectedWaypointIndex(-1)
       , doAirgHitTest(false)
       , buildingVisionAndDeadEndData(false) {

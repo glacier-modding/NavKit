@@ -276,10 +276,10 @@ void RecastAdapter::showRecastDialog() {
         SetForegroundWindow(hRecastDialog);
         return;
     }
-    const HINSTANCE hInstance = GetModuleHandle(NULL);
+    const HINSTANCE hInstance = GetModuleHandle(nullptr);
     const HWND hParentWnd = Renderer::hwnd;
     hRecastDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, RecastDialogProc,
-                                      (LPARAM) this);
+                                      reinterpret_cast<LPARAM>(this));
 
     if (hRecastDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
@@ -298,7 +298,7 @@ void RecastAdapter::showRecastDialog() {
         int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
         int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
 
-        SetWindowPos(hRecastDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hRecastDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
         ShowWindow(hRecastDialog, SW_SHOW);
     }

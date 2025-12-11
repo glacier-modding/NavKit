@@ -73,7 +73,6 @@ public:
     bool doNavpHitTest;
     bool doNavpExclusionBoxHitTest;
     bool doNavpPfSeedPointHitTest;
-    int navpScroll;
     bool loading;
 
     bool stairsCheckboxValue;

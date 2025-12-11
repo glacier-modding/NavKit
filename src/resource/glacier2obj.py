@@ -1287,7 +1287,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     return aloc.collision_type, objects
 
 
-def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file):
+def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file, mesh_type):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -1295,21 +1295,23 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
     data = json.loads(f.read())
     f.close()
     transforms = {}
-    for hash_and_entity in data['alocs']:
-        aloc_hash = hash_and_entity['hash']
+    for hash_and_entity in data['meshes']:
+        if mesh_type == "ALOC":
+            mesh_hash = hash_and_entity['alocHash']
+        else:
+            mesh_hash = hash_and_entity['primHash']
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
                      "scale": entity["scale"]["data"], "id": entity["id"]}
 
-        if aloc_hash not in transforms:
-            transforms[aloc_hash] = []
-        transforms[aloc_hash].append(transform)
-    alocs_json_dir = os.path.dirname(path_to_output_obj_file)
-
-    path_to_aloc_dir = "%s\\%s" % (alocs_json_dir, "aloc")
-    log("INFO", "Path to aloc dir:" + path_to_aloc_dir, "load_scenario")
-    file_list = sorted(os.listdir(path_to_aloc_dir))
-    aloc_list = [item for item in file_list if item.lower().endswith('.aloc')]
+        if mesh_hash not in transforms:
+            transforms[mesh_hash] = []
+            transforms[mesh_hash].append(transform)
+    output_dir = os.path.dirname(path_to_output_obj_file)
+    path_to_aloc_or_prim_dir = "%s\\%s" % (output_dir, mesh_type.lower())
+    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "load_scenario")
+    file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
+    aloc_or_prim_list = [item for item in file_list if item.lower().endswith('.' + mesh_type.lower())]
 
     excluded_collision_types = [
         # PhysicsCollisionType.NONE,
@@ -1317,59 +1319,63 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
         # PhysicsCollisionType.KINEMATIC_LINKED,
         # PhysicsCollisionType.SHATTER_LINKED
     ]
-    excluded_aloc_hashes = [
+    excluded_mesh_hashes = [
         # "00C47B7553348F32"
     ]
-    aloc_file_count = len(aloc_list)
+    aloc_or_prim_file_count = len(aloc_or_prim_list)
     mesh_count = 0
-    for aloc_i in range(0, aloc_file_count):
-        aloc_filename = aloc_list[aloc_i]
-        aloc_hash = aloc_filename[:-5]
-        if aloc_hash in transforms:
-            mesh_count += len(transforms[aloc_filename[:-5]])
+    for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
+        aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
+        mesh_hash = aloc_or_prim_filename[:-5]
+        if mesh_hash in transforms:
+            mesh_count += len(transforms[aloc_or_prim_filename[:-5]])
 
     mesh_i = 0
-    alocs_in_scenario_count = len(transforms)
-    current_aloc_in_scene_index = 0
-    for aloc_i in range(0, aloc_file_count):
-        aloc_filename = aloc_list[aloc_i]
-        aloc_hash = aloc_filename[:-5]
-        if aloc_hash not in transforms:
+    meshes_in_scenario_count = len(transforms)
+    current_mesh_in_scene_index = 0
+    for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
+        aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
+        mesh_hash = aloc_or_prim_filename[:-5]
+        if mesh_hash not in transforms:
             continue
-        if aloc_hash in excluded_aloc_hashes:
-            log("INFO", "Skipping aloc file " + aloc_hash, aloc_hash)
+        if mesh_hash in excluded_mesh_hashes:
+            log("INFO", "Skipping " + mesh_type + " file " + mesh_hash, mesh_hash)
             continue
-        aloc_path = os.path.join(path_to_aloc_dir, aloc_filename)
+        aloc_or_prim_path = os.path.join(path_to_aloc_or_prim_dir, aloc_or_prim_filename)
 
-        log("INFO", "Loading aloc: " + aloc_hash, "load_scenario")
+        log("INFO", "Loading " + mesh_type + ": " + mesh_hash, "load_scenario")
         try:
-            collision_type, objects = load_aloc(
-                None, context, aloc_path, False
-            )
-            if collision_type == -1 and objects == -1:
+            if mesh_type == "ALOC":
+                collision_type, objects = load_aloc(
+                    None, context, aloc_or_prim_path, False
+                )
+                if collision_type == -1 and objects == -1:
+                    continue
+            else:
+                log("INFO", "Stubbed PRIM loading for: " + mesh_hash, "load_scenario")
                 continue
         except struct.error as err:
-            log("DEBUG", "=========================== Error Loading aloc: " + str(aloc_hash) + " Exception: " + str(err) + " ================", "load_scenario")
+            log("DEBUG", "=========================== Error Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err) + " ================", "load_scenario")
             continue
 
         if len(objects) == 0:
-            log("DEBUG", "No collidable objects for " + str(aloc_hash), "load_scenario")
+            log("DEBUG", "No collidable objects for " + str(mesh_hash), "load_scenario")
             continue
         if not objects:
-            log("INFO", "-------------------- Error Loading aloc:" + aloc_hash + " ----------------------", "load_scenario")
+            log("INFO", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------", "load_scenario")
             continue
         if collision_type in excluded_collision_types:
-            log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable ALOC: " + aloc_hash + " with collision type: " + str(collision_type) + " +++++++++++++", "load_scenario")
+            log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(collision_type) + " +++++++++++++", "load_scenario")
             continue
-        t = transforms[aloc_hash]
-        current_aloc_in_scene_index += 1
+        t = transforms[mesh_hash]
+        current_mesh_in_scene_index += 1
         t_size = len(t)
         for i in range(0, t_size):
-            transform = transforms[aloc_hash][i]
-            p = transform["position"]
-            r = transform["rotate"]
-            s = transform["scale"]
-            log("INFO", "Transforming aloc [" + str(current_aloc_in_scene_index) + "/" + str(alocs_in_scenario_count) + "]: " + aloc_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
+            mesh_transform = transforms[mesh_hash][i]
+            p = mesh_transform["position"]
+            r = mesh_transform["rotate"]
+            s = mesh_transform["scale"]
+            log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
             mesh_i += 1
             for obj in objects:
                 if i != 0:
@@ -1378,7 +1384,7 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
                     cur = obj
                 collection.objects.link(cur)
                 cur.select_set(True)
-                cur.name = aloc_hash + " " + transform["id"]
+                cur.name = mesh_hash + " " + mesh_transform["id"]
                 cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
                 cur.rotation_mode = 'QUATERNION'
                 cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
@@ -1391,14 +1397,15 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
 
 
 def main():
-    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <debug logs enabled>", "main")
+    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <debug logs enabled>", "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
     scene_path = argv[0]
     output_path = argv[1]
+    mesh_type = argv[2]
     global glacier2obj_enabled_log_levels
-    if len(argv) > 2 and argv[2] == True:
+    if len(argv) > 3 and argv[3] == True:
         log("INFO", "Enabling debug logs", "main"),
         glacier2obj_enabled_log_levels.append("DEBUG")
 
@@ -1410,7 +1417,7 @@ def main():
     )
     bpy.context.scene.collection.children.link(collection)
 
-    scenario = load_scenario(bpy.context, collection, scene_path, output_path)
+    scenario = load_scenario(bpy.context, collection, scene_path, output_path, mesh_type)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1

@@ -4,10 +4,18 @@
 #include <string>
 #include <thread>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
+enum MeshType {
+    ALOC,
+    PRIM
+};
 
 class Obj {
     explicit Obj();
+
+    static void updateObjDialogControls(HWND hDlg);
 
 public:
     static Obj &getInstance() {
@@ -33,10 +41,13 @@ public:
     bool glacier2ObjDebugLogsEnabled;
     bool errorBuilding;
     bool errorExtracting;
-    bool extractingAlocs;
-    bool doneExtractingAlocs;
+    bool extractingAlocsOrPrims;
+    bool doneExtractingAlocsOrPrims;
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
+    MeshType meshTypeForBuild;
+    bool primLods[8];
+    static HWND hObjDialog;
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 
@@ -78,9 +89,18 @@ public:
 
     void finalizeLoad();
 
+    [[nodiscard]] std::string buildPrimLodsString() const;
+
+    void saveObjSettings() const;
+
+    static INT_PTR ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+    void showObjDialog();
+
     std::optional<std::jthread> backgroundWorker;
 
-    void finalizeExtractAlocs();
+    void finalizeExtractAlocsOrPrims();
+
 private:
-    void extractAlocs();
+    void extractAlocsOrPrims();
 };

@@ -17,7 +17,8 @@
 #define IDM_SETTINGS_NAVKIT                     1200
 #define IDM_SETTINGS_SCENE                      1201
 #define IDM_SETTINGS_RECAST                     1202
-#define IDM_SETTINGS_AIRG                       1203
+#define IDM_SETTINGS_OBJ                        1203
+#define IDM_SETTINGS_AIRG                       1204
 #define IDM_VIEW_NAVP_SHOW_NAVP                 1300
 #define IDM_VIEW_NAVP_SHOW_INDICES              1301
 #define IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES     1302
@@ -127,3 +128,15 @@
 #define IDC_STATIC_TILING_INFO_MAX_TILES        30336
 #define IDC_STATIC_TILING_INFO_MAX_POLYS        30337
 #define IDC_BUTTON_RECAST_RESET                 30338
+
+#define IDD_OBJ_SETTINGS                        30400
+#define IDC_RADIO_MESH_TYPE_ALOC                30401
+#define IDC_RADIO_MESH_TYPE_PRIM                30402
+#define IDC_CHECK_PRIM_LOD_1                    30403
+#define IDC_CHECK_PRIM_LOD_2                    30404
+#define IDC_CHECK_PRIM_LOD_3                    30405
+#define IDC_CHECK_PRIM_LOD_4                    30406
+#define IDC_CHECK_PRIM_LOD_5                    30407
+#define IDC_CHECK_PRIM_LOD_6                    30408
+#define IDC_CHECK_PRIM_LOD_7                    30409
+#define IDC_CHECK_PRIM_LOD_8                    30410

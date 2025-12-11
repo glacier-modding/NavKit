@@ -77,8 +77,8 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
                 }
             } else if (commandId == IDOK || commandId == IDC_APPLY) {
                 if (tempSettings) {
-                   settings->setHitmanFolder(tempSettings->hitmanFolder);
-                   settings->setOutputFolder(tempSettings->outputFolder);
+                    settings->setHitmanFolder(tempSettings->hitmanFolder);
+                    settings->setOutputFolder(tempSettings->outputFolder);
                     settings->setBlenderFile(tempSettings->blenderPath);
 
                     settings->backgroundColor = tempSettings->backgroundColor;
@@ -112,15 +112,12 @@ INT_PTR CALLBACK Settings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wP
     return FALSE;
 }
 
-Settings::Settings() :
-    ini(CSimpleIniA()),
-    backgroundColor(0.30f),
-    blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")"),
-    hitmanFolder(""),
-    hitmanSet(false),
-    outputFolder(""),
-    outputSet(false),
-    blenderSet(false) {
+Settings::Settings() : ini(CSimpleIniA()),
+                       backgroundColor(0.30f),
+                       hitmanSet(false),
+                       outputSet(false),
+                       blenderSet(false),
+                       blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")") {
 }
 
 void Settings::load() {
@@ -140,6 +137,23 @@ void Settings::load() {
         grid.saveSpacing(static_cast<float>(atof(ini.GetValue("Airg", "spacing", "2.0f"))));
         renderer.initFrameRate(static_cast<float>(atof(ini.GetValue("Renderer", "frameRate", "-1.0f"))));
         getInstance().backgroundColor = static_cast<float>(atof(ini.GetValue("Colors", "backgroundColor", "0.16f")));
+
+        Obj &obj = Obj::getInstance();
+        const char *meshTypeStr = ini.GetValue("Obj", "MeshTypeForBuild", "ALOC");
+        if (strcmp(meshTypeStr, "PRIM") == 0) {
+            obj.meshTypeForBuild = PRIM;
+        } else {
+            obj.meshTypeForBuild = ALOC;
+        }
+
+        const char *primLodsStr = ini.GetValue("Obj", "PrimLods", "11111111");
+        for (int i = 0; i < 8; ++i) {
+            if (i < strlen(primLodsStr)) {
+                obj.primLods[i] = primLodsStr[i] == '1';
+            } else {
+                obj.primLods[i] = true;
+            }
+        }
     }
 }
 
@@ -148,14 +162,14 @@ void Settings::showSettingsDialog() {
         SetForegroundWindow(hSettingsDialog);
         return;
     }
-    HINSTANCE hInstance = GetModuleHandle(NULL);
-    HWND hParentWnd = Renderer::getInstance().hwnd;
+    const HINSTANCE hInstance = GetModuleHandle(nullptr);
+    const HWND hParentWnd = Renderer::hwnd;
     hSettingsDialog = CreateDialogParam(
         hInstance,
         MAKEINTRESOURCE(IDD_NAVKIT_SETTINGS),
         hParentWnd,
         SettingsDialogProc,
-        (LPARAM) this
+        reinterpret_cast<LPARAM>(this)
     );
 
     if (hSettingsDialog) {
@@ -217,7 +231,7 @@ void Settings::setOutputFolder(const std::string &folderName) {
     }
 }
 
-void Settings::setBlenderFile(const std::string& fileName) {
+void Settings::setBlenderFile(const std::string &fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         blenderSet = true;
         blenderPath = fileName;

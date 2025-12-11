@@ -113,7 +113,8 @@ void Menu::updateMenuState() {
         isStairs = navp.stairsAreaSelected();
     }
     setMenuItemChecked(IDM_EDIT_NAVP_STAIRS, isStairs, "Stairs Area");
-    setMenuItemChecked(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
+    setMenuItemChecked(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled,
+                       "Connect Waypoint Mode Enabled");
 }
 
 void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const char *itemName) {
@@ -285,6 +286,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                 case IDM_SETTINGS_RECAST:
                     RecastAdapter::getInstance().showRecastDialog();
                     Logger::log(NK_DEBUG, "Settings -> Recast Settings clicked");
+                    break;
+                case IDM_SETTINGS_OBJ:
+                    Obj::getInstance().showObjDialog();
+                    Logger::log(NK_DEBUG, "Settings -> Obj Settings clicked");
                     break;
 
                 default:

@@ -94,7 +94,7 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
         }
         if (size_t found = outputString.find("panic"); found != std::string::npos) {
             Logger::log(NK_ERROR,
-                        "Error extracting scene from game. Make sure Hitman is running with ZHMModSDK installed.");
+                        "Error extracting resources from Rpkg files. Please report this to AtomicForce.");
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(hReadPipe);
             CloseHandle(pi.hProcess);

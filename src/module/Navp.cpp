@@ -40,7 +40,6 @@ Navp::Navp()
       doNavpHitTest(false),
       doNavpExclusionBoxHitTest(false),
       doNavpPfSeedPointHitTest(false),
-      navpScroll(0),
       loading(false),
       stairsCheckboxValue(false),
       building(false),

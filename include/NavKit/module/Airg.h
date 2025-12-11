@@ -42,7 +42,6 @@ public:
     ResourceConverter *airgResourceConverter;
     ResourceGenerator *airgResourceGenerator;
     ReasoningGrid *reasoningGrid;
-    int airgScroll;
     int selectedWaypointIndex;
     bool doAirgHitTest;
     bool buildingVisionAndDeadEndData;
