@@ -170,10 +170,11 @@ void Obj::buildObj() {
     command += settings.outputFolder;
     command += "\\output.obj\"";
     if (meshTypeForBuild == ALOC) {
-        command += " ALOC";
+        command += " ALOC ";
     } else {
-        command += " PRIM";
+        command += " PRIM ";
     }
+    command += buildPrimLodsString();
     if (glacier2ObjDebugLogsEnabled) {
         command += " True";
     }

@@ -110,11 +110,11 @@ static void UpdateRecastDialogControls(HWND hDlg) {
     set_slider(IDC_SLIDER_CELL_HEIGHT, IDC_STATIC_CELL_HEIGHT_VAL, sample->m_cellHeight, 0.01f, 0.01f, 39, 2);
     // Range: 0.01 to 0.40
 
-    set_slider(IDC_SLIDER_AGENT_HEIGHT, IDC_STATIC_AGENT_HEIGHT_VAL, sample->m_agentHeight, 0.1f, 0.1f, 49, 2);
+    set_slider(IDC_SLIDER_AGENT_HEIGHT, IDC_STATIC_AGENT_HEIGHT_VAL, sample->m_agentHeight, 0.1f, 0.01f, 490, 2);
     // Range: 0.1 to 5.0
-    set_slider(IDC_SLIDER_AGENT_RADIUS, IDC_STATIC_AGENT_RADIUS_VAL, sample->m_agentRadius, 0.0f, 0.1f, 20, 2);
+    set_slider(IDC_SLIDER_AGENT_RADIUS, IDC_STATIC_AGENT_RADIUS_VAL, sample->m_agentRadius, 0.0f, 0.01f, 200, 2);
     // Range: 0.0 to 2.0
-    set_slider(IDC_SLIDER_AGENT_MAX_CLIMB, IDC_STATIC_AGENT_MAX_CLIMB_VAL, sample->m_agentMaxClimb, 0.0f, 0.1f, 50,
+    set_slider(IDC_SLIDER_AGENT_MAX_CLIMB, IDC_STATIC_AGENT_MAX_CLIMB_VAL, sample->m_agentMaxClimb, 0.0f, 0.01f, 500,
                2); // Range: 0.0 to 5.0
     set_slider(IDC_SLIDER_AGENT_MAX_SLOPE, IDC_STATIC_AGENT_MAX_SLOPE_VAL, sample->m_agentMaxSlope, 0.0f, 1.0f, 90,
                0); // Range: 0 to 90
@@ -212,11 +212,11 @@ INT_PTR CALLBACK RecastAdapter::RecastDialogProc(HWND hDlg, UINT message, WPARAM
             } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_CELL_HEIGHT)) {
                 update_float_slider(sample->m_cellHeight, 0.01f, 0.01f, IDC_STATIC_CELL_HEIGHT_VAL, 2);
             } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_HEIGHT)) {
-                update_float_slider(sample->m_agentHeight, 0.1f, 0.1f, IDC_STATIC_AGENT_HEIGHT_VAL, 2);
+                update_float_slider(sample->m_agentHeight, 0.1f, 0.01f, IDC_STATIC_AGENT_HEIGHT_VAL, 2);
             } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_RADIUS)) {
-                update_float_slider(sample->m_agentRadius, 0.0f, 0.1f, IDC_STATIC_AGENT_RADIUS_VAL, 2);
+                update_float_slider(sample->m_agentRadius, 0.0f, 0.01f, IDC_STATIC_AGENT_RADIUS_VAL, 2);
             } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_MAX_CLIMB)) {
-                update_float_slider(sample->m_agentMaxClimb, 0.0f, 0.1f, IDC_STATIC_AGENT_MAX_CLIMB_VAL, 2);
+                update_float_slider(sample->m_agentMaxClimb, 0.0f, 0.01f, IDC_STATIC_AGENT_MAX_CLIMB_VAL, 2);
             } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_MAX_SLOPE)) {
                 update_int_slider(sample->m_agentMaxSlope, 0, 1, IDC_STATIC_AGENT_MAX_SLOPE_VAL);
             } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_REGION_MIN_SIZE)) {
