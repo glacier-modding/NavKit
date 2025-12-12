@@ -1,6 +1,5 @@
 #pragma once
 #include <functional>
-#include <string>
 
 class SceneExtract {
 public:
@@ -13,19 +12,8 @@ public:
         return instance;
     }
 
-    void finalizeExtract();
-
-    std::string hitmanFolder;
-    std::string outputFolder;
-    bool outputSet;
-    bool extractingAlocs;
-    bool doneExtractingAlocs;
     bool extractingFromGame;
     bool doneExtractingFromGame;
-
-    void setHitmanFolder(const std::string &folderName);
-
-    void setOutputFolder(const std::string &folderName);
 
     void handleExtractFromGameClicked();
 
@@ -39,21 +27,19 @@ public:
 
     void handleExtractFromGameAndBuildAllClicked();
 
-    int extractScroll;
-    bool hitmanSet;
-    bool errorExtracting;
     bool alsoBuildObj;
     bool alsoBuildAll;
 
     static char *openHitmanFolderDialog(char *lastHitmanFolder);
 
     static char *openOutputFolderDialog(char *lastOutputFolder);
+
     std::optional<std::jthread> backgroundWorker;
+
     void extractScene();
 
+    void finalizeExtractScene();
+
 private:
-
-    void extractAlocs();
-
     static void extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback);
 };

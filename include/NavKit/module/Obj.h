@@ -4,10 +4,18 @@
 #include <string>
 #include <thread>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
+enum MeshType {
+    ALOC,
+    PRIM
+};
 
 class Obj {
     explicit Obj();
+
+    static void updateObjDialogControls(HWND hDlg);
 
 public:
     static Obj &getInstance() {
@@ -27,16 +35,19 @@ public:
     const std::string meshesFolder = "Obj";
     std::string objToLoad;
     std::vector<bool> objLoadDone;
-    int objScroll;
     bool startedObjGeneration;
     bool blenderObjStarted;
     bool blenderObjGenerationDone;
     bool glacier2ObjDebugLogsEnabled;
-    bool blenderSet;
     bool errorBuilding;
-    std::string blenderPath;
+    bool errorExtracting;
+    bool extractingAlocsOrPrims;
+    bool doneExtractingAlocsOrPrims;
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
+    MeshType meshTypeForBuild;
+    bool primLods[8];
+    static HWND hObjDialog;
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 
@@ -46,11 +57,9 @@ public:
 
     void saveObjMesh(char *objToCopy, char *newFileName);
 
-    void setBlenderFile(const std::string &fileName);
-
     void buildObjFromNavp(bool alsoLoadIntoUi);
 
-    void buildObj(const char *blenderPath, const char *sceneFilePath, const char *outputFolder);
+    void buildObj();
 
     void finalizeObjBuild();
 
@@ -70,7 +79,7 @@ public:
 
     bool canLoad() const;
 
-    bool canBuildObjFromNavp() const;
+    static bool canBuildObjFromNavp();
 
     bool canBuildObjFromScene() const;
 
@@ -80,5 +89,18 @@ public:
 
     void finalizeLoad();
 
+    [[nodiscard]] std::string buildPrimLodsString() const;
+
+    void saveObjSettings() const;
+
+    static INT_PTR ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+    void showObjDialog();
+
     std::optional<std::jthread> backgroundWorker;
+
+    void finalizeExtractAlocsOrPrims();
+
+private:
+    void extractAlocsOrPrims();
 };

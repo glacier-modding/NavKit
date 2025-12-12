@@ -82,21 +82,23 @@ namespace ZPathfinding {
         void readJson(simdjson::ondemand::object json);
     };
 
-    class HashAndEntity {
+    class HashesAndEntity {
     public:
-        HashAndEntity() = default;
+        HashesAndEntity() = default;
 
-        std::string hash;
+        std::string alocHash;
+        std::string primHash;
         Entity entity;
 
         void readJson(simdjson::ondemand::object json);
     };
 
-    class Aloc {
+    class Mesh {
     public:
-        Aloc() = default;
+        Mesh() = default;
 
-        std::string hash;
+        std::string alocHash;
+        std::string primHash;
         std::string id;
         std::string name;
         std::string tblu;
@@ -107,16 +109,16 @@ namespace ZPathfinding {
         void writeJson(std::ostream &f) const;
     };
 
-    class Alocs {
+    class Meshes {
     public:
-        Alocs() {
+        Meshes() {
         }
 
-        Alocs(std::string fileName);
+        Meshes(simdjson::ondemand::array alocs);
 
-        std::vector<Aloc> readAlocs() const;
+        std::vector<Mesh> readMeshes() const;
 
-        std::vector<HashAndEntity> hashesAndEntities{};
+        std::vector<HashesAndEntity> hashesAndEntities{};
     };
 
     class PfBox {
@@ -149,13 +151,11 @@ namespace ZPathfinding {
 
         static inline const std::string NO_EXCLUDE_BOX_FOUND = "NO_EXCLUDE_BOX_FOUND";
 
-        PfBoxes(std::string fileName);
+        PfBoxes(simdjson::ondemand::array);
 
         void readPathfindingBBoxes();
 
-        std::vector<PfBox> readExclusionBoxes() const;
-
-        std::vector<HashAndEntity> hashesAndEntities{};
+        std::vector<Entity> entities{};
     };
 
     class PfSeedPoint {
@@ -180,10 +180,10 @@ namespace ZPathfinding {
         PfSeedPoints() {
         }
 
-        PfSeedPoints(std::string fileName);
+        PfSeedPoints(simdjson::ondemand::array pfSeedPoints);
 
         std::vector<PfSeedPoint> readPfSeedPoints() const;
 
-        std::vector<HashAndEntity> hashesAndEntities{};
+        std::vector<Entity> entities{};
     };
 }

@@ -16,7 +16,7 @@
 
 Scene::Scene()
     : sceneLoaded(false),
-      sceneScroll(0),
+      version(1),
       loadSceneName("Load NavKit Scene"),
       saveSceneName("Save NavKit Scene") {
     resetBBoxDefaults();
@@ -56,23 +56,24 @@ void Scene::setLastSaveFileName(char *fileName) {
     saveSceneName = saveSceneName.substr(saveSceneName.find_last_of("/\\") + 1);
 }
 
-void Scene::loadScene(const std::string &fileName, const std::function<void()> &callback,
-                      const std::function<void()> &errorCallback) {
-    sceneLoaded = false;
-    Menu::updateMenuState();
-    ZPathfinding::Alocs newAlocs;
+void Scene::loadMeshes(const std::function<void()> &errorCallback,
+                      simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+    ZPathfinding::Meshes newMeshes;
     try {
-        newAlocs = ZPathfinding::Alocs(fileName);
+        newMeshes = ZPathfinding::Meshes(jsonDocument["meshes"]);
     } catch (const std::exception &e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
     }
-    alocs = newAlocs.readAlocs();
+    meshes = newMeshes.readMeshes();
+}
 
+void Scene::loadPfBoxes(const std::function<void()> &errorCallback,
+                        simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
     ZPathfinding::PfBoxes pfBoxes;
     try {
-        pfBoxes = ZPathfinding::PfBoxes(fileName);
+        pfBoxes = ZPathfinding::PfBoxes(jsonDocument["pfBoxes"]);
     } catch (const std::exception &e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
@@ -90,25 +91,54 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
         const float size[3] = {includeBox.scale.x, includeBox.scale.z, includeBox.scale.y};
         setBBox(pos, size);
     }
+}
 
+void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+    try {
+        version = static_cast<int>(static_cast<uint64_t>(jsonDocument["version"]));
+    } catch (...) {
+        Logger::log(NK_INFO, "Version field not found in scene, defaulting to version zero.");
+        version = 0;
+    }
+}
+
+void Scene::loadPfSeedPoints(const std::function<void()> &errorCallback,
+                             simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
     ZPathfinding::PfSeedPoints newPfSeedPoints;
     try {
-        newPfSeedPoints = ZPathfinding::PfSeedPoints(fileName);
+        newPfSeedPoints = ZPathfinding::PfSeedPoints(jsonDocument["pfSeedPoints"]);
     } catch (const std::exception &e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
     }
     pfSeedPoints = newPfSeedPoints.readPfSeedPoints();
+}
+
+void Scene::loadScene(const std::string &fileName, const std::function<void()> &callback,
+                      const std::function<void()> &errorCallback) {
+    sceneLoaded = false;
+    Menu::updateMenuState();
+
+    simdjson::ondemand::parser parser;
+    const simdjson::padded_string json = simdjson::padded_string::load(fileName);
+    auto jsonDocument = parser.iterate(json);
+
+    loadVersion(jsonDocument);
+    loadMeshes(errorCallback, jsonDocument);
+    loadPfBoxes(errorCallback, jsonDocument);
+    loadPfSeedPoints(errorCallback, jsonDocument);
+
     callback();
 }
 
 void Scene::saveScene(char *fileName) const {
     std::stringstream ss;
 
-    ss << R"({"alocs":[)";
+    ss << R"({"version":)" << version << ",";
+    ss << R"("meshes":[)";
     auto separator = "";
-    for (const auto &aloc: alocs) {
+    for (const auto &aloc: meshes) {
         ss << separator;
         aloc.writeJson(ss);
         separator = ",";
@@ -206,41 +236,40 @@ void Scene::resetBBoxDefaults() {
     setBBox(pos, scale);
 }
 
-static void UpdateSceneDialogControls(HWND hDlg) {
-    Scene &scene = Scene::getInstance();
+void Scene::UpdateSceneDialogControls(HWND hDlg) const {
     // Position Sliders (-500 to 500)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, (int) (scene.bBoxPos[0] + 500.0f));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, (int) (bBoxPos[0] + 500.0f));
+    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(bBoxPos[0]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, (int) (scene.bBoxPos[1] + 500.0f));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, (int) (bBoxPos[1] + 500.0f));
+    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(bBoxPos[1]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, (int) (scene.bBoxPos[2] + 500.0f));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, (int) (bBoxPos[2] + 500.0f));
+    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(bBoxPos[2]).c_str());
 
     // Scale Sliders (1 to 800)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, (int) scene.bBoxScale[0]);
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, (int) bBoxScale[0]);
+    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(bBoxScale[0]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, (int) scene.bBoxScale[1]);
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, (int) bBoxScale[1]);
+    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(bBoxScale[1]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, (int) scene.bBoxScale[2]);
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, (int) bBoxScale[2]);
+    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
 }
 
 INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    Scene &scene = Scene::getInstance();
+    Scene &scene = getInstance();
 
     switch (message) {
         case WM_INITDIALOG:
-            UpdateSceneDialogControls(hDlg);
+            scene.UpdateSceneDialogControls(hDlg);
             return (INT_PTR) TRUE;
 
         case WM_HSCROLL: {
@@ -282,7 +311,7 @@ INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         case WM_COMMAND:
             if (LOWORD(wParam) == IDC_BUTTON_BBOX_RESET) {
                 scene.resetBBoxDefaults();
-                UpdateSceneDialogControls(hDlg);
+                scene.UpdateSceneDialogControls(hDlg);
             }
             return (INT_PTR) TRUE;
 
@@ -304,11 +333,11 @@ void Scene::showSceneDialog() {
         return;
     }
 
-    HINSTANCE hInstance = GetModuleHandle(NULL);
-    HWND hParentWnd = Renderer::getInstance().hwnd;
+    HINSTANCE hInstance = GetModuleHandle(nullptr);
+    HWND hParentWnd = Renderer::hwnd;
 
     hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, SceneDialogProc,
-                                     (LPARAM) this);
+                                     reinterpret_cast<LPARAM>(this));
 
     if (hSceneDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {

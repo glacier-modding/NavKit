@@ -70,14 +70,16 @@ void ZPathfinding::Entity::readJson(simdjson::ondemand::object json) {
     }
 }
 
-void ZPathfinding::HashAndEntity::readJson(simdjson::ondemand::object json) {
-    hash = std::string{std::string_view(json["hash"])};
+void ZPathfinding::HashesAndEntity::readJson(simdjson::ondemand::object json) {
+    alocHash = std::string{std::string_view(json["alocHash"])};
+    primHash = std::string{std::string_view(json["primHash"])};
     simdjson::ondemand::object entityJson = json["entity"];
     entity.readJson(entityJson);
 }
 
-void ZPathfinding::Aloc::writeJson(std::ostream &f) const {
-    f << R"({"hash":")" << hash <<
+void ZPathfinding::Mesh::writeJson(std::ostream &f) const {
+    f << R"({"alocHash":")" << alocHash <<
+            R"({"primHash":")" << primHash <<
             R"(","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
@@ -89,32 +91,29 @@ void ZPathfinding::Aloc::writeJson(std::ostream &f) const {
     f << "}}";
 }
 
-ZPathfinding::Alocs::Alocs(std::string fileName) {
-    simdjson::ondemand::parser parser;
-    simdjson::padded_string json = simdjson::padded_string::load(fileName);
-    auto jsonDocument = parser.iterate(json);
-    simdjson::ondemand::array alocs = jsonDocument["alocs"];
+ZPathfinding::Meshes::Meshes(simdjson::ondemand::array alocs) {
     for (simdjson::ondemand::value hashAndEntityJson: alocs) {
-        HashAndEntity hashAndEntity;
+        HashesAndEntity hashAndEntity;
         hashAndEntity.readJson(hashAndEntityJson);
         hashesAndEntities.push_back(hashAndEntity);
     }
 }
 
-std::vector<ZPathfinding::Aloc> ZPathfinding::Alocs::readAlocs() const {
-    std::vector<Aloc> alocs;
-    for (const HashAndEntity &hashAndEntity: hashesAndEntities) {
-        Aloc aloc;
-        aloc.hash = hashAndEntity.hash;
-        aloc.id = hashAndEntity.entity.id;
-        aloc.name = hashAndEntity.entity.name;
-        aloc.tblu = hashAndEntity.entity.tblu;
-        aloc.pos = hashAndEntity.entity.position;
-        aloc.rotation = hashAndEntity.entity.rotation;
-        aloc.scale = hashAndEntity.entity.scale;
-        alocs.emplace_back(aloc);
+std::vector<ZPathfinding::Mesh> ZPathfinding::Meshes::readMeshes() const {
+    std::vector<Mesh> meshes;
+    for (const HashesAndEntity &hashAndEntity: hashesAndEntities) {
+        Mesh mesh;
+        mesh.alocHash = hashAndEntity.alocHash;
+        mesh.primHash = hashAndEntity.alocHash;
+        mesh.id = hashAndEntity.entity.id;
+        mesh.name = hashAndEntity.entity.name;
+        mesh.tblu = hashAndEntity.entity.tblu;
+        mesh.pos = hashAndEntity.entity.position;
+        mesh.rotation = hashAndEntity.entity.rotation;
+        mesh.scale = hashAndEntity.entity.scale;
+        meshes.emplace_back(mesh);
     }
-    return alocs;
+    return meshes;
 }
 
 void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
@@ -132,15 +131,11 @@ void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
     f << "}}";
 }
 
-ZPathfinding::PfBoxes::PfBoxes(std::string fileName) {
-    simdjson::ondemand::parser parser;
-    simdjson::padded_string json = simdjson::padded_string::load(fileName);
-    auto jsonDocument = parser.iterate(json);
-    simdjson::ondemand::array pfBoxes = jsonDocument["pfBoxes"];
-    for (simdjson::ondemand::value hashAndEntityJson: pfBoxes) {
-        HashAndEntity hashAndEntity;
-        hashAndEntity.readJson(hashAndEntityJson);
-        hashesAndEntities.push_back(hashAndEntity);
+ZPathfinding::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
+    for (simdjson::ondemand::value entityJson: pfBoxes) {
+        Entity entity;
+        entity.readJson(entityJson);
+        entities.push_back(entity);
     }
 }
 
@@ -148,29 +143,29 @@ void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
     Scene &scene = Scene::getInstance();
     scene.exclusionBoxes.clear();
     bool includeBoxFound = false;
-    for (HashAndEntity &hashAndEntity: hashesAndEntities) {
-        if (hashAndEntity.entity.id == "48b22d0153942122" && abs(hashAndEntity.entity.position.x - -26.9811001) < 0.1) {
-            hashAndEntity.entity.type.data = INCLUDE_TYPE; // Workaround for bug in Sapienza's include box
+    for (Entity &entity: entities) {
+        if (entity.id == "48b22d0153942122" && abs(entity.position.x - -26.9811001) < 0.1) {
+            entity.type.data = INCLUDE_TYPE; // Workaround for bug in Sapienza's include box
         }
-        if (hashAndEntity.entity.type.data == INCLUDE_TYPE) {
-            std::string id = hashAndEntity.entity.id;
-            std::string name = hashAndEntity.entity.name;
-            std::string tblu = hashAndEntity.entity.tblu;
-            Vec3 p = hashAndEntity.entity.position;
-            Vec3 s = hashAndEntity.entity.scale.data;
-            Rotation r = hashAndEntity.entity.rotation;
-            PfBoxType type = hashAndEntity.entity.type;
+        if (entity.type.data == INCLUDE_TYPE) {
+            std::string id = entity.id;
+            std::string name = entity.name;
+            std::string tblu = entity.tblu;
+            Vec3 p = entity.position;
+            Vec3 s = entity.scale.data;
+            Rotation r = entity.rotation;
+            PfBoxType type = entity.type;
             scene.includeBox = {id, name, tblu, p, s, r, type};
             includeBoxFound = true;
         }
-        if (hashAndEntity.entity.type.data == EXCLUDE_TYPE) {
-            std::string id = hashAndEntity.entity.id;
-            std::string name = hashAndEntity.entity.name;
-            std::string tblu = hashAndEntity.entity.tblu;
-            Vec3 p = hashAndEntity.entity.position;
-            Vec3 s = hashAndEntity.entity.scale.data;
-            Rotation r = hashAndEntity.entity.rotation;
-            PfBoxType type = hashAndEntity.entity.type;
+        if (entity.type.data == EXCLUDE_TYPE) {
+            std::string id = entity.id;
+            std::string name = entity.name;
+            std::string tblu = entity.tblu;
+            Vec3 p = entity.position;
+            Vec3 s = entity.scale.data;
+            Rotation r = entity.rotation;
+            PfBoxType type = entity.type;
             scene.exclusionBoxes.emplace_back(id, name, tblu, p, s, r, type);
         }
     }
@@ -186,13 +181,6 @@ void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
     }
 }
 
-std::vector<ZPathfinding::PfBox> ZPathfinding::PfBoxes::readExclusionBoxes() const {
-    std::vector<PfBox> exclusionBoxes;
-    for (const HashAndEntity &hashAndEntity: hashesAndEntities) {
-    }
-    return exclusionBoxes;
-}
-
 void ZPathfinding::PfSeedPoint::writeJson(std::ostream &f) const {
     f << R"({"hash":"00280B8C4462FAC8","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
@@ -203,26 +191,22 @@ void ZPathfinding::PfSeedPoint::writeJson(std::ostream &f) const {
     f << "}}";
 }
 
-ZPathfinding::PfSeedPoints::PfSeedPoints(std::string fileName) {
-    simdjson::ondemand::parser parser;
-    simdjson::padded_string json = simdjson::padded_string::load(fileName);
-    auto jsonDocument = parser.iterate(json);
-    simdjson::ondemand::array pfSeedPoints = jsonDocument["pfSeedPoints"];
-    for (simdjson::ondemand::value hashAndEntityJson: pfSeedPoints) {
-        HashAndEntity hashAndEntity;
-        hashAndEntity.readJson(hashAndEntityJson);
-        hashesAndEntities.push_back(hashAndEntity);
+ZPathfinding::PfSeedPoints::PfSeedPoints(simdjson::ondemand::array pfSeedPoints) {
+    for (simdjson::ondemand::value entityJson: pfSeedPoints) {
+        Entity entity;
+        entity.readJson(entityJson);
+        entities.push_back(entity);
     }
 }
 
 std::vector<ZPathfinding::PfSeedPoint> ZPathfinding::PfSeedPoints::readPfSeedPoints() const {
     std::vector<PfSeedPoint> pfSeedPoints;
-    for (const HashAndEntity &hashAndEntity: hashesAndEntities) {
-        std::string id = hashAndEntity.entity.id;
-        std::string name = hashAndEntity.entity.name;
-        std::string tblu = hashAndEntity.entity.tblu;
-        Vec3 p = hashAndEntity.entity.position;
-        Rotation r = hashAndEntity.entity.rotation;
+    for (const Entity &entity: entities) {
+        std::string id = entity.id;
+        std::string name = entity.name;
+        std::string tblu = entity.tblu;
+        Vec3 p = entity.position;
+        Rotation r = entity.rotation;
         pfSeedPoints.emplace_back(id, name, tblu, p, r);
     }
     return pfSeedPoints;

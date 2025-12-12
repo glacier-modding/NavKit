@@ -42,7 +42,7 @@ int SDL_main(const int argc, char **argv) {
             std::thread logThread(Logger::logRunner);
             logThread.detach();
 
-            Settings::Load();
+            Settings::getInstance().load();
             Renderer &renderer = Renderer::getInstance();
             if (!renderer.initWindowAndRenderer()) {
                 return -1;
@@ -69,12 +69,12 @@ int SDL_main(const int argc, char **argv) {
                 inputHandler.hitTest();
                 gui.drawGui();
 
-                sceneExtract.finalizeExtract();
+                sceneExtract.finalizeExtractScene();
                 obj.finalizeObjBuild();
                 navp.finalizeBuild();
                 obj.finalizeLoad();
                 airg.finalizeSave();
-
+                obj.finalizeExtractAlocsOrPrims();
                 renderer.finalizeFrame();
             }
 

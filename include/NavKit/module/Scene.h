@@ -19,7 +19,7 @@ public:
     void setLastSaveFileName(char *file_name);
 
     void loadScene(const std::string &fileName, const std::function<void()> &callback,
-                          const std::function<void()> &errorCallback);
+                   const std::function<void()> &errorCallback);
 
     void saveScene(char *fileName) const;
 
@@ -27,9 +27,25 @@ public:
 
     void handleSaveSceneClicked();
 
+    void loadMeshes(const std::function<void()> &errorCallback,
+                   simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument);
+
+    void loadPfBoxes(const std::function<void()> &errorCallback,
+                     simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument);
+
+    void loadVersion(
+        simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument);
+
+    void loadPfSeedPoints(const std::function<void()> &errorCallback,
+                          simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument);
+
     void showSceneDialog();
-    void setBBox(const float* pos, const float* scale);
+
+    void setBBox(const float *pos, const float *scale);
+
     void resetBBoxDefaults();
+
+    void UpdateSceneDialogControls(HWND hDlg) const;
 
     static Scene &getInstance() {
         static Scene instance;
@@ -39,18 +55,20 @@ public:
     std::string lastLoadSceneFile;
     bool sceneLoaded;
 
-    std::vector<ZPathfinding::Aloc> alocs;
+    std::vector<ZPathfinding::Mesh> meshes;
+    std::vector<ZPathfinding::Mesh> prims;
     ZPathfinding::PfBox includeBox;
     std::vector<ZPathfinding::PfBox> exclusionBoxes;
     std::vector<ZPathfinding::PfSeedPoint> pfSeedPoints;
     std::optional<std::jthread> backgroundWorker;
     float bBoxPos[3]{};
     float bBoxScale[3]{};
+    int version;
     static HWND hSceneDialog;
 
 private:
-    int sceneScroll;
     std::string loadSceneName;
     std::string saveSceneName;
+
     static INT_PTR CALLBACK SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

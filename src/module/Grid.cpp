@@ -30,8 +30,8 @@ void Grid::loadBoundsFromAirg() {
     gridWidth = std::ceil((xMax - xMin) / spacing);
 }
 
-void Grid::saveSpacing(float newSpacing) {
-    Settings::setValue("Airg", "spacing", std::to_string(newSpacing).c_str());
+void Grid::saveSpacing(const float newSpacing) {
+    Settings::getInstance().setValue("Airg", "spacing", std::to_string(newSpacing));
     spacing = newSpacing;
 }
 
@@ -109,7 +109,8 @@ void Grid::renderGridText() const {
             }
             Vec3 textCoords{x + gridSpacing / 2.0f, z, -(y + gridSpacing / 2.0f)};
             // int cellIndex = xi + yi * gridWidth;
-            std::string cellText = std::to_string(xi) + ", " + std::to_string(yi);// + " = " + std::to_string(cellIndex);
+            std::string cellText = std::to_string(xi) + ", " + std::to_string(yi);
+            // + " = " + std::to_string(cellIndex);
             renderer.drawText(cellText, textCoords, color, 20);
         }
     }
