@@ -157,24 +157,20 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
 }
 
 void Obj::buildObj() {
-    Settings &settings = Settings::getInstance();
-    Scene &scene = Scene::getInstance();
+    const Settings &settings = Settings::getInstance();
+    const Scene &scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
     startedObjGeneration = true;
-    Logger::log(NK_INFO, "Generating obj from nav.json file.");
+    std::string buildOutputFileType = blendFileOnlyExtract ? "blend" : "obj";
+    Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
     command += settings.blenderPath;
     command += "\" -b --factory-startup -P glacier2obj.py -- \""; //--debug-all
     command += scene.lastLoadSceneFile;
     command += "\" \"";
     command += settings.outputFolder;
-    if (!blendFileOnlyExtract) {
-        command += "\\output.obj\"";
-    }
-    else {
-        command += "\\output.blend\"";
-    }
+    command += "\\output." + buildOutputFileType + "\"";
     if (meshTypeForBuild == ALOC) {
         command += " ALOC ";
     } else {
@@ -190,8 +186,8 @@ void Obj::buildObj() {
     generatedObjName = "output.obj";
 
     backgroundWorker.emplace(
-        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2ObjBlender.log", [this] {
-            Logger::log(NK_INFO, "Finished generating obj from nav.json file.");
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2ObjBlender.log", [this, buildOutputFileType] {
+            Logger::log(NK_INFO, "Finished generating %s from nav.json file.", buildOutputFileType.c_str());
             blenderObjGenerationDone = true;
         }, [this] {
             errorBuilding = true;
