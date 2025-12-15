@@ -160,7 +160,7 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
             }
             if (message.find("Unknown editor message type: listAlocPfBoxAndSeedPointEntities") != -1) {
                 Logger::log(NK_ERROR,
-                            "Failed to get ALOCs from game. Is ZHMModSDK up to date?");
+                            "Failed to get entities from game. Is ZHMModSDK up to date?");
                 done = true;
                 return;
             }
@@ -184,42 +184,4 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
 
 void GameConnection::sendHelloMessage() const {
     ws->send(R"({"type":"hello","identifier":"NavKit"})");
-}
-
-void GameConnection::sendChunk(const std::vector<NavPower::Area> &areas, int chunkIndex, int chunkCount) const {
-    std::stringstream m;
-    m << std::fixed << std::setprecision(3);
-    m << R"({"type":"loadNavp","chunkCount":)";
-    m << chunkCount;
-    m << ",\"chunk\":";
-    m << chunkIndex;
-    m << ",\"areas\":[";
-    int numArea = 0;
-
-    for (auto &navPowerArea: areas) {
-        numArea++;
-        m << "[";
-        int numEdge = 0;
-        for (auto &edge: navPowerArea.m_edges) {
-            numEdge++;
-            auto point = edge->m_pos;
-            m << "[";
-            m << point.X;
-            m << ",";
-            m << point.Y;
-            m << ",";
-            m << point.Z;
-            m << "]";
-            if (numEdge != navPowerArea.m_edges.size()) {
-                m << ",";
-            }
-        }
-        m << "]";
-        if (numArea != areas.size()) {
-            m << ",";
-        }
-    }
-    m << "]}";
-    const std::string msg = m.str();
-    ws->send(msg);
 }

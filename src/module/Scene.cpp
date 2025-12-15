@@ -80,7 +80,7 @@ void Scene::loadPfBoxes(const std::function<void()> &errorCallback,
         errorCallback();
     }
     pfBoxes.readPathfindingBBoxes();
-    if (includeBox.id == ZPathfinding::PfBoxes::NO_EXCLUDE_BOX_FOUND) {
+    if (includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
         if (Obj::getInstance().objLoaded) {
             RecastAdapter::getInstance().setSceneBBoxToMesh();
         }

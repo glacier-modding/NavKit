@@ -27,8 +27,6 @@ public:
 
     ~GameConnection();
 
-    void sendChunk(const std::vector<NavPower::Area> &areas, int chunkIndex, int chunkCount) const;
-
     int connectToGame();
 
     [[nodiscard]] int closeConnection() const;
