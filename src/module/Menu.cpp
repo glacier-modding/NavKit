@@ -103,6 +103,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
     setMenuItemEnabled(IDM_BUILD_OBJ_FROM_SCENE, obj.canBuildObjFromScene());
     setMenuItemEnabled(IDM_BUILD_OBJ_FROM_NAVP, obj.canBuildObjFromNavp());
+    setMenuItemEnabled(IDM_BUILD_BLEND_FROM_SCENE, obj.canBuildBlendFromScene());
 
     setMenuItemEnabled(IDM_EXTRACT_SCENE, sceneExtract.canExtractFromGame());
     setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_OBJ, sceneExtract.canExtractFromGameAndBuildObj());
@@ -240,6 +241,9 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
 
                 case IDM_BUILD_OBJ_FROM_NAVP:
                     obj.handleBuildObjFromNavpClicked();
+                    break;
+                case IDM_BUILD_BLEND_FROM_SCENE:
+                    obj.handleBuildBlendFromSceneClicked();
                     break;
                 case IDM_BUILD_OBJ_FROM_SCENE:
                     obj.handleBuildObjFromSceneClicked();

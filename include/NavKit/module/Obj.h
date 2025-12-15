@@ -38,6 +38,7 @@ public:
     bool startedObjGeneration;
     bool blenderObjStarted;
     bool blenderObjGenerationDone;
+    bool blendFileOnlyExtract;
     bool glacier2ObjDebugLogsEnabled;
     bool errorBuilding;
     bool errorExtracting;
@@ -83,7 +84,11 @@ public:
 
     bool canBuildObjFromScene() const;
 
+    bool canBuildBlendFromScene() const;
+
     void handleBuildObjFromSceneClicked();
+
+    void handleBuildBlendFromSceneClicked();
 
     void handleBuildObjFromNavpClicked();
 

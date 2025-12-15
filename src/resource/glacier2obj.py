@@ -2566,10 +2566,16 @@ def main():
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1
-    if bpy.app.version_string[0] == "3":
-        bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
+    if(output_path[-6:]=='.blend'):
+        log("INFO", "Attempting to save blender file to :" + output_path, "main")
+        bpy.ops.wm.save_as_mainfile(filepath=output_path)
     else:
-        bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
+        log("INFO", "Attempting to save obj file to :" + output_path, "main")
+        if bpy.app.version_string[0] == "3":
+            bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
+        else:
+            bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
+
     return None
 
 
