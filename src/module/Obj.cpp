@@ -36,6 +36,7 @@ Obj::Obj() : loadObjName("Load Obj"),
              errorBuilding(false),
              errorExtracting(false),
              extractingAlocsOrPrims(false),
+             blendFileOnlyExtract(false),
              doneExtractingAlocsOrPrims(false),
              doObjHitTest(false),
              meshTypeForBuild(ALOC),
@@ -168,7 +169,12 @@ void Obj::buildObj() {
     command += scene.lastLoadSceneFile;
     command += "\" \"";
     command += settings.outputFolder;
-    command += "\\output.obj\"";
+    if (!blendFileOnlyExtract) {
+        command += "\\output.obj\"";
+    }
+    else {
+        command += "\\output.blend\"";
+    }
     if (meshTypeForBuild == ALOC) {
         command += " ALOC ";
     } else {
@@ -284,12 +290,13 @@ void Obj::finalizeObjBuild() {
         startedObjGeneration = false;
         objToLoad = settings.outputFolder;
         objToLoad += "\\" + generatedObjName;
-        loadObj = true;
+        loadObj = !blendFileOnlyExtract;
         lastObjFileName = settings.outputFolder;
         lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
         sceneExtract.alsoBuildObj = false;
+        blendFileOnlyExtract = false;
     }
     if (errorBuilding) {
         errorBuilding = false;
@@ -299,6 +306,7 @@ void Obj::finalizeObjBuild() {
         objLoaded = false;
         sceneExtract.alsoBuildAll = false;
         sceneExtract.alsoBuildObj = false;
+        blendFileOnlyExtract = false;
     }
     Menu::updateMenuState();
 }
@@ -437,7 +445,18 @@ bool Obj::canBuildObjFromScene() const {
            scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone;
 }
 
+bool Obj::canBuildBlendFromScene() const {
+    // Currently this is the same as Obj::canBuildObjFromScene.
+    // Its expected this may change if the blend export includes features OBJ can't handle - like lights.
+    return Obj::canBuildObjFromScene();
+}
+
 void Obj::handleBuildObjFromSceneClicked() {
+    backgroundWorker.emplace(&Obj::extractAlocsOrPrims, this);
+}
+
+void Obj::handleBuildBlendFromSceneClicked() {
+    blendFileOnlyExtract = true;
     backgroundWorker.emplace(&Obj::extractAlocsOrPrims, this);
 }
 

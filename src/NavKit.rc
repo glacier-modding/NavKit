@@ -73,6 +73,8 @@ BEGIN
         MENUITEM "Build &Navp from Obj and Scene",           IDM_BUILD_NAVP
         MENUITEM SEPARATOR
         MENUITEM "Build &Airg from Navp",                    IDM_BUILD_AIRG
+        MENUITEM SEPARATOR
+        MENUITEM "Build Blend from &Scene"                   IDM_BUILD_BLEND_FROM_SCENE
     END
 
     POPUP "&Help"

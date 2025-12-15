@@ -39,6 +39,7 @@
 #define IDM_EXTRACT_SCENE_AND_BUILD_ALL         1402
 #define IDM_BUILD_OBJ_FROM_SCENE                1500
 #define IDM_BUILD_OBJ_FROM_NAVP                 1501
+#define IDM_BUILD_BLEND_FROM_SCENE				1502
 #define IDM_BUILD_NAVP                          1510
 #define IDM_BUILD_AIRG                          1520
 #define IDM_HELP_ABOUT                          1600
