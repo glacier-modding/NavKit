@@ -106,6 +106,5 @@ public:
 
     void finalizeExtractAlocsOrPrims();
 
-private:
-    void extractAlocsOrPrims();
+    void extractAlocsOrPrimsAndStartObjBuild();
 };

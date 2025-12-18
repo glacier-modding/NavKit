@@ -194,7 +194,7 @@ void Obj::buildObj() {
         });
 }
 
-void Obj::extractAlocsOrPrims() {
+void Obj::extractAlocsOrPrimsAndStartObjBuild() {
     Settings &settings = Settings::getInstance();
     std::string retailFolder = "\"";
     retailFolder += settings.hitmanFolder;
@@ -444,16 +444,16 @@ bool Obj::canBuildObjFromScene() const {
 bool Obj::canBuildBlendFromScene() const {
     // Currently this is the same as Obj::canBuildObjFromScene.
     // Its expected this may change if the blend export includes features OBJ can't handle - like lights.
-    return Obj::canBuildObjFromScene();
+    return canBuildObjFromScene();
 }
 
 void Obj::handleBuildObjFromSceneClicked() {
-    backgroundWorker.emplace(&Obj::extractAlocsOrPrims, this);
+    backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
 }
 
 void Obj::handleBuildBlendFromSceneClicked() {
     blendFileOnlyExtract = true;
-    backgroundWorker.emplace(&Obj::extractAlocsOrPrims, this);
+    backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
 }
 
 void Obj::handleBuildObjFromNavpClicked() {

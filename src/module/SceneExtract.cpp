@@ -129,7 +129,7 @@ void SceneExtract::finalizeExtractScene() {
                 const std::string &fileNameString = sceneFile;
                 sceneScoped.lastLoadSceneFile = sceneFile;
                 if ((alsoBuildObj || alsoBuildAll) && !obj.startedObjGeneration) {
-                    obj.buildObj();
+                    obj.extractAlocsOrPrimsAndStartObjBuild();
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();
