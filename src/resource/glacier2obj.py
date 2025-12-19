@@ -2439,18 +2439,39 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
     data = json.loads(f.read())
     f.close()
     transforms = {}
+    room_names = {}
+    roomColorIndex = 0
+    roomFolderColorIdx = 0    
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
             mesh_hash = hash_and_entity['alocHash']
         else:
             mesh_hash = hash_and_entity['primHash']
+            
+        room_folder_name = hash_and_entity["roomFolderName"]
+        if room_folder_name not in bpy.data.collections:
+            coll = bpy.data.collections.new(room_folder_name)
+            bpy.context.scene.collection.children.link(coll)
+            coll.color_tag = "COLOR_0" + str(roomFolderColorIdx%8 + 1)
+            roomFolderColorIdx += 1
+        room_folder_coll = bpy.data.collections.get(room_folder_name)
+        
+        room_name = hash_and_entity["roomName"]
+        if room_name not in bpy.data.collections:
+            coll = bpy.data.collections.new(room_name)
+            room_folder_coll.children.link(coll)
+            coll.color_tag = "COLOR_0" + str(roomColorIndex%8 + 1)
+            roomColorIndex += 1
+            
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
                      "scale": entity["scale"]["data"], "id": entity["id"]}
-
+        
         if mesh_hash not in transforms:
             transforms[mesh_hash] = []
+            room_names[mesh_hash] = []
         transforms[mesh_hash].append(transform)
+        room_names[mesh_hash].append(room_name)
     output_dir = os.path.dirname(path_to_output_obj_file)
     path_to_aloc_or_prim_dir = "%s\\%s" % (output_dir, mesh_type.lower())
     log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "load_scenario")
@@ -2516,6 +2537,7 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
         t_size = len(t)
         for i in range(0, t_size):
             mesh_transform = transforms[mesh_hash][i]
+            room_name = room_names[mesh_hash][i]
             p = mesh_transform["position"]
             r = mesh_transform["rotate"]
             s = mesh_transform["scale"]
@@ -2526,7 +2548,7 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
                     cur = obj.copy()
                 else:
                     cur = obj
-                collection.objects.link(cur)
+                bpy.data.collections.get(room_name).objects.link(cur)
                 cur.select_set(True)
                 cur.name = mesh_hash + " " + mesh_transform["id"]
                 cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
