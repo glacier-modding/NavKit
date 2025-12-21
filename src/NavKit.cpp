@@ -28,9 +28,9 @@
 #include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/Navp.h"
 #include "../include/NavKit/module/Obj.h"
+#include "../include/NavKit/module/PersistedSettings.h"
 #include "../include/NavKit/module/Renderer.h"
 #include "../include/NavKit/module/SceneExtract.h"
-#include "../include/NavKit/module/Settings.h"
 #include "../include/NavKit/util/ErrorHandler.h"
 #include "../include/NavKit/util/FileUtil.h"
 #include "../include/NavKit/util/UpdateChecker.h"
@@ -42,7 +42,7 @@ int SDL_main(const int argc, char **argv) {
             std::thread logThread(Logger::logRunner);
             logThread.detach();
 
-            Settings::getInstance().load();
+            PersistedSettings::getInstance().load();
             Renderer &renderer = Renderer::getInstance();
             if (!renderer.initWindowAndRenderer()) {
                 return -1;

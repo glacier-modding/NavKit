@@ -56,6 +56,7 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
                      ".").c_str());
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
+        fclose(logFile);
         errorCallback();
         return;
     }
@@ -71,6 +72,7 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
 
     while (true) {
         if (closing) {
+            fclose(logFile);
             return;
         }
         if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0)) {
@@ -102,12 +104,12 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             handles[commandIndex].pop_back();
             handles[commandIndex].pop_back();
             handles[commandIndex].pop_back();
+            fclose(logFile);
             errorCallback();
             return;
         }
         bool pythonError = false;
-        std::string outputErrorCheck = output.data();
-        if (size_t found = outputErrorCheck.find("Error"); found != std::string::npos) {
+        if (outputString.find("Error") != std::string::npos) {
             pythonError = true;
         }
         if (pythonError) {
@@ -122,17 +124,23 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             handles[commandIndex].pop_back();
             handles[commandIndex].pop_back();
             handles[commandIndex].pop_back();
-            std::string errorMessage = lastOutput.data();
-            errorMessage += output.data();
+            std::string errorMessage;
+            if (!lastOutput.empty()) {
+                errorMessage.append(lastOutput.begin(), lastOutput.end());
+            }
+            errorMessage += outputString;
             errorMessage +=
                     "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
             ErrorHandler::openErrorDialog(errorMessage);
+            fclose(logFile);
             return;
         }
-        lastOutput.resize(output.size());
-        std::ranges::copy(output, lastOutput.begin());
-        output.clear();
-        //}
+        if (start > 0) {
+            lastOutput.assign(output.begin(), output.begin() + start);
+            output.erase(output.begin(), output.begin() + start);
+        } else {
+            lastOutput.clear();
+        }
     }
 
     // Process any remaining output
@@ -148,9 +156,16 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             pos++;
             start = pos;
         }
+        if (start < outputString.size()) {
+            std::string line = outputString.substr(start);
+            Logger::log(NK_INFO, line.c_str());
+            fputs(line.c_str(), logFile);
+            fputc('\n', logFile);
+        }
     }
 
     if (closing) {
+        fclose(logFile);
         return;
     }
 
@@ -163,5 +178,6 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
     handles[commandIndex].pop_back();
     handles[commandIndex].pop_back();
 
+    fclose(logFile);
     callback();
 }

@@ -1,17 +1,17 @@
 #include "../../include/NavKit/module/GameConnection.h"
 
+#include <chrono>
 #include <fstream>
-#include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <thread>
-#include <chrono>
-#include <memory>
-#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include "../../extern/simdjson/simdjson.h"
+#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 // 46735 is a phoneword for HMSDK
@@ -114,7 +114,7 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
     std::thread writer_thread([&] {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
-        const std::string outputFolder = Settings::getInstance().outputFolder;
+        const std::string outputFolder = NavKitSettings::getInstance().outputFolder;
         std::ofstream f(outputFolder + "\\output.nav.json", std::ios::app);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",

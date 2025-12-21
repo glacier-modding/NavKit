@@ -1,8 +1,6 @@
 #include "../../include/NavKit/model/ZPathfinding.h"
 #include "../../include/NavKit/module/Scene.h"
 
-#include <fstream>
-
 void ZPathfinding::Vec3::readJson(simdjson::ondemand::object json) {
     x = static_cast<float>(static_cast<double>(json["x"]));
     y = static_cast<float>(static_cast<double>(json["y"]));
@@ -73,6 +71,8 @@ void ZPathfinding::Entity::readJson(simdjson::ondemand::object json) {
 void ZPathfinding::HashesAndEntity::readJson(simdjson::ondemand::object json) {
     alocHash = std::string{std::string_view(json["alocHash"])};
     primHash = std::string{std::string_view(json["primHash"])};
+    roomName = std::string{std::string_view(json["roomName"])};
+    roomFolderName = std::string{std::string_view(json["roomFolderName"])};
     simdjson::ondemand::object entityJson = json["entity"];
     entity.readJson(entityJson);
 }
@@ -80,6 +80,8 @@ void ZPathfinding::HashesAndEntity::readJson(simdjson::ondemand::object json) {
 void ZPathfinding::Mesh::writeJson(std::ostream &f) const {
     f << R"({"alocHash":")" << alocHash <<
             R"({"primHash":")" << primHash <<
+            R"({"roomName":")" << roomName <<
+            R"({"roomFolderName":")" << roomFolderName <<
             R"(","entity":{"id":")" << id <<
             R"(","name": ")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
@@ -105,6 +107,8 @@ std::vector<ZPathfinding::Mesh> ZPathfinding::Meshes::readMeshes() const {
         Mesh mesh;
         mesh.alocHash = hashAndEntity.alocHash;
         mesh.primHash = hashAndEntity.alocHash;
+        mesh.roomName = hashAndEntity.roomName;
+        mesh.roomFolderName = hashAndEntity.roomFolderName;
         mesh.id = hashAndEntity.entity.id;
         mesh.name = hashAndEntity.entity.name;
         mesh.tblu = hashAndEntity.entity.tblu;

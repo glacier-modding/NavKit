@@ -10,10 +10,10 @@ typedef int GLint;
 
 enum HitTestType {
     NONE = 0,
-    NAVMESH_AREA = 60,
-    AIRG_WAYPOINT = 61,
-    PF_SEED_POINT = 62,
-    PF_EXCLUSION_BOX = 63
+    NAVMESH_AREA = 240,
+    AIRG_WAYPOINT = 241,
+    PF_SEED_POINT = 242,
+    PF_EXCLUSION_BOX = 243
 };
 
 class HitTestResult {

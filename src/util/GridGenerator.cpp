@@ -11,12 +11,13 @@
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Scene.h"
 
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/NavKit/util/Pathfinding.h"
 
@@ -32,9 +33,8 @@ bool GridGenerator::initRecastAirgAdapter() {
     obj.buildObjFromNavp(false);
     const RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
-    const SceneExtract &sceneExtract = SceneExtract::getInstance();
-    const Settings &settings = Settings::getInstance();
-    const std::string objFileName = settings.outputFolder + "\\outputNavp.obj";
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const std::string objFileName = navKitSettings.outputFolder + "\\outputNavp.obj";
     Logger::log(NK_INFO, "Loading navmesh Obj into Recast...");
     if (!recastAirgAdapter.loadInputGeom(objFileName)) {
         airg.airgLoaded = false;
@@ -68,7 +68,7 @@ bool GridGenerator::initRecastAirgAdapter() {
         Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
         return true;
     }
-    const std::string outputNavpFilename = settings.outputFolder + "\\outputForAirg.navp.json";
+    const std::string outputNavpFilename = navKitSettings.outputFolder + "\\outputForAirg.navp.json";
     recastAirgAdapter.save(outputNavpFilename);
 
     Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, false, true);

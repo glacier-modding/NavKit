@@ -3,21 +3,21 @@
 #include <DetourNavMeshQuery.h>
 #include <RecastDebugDraw.h>
 
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
-#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
-#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/RecastDemo/InputGeom.h"
 
-#include <queue>
-#include <SDL_keyboard.h>
 #include <CommCtrl.h>
 #include <iomanip>
+#include <queue>
+#include <SDL_keyboard.h>
 #include <sstream>
 
 #include <GL/glu.h>
@@ -978,9 +978,18 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
                     break;
                 }
             }
+            std::string meshNameString;
+            std::string roomString;
+            if (Scene::getInstance().sceneLoaded) {
+                if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
+                    selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
+                    meshNameString = mesh->name;
+                    roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
+                }
+            }
             Logger::log(
                 NK_INFO,
-                ("Selected Object: '" + selectedObject + "' Obj vertex: " + std::to_string(hit) +
+                ("Selected Object: '" + meshNameString + "' Mesh: '"+ selectedObject + "' Obj vertex: " + std::to_string(hit) + roomString +
                  ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
                  std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
         }

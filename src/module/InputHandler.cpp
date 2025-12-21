@@ -1,5 +1,5 @@
-#include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/InputHandler.h"
+#include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Menu.h"
@@ -7,12 +7,13 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/RecastDemo/imgui.h"
 
 #include <algorithm>
 #include <SDL.h>
 #include <SDL_opengl.h>
+
+#include "../../include/NavKit/module/NavKitSettings.h"
 
 
 InputHandler::InputHandler() {
@@ -119,7 +120,7 @@ int InputHandler::handleInput() {
                 break;
             case SDL_SYSWMEVENT:
                 if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
-                    (Settings::hSettingsDialog && IsDialogMessage(Settings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (NavKitSettings::hSettingsDialog && IsDialogMessage(NavKitSettings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                     (Airg::hAirgDialog && IsDialogMessage(Airg::hAirgDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                     (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                     (RecastAdapter::hRecastDialog && IsDialogMessage(RecastAdapter::hRecastDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {

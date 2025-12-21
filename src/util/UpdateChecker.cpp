@@ -10,8 +10,8 @@
 #include <httplib.h>
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/Resource.h"
-#include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Renderer.h"
 
 UpdateChecker::UpdateChecker()
     : updateCheckCompleted(false)
@@ -124,6 +124,7 @@ void UpdateChecker::performUpdate() const {
     GetModuleFileNameA(nullptr, current_exe_path, MAX_PATH);
     const std::filesystem::path install_dir = std::filesystem::path(current_exe_path).parent_path();
     const std::filesystem::path original_updater_path = install_dir / "updater.exe";
+    const std::filesystem::path original_settings_path = install_dir / "NavKit.ini";
 
     if (!std::filesystem::exists(original_updater_path)) {
         Logger::log(NK_ERROR, ("NavKit: updater.exe not found at " + original_updater_path.string()).c_str());

@@ -5,7 +5,7 @@
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/module/Settings.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 
 Grid::Grid() {
     spacing = 2.25;
@@ -31,7 +31,7 @@ void Grid::loadBoundsFromAirg() {
 }
 
 void Grid::saveSpacing(const float newSpacing) {
-    Settings::getInstance().setValue("Airg", "spacing", std::to_string(newSpacing));
+    PersistedSettings::getInstance().setValue("Airg", "spacing", std::to_string(newSpacing));
     spacing = newSpacing;
 }
 

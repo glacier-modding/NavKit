@@ -13,15 +13,15 @@
 #include <array>
 
 #include "../../include/NavKit/module/Scene.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
 #include <SDL.h>
+
 #include <GL/glew.h>
 #include <GL/glu.h>
-#include <GL/glew.h>
 #include <SDL_opengl.h>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/util/Math.h"
 
 HWND Renderer::hwnd = nullptr;
@@ -144,8 +144,8 @@ bool Renderer::initWindowAndRenderer() {
     }
 
     // Fog.
-    Settings &settings = Settings::getInstance();
-    const float backgroundColor = settings.backgroundColor;
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const float backgroundColor = navKitSettings.backgroundColor;
     float fogColor[4] = {backgroundColor, backgroundColor, backgroundColor, 1.0f};
     glEnable(GL_FOG);
     glFogi(GL_FOG_MODE, GL_LINEAR);
@@ -194,8 +194,8 @@ void Renderer::renderFrame() {
     glGetIntegerv(GL_VIEWPORT, viewport);
 
     // Clear the screen
-    Settings &settings = Settings::getInstance();
-    float backgroundColor = settings.backgroundColor;
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    float backgroundColor = navKitSettings.backgroundColor;
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_BLEND);
@@ -279,7 +279,9 @@ void Renderer::renderFrame() {
         grid.renderGridText();
     }
     glClear(GL_DEPTH_BUFFER_BIT);
-    drawBounds();
+    if (scene.showBBox) {
+        drawBounds();
+    }
     drawAxes();
 }
 

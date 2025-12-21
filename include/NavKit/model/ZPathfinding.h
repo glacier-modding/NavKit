@@ -88,6 +88,8 @@ namespace ZPathfinding {
 
         std::string alocHash;
         std::string primHash;
+        std::string roomName;
+        std::string roomFolderName;
         Entity entity;
 
         void readJson(simdjson::ondemand::object json);
@@ -99,6 +101,8 @@ namespace ZPathfinding {
 
         std::string alocHash;
         std::string primHash;
+        std::string roomName;
+        std::string roomFolderName;
         std::string id;
         std::string name;
         std::string tblu;

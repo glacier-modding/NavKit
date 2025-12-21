@@ -10,7 +10,7 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include <SDL.h>
 #include <GL/glew.h>
 #include <GL/glu.h>

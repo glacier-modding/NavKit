@@ -37,6 +37,8 @@ BEGIN
     END
     POPUP "&View"
     BEGIN
+        MENUITEM "Show &BBox",                               IDM_VIEW_SCENE_SHOW_BBOX, CHECKED
+        MENUITEM SEPARATOR
         MENUITEM "Show &Navp",                               IDM_VIEW_NAVP_SHOW_NAVP, CHECKED
         MENUITEM "Show Navp &Indices",                       IDM_VIEW_NAVP_SHOW_INDICES
         MENUITEM "Show &Exclusion Boxes",                    IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, CHECKED

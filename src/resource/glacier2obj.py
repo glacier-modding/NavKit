@@ -5,14 +5,8 @@ import ctypes
 import numpy as np
 import json
 import mathutils
-from mathutils import Euler
-import math
-import enum
-import sys
 from timeit import default_timer as timer
-from enum import IntEnum
 import struct
-import binascii
 
 from bpy.props import (
     StringProperty,
@@ -33,7 +27,6 @@ from bpy.types import (
     Operator,
     PropertyGroup,
 )
-global glacier2obj_enabled_log_levels
 glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
 
 # General
@@ -42,6 +35,11 @@ glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are 
 def log(level, msg, filter_field):
     if level in glacier2obj_enabled_log_levels: # and filter_field == "007573591BE1BE69":
         print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
+        try:
+            sys.stdout.flush()
+            os.fsync(sys.stdout.fileno())
+        except OSError:
+            pass
 
 class BinaryReader:
     def __init__(self, stream):
@@ -2063,7 +2061,11 @@ class Physics:
             # 27
             self.read_primitive_mesh(br, primitive_count, aloc_name)
             self.primitive_count = self.primitive_capsules_count + self.primitive_boxes_count + self.primitive_spheres_count
+            log("DEBUG", "mesh_type == ICP ALOC: " + aloc_name, aloc_name)
+            # raise(Exception("mesh_type == ICP")) # TODO: Verify that ICP meshes work properly
+            return self.primitive_boxes + self.primitive_spheres + self.primitive_capsules
         br.close()
+        return {}
 
     def set_collision_settings(self, settings):
         self.lib.SetCollisionSettings(ctypes.byref(settings))
@@ -2431,7 +2433,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     return aloc.collision_type, objects
 
 
-def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask):
+def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -2440,8 +2442,8 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
     f.close()
     transforms = {}
     room_names = {}
-    roomColorIndex = 0
-    roomFolderColorIdx = 0    
+    room_color_index = 0
+    room_folder_color_index = 0
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
             mesh_hash = hash_and_entity['alocHash']
@@ -2452,16 +2454,16 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
         if room_folder_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_folder_name)
             bpy.context.scene.collection.children.link(coll)
-            coll.color_tag = "COLOR_0" + str(roomFolderColorIdx%8 + 1)
-            roomFolderColorIdx += 1
+            coll.color_tag = "COLOR_0" + str(room_folder_color_index%8 + 1)
+            room_folder_color_index += 1
         room_folder_coll = bpy.data.collections.get(room_folder_name)
         
         room_name = hash_and_entity["roomName"]
         if room_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_name)
             room_folder_coll.children.link(coll)
-            coll.color_tag = "COLOR_0" + str(roomColorIndex%8 + 1)
-            roomColorIndex += 1
+            coll.color_tag = "COLOR_0" + str(room_color_index%8 + 1)
+            room_color_index += 1
             
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
@@ -2489,22 +2491,25 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
     ]
     aloc_or_prim_file_count = len(aloc_or_prim_list)
     mesh_count = 0
+    meshes_in_scenario_count = 0
     for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
         aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
         mesh_hash = aloc_or_prim_filename[:-5]
         if mesh_hash in transforms:
+            meshes_in_scenario_count += 1
             mesh_count += len(transforms[aloc_or_prim_filename[:-5]])
 
     mesh_i = 0
-    meshes_in_scenario_count = len(transforms)
     current_mesh_in_scene_index = 0
     for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
         aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
         mesh_hash = aloc_or_prim_filename[:-5]
         if mesh_hash not in transforms:
             continue
+        current_mesh_in_scene_index += 1
         if mesh_hash in excluded_mesh_hashes:
             log("INFO", "Skipping " + mesh_type + " file " + mesh_hash, mesh_hash)
+            mesh_i += len(transforms[mesh_hash])
             continue
         aloc_or_prim_path = os.path.join(path_to_aloc_or_prim_dir, aloc_or_prim_filename)
 
@@ -2516,25 +2521,33 @@ def load_scenario(context, collection, path_to_nav_json, path_to_output_obj_file
                     None, context, aloc_or_prim_path, False
                 )
                 if collision_type == -1 and objects == -1:
+                    mesh_i += len(transforms[mesh_hash])
                     continue
             else:
                 objects = load_prim(None, context, aloc_or_prim_path, lod_mask)
         except struct.error as err:
             log("DEBUG", "=========================== Error Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err) + " ================", "load_scenario")
+            mesh_i += len(transforms[mesh_hash])
             continue
-
+        t = transforms[mesh_hash]
+        t_size = len(t)
+        if collision_type == PhysicsCollisionType.RIGIDBODY:
+            for i in range(0, t_size):
+                log("INFO", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
+                mesh_i += 1
+            continue
         if len(objects) == 0:
             log("DEBUG", "No collidable objects for " + str(mesh_hash), "load_scenario")
+            mesh_i += len(transforms[mesh_hash])
             continue
         if not objects:
             log("INFO", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------", "load_scenario")
+            mesh_i += len(transforms[mesh_hash])
             continue
         if collision_type in excluded_collision_types:
             log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(collision_type) + " +++++++++++++", "load_scenario")
+            mesh_i += len(transforms[mesh_hash])
             continue
-        t = transforms[mesh_hash]
-        current_mesh_in_scene_index += 1
-        t_size = len(t)
         for i in range(0, t_size):
             mesh_transform = transforms[mesh_hash][i]
             room_name = room_names[mesh_hash][i]
@@ -2571,7 +2584,6 @@ def main():
     output_path = argv[1]
     mesh_type = argv[2]
     lod_mask = argv[3]
-    global glacier2obj_enabled_log_levels
     if len(argv) > 4 and argv[4] == True:
         log("INFO", "Enabling debug logs", "main"),
         glacier2obj_enabled_log_levels.append("DEBUG")
@@ -2579,16 +2591,11 @@ def main():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-    collection = bpy.data.collections.new(
-        bpy.path.display_name_from_filepath(scene_path)
-    )
-    bpy.context.scene.collection.children.link(collection)
-
-    scenario = load_scenario(bpy.context, collection, scene_path, output_path, mesh_type, lod_mask)
+    scenario = load_scenario(bpy.context, scene_path, output_path, mesh_type, lod_mask)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1
-    if(output_path[-6:]=='.blend'):
+    if output_path[-6:]== '.blend':
         log("INFO", "Attempting to save blender file to :" + output_path, "main")
         bpy.ops.wm.save_as_mainfile(filepath=output_path)
     else:
@@ -2598,6 +2605,12 @@ def main():
         else:
             bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
 
+    log("INFO", "Script finished, waiting...", "main")
+    try:
+        sys.stdout.flush()
+        os.fsync(sys.stdout.fileno())
+    except OSError:
+        pass
     return None
 
 

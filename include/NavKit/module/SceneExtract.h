@@ -1,5 +1,7 @@
 #pragma once
 #include <functional>
+#include <optional>
+#include <thread>
 
 class SceneExtract {
 public:

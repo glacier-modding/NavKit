@@ -34,6 +34,7 @@
 #define IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA    1326
 #define IDM_VIEW_AIRG_CELL_COLOR_LAYER          1327
 #define IDM_VIEW_LOG_SHOW_LOG                   1330
+#define IDM_VIEW_SCENE_SHOW_BBOX                1340
 #define IDM_EXTRACT_SCENE                       1400
 #define IDM_EXTRACT_SCENE_AND_BUILD_OBJ         1401
 #define IDM_EXTRACT_SCENE_AND_BUILD_ALL         1402

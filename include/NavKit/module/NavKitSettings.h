@@ -1,16 +1,13 @@
 #pragma once
 #include <SimpleIni.h>
 
-class Settings {
+class NavKitSettings {
     static INT_PTR SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
-    explicit Settings();
-
-    CSimpleIniA ini;
-
+    explicit NavKitSettings();
 public:
-    static Settings &getInstance() {
-        static Settings instance;
+    static NavKitSettings &getInstance() {
+        static NavKitSettings instance;
         return instance;
     }
 
@@ -23,17 +20,11 @@ public:
     std::string blenderPath;
     static HWND hSettingsDialog;
 
-    void setValue(const std::string &folder, const std::string &key, const std::string &value);
-
     void setHitmanFolder(const std::string &folderName);
 
     void setOutputFolder(const std::string &folderName);
 
     void setBlenderFile(const std::string &fileName);
 
-    void save() const;
-
-    void load();
-
-    void showSettingsDialog();
+    void showNavKitSettingsDialog();
 };

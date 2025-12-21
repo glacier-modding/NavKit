@@ -11,11 +11,12 @@
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
@@ -107,8 +108,8 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
 }
 
 void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
-    Settings &settings = Settings::getInstance();
-    std::string fileName = settings.outputFolder + "\\outputNavp.obj";
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    std::string fileName = navKitSettings.outputFolder + "\\outputNavp.obj";
     Gui &gui = Gui::getInstance();
     gui.showLog = true;
 
@@ -157,7 +158,7 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
 }
 
 void Obj::buildObj() {
-    const Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
@@ -165,11 +166,11 @@ void Obj::buildObj() {
     std::string buildOutputFileType = blendFileOnlyExtract ? "blend" : "obj";
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
-    command += settings.blenderPath;
+    command += navKitSettings.blenderPath;
     command += "\" -b --factory-startup -P glacier2obj.py -- \""; //--debug-all
     command += scene.lastLoadSceneFile;
     command += "\" \"";
-    command += settings.outputFolder;
+    command += navKitSettings.outputFolder;
     command += "\\output." + buildOutputFileType + "\"";
     if (meshTypeForBuild == ALOC) {
         command += " ALOC ";
@@ -195,19 +196,19 @@ void Obj::buildObj() {
 }
 
 void Obj::extractAlocsOrPrimsAndStartObjBuild() {
-    Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     std::string retailFolder = "\"";
-    retailFolder += settings.hitmanFolder;
+    retailFolder += navKitSettings.hitmanFolder;
     retailFolder += "\\Retail\"";
     std::string gameVersion = "HM3";
     std::string navJsonFilePath = "\"";
-    navJsonFilePath += settings.outputFolder;
+    navJsonFilePath += navKitSettings.outputFolder;
     navJsonFilePath += "\\output.nav.json\"";
     std::string runtimeFolder = "\"";
-    runtimeFolder += settings.hitmanFolder;
+    runtimeFolder += navKitSettings.hitmanFolder;
     runtimeFolder += "\\Runtime\"";
     std::string alocOrPrimFolder;
-    alocOrPrimFolder += settings.outputFolder;
+    alocOrPrimFolder += navKitSettings.outputFolder;
     alocOrPrimFolder += (meshTypeForBuild == ALOC) ? "\\aloc" : "\\prim";
 
     struct stat folderExists{};
@@ -251,7 +252,7 @@ char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
 }
 
 void Obj::finalizeExtractAlocsOrPrims() {
-    Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
 
     if (errorExtracting) {
         errorBuilding = false;
@@ -266,7 +267,7 @@ void Obj::finalizeExtractAlocsOrPrims() {
     }
     if (doneExtractingAlocsOrPrims) {
         doneExtractingAlocsOrPrims = false;
-        std::string sceneFile = settings.outputFolder;
+        std::string sceneFile = navKitSettings.outputFolder;
         sceneFile += "\\output.nav.json";
         Scene &scene = Scene::getInstance();
         const std::string &fileNameString = sceneFile;
@@ -281,13 +282,13 @@ void Obj::finalizeExtractAlocsOrPrims() {
 
 void Obj::finalizeObjBuild() {
     SceneExtract &sceneExtract = SceneExtract::getInstance();
-    Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     if (blenderObjGenerationDone) {
         startedObjGeneration = false;
-        objToLoad = settings.outputFolder;
+        objToLoad = navKitSettings.outputFolder;
         objToLoad += "\\" + generatedObjName;
         loadObj = !blendFileOnlyExtract;
-        lastObjFileName = settings.outputFolder;
+        lastObjFileName = navKitSettings.outputFolder;
         lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
@@ -429,15 +430,15 @@ bool Obj::canLoad() const {
 }
 
 bool Obj::canBuildObjFromNavp() {
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Navp &navp = Navp::getInstance();
-    const Settings &settings = Settings::getInstance();
-    return settings.outputSet && settings.blenderSet && navp.navpLoaded;
+    return navKitSettings.outputSet && navKitSettings.blenderSet && navp.navpLoaded;
 }
 
 bool Obj::canBuildObjFromScene() const {
-    const Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
-    return settings.hitmanSet && settings.outputSet && !extractingAlocsOrPrims && settings.blenderSet &&
+    return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingAlocsOrPrims && navKitSettings.blenderSet &&
            scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone;
 }
 
@@ -499,15 +500,15 @@ std::string Obj::buildPrimLodsString() const {
 }
 
 void Obj::saveObjSettings() const {
-    Settings &settings = Settings::getInstance();
+    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
 
     const char *meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
-    settings.setValue("Obj", "MeshTypeForBuild", meshTypeStr);
+    persistedSettings.setValue("Obj", "MeshTypeForBuild", meshTypeStr);
 
     const std::string primLodsStr = buildPrimLodsString();
-    settings.setValue("Obj", "PrimLods", primLodsStr);
+    persistedSettings.setValue("Obj", "PrimLods", primLodsStr);
 
-    settings.save();
+    persistedSettings.save();
 }
 
 void Obj::showObjDialog() {
