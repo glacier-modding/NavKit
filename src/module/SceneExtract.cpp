@@ -1,19 +1,16 @@
 #pragma once
+#include <fstream>
 
+#include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
-#include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/GameConnection.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/module/SceneExtract.h"
-
-#include <fstream>
-
-#include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Scene.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
 SceneExtract::SceneExtract() {
@@ -39,16 +36,16 @@ bool SceneExtract::canExtractFromGame() const {
 
 bool SceneExtract::canExtractFromGameAndBuildObj() const {
     const Obj &obj = Obj::getInstance();
-    const Settings &settings = Settings::getInstance();
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame()
-           && settings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+           && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
 }
 
 bool SceneExtract::canExtractFromGameAndBuildAll() const {
     const Obj &obj = Obj::getInstance();
-    const Settings &settings = Settings::getInstance();
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame()
-           && settings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+           && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
 }
 
 void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
@@ -69,8 +66,8 @@ void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
 
 void SceneExtract::extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback) {
     GameConnection &gameConnection = GameConnection::getInstance();
-    const Settings &settings = Settings::getInstance();
-    std::ofstream f(settings.outputFolder + "\\output.nav.json");
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    std::ofstream f(navKitSettings.outputFolder + "\\output.nav.json");
     f.clear();
     f.close();
 
@@ -112,9 +109,9 @@ void SceneExtract::extractScene() {
 void SceneExtract::finalizeExtractScene() {
     if (doneExtractingFromGame) {
         doneExtractingFromGame = false;
-        const Settings &settings = Settings::getInstance();
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
         Scene &scene = Scene::getInstance();
-        std::string sceneFile = settings.outputFolder;
+        std::string sceneFile = navKitSettings.outputFolder;
         sceneFile += "\\output.nav.json";
         Logger::log(NK_INFO, "Loading nav.json file: '%s'.", sceneFile.c_str());
 

@@ -88,6 +88,8 @@ namespace ZPathfinding {
 
         std::string alocHash;
         std::string primHash;
+        std::string roomName;
+        std::string roomFolderName;
         Entity entity;
 
         void readJson(simdjson::ondemand::object json);
@@ -99,6 +101,8 @@ namespace ZPathfinding {
 
         std::string alocHash;
         std::string primHash;
+        std::string roomName;
+        std::string roomFolderName;
         std::string id;
         std::string name;
         std::string tblu;
@@ -149,7 +153,7 @@ namespace ZPathfinding {
         static inline const std::string INCLUDE_TYPE = "PFBT_INCLUDE_MESH_COLLISION";
         static inline const std::string EXCLUDE_TYPE = "PFBT_EXCLUDE_MESH_COLLISION";
 
-        static inline const std::string NO_EXCLUDE_BOX_FOUND = "NO_EXCLUDE_BOX_FOUND";
+        static inline const std::string NO_INCLUDE_BOX_FOUND = "NO_EXCLUDE_BOX_FOUND";
 
         PfBoxes(simdjson::ondemand::array);
 

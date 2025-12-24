@@ -4,21 +4,21 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/module/Obj.h"
-
+#include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
 Scene::Scene()
     : sceneLoaded(false),
       version(1),
       loadSceneName("Load NavKit Scene"),
-      saveSceneName("Save NavKit Scene") {
+      saveSceneName("Save NavKit Scene"),
+      showBBox(true) {
     resetBBoxDefaults();
 }
 
@@ -80,7 +80,7 @@ void Scene::loadPfBoxes(const std::function<void()> &errorCallback,
         errorCallback();
     }
     pfBoxes.readPathfindingBBoxes();
-    if (includeBox.id == ZPathfinding::PfBoxes::NO_EXCLUDE_BOX_FOUND) {
+    if (includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
         if (Obj::getInstance().objLoaded) {
             RecastAdapter::getInstance().setSceneBBoxToMesh();
         }
@@ -138,9 +138,9 @@ void Scene::saveScene(char *fileName) const {
     ss << R"({"version":)" << version << ",";
     ss << R"("meshes":[)";
     auto separator = "";
-    for (const auto &aloc: meshes) {
+    for (const auto &mesh: meshes) {
         ss << separator;
-        aloc.writeJson(ss);
+        mesh.writeJson(ss);
         separator = ",";
     }
 
@@ -264,6 +264,25 @@ void Scene::UpdateSceneDialogControls(HWND hDlg) const {
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
 }
 
+const ZPathfinding::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const {
+    std::vector<const ZPathfinding::Mesh *> closestMeshes;
+    for (const ZPathfinding::Mesh& mesh : meshes) {
+        if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.id == id) {
+            closestMeshes.push_back(&mesh);
+        }
+    }
+    if (closestMeshes.empty()) {
+        return nullptr;
+    }
+    Vec3 posVec = {pos[0], pos[1], pos[2]};
+    std::ranges::sort(closestMeshes, [posVec](const ZPathfinding::Mesh *a, const ZPathfinding::Mesh *b) {
+        const Vec3 aPos = {a->pos.x, a->pos.y, a->pos.z};
+        const Vec3 bPos = {b->pos.x, b->pos.y, b->pos.z};
+        return posVec.DistanceSquaredTo(aPos) < posVec.DistanceSquaredTo(bPos);
+    });
+    return closestMeshes[0];
+}
+
 INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     Scene &scene = getInstance();
 
@@ -309,7 +328,7 @@ INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         }
 
         case WM_COMMAND:
-            if (LOWORD(wParam) == IDC_BUTTON_BBOX_RESET) {
+            if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
                 scene.resetBBoxDefaults();
                 scene.UpdateSceneDialogControls(hDlg);
             }

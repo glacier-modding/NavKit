@@ -1,17 +1,17 @@
 #include "../../include/NavKit/module/GameConnection.h"
 
+#include <chrono>
 #include <fstream>
-#include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <thread>
-#include <chrono>
-#include <memory>
-#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include "../../extern/simdjson/simdjson.h"
+#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 // 46735 is a phoneword for HMSDK
@@ -114,7 +114,7 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
     std::thread writer_thread([&] {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
-        const std::string outputFolder = Settings::getInstance().outputFolder;
+        const std::string outputFolder = NavKitSettings::getInstance().outputFolder;
         std::ofstream f(outputFolder + "\\output.nav.json", std::ios::app);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
@@ -160,7 +160,7 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
             }
             if (message.find("Unknown editor message type: listAlocPfBoxAndSeedPointEntities") != -1) {
                 Logger::log(NK_ERROR,
-                            "Failed to get ALOCs from game. Is ZHMModSDK up to date?");
+                            "Failed to get entities from game. Is ZHMModSDK up to date?");
                 done = true;
                 return;
             }
@@ -184,42 +184,4 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
 
 void GameConnection::sendHelloMessage() const {
     ws->send(R"({"type":"hello","identifier":"NavKit"})");
-}
-
-void GameConnection::sendChunk(const std::vector<NavPower::Area> &areas, int chunkIndex, int chunkCount) const {
-    std::stringstream m;
-    m << std::fixed << std::setprecision(3);
-    m << R"({"type":"loadNavp","chunkCount":)";
-    m << chunkCount;
-    m << ",\"chunk\":";
-    m << chunkIndex;
-    m << ",\"areas\":[";
-    int numArea = 0;
-
-    for (auto &navPowerArea: areas) {
-        numArea++;
-        m << "[";
-        int numEdge = 0;
-        for (auto &edge: navPowerArea.m_edges) {
-            numEdge++;
-            auto point = edge->m_pos;
-            m << "[";
-            m << point.X;
-            m << ",";
-            m << point.Y;
-            m << ",";
-            m << point.Z;
-            m << "]";
-            if (numEdge != navPowerArea.m_edges.size()) {
-                m << ",";
-            }
-        }
-        m << "]";
-        if (numArea != areas.size()) {
-            m << ",";
-        }
-    }
-    m << "]}";
-    const std::string msg = m.str();
-    ws->send(msg);
 }

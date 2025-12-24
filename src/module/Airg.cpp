@@ -4,8 +4,13 @@
 #include <fstream>
 #include <numbers>
 
+#include <CommCtrl.h>
+#include <iomanip>
 #include <SDL.h>
+#include <sstream>
+#include <string>
 #include <GL/glew.h>
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/VisionData.h"
 #include "../../include/NavKit/module/Grid.h"
@@ -13,20 +18,15 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/GridGenerator.h"
-#include "../../include/NavKit/Resource.h"
-#include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceGenerator.h"
+#include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
-#include <CommCtrl.h>
-#include <string>
-#include <sstream>
-#include <iomanip>
 
 HWND Airg::hAirgDialog = nullptr;
 
@@ -557,11 +557,11 @@ void Airg::renderAirg() {
 }
 
 void Airg::renderAirgForHitTest() const {
-    if (showAirg) {
+    if (showAirg && airgLoaded) {
         const int numWaypoints = reasoningGrid->m_WaypointList.size();
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
-            glColor3ub(61, i / 255, i % 255);
+            glColor3ub(AIRG_WAYPOINT, i / 255, i % 255);
             renderWaypoint(waypoint, true);
         }
     }

@@ -10,8 +10,8 @@
 #include <httplib.h>
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/Resource.h"
-#include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/Renderer.h"
 
 UpdateChecker::UpdateChecker()
     : updateCheckCompleted(false)
@@ -124,6 +124,7 @@ void UpdateChecker::performUpdate() const {
     GetModuleFileNameA(nullptr, current_exe_path, MAX_PATH);
     const std::filesystem::path install_dir = std::filesystem::path(current_exe_path).parent_path();
     const std::filesystem::path original_updater_path = install_dir / "updater.exe";
+    const std::filesystem::path original_settings_path = install_dir / "NavKit.ini";
 
     if (!std::filesystem::exists(original_updater_path)) {
         Logger::log(NK_ERROR, ("NavKit: updater.exe not found at " + original_updater_path.string()).c_str());
@@ -144,6 +145,21 @@ void UpdateChecker::performUpdate() const {
     } catch (const std::filesystem::filesystem_error &e) {
         Logger::log(NK_ERROR, ("NavKit: Failed to copy updater to temp directory: " + std::string(e.what())).c_str());
         return;
+    }
+
+    if (std::filesystem::exists(original_settings_path)) {
+        const std::filesystem::path temp_settings_path = temp_updater_dir / "NavKit.ini";
+        try {
+            std::filesystem::copy_file(original_settings_path, temp_settings_path,
+                                       std::filesystem::copy_options::overwrite_existing);
+            Logger::log(
+                NK_INFO, ("Copied NavKit.ini to " + temp_settings_path.string() + " to preserve settings.").c_str());
+        } catch (const std::filesystem::filesystem_error &e) {
+            Logger::log(
+                NK_ERROR,
+                ("NavKit: Failed to copy NavKit.ini to temp directory, settings will not be preserved: " +
+                 std::string(e.what())).c_str());
+        }
     }
 
     const std::filesystem::path local_msi_path = std::filesystem::path(temp_path_buf) / "NavKit.msi";

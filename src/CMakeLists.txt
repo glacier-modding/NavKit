@@ -24,12 +24,13 @@ set(MODULE_SOURCES
         module/InputHandler.cpp
         module/Logger.cpp
         module/Menu.cpp
+        module/NavKitSettings.cpp
         module/Navp.cpp
         module/Obj.cpp
+        module/PersistedSettings.cpp
         module/Renderer.cpp
         module/Scene.cpp
         module/SceneExtract.cpp
-        module/Settings.cpp
 )
 set(UTIL_SOURCES
         util/CommandRunner.cpp

@@ -71,13 +71,13 @@ namespace Math {
         return Plane({normal.X, normal.Y, normal.Z}, d);
     }
 
-    float Distance(const SVector3 *a, const float4 *b) {
+    float Distance2D(const SVector3 *a, const float4 *b) {
         float dx = a->x - b->x;
         float dy = a->y - b->y;
         return sqrtf(dx * dx + dy * dy);
     }
 
-    float Distance(const float4 *a, const float4 *b) {
+    float Distance2D(const float4 *a, const float4 *b) {
         float dx = a->x - b->x;
         float dy = a->y - b->y;
         return sqrtf(dx * dx + dy * dy);

@@ -8,12 +8,13 @@
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 
 
 void Menu::setMenuItemEnabled(const UINT menuId, const bool isEnabled) {
@@ -180,6 +181,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     airg.handleConnectWaypointClicked();
                     break;
 
+                case IDM_VIEW_SCENE_SHOW_BBOX:
+                    handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_BBOX, Scene::getInstance().showBBox, "Show BBox");
+                    break;
+
                 case IDM_VIEW_NAVP_SHOW_NAVP:
                     handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_NAVP, Navp::getInstance().showNavp, "Show Navp");
                     break;
@@ -276,7 +281,7 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                 }
 
                 case IDM_SETTINGS_NAVKIT:
-                    Settings::getInstance().showSettingsDialog();
+                    NavKitSettings::getInstance().showNavKitSettingsDialog();
                     Logger::log(NK_DEBUG, "Settings -> NavKit Settings clicked");
                     break;
                 case IDM_SETTINGS_SCENE:

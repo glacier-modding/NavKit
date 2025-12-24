@@ -103,13 +103,15 @@ public:
 
     dtPolyRef getPolyRefForLink(const dtLink &link) const;
 
-    dtPolyRef getFirstLink(dtPolyRef polyRef) const;
-
     bool PFLineBlocked(const Vec3 &recastStart, const Vec3 &recastEnd) const;
 
     dtPolyRef getAdjacentPoly(dtPolyRef poly, int edgeIndex) const;
 
     void doHitTest(int mx, int my);
+
+    void loadSettings() const;
+
+    void saveSettings() const;
 
     static Vec3 convertFromNavPowerToRecast(Vec3 pos);
 
@@ -142,7 +144,9 @@ public:
     std::string selectedObject;
 
     static HWND hRecastDialog;
+
 private:
     std::vector<dtPolyRef> pfSeedPointAreas;
-    static INT_PTR CALLBACK RecastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+    static INT_PTR CALLBACK recastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

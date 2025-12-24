@@ -13,15 +13,16 @@
 #include <array>
 
 #include "../../include/NavKit/module/Scene.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
 #include <SDL.h>
+
 #include <GL/glew.h>
 #include <GL/glu.h>
-#include <GL/glew.h>
 #include <SDL_opengl.h>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/util/Math.h"
 
 HWND Renderer::hwnd = nullptr;
@@ -70,7 +71,7 @@ void Renderer::initFrameBuffer(const int width, const int height) {
     updateFrameRate();
 }
 
-void Renderer::initFrameRate(float frameRateValue) {
+void Renderer::initFrameRate(const float frameRateValue) {
     initialFrameRate = frameRateValue;
 }
 
@@ -113,10 +114,19 @@ bool Renderer::initWindowAndRenderer() {
 
     SDL_DisplayMode displayMode;
     SDL_GetCurrentDisplayMode(0, &displayMode);
-    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
-    constexpr float aspect = 16.0f / 9.0f;
-    width = std::min(displayMode.w, static_cast<int>(static_cast<float>(displayMode.h) * aspect)) - 120;
-    height = displayMode.h - 120;
+    constexpr Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
+    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    if (const float
+                settingsWidth = atof(persistedSettings.getValue("Renderer", "windowWidth", "-1.0f")),
+                settingsHeight = atof(persistedSettings.getValue("Renderer", "windowHeight", "-1.0f"));
+        settingsWidth == -1.0f || settingsHeight == -1) {
+        constexpr float aspect = 16.0f / 9.0f;
+        width = std::min(displayMode.w, static_cast<int>(static_cast<float>(displayMode.h) * aspect)) - 120;
+        height = displayMode.h - 120;
+    } else {
+        width = settingsWidth;
+        height = settingsHeight;
+    }
     window = SDL_CreateWindow("", 0, 0, width, height, flags);
     if (const auto context = SDL_GL_CreateContext(window); context == nullptr) {
         printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
@@ -130,8 +140,13 @@ bool Renderer::initWindowAndRenderer() {
         SDL_Quit();
         return false;
     }
-
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
+            y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
+    if (x == -1.0f || y == -1.0f) {
+        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    } else {
+        SDL_SetWindowPosition(window, x, y);
+    }
     const std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
     std::string title = "NavKit ";
     title += navKitVersion;
@@ -144,8 +159,8 @@ bool Renderer::initWindowAndRenderer() {
     }
 
     // Fog.
-    Settings &settings = Settings::getInstance();
-    const float backgroundColor = settings.backgroundColor;
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const float backgroundColor = navKitSettings.backgroundColor;
     float fogColor[4] = {backgroundColor, backgroundColor, backgroundColor, 1.0f};
     glEnable(GL_FOG);
     glFogi(GL_FOG_MODE, GL_LINEAR);
@@ -181,11 +196,33 @@ void Renderer::closeWindow() const {
     SDL_DestroyWindow(window);
 }
 
+void Renderer::loadSettings() {
+    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    initFrameRate(static_cast<float>(atof(persistedSettings.getValue("Renderer", "frameRate", "-1.0f"))));
+}
+
+void Renderer::handleMoved() {
+    updateFrameRate();
+    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    int x;
+    int y;
+    SDL_GetWindowPosition(window, &x, &y);
+    persistedSettings.setValue("Renderer", "windowX", std::to_string(x));
+    persistedSettings.setValue("Renderer", "windowY", std::to_string(y));
+    persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
+    persistedSettings.save();
+}
+
 void Renderer::handleResize() {
     width = SDL_GetWindowSurface(window)->w;
     height = SDL_GetWindowSurface(window)->h;
     Logger::log(NK_INFO,
                 ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
+    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    persistedSettings.setValue("Renderer", "windowWidth", std::to_string(width));
+    persistedSettings.setValue("Renderer", "windowHeight", std::to_string(height));
+    persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
+    persistedSettings.save();
 }
 
 void Renderer::renderFrame() {
@@ -194,8 +231,8 @@ void Renderer::renderFrame() {
     glGetIntegerv(GL_VIEWPORT, viewport);
 
     // Clear the screen
-    Settings &settings = Settings::getInstance();
-    float backgroundColor = settings.backgroundColor;
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    float backgroundColor = navKitSettings.backgroundColor;
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_BLEND);
@@ -279,7 +316,9 @@ void Renderer::renderFrame() {
         grid.renderGridText();
     }
     glClear(GL_DEPTH_BUFFER_BIT);
-    drawBounds();
+    if (scene.showBBox) {
+        drawBounds();
+    }
     drawAxes();
 }
 

@@ -12,11 +12,12 @@
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
@@ -77,7 +78,7 @@ void Navp::renderPfSeedPoints() const {
 }
 
 void Navp::renderPfSeedPointsForHitTest() const {
-    if (showPfSeedPoints) {
+    if (showPfSeedPoints && Scene::getInstance().sceneLoaded) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
         for (const ZPathfinding::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
@@ -88,9 +89,9 @@ void Navp::renderPfSeedPointsForHitTest() const {
                 {0.25, 0.5, 0.25},
                 {0, 0, 0, 1},
                 true,
-                {62.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 true,
-                {62.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 1.0);
             i++;
         }
@@ -123,7 +124,7 @@ void Navp::renderExclusionBoxes() const {
 }
 
 void Navp::renderExclusionBoxesForHitTest() const {
-    if (showPfExclusionBoxes) {
+    if (showPfExclusionBoxes && Scene::getInstance().sceneLoaded) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
         for (const ZPathfinding::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
@@ -134,9 +135,9 @@ void Navp::renderExclusionBoxesForHitTest() const {
                 {exclusionBox.scale.x, exclusionBox.scale.z, -exclusionBox.scale.y},
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
                 true,
-                {63.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 true,
-                {63.0f / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
                 1.0);
             i++;
         }
@@ -416,10 +417,10 @@ void Navp::renderNavMesh() {
 }
 
 void Navp::renderNavMeshForHitTest() const {
-    if (!loading && showNavp) {
+    if (!loading && showNavp && navpLoaded) {
         int areaIndex = 0;
         for (const NavPower::Area &area: navMesh->m_areas) {
-            glColor3ub(60, areaIndex / 255, areaIndex % 255);
+            glColor3ub(NAVMESH_AREA, areaIndex / 255, areaIndex % 255);
             areaIndex++;
             glBegin(GL_POLYGON);
             for (auto vertex: area.m_edges) {
@@ -462,10 +463,10 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
                                                ? LoadNavMeshFromJson(fileName.c_str())
                                                : LoadNavMeshFromBinary(fileName.c_str());
             std::swap(*navMesh, newNavMesh);
-            const Settings &settings = Settings::getInstance();
+            const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
             if (isFromBuildingNavp || isFromBuildingAirg) {
                 setStairsFlags();
-                outputNavpFilename = settings.outputFolder + (isFromBuildingNavp
+                outputNavpFilename = navKitSettings.outputFolder + (isFromBuildingNavp
                                                                   ? "\\output.navp"
                                                                   : "\\outputForAirg.navp");
                 OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
@@ -607,8 +608,8 @@ void Navp::saveNavMesh(const std::string &fileName, const std::string &extension
         if (upper_extension == "JSON") {
             OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
         } else if (upper_extension == "NAVP") {
-            const Settings &settings = Settings::getInstance();
-            const std::string tempOutputJSONFilename = settings.outputFolder + "\\temp_save.navp.json";
+            const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+            const std::string tempOutputJSONFilename = navKitSettings.outputFolder + "\\temp_save.navp.json";
 
             OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
 
@@ -696,8 +697,8 @@ void Navp::finalizeBuild() {
     if (navpBuildDone) {
         navpLoaded = true;
         const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        const Settings &settings = Settings::getInstance();
-        outputNavpFilename = settings.outputFolder + "\\output.navp.json";
+        const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+        outputNavpFilename = navKitSettings.outputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
         navpBuildDone.store(false);

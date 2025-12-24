@@ -11,11 +11,12 @@
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/module/Settings.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
@@ -57,6 +58,19 @@ void Obj::updateObjDialogControls(HWND hDlg) {
     }
 }
 
+void Obj::loadSettings() {
+    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
+    const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
+    for (int i = 0; i < 8; ++i) {
+        if (i < primLodsStr.size()) {
+            primLods[i] = primLodsStr[i] == '1';
+        } else {
+            primLods[i] = true;
+        }
+    }
+}
+
 INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     Obj &obj = getInstance();
     switch (message) {
@@ -76,6 +90,16 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
                     return (INT_PTR) TRUE;
                 }
 
+                case IDC_BUTTON_RESET_DEFAULTS:
+                    obj.resetDefaults();
+                    updateObjDialogControls(hDlg);
+                    Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+                    Logger::log(NK_INFO, "Mesh type for build set to %s.",
+                                obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                    obj.saveObjSettings();
+
+
+                    break;
                 case WM_CLOSE:
                     DestroyWindow(hDlg);
                     return (INT_PTR) TRUE;
@@ -107,8 +131,8 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
 }
 
 void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
-    Settings &settings = Settings::getInstance();
-    std::string fileName = settings.outputFolder + "\\outputNavp.obj";
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    std::string fileName = navKitSettings.outputFolder + "\\outputNavp.obj";
     Gui &gui = Gui::getInstance();
     gui.showLog = true;
 
@@ -157,7 +181,7 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
 }
 
 void Obj::buildObj() {
-    const Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
@@ -165,11 +189,11 @@ void Obj::buildObj() {
     std::string buildOutputFileType = blendFileOnlyExtract ? "blend" : "obj";
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
-    command += settings.blenderPath;
+    command += navKitSettings.blenderPath;
     command += "\" -b --factory-startup -P glacier2obj.py -- \""; //--debug-all
     command += scene.lastLoadSceneFile;
     command += "\" \"";
-    command += settings.outputFolder;
+    command += navKitSettings.outputFolder;
     command += "\\output." + buildOutputFileType + "\"";
     if (meshTypeForBuild == ALOC) {
         command += " ALOC ";
@@ -186,7 +210,8 @@ void Obj::buildObj() {
     generatedObjName = "output.obj";
 
     backgroundWorker.emplace(
-        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2ObjBlender.log", [this, buildOutputFileType] {
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2ObjBlender.log", [this,
+            buildOutputFileType] {
             Logger::log(NK_INFO, "Finished generating %s from nav.json file.", buildOutputFileType.c_str());
             blenderObjGenerationDone = true;
         }, [this] {
@@ -195,19 +220,19 @@ void Obj::buildObj() {
 }
 
 void Obj::extractAlocsOrPrimsAndStartObjBuild() {
-    Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     std::string retailFolder = "\"";
-    retailFolder += settings.hitmanFolder;
+    retailFolder += navKitSettings.hitmanFolder;
     retailFolder += "\\Retail\"";
     std::string gameVersion = "HM3";
     std::string navJsonFilePath = "\"";
-    navJsonFilePath += settings.outputFolder;
+    navJsonFilePath += navKitSettings.outputFolder;
     navJsonFilePath += "\\output.nav.json\"";
     std::string runtimeFolder = "\"";
-    runtimeFolder += settings.hitmanFolder;
+    runtimeFolder += navKitSettings.hitmanFolder;
     runtimeFolder += "\\Runtime\"";
     std::string alocOrPrimFolder;
-    alocOrPrimFolder += settings.outputFolder;
+    alocOrPrimFolder += navKitSettings.outputFolder;
     alocOrPrimFolder += (meshTypeForBuild == ALOC) ? "\\aloc" : "\\prim";
 
     struct stat folderExists{};
@@ -251,7 +276,7 @@ char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
 }
 
 void Obj::finalizeExtractAlocsOrPrims() {
-    Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
 
     if (errorExtracting) {
         errorBuilding = false;
@@ -266,7 +291,7 @@ void Obj::finalizeExtractAlocsOrPrims() {
     }
     if (doneExtractingAlocsOrPrims) {
         doneExtractingAlocsOrPrims = false;
-        std::string sceneFile = settings.outputFolder;
+        std::string sceneFile = navKitSettings.outputFolder;
         sceneFile += "\\output.nav.json";
         Scene &scene = Scene::getInstance();
         const std::string &fileNameString = sceneFile;
@@ -281,13 +306,13 @@ void Obj::finalizeExtractAlocsOrPrims() {
 
 void Obj::finalizeObjBuild() {
     SceneExtract &sceneExtract = SceneExtract::getInstance();
-    Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     if (blenderObjGenerationDone) {
         startedObjGeneration = false;
-        objToLoad = settings.outputFolder;
+        objToLoad = navKitSettings.outputFolder;
         objToLoad += "\\" + generatedObjName;
         loadObj = !blendFileOnlyExtract;
-        lastObjFileName = settings.outputFolder;
+        lastObjFileName = navKitSettings.outputFolder;
         lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
@@ -313,14 +338,14 @@ void Obj::copyObjFile(const std::string &from, const std::string &to) {
         return;
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    const auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Copying OBJ from '%s' to '%s'...", from.c_str(), to.c_str());
 
     try {
         std::filesystem::copy(from, to, std::filesystem::copy_options::overwrite_existing);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        const auto end = std::chrono::high_resolution_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving Obj in %lld ms.", duration.count());
     } catch (const std::filesystem::filesystem_error &e) {
         Logger::log(NK_ERROR, "Error copying file: %s", e.what());
@@ -328,7 +353,7 @@ void Obj::copyObjFile(const std::string &from, const std::string &to) {
 }
 
 void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Obj to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
@@ -336,22 +361,22 @@ void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
 }
 
 void Obj::loadObjMesh() {
-    std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Obj from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    auto start = std::chrono::high_resolution_clock::now();
-    if (RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const auto start = std::chrono::high_resolution_clock::now();
+    if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0) {
         if (objLoadDone.empty()) {
             objLoadDone.push_back(true);
             Scene &scene = Scene::getInstance();
-            float pos[3] = {
+            const float pos[3] = {
                 scene.bBoxPos[0],
                 scene.bBoxPos[1],
                 scene.bBoxPos[2]
             };
-            float size[3] = {
+            const float size[3] = {
                 scene.bBoxScale[0],
                 scene.bBoxScale[1],
                 scene.bBoxScale[2]
@@ -404,8 +429,7 @@ void Obj::setLastSaveFileName(const char *fileName) {
 }
 
 void Obj::handleOpenObjClicked() {
-    char *fileName = openLoadObjFileDialog(loadObjName.data());
-    if (fileName) {
+    if (const char *fileName = openLoadObjFileDialog(loadObjName.data())) {
         setLastLoadFileName(fileName);
         objLoaded = false;
         objToLoad = fileName;
@@ -415,8 +439,7 @@ void Obj::handleOpenObjClicked() {
 }
 
 void Obj::handleSaveObjClicked() {
-    char *fileName = openSaveObjFileDialog(loadObjName.data());
-    if (fileName) {
+    if (const char *fileName = openSaveObjFileDialog(loadObjName.data())) {
         loadObjName = fileName;
         setLastSaveFileName(fileName);
         saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
@@ -429,15 +452,16 @@ bool Obj::canLoad() const {
 }
 
 bool Obj::canBuildObjFromNavp() {
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Navp &navp = Navp::getInstance();
-    const Settings &settings = Settings::getInstance();
-    return settings.outputSet && settings.blenderSet && navp.navpLoaded;
+    return navKitSettings.outputSet && navKitSettings.blenderSet && navp.navpLoaded;
 }
 
 bool Obj::canBuildObjFromScene() const {
-    const Settings &settings = Settings::getInstance();
+    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
-    return settings.hitmanSet && settings.outputSet && !extractingAlocsOrPrims && settings.blenderSet &&
+    return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingAlocsOrPrims && navKitSettings.blenderSet
+           &&
            scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone;
 }
 
@@ -499,15 +523,22 @@ std::string Obj::buildPrimLodsString() const {
 }
 
 void Obj::saveObjSettings() const {
-    Settings &settings = Settings::getInstance();
+    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
 
     const char *meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
-    settings.setValue("Obj", "MeshTypeForBuild", meshTypeStr);
+    persistedSettings.setValue("Obj", "MeshTypeForBuild", meshTypeStr);
 
     const std::string primLodsStr = buildPrimLodsString();
-    settings.setValue("Obj", "PrimLods", primLodsStr);
+    persistedSettings.setValue("Obj", "PrimLods", primLodsStr);
 
-    settings.save();
+    persistedSettings.save();
+}
+
+void Obj::resetDefaults() {
+    meshTypeForBuild = ALOC;
+    for (int i = 0; i < 8; i++) {
+        primLods[i] = true;
+    }
 }
 
 void Obj::showObjDialog() {
@@ -534,15 +565,15 @@ void Obj::showObjDialog() {
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hObjDialog, &dialogRect);
 
-        int parentWidth = parentRect.right - parentRect.left;
-        int parentHeight = parentRect.bottom - parentRect.top;
-        int dialogWidth = dialogRect.right - dialogRect.left;
-        int dialogHeight = dialogRect.bottom - dialogRect.top;
+        const int parentWidth = parentRect.right - parentRect.left;
+        const int parentHeight = parentRect.bottom - parentRect.top;
+        const int dialogWidth = dialogRect.right - dialogRect.left;
+        const int dialogHeight = dialogRect.bottom - dialogRect.top;
 
-        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
 
-        SetWindowPos(hObjDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hObjDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
         ShowWindow(hObjDialog, SW_SHOW);
     }

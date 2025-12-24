@@ -63,8 +63,11 @@ public:
     std::optional<std::jthread> backgroundWorker;
     float bBoxPos[3]{};
     float bBoxScale[3]{};
+    bool showBBox;
     int version;
     static HWND hSceneDialog;
+
+    const ZPathfinding::Mesh *findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const;
 
 private:
     std::string loadSceneName;

@@ -34,6 +34,7 @@
 #define IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA    1326
 #define IDM_VIEW_AIRG_CELL_COLOR_LAYER          1327
 #define IDM_VIEW_LOG_SHOW_LOG                   1330
+#define IDM_VIEW_SCENE_SHOW_BBOX                1340
 #define IDM_EXTRACT_SCENE                       1400
 #define IDM_EXTRACT_SCENE_AND_BUILD_OBJ         1401
 #define IDM_EXTRACT_SCENE_AND_BUILD_ALL         1402
@@ -82,13 +83,12 @@
 #define IDC_SLIDER_BBOX_SCALE_X                 30204
 #define IDC_SLIDER_BBOX_SCALE_Y                 30205
 #define IDC_SLIDER_BBOX_SCALE_Z                 30206
-#define IDC_BUTTON_BBOX_RESET                   30207
-#define IDC_STATIC_BBOX_POS_X_VAL               30208
-#define IDC_STATIC_BBOX_POS_Y_VAL               30209
-#define IDC_STATIC_BBOX_POS_Z_VAL               30210
-#define IDC_STATIC_BBOX_SCALE_X_VAL             30211
-#define IDC_STATIC_BBOX_SCALE_Y_VAL             30212
-#define IDC_STATIC_BBOX_SCALE_Z_VAL             30213
+#define IDC_STATIC_BBOX_POS_X_VAL               30207
+#define IDC_STATIC_BBOX_POS_Y_VAL               30208
+#define IDC_STATIC_BBOX_POS_Z_VAL               30209
+#define IDC_STATIC_BBOX_SCALE_X_VAL             30210
+#define IDC_STATIC_BBOX_SCALE_Y_VAL             30211
+#define IDC_STATIC_BBOX_SCALE_Z_VAL             30212
 
 #define IDD_RECAST_MENU                         30300
 #define IDC_SLIDER_CELL_SIZE                    30301
@@ -128,7 +128,6 @@
 #define IDC_STATIC_TILING_INFO_TILES            30335
 #define IDC_STATIC_TILING_INFO_MAX_TILES        30336
 #define IDC_STATIC_TILING_INFO_MAX_POLYS        30337
-#define IDC_BUTTON_RECAST_RESET                 30338
 
 #define IDD_OBJ_SETTINGS                        30400
 #define IDC_RADIO_MESH_TYPE_ALOC                30401
