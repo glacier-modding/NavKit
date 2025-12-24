@@ -206,6 +206,22 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
 
+    const std::filesystem::path temp_settings_path = args->updater_exe_path.parent_path() / "NavKit.ini";
+    const std::filesystem::path old_settings_destination_path = install_dir / "NavKit.ini.old";
+
+    if (std::filesystem::exists(temp_settings_path)) {
+        LogMessage("Updater: Staging previous NavKit.ini for merging by the application...");
+        try {
+            std::filesystem::copy_file(temp_settings_path, old_settings_destination_path,
+                                       std::filesystem::copy_options::overwrite_existing);
+            LogMessage("Updater: Copied old settings to " + old_settings_destination_path.string());
+        } catch (const std::exception &e) {
+            LogMessage("Updater: Failed to stage old settings for merging. Error: " + std::string(e.what()));
+        }
+    } else {
+        LogMessage("Updater: No previous NavKit.ini found to restore.");
+    }
+
     const std::filesystem::path navkit_path = install_dir / "NavKit.exe";
     WPARAM update_status = 0;
 

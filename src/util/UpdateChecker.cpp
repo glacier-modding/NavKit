@@ -147,6 +147,21 @@ void UpdateChecker::performUpdate() const {
         return;
     }
 
+    if (std::filesystem::exists(original_settings_path)) {
+        const std::filesystem::path temp_settings_path = temp_updater_dir / "NavKit.ini";
+        try {
+            std::filesystem::copy_file(original_settings_path, temp_settings_path,
+                                       std::filesystem::copy_options::overwrite_existing);
+            Logger::log(
+                NK_INFO, ("Copied NavKit.ini to " + temp_settings_path.string() + " to preserve settings.").c_str());
+        } catch (const std::filesystem::filesystem_error &e) {
+            Logger::log(
+                NK_ERROR,
+                ("NavKit: Failed to copy NavKit.ini to temp directory, settings will not be preserved: " +
+                 std::string(e.what())).c_str());
+        }
+    }
+
     const std::filesystem::path local_msi_path = std::filesystem::path(temp_path_buf) / "NavKit.msi";
     std::string domain, msi_path_part;
     splitUrl(msiUrl, domain, msi_path_part);

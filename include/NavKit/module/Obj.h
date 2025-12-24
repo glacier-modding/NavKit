@@ -52,6 +52,8 @@ public:
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 
+    void loadSettings();
+
     void loadObjMesh();
 
     static void copyObjFile(const std::string &from, const std::string &to);
@@ -97,6 +99,8 @@ public:
     [[nodiscard]] std::string buildPrimLodsString() const;
 
     void saveObjSettings() const;
+
+    void resetDefaults();
 
     static INT_PTR ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 

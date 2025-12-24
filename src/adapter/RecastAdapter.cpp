@@ -22,6 +22,8 @@
 
 #include <GL/glu.h>
 
+#include "../../include/NavKit/module/PersistedSettings.h"
+
 RecastAdapter::RecastAdapter() {
     buildContext = new BuildContext();
     sample = new Sample_TileMesh();
@@ -92,7 +94,7 @@ inline unsigned int nextPow2(unsigned int v) {
     return v;
 }
 
-static void UpdateRecastDialogControls(HWND hDlg) {
+static void updateRecastDialogControls(HWND hDlg) {
     RecastAdapter &adapter = RecastAdapter::getInstance();
     Sample_TileMesh *sample = adapter.sample;
     if (!sample) return;
@@ -182,13 +184,13 @@ static void UpdateRecastDialogControls(HWND hDlg) {
     }
 }
 
-INT_PTR CALLBACK RecastAdapter::RecastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK RecastAdapter::recastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     Sample_TileMesh *sample = getInstance().sample;
     if (!sample) return (INT_PTR) FALSE;
 
     switch (message) {
         case WM_INITDIALOG: {
-            UpdateRecastDialogControls(hDlg);
+            updateRecastDialogControls(hDlg);
             return (INT_PTR) TRUE;
         }
         case WM_HSCROLL: {
@@ -240,8 +242,9 @@ INT_PTR CALLBACK RecastAdapter::RecastDialogProc(HWND hDlg, UINT message, WPARAM
             }
 
             if (needs_tiling_update) {
-                UpdateRecastDialogControls(hDlg);
+                updateRecastDialogControls(hDlg);
             }
+            getInstance().saveSettings();
             return (INT_PTR) TRUE;
         }
         case WM_COMMAND: {
@@ -255,10 +258,11 @@ INT_PTR CALLBACK RecastAdapter::RecastDialogProc(HWND hDlg, UINT message, WPARAM
                 if (commandId == IDC_CHECK_FILTER_LOW_HANGING) sample->m_filterLowHangingObstacles = checked;
                 else if (commandId == IDC_CHECK_FILTER_LEDGE_SPANS) sample->m_filterLedgeSpans = checked;
                 else if (commandId == IDC_CHECK_FILTER_WALKABLE_LOW) sample->m_filterWalkableLowHeightSpans = checked;
-            } else if (commandId == IDC_BUTTON_RECAST_RESET) {
+            } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
                 getInstance().resetCommonSettings();
-                UpdateRecastDialogControls(hDlg);
+                updateRecastDialogControls(hDlg);
             }
+            getInstance().saveSettings();
             return (INT_PTR) TRUE;
         }
         case WM_CLOSE:
@@ -278,7 +282,7 @@ void RecastAdapter::showRecastDialog() {
     }
     const HINSTANCE hInstance = GetModuleHandle(nullptr);
     const HWND hParentWnd = Renderer::hwnd;
-    hRecastDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, RecastDialogProc,
+    hRecastDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, recastDialogProc,
                                       reinterpret_cast<LPARAM>(this));
 
     if (hRecastDialog) {
@@ -989,7 +993,8 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
             }
             Logger::log(
                 NK_INFO,
-                ("Selected Object: '" + meshNameString + "' Mesh: '"+ selectedObject + "' Obj vertex: " + std::to_string(hit) + roomString +
+                ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
+                 std::to_string(hit) + roomString +
                  ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
                  std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
         }
@@ -999,6 +1004,81 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
             markerPositionSet = false;
         }
     }
+}
+
+void RecastAdapter::loadSettings() const {
+    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    sample->m_cellSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "cellSize", "0.1f")));
+    sample->m_cellHeight = static_cast<float>(atof(persistedSettings.getValue("Recast", "cellHeight", "0.1f")));
+    sample->m_agentHeight = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentHeight", "1.8f")));
+    sample->m_agentRadius = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentRadius", "0.2f")));
+    sample->m_agentMaxClimb = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentMaxClimb", "0.41f")));
+    sample->m_agentMaxSlope = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentMaxSlope", "45.0f")));
+    sample->m_regionMinSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "regionMinSize", "25f")));
+    sample->m_regionMergeSize = static_cast<float>(
+        atof(persistedSettings.getValue("Recast", "regionMergeSize", "30f")));
+    if (const char *partitionTypeStr(
+        persistedSettings.getValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED")); strcmp(partitionTypeStr,
+            "SAMPLE_PARTITION_MONOTONE") == 0) {
+        sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
+    } else if (strcmp(partitionTypeStr, "SAMPLE_PARTITION_LAYERS") == 0) {
+        sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
+    } else {
+        sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
+    }
+    sample->m_filterLowHangingObstacles = static_cast<bool>(atoi(
+        persistedSettings.getValue("Recast", "filterLowHangingObstacles", "1f")));
+    sample->m_filterLedgeSpans = static_cast<bool>(
+        atoi(persistedSettings.getValue("Recast", "filterLedgeSpans", "1f")));
+    sample->m_filterWalkableLowHeightSpans = static_cast<bool>(atoi(
+        persistedSettings.getValue("Recast", "filterWalkableLowHeightSpans", "1f")));
+    sample->m_edgeMaxLen = static_cast<float>(atof(
+        persistedSettings.getValue("Recast", "polygonizationEdgeMaxLen", "5.0f")));
+    sample->m_edgeMaxError = static_cast<float>(atof(
+        persistedSettings.getValue("Recast", "polygonizationEdgeMaxError", "1.4f")));
+    sample->m_vertsPerPoly = static_cast<float>(atof(
+        persistedSettings.getValue("Recast", "polygonizationVertsPerPoly", "3")));
+    sample->m_detailSampleDist = static_cast<float>(atof(
+        persistedSettings.getValue("Recast", "detailSampleDist", "1.5f")));
+    sample->m_detailSampleMaxError = static_cast<float>(atof(
+        persistedSettings.getValue("Recast", "detailSampleMaxError", "1.4f")));
+    sample->m_tileSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "tilingTileSize", "64f")));
+}
+
+void RecastAdapter::saveSettings() const {
+    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    persistedSettings.setValue("Recast", "cellSize", std::to_string(sample->m_cellSize));
+    persistedSettings.setValue("Recast", "cellHeight", std::to_string(sample->m_cellHeight));
+    persistedSettings.setValue("Recast", "agentHeight", std::to_string(sample->m_agentHeight));
+    persistedSettings.setValue("Recast", "agentRadius", std::to_string(sample->m_agentRadius));
+    persistedSettings.setValue("Recast", "agentMaxClimb", std::to_string(sample->m_agentMaxClimb));
+    persistedSettings.setValue("Recast", "agentMaxSlope", std::to_string(sample->m_agentMaxSlope));
+    persistedSettings.setValue("Recast", "regionMinSize", std::to_string(sample->m_regionMinSize));
+    persistedSettings.setValue("Recast", "regionMergeSize", std::to_string(sample->m_regionMergeSize));
+    persistedSettings.setValue("Recast", "filterLowHangingObstacles",
+                               std::to_string(sample->m_filterLowHangingObstacles));
+    persistedSettings.setValue("Recast", "filterLedgeSpans", std::to_string(sample->m_filterLedgeSpans));
+    persistedSettings.setValue("Recast", "filterWalkableLowHeightSpans",
+                               std::to_string(sample->m_filterWalkableLowHeightSpans));
+    persistedSettings.setValue("Recast", "polygonizationEdgeMaxLen", std::to_string(sample->m_edgeMaxLen));
+    persistedSettings.setValue("Recast", "polygonizationEdgeMaxError", std::to_string(sample->m_edgeMaxError));
+    persistedSettings.setValue("Recast", "polygonizationVertsPerPoly", std::to_string(sample->m_vertsPerPoly));
+    persistedSettings.setValue("Recast", "detailSampleDist", std::to_string(sample->m_detailSampleDist));
+    persistedSettings.setValue("Recast", "detailSampleMaxError", std::to_string(sample->m_detailSampleMaxError));
+    persistedSettings.setValue("Recast", "tilingTileSize", std::to_string(sample->m_tileSize));
+    switch (sample->m_partitionType) {
+        case SAMPLE_PARTITION_MONOTONE:
+            persistedSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_MONOTONE");
+            break;
+        case SAMPLE_PARTITION_LAYERS:
+            persistedSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_LAYERS");
+            break;
+        case SAMPLE_PARTITION_WATERSHED:
+        default:
+            persistedSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED");
+            break;
+    }
+    persistedSettings.save();
 }
 
 Vec3 RecastAdapter::convertFromNavPowerToRecast(Vec3 pos) {

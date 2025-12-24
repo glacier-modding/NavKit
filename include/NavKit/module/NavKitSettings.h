@@ -1,10 +1,22 @@
 #pragma once
 #include <SimpleIni.h>
 
+struct DialogSettings {
+    float backgroundColor{};
+    std::string hitmanFolder;
+    std::string outputFolder;
+    std::string blenderPath;
+};
+
 class NavKitSettings {
+    static void resetDefaults(DialogSettings &settings);
+
+    static void setDialogInputs(HWND hDlg, const DialogSettings &tempSettings);
+
     static INT_PTR SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
     explicit NavKitSettings();
+
 public:
     static NavKitSettings &getInstance() {
         static NavKitSettings instance;
@@ -27,4 +39,6 @@ public:
     void setBlenderFile(const std::string &fileName);
 
     void showNavKitSettingsDialog();
+
+    void loadSettings();
 };

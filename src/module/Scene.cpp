@@ -328,7 +328,7 @@ INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         }
 
         case WM_COMMAND:
-            if (LOWORD(wParam) == IDC_BUTTON_BBOX_RESET) {
+            if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
                 scene.resetBBoxDefaults();
                 scene.UpdateSceneDialogControls(hDlg);
             }

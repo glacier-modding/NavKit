@@ -43,7 +43,7 @@ int InputHandler::handleInput() {
                     renderer.handleResize();
                 }
                 if (event.window.event == SDL_WINDOWEVENT_MOVED) {
-                    renderer.updateFrameRate();
+                    renderer.handleMoved();
                 }
                 break;
 
@@ -119,12 +119,17 @@ int InputHandler::handleInput() {
                 done = true;
                 break;
             case SDL_SYSWMEVENT:
-                if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
-                    (NavKitSettings::hSettingsDialog && IsDialogMessage(NavKitSettings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                    (Airg::hAirgDialog && IsDialogMessage(Airg::hAirgDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                    (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                    (RecastAdapter::hRecastDialog && IsDialogMessage(RecastAdapter::hRecastDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
-                   continue;
+                if (SDL_SysWMmsg *wmMsg = event.syswm.msg;
+                    (NavKitSettings::hSettingsDialog &&
+                     IsDialogMessage(NavKitSettings::hSettingsDialog,
+                                     reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (Airg::hAirgDialog && IsDialogMessage(Airg::hAirgDialog,
+                                                          reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog,
+                                                            reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (RecastAdapter::hRecastDialog && IsDialogMessage(RecastAdapter::hRecastDialog,
+                                                                     reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
+                    continue;
                 }
                 if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
                     done = true;

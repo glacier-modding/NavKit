@@ -31,6 +31,8 @@ public:
 
     ~Renderer();
 
+    void handleMoved();
+
     static Renderer &getInstance() {
         static Renderer instance;
         return instance;
@@ -46,6 +48,8 @@ public:
     bool initWindowAndRenderer();
 
     void closeWindow() const;
+
+    void loadSettings();
 
     void initFrameRate(float frameRateValue);
 
