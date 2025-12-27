@@ -108,14 +108,10 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             errorCallback();
             return;
         }
-        bool pythonError = false;
         if (outputString.find("Error") != std::string::npos) {
-            pythonError = true;
-        }
-        if (pythonError) {
             Logger::log(
                 NK_ERROR,
-                "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
+                "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
             errorCallback();
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(hReadPipe);
@@ -130,7 +126,7 @@ void CommandRunner::runCommand(std::string command, std::string logFileName, std
             }
             errorMessage += outputString;
             errorMessage +=
-                    "Error extracting scene from game. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
+                    "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
             ErrorHandler::openErrorDialog(errorMessage);
             fclose(logFile);
             return;

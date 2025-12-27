@@ -2450,21 +2450,24 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
         else:
             mesh_hash = hash_and_entity['primHash']
             
-        room_folder_name = hash_and_entity["roomFolderName"]
+        room_folder_name = hash_and_entity["roomFolderName"][:63]
         if room_folder_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_folder_name)
             bpy.context.scene.collection.children.link(coll)
             coll.color_tag = "COLOR_0" + str(room_folder_color_index%8 + 1)
             room_folder_color_index += 1
+            log("INFO", "Adding new collection for room folder name: " + room_folder_name, "load_scenario")
+
         room_folder_coll = bpy.data.collections.get(room_folder_name)
-        
-        room_name = hash_and_entity["roomName"]
+
+        room_name = hash_and_entity["roomName"][:63]
         if room_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_name)
             room_folder_coll.children.link(coll)
-            coll.color_tag = "COLOR_0" + str(room_color_index%8 + 1)
+            coll.color_tag = "COLOR_0" + str(room_color_index % 8 + 1)
             room_color_index += 1
-            
+            log("INFO", "Adding new collection for room name: " + room_name, "load_scenario")
+
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
                      "scale": entity["scale"]["data"], "id": entity["id"]}
@@ -2554,7 +2557,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
             p = mesh_transform["position"]
             r = mesh_transform["rotate"]
             s = mesh_transform["scale"]
-            log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
+            log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
             mesh_i += 1
             for obj in objects:
                 if i != 0:

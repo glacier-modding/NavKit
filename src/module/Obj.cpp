@@ -220,14 +220,14 @@ void Obj::buildObj() {
 }
 
 void Obj::extractAlocsOrPrimsAndStartObjBuild() {
+    const Scene &scene = Scene::getInstance();
+    const std::string &fileNameString = scene.lastLoadSceneFile;
     NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     std::string retailFolder = "\"";
     retailFolder += navKitSettings.hitmanFolder;
     retailFolder += "\\Retail\"";
     std::string gameVersion = "HM3";
-    std::string navJsonFilePath = "\"";
-    navJsonFilePath += navKitSettings.outputFolder;
-    navJsonFilePath += "\\output.nav.json\"";
+    std::string navJsonFilePath = "\"" + fileNameString + "\"";
     std::string runtimeFolder = "\"";
     runtimeFolder += navKitSettings.hitmanFolder;
     runtimeFolder += "\\Runtime\"";
@@ -276,8 +276,6 @@ char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
 }
 
 void Obj::finalizeExtractAlocsOrPrims() {
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-
     if (errorExtracting) {
         errorBuilding = false;
         startedObjGeneration = false;
@@ -291,12 +289,9 @@ void Obj::finalizeExtractAlocsOrPrims() {
     }
     if (doneExtractingAlocsOrPrims) {
         doneExtractingAlocsOrPrims = false;
-        std::string sceneFile = navKitSettings.outputFolder;
-        sceneFile += "\\output.nav.json";
-        Scene &scene = Scene::getInstance();
-        const std::string &fileNameString = sceneFile;
+        const Scene &scene = Scene::getInstance();
+        const std::string &fileNameString = scene.lastLoadSceneFile;
         extractingAlocsOrPrims = false;
-        scene.lastLoadSceneFile = sceneFile;
         buildObj();
         Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
         errorExtracting = false;
