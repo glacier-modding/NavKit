@@ -43,8 +43,11 @@ void ZPathfinding::Scale::writeJson(std::ostream &f) const {
 }
 
 void ZPathfinding::Entity::readJson(simdjson::ondemand::object json) {
-    id = std::string{std::string_view(json["id"])};
-    auto result = json["name"];
+    auto result = json["id"];
+    if (result.error() == simdjson::SUCCESS) {
+        id = std::string{std::string_view(json["id"])};
+    }
+    result = json["name"];
     if (result.error() == simdjson::SUCCESS) {
         name = std::string{std::string_view(json["name"])};
     }
@@ -79,11 +82,11 @@ void ZPathfinding::HashesAndEntity::readJson(simdjson::ondemand::object json) {
 
 void ZPathfinding::Mesh::writeJson(std::ostream &f) const {
     f << R"({"alocHash":")" << alocHash <<
-            R"({"primHash":")" << primHash <<
-            R"({"roomName":")" << roomName <<
-            R"({"roomFolderName":")" << roomFolderName <<
+            R"(","primHash":")" << primHash <<
+            R"(","roomName":")" << roomName <<
+            R"(","roomFolderName":")" << roomFolderName <<
             R"(","entity":{"id":")" << id <<
-            R"(","name": ")" << name <<
+            R"(","name":")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
     pos.writeJson(f);
     f << ",";
@@ -106,7 +109,7 @@ std::vector<ZPathfinding::Mesh> ZPathfinding::Meshes::readMeshes() const {
     for (const HashesAndEntity &hashAndEntity: hashesAndEntities) {
         Mesh mesh;
         mesh.alocHash = hashAndEntity.alocHash;
-        mesh.primHash = hashAndEntity.alocHash;
+        mesh.primHash = hashAndEntity.primHash;
         mesh.roomName = hashAndEntity.roomName;
         mesh.roomFolderName = hashAndEntity.roomFolderName;
         mesh.id = hashAndEntity.entity.id;
@@ -121,8 +124,8 @@ std::vector<ZPathfinding::Mesh> ZPathfinding::Meshes::readMeshes() const {
 }
 
 void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
-    f << R"({"hash":"00724CDE424AFE76","entity":{"id":")" << id <<
-            R"(","name": ")" << name <<
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
     pos.writeJson(f);
     f << ",";
@@ -132,7 +135,7 @@ void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
     f << ",";
     Scale scaleJson("SVector3", scale);
     scaleJson.writeJson(f);
-    f << "}}";
+    f << "}";
 }
 
 ZPathfinding::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
@@ -186,13 +189,13 @@ void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
 }
 
 void ZPathfinding::PfSeedPoint::writeJson(std::ostream &f) const {
-    f << R"({"hash":"00280B8C4462FAC8","entity":{"id":")" << id <<
-            R"(","name": ")" << name <<
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
     pos.writeJson(f);
     f << ",";
     rotation.writeJson(f);
-    f << "}}";
+    f << "}";
 }
 
 ZPathfinding::PfSeedPoints::PfSeedPoints(simdjson::ondemand::array pfSeedPoints) {
