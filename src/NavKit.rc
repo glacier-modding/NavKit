@@ -32,7 +32,7 @@ BEGIN
         MENUITEM "&NavKit Settings",                         IDM_SETTINGS_NAVKIT
         MENUITEM "&Scene Settings",                          IDM_SETTINGS_SCENE
         MENUITEM "&Recast Settings",                         IDM_SETTINGS_RECAST
-        MENUITEM "&Obj Settings",                            IDM_SETTINGS_OBJ
+        MENUITEM "&Scene Mesh Settings",                     IDM_SETTINGS_OBJ
         MENUITEM "&Airg Settings",                           IDM_SETTINGS_AIRG
     END
     POPUP "&View"
@@ -251,9 +251,9 @@ BEGIN
     PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,188,490,65,14
 END
 
-IDD_OBJ_SETTINGS DIALOGEX 0, 0, 260, 150
+IDD_OBJ_SETTINGS DIALOGEX 0, 0, 260, 195
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "Obj Settings"
+CAPTION "Scene Mesh Settings"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Mesh Type for Build",IDC_STATIC,7,7,246,35
@@ -269,5 +269,10 @@ BEGIN
     AUTOCHECKBOX    "LOD 6", IDC_CHECK_PRIM_LOD_6, 84, 80, 50, 8
     AUTOCHECKBOX    "LOD 7", IDC_CHECK_PRIM_LOD_7, 84, 95, 50, 8
     AUTOCHECKBOX    "LOD 8", IDC_CHECK_PRIM_LOD_8, 84, 110, 50, 8
-    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,188,130,65,14
+
+    GROUPBOX        "Build Type for Blender File",IDC_STATIC,7,135,246,35
+    CONTROL         "Copy",IDC_RADIO_BUILD_TYPE_COPY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,150,40,10
+    CONTROL         "Instance",IDC_RADIO_BUILD_TYPE_INSTANCE,"Button",BS_AUTORADIOBUTTON,64,150,40,10
+
+    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,188,175,65,14
 END

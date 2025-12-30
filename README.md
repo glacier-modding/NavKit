@@ -3,11 +3,11 @@
 # How to Use
 The [NavKit Guide](https://glaciermodding.org/docs/modding/hitman/customcampaigns/using_navkit) is available on the [Glacier Modding Wiki](https://glaciermodding.org/).
 
-You can run NavKit by opening `NavKit.exe`. To use the **View Navp in game** and **Scene Extraction** features, you will need ZHMModSdk installed. For the **Scene Extraction** feature, you will also need to have Blender installed.
+You can run NavKit by opening `NavKit.exe`. To use the **Scene Extraction** feature, you will need ZHMModSdk installed. For the **Build Obj** and **Build Blend file** feature, you will also need to have Blender installed.
 
 You will also need to install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
 
-Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, scene extraction, building Navp, building Airg and viewing navp in game.  
+Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, scene extraction, building Obj, building blend files, building Navp, and building Airg.  
 
 # Full generation of Navp and Airg (Scene Extraction, Navp generation, Airg generation)
 1. Download the latest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and run the installer
