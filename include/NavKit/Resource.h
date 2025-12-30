@@ -140,3 +140,5 @@
 #define IDC_CHECK_PRIM_LOD_6                    30408
 #define IDC_CHECK_PRIM_LOD_7                    30409
 #define IDC_CHECK_PRIM_LOD_8                    30410
+#define IDC_RADIO_BUILD_TYPE_COPY               30411
+#define IDC_RADIO_BUILD_TYPE_INSTANCE           30412

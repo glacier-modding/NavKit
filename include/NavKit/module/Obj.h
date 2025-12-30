@@ -32,7 +32,6 @@ public:
     bool showObj;
     bool loadObj;
     std::vector<std::string> files;
-    const std::string meshesFolder = "Obj";
     std::string objToLoad;
     std::vector<bool> objLoadDone;
     bool startedObjGeneration;
