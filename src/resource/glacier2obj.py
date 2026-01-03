@@ -1985,6 +1985,8 @@ class Physics:
             br.readUByte()  # .
         except struct.error as err:
             log("ERROR", "Error reading ALOC " + aloc_name + ". Error message: " + str(err), aloc_name)
+            br.close()
+            return -1
 
         # End of header. Current offset = 23
 
@@ -2005,7 +2007,10 @@ class Physics:
                 else:
                     log("ERROR", "Can't continue loading current ALOC " + aloc_name + ". Returning loaded meshes.", aloc_name)
                     self.triangle_mesh_count = triangle_mesh_index
-                    return self.triangle_meshes
+                    br.close()
+                    return 0
+            br.close()
+            return 0
         elif self.data_type == PhysicsDataType.CONVEX_MESH_AND_PRIMITIVE:
             log("DEBUG", "Loading Convex Mesh and Primitives for ALOC: " + aloc_name, aloc_name)
             self.convex_mesh_count = br.readUInt()
@@ -2018,6 +2023,8 @@ class Physics:
             self.primitive_count = br.readUInt()
             log("DEBUG", "Loading Primitive mesh", aloc_name)
             self.read_primitive_mesh(br, self.primitive_count, aloc_name)
+            br.close()
+            return 0
         elif self.data_type == PhysicsDataType.TRIANGLE_MESH_AND_PRIMITIVE:
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
@@ -2028,8 +2035,12 @@ class Physics:
             self.primitive_count = br.readUInt()
             log("DEBUG", "Loading Primitive mesh", aloc_name)
             self.read_primitive_mesh(br, self.primitive_count, aloc_name)
+            br.close()
+            return 0
         elif self.data_type == PhysicsDataType.SHATTER_LINKED:
             self.shatter_count = br.readUInt()
+            br.close()
+            return 0
         elif mesh_type == "CVX":
             if self.data_type != PhysicsDataType.CONVEX_MESH:
                 _ = -1
@@ -2038,6 +2049,8 @@ class Physics:
             for convex_mesh_index in range(self.convex_mesh_count):
                 log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count), aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
+            br.close()
+            return 0
         elif mesh_type == "TRI":
             if self.data_type != PhysicsDataType.TRIANGLE_MESH:
                 _ = -1
@@ -2051,7 +2064,10 @@ class Physics:
                 else:
                     log("ERROR", "Can't continue loading current ALOC: " + aloc_name + ". Returning loaded meshes.", aloc_name)
                     self.triangle_mesh_count = triangle_mesh_index
-                    return self.triangle_meshes
+                    br.close()
+                    return 0
+            br.close()
+            return 0
         elif mesh_type == "ICP":
             if self.data_type != PhysicsDataType.PRIMITIVE:
                 _ = -1
@@ -2063,9 +2079,10 @@ class Physics:
             self.primitive_count = self.primitive_capsules_count + self.primitive_boxes_count + self.primitive_spheres_count
             log("DEBUG", "mesh_type == ICP ALOC: " + aloc_name, aloc_name)
             # raise(Exception("mesh_type == ICP")) # TODO: Verify that ICP meshes work properly
-            return self.primitive_boxes + self.primitive_spheres + self.primitive_capsules
+            br.close()
+            return 0
         br.close()
-        return {}
+        return -1
 
     def set_collision_settings(self, settings):
         self.lib.SetCollisionSettings(ctypes.byref(settings))
@@ -2116,13 +2133,10 @@ class Physics:
 
 
 def read_aloc(filepath):
-    fp = os.fsencode(filepath)
-    file = open(fp, "rb")
-    br = BinaryReader(file)
     aloc = Physics()
     return_val = aloc.read(filepath)
-    br.close()
     if return_val == -1:
+        log("ERROR", "Failed to read ALOC from file: " + filepath + ".", "read_aloc")
         return -1
     log("DEBUG", "Finished reading ALOC from file: " + filepath + ".", "read_aloc")
 
