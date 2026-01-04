@@ -2421,6 +2421,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     objects = []
     if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
         log("DEBUG", "Converting Convex Mesh and Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        objects += load_convex_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
         objects += load_triangle_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
     elif aloc.data_type == PhysicsDataType.CONVEX_MESH:
         log("DEBUG", "Converting Convex Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
