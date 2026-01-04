@@ -41,6 +41,7 @@ public:
     bool blendFileOnlyExtract;
     bool glacier2ObjDebugLogsEnabled;
     bool errorBuilding;
+    bool skipExtractingAlocsOrPrims;
     bool errorExtracting;
     bool extractingAlocsOrPrims;
     bool doneExtractingAlocsOrPrims;
