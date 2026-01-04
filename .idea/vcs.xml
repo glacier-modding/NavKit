@@ -4,4 +4,5 @@
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/extern/vcpkg" vcs="Git" />
   </component>
+
 </project>

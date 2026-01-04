@@ -37,6 +37,7 @@ Obj::Obj() : loadObjName("Load Obj"),
              errorBuilding(false),
              errorExtracting(false),
              extractingAlocsOrPrims(false),
+             skipExtractingAlocsOrPrims(false),
              blendFileOnlyExtract(false),
              doneExtractingAlocsOrPrims(false),
              doObjHitTest(false),
@@ -220,6 +221,12 @@ void Obj::buildObj() {
 }
 
 void Obj::extractAlocsOrPrimsAndStartObjBuild() {
+    if (skipExtractingAlocsOrPrims) {
+        Logger::log(NK_INFO, "Skipping extraction of Alocs / Prims from Rpkg files.");
+        doneExtractingAlocsOrPrims = true;
+        Menu::updateMenuState();
+        return;
+    }
     const Scene &scene = Scene::getInstance();
     const std::string &fileNameString = scene.lastLoadSceneFile;
     NavKitSettings &navKitSettings = NavKitSettings::getInstance();
@@ -262,7 +269,7 @@ void Obj::extractAlocsOrPrimsAndStartObjBuild() {
     std::jthread commandThread(
         &CommandRunner::runCommand, CommandRunner::getInstance(), command,
         "Glacier2ObjExtract.log", [this] {
-            Logger::log(NK_INFO, "Finished extracting Alocs / Prims from Rpkg files file.");
+            Logger::log(NK_INFO, "Finished extracting Alocs / Prims from Rpkg files.");
             doneExtractingAlocsOrPrims = true;
             Menu::updateMenuState();
         }, [this] {
