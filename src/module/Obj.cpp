@@ -33,15 +33,17 @@ Obj::Obj() : loadObjName("Load Obj"),
              startedObjGeneration(false),
              blenderObjStarted(false),
              blenderObjGenerationDone(false),
+             blendFileOnlyBuild(false),
+             blendFileAndObjBuild(false),
              glacier2ObjDebugLogsEnabled(false),
              errorBuilding(false),
+             skipExtractingAlocsOrPrims(false),
              errorExtracting(false),
              extractingAlocsOrPrims(false),
-             skipExtractingAlocsOrPrims(false),
-             blendFileOnlyExtract(false),
              doneExtractingAlocsOrPrims(false),
              doObjHitTest(false),
              meshTypeForBuild(ALOC),
+             sceneMeshBuildType(COPY),
              primLods{true, true, true, true, true, true, true, true} {
 }
 
@@ -57,19 +59,11 @@ void Obj::updateObjDialogControls(HWND hDlg) {
     for (int i = 0; i < 8; ++i) {
         EnableWindow(GetDlgItem(hDlg, IDC_CHECK_PRIM_LOD_1 + i), isPrim);
     }
-}
+    CheckRadioButton(hDlg, IDC_RADIO_BUILD_TYPE_COPY, IDC_RADIO_BUILD_TYPE_INSTANCE,
+                     obj.sceneMeshBuildType == COPY ? IDC_RADIO_BUILD_TYPE_COPY : IDC_RADIO_BUILD_TYPE_INSTANCE);
 
-void Obj::loadSettings() {
-    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
-    meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
-    const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
-    for (int i = 0; i < 8; ++i) {
-        if (i < primLodsStr.size()) {
-            primLods[i] = primLodsStr[i] == '1';
-        } else {
-            primLods[i] = true;
-        }
-    }
+    CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS, obj.glacier2ObjDebugLogsEnabled ? BST_CHECKED : BST_UNCHECKED);
 }
 
 INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -90,15 +84,38 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
                     updateObjDialogControls(hDlg);
                     return (INT_PTR) TRUE;
                 }
+                case IDC_RADIO_BUILD_TYPE_COPY:
+                case IDC_RADIO_BUILD_TYPE_INSTANCE: {
+                        obj.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
+                        obj.saveObjSettings();
+                        Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
+                                    obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+                        updateObjDialogControls(hDlg);
+                        return (INT_PTR) TRUE;
+                }
+
+                case IDC_CHECK_SKIP_RPKG_EXTRACT:
+                        obj.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
+                        obj.saveObjSettings();
+                        Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.", obj.skipExtractingAlocsOrPrims ? "true" : "false");
+                        updateObjDialogControls(hDlg);
+                        return (INT_PTR) TRUE;
+                case IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS:
+                    obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS) ? COPY : INSTANCE;
+                    obj.saveObjSettings();
+                    Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.", obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
+                    updateObjDialogControls(hDlg);
+                    return (INT_PTR) TRUE;
 
                 case IDC_BUTTON_RESET_DEFAULTS:
                     obj.resetDefaults();
                     updateObjDialogControls(hDlg);
                     Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
                     Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                                obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                    obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                    Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
+                                obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
                     obj.saveObjSettings();
-
 
                     break;
                 case WM_CLOSE:
@@ -181,13 +198,17 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
     }
 }
 
-void Obj::buildObj() {
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+void Obj::buildObjFromScene() {
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
     startedObjGeneration = true;
-    std::string buildOutputFileType = blendFileOnlyExtract ? "blend" : "obj";
+    std::string buildOutputFileType = blendFileAndObjBuild
+                                          ? "both"
+                                          : blendFileOnlyBuild
+                                                ? "blend"
+                                                : "obj";
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
     command += navKitSettings.blenderPath;
@@ -202,8 +223,14 @@ void Obj::buildObj() {
         command += " PRIM ";
     }
     command += buildPrimLodsString();
+    if (sceneMeshBuildType == COPY) {
+        command += " copy ";
+    } else {
+        command += " instance ";
+    }
+
     if (glacier2ObjDebugLogsEnabled) {
-        command += " True";
+        command += " true";
     }
     blenderObjStarted = true;
     Gui &gui = Gui::getInstance();
@@ -299,7 +326,7 @@ void Obj::finalizeExtractAlocsOrPrims() {
         const Scene &scene = Scene::getInstance();
         const std::string &fileNameString = scene.lastLoadSceneFile;
         extractingAlocsOrPrims = false;
-        buildObj();
+        buildObjFromScene();
         Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
         errorExtracting = false;
     }
@@ -313,13 +340,13 @@ void Obj::finalizeObjBuild() {
         startedObjGeneration = false;
         objToLoad = navKitSettings.outputFolder;
         objToLoad += "\\" + generatedObjName;
-        loadObj = !blendFileOnlyExtract;
+        loadObj = !blendFileOnlyBuild;
         lastObjFileName = navKitSettings.outputFolder;
         lastObjFileName += generatedObjName;
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
         sceneExtract.alsoBuildObj = false;
-        blendFileOnlyExtract = false;
+        blendFileOnlyBuild = false;
     }
     if (errorBuilding) {
         errorBuilding = false;
@@ -329,7 +356,7 @@ void Obj::finalizeObjBuild() {
         objLoaded = false;
         sceneExtract.alsoBuildAll = false;
         sceneExtract.alsoBuildObj = false;
-        blendFileOnlyExtract = false;
+        blendFileOnlyBuild = false;
     }
     Menu::updateMenuState();
 }
@@ -460,7 +487,7 @@ bool Obj::canBuildObjFromNavp() {
 }
 
 bool Obj::canBuildObjFromScene() const {
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingAlocsOrPrims && navKitSettings.blenderSet
            &&
@@ -473,12 +500,21 @@ bool Obj::canBuildBlendFromScene() const {
     return canBuildObjFromScene();
 }
 
+bool Obj::canBuildBlendAndObjFromScene() const {
+    return canBuildObjFromScene();
+}
+
 void Obj::handleBuildObjFromSceneClicked() {
     backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
 }
 
 void Obj::handleBuildBlendFromSceneClicked() {
-    blendFileOnlyExtract = true;
+    blendFileOnlyBuild = true;
+    backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
+}
+
+void Obj::handleBuildBlendAndObjFromSceneClicked() {
+    blendFileAndObjBuild = true;
     backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
 }
 
@@ -524,23 +560,51 @@ std::string Obj::buildPrimLodsString() const {
     return primLodsStr;
 }
 
+void Obj::loadSettings() {
+    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
+    const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
+    for (int i = 0; i < 8; ++i) {
+        if (i < primLodsStr.size()) {
+            primLods[i] = primLodsStr[i] == '1';
+        } else {
+            primLods[i] = true;
+        }
+    }
+    sceneMeshBuildType = strcmp(persistedSettings.getValue("Obj", "sceneMeshBuildType", "COPY"), "COPY") == 0 ? COPY : INSTANCE;
+    skipExtractingAlocsOrPrims = strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"), "true") == 0;
+    glacier2ObjDebugLogsEnabled = strcmp(persistedSettings.getValue("Obj", "glacier2ObjDebugLogsEnabled", "false"), "true") == 0;
+}
+
 void Obj::saveObjSettings() const {
     PersistedSettings &persistedSettings = PersistedSettings::getInstance();
 
     const char *meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
-    persistedSettings.setValue("Obj", "MeshTypeForBuild", meshTypeStr);
+    persistedSettings.setValue("Obj", "meshTypeForBuild", meshTypeStr);
 
     const std::string primLodsStr = buildPrimLodsString();
-    persistedSettings.setValue("Obj", "PrimLods", primLodsStr);
+    persistedSettings.setValue("Obj", "primLods", primLodsStr);
+
+    const char *buildTypeStr = (sceneMeshBuildType == COPY) ? "COPY" : "INSTANCE";
+    persistedSettings.setValue("Obj", "sceneMeshBuildType", buildTypeStr);
+
+    const char *skipRpkgExtract = skipExtractingAlocsOrPrims ? "true" : "false";
+    persistedSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
+
+    const char *debugEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    persistedSettings.setValue("Obj", "glacier2ObjDebugLogsEnabled", debugEnabled);
 
     persistedSettings.save();
 }
 
 void Obj::resetDefaults() {
     meshTypeForBuild = ALOC;
-    for (int i = 0; i < 8; i++) {
-        primLods[i] = true;
+    for (bool & primLod : primLods) {
+        primLod = true;
     }
+    sceneMeshBuildType = COPY;
+    skipExtractingAlocsOrPrims = false;
+    glacier2ObjDebugLogsEnabled = false;
 }
 
 void Obj::showObjDialog() {

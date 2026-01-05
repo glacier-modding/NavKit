@@ -113,6 +113,7 @@ set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/DroidSans.ttf"
         "${NavKit_SOURCE_DIR}/src/resource/NavKit.ini"
         "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py"
+        "${NavKit_SOURCE_DIR}/src/resource/res.blend"
         "${NavKit_SOURCE_DIR}/bin/glacier2Obj.exe"
 )
 set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES} PARENT_SCOPE)

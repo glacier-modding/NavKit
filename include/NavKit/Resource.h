@@ -41,6 +41,7 @@
 #define IDM_BUILD_OBJ_FROM_SCENE                1500
 #define IDM_BUILD_OBJ_FROM_NAVP                 1501
 #define IDM_BUILD_BLEND_FROM_SCENE				1502
+#define IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE  	1503
 #define IDM_BUILD_NAVP                          1510
 #define IDM_BUILD_AIRG                          1520
 #define IDM_HELP_ABOUT                          1600
@@ -140,3 +141,7 @@
 #define IDC_CHECK_PRIM_LOD_6                    30408
 #define IDC_CHECK_PRIM_LOD_7                    30409
 #define IDC_CHECK_PRIM_LOD_8                    30410
+#define IDC_RADIO_BUILD_TYPE_COPY               30411
+#define IDC_RADIO_BUILD_TYPE_INSTANCE           30412
+#define IDC_CHECK_SKIP_RPKG_EXTRACT             30413
+#define IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS       30414

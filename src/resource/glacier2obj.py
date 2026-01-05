@@ -2448,7 +2448,7 @@ def load_aloc(operator, context, filepath, include_non_collidable_layers):
     return aloc.collision_type, objects
 
 
-def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask):
+def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -2459,6 +2459,17 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
     room_names = {}
     room_color_index = 0
     room_folder_color_index = 0
+    if build_type == "instance":
+        #link the geonode
+        geo_node_name = "HitmanMapNode"
+        filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
+        print(filepath)
+        with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
+            if geo_node_name in data_from.node_groups:
+                data_to.node_groups.append(geo_node_name)
+            else:
+                log("DEBUG", "=========================== Error Loading the resource blend file ================", "load_scenario")
+                assert 0
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
             mesh_hash = hash_and_entity['alocHash']
@@ -2576,27 +2587,58 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
             log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(collision_type) + " +++++++++++++", "load_scenario")
             mesh_i += len(transforms[mesh_hash])
             continue
-        for i in range(0, t_size):
-            mesh_transform = transforms[mesh_hash][i]
-            room_name = room_names[mesh_hash][i]
-            p = mesh_transform["position"]
-            r = mesh_transform["rotate"]
-            s = mesh_transform["scale"]
-            log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
-            mesh_i += 1
+        if build_type == "instance":
             for obj in objects:
-                if i != 0:
-                    cur = obj.copy()
-                else:
-                    cur = obj
-                bpy.data.collections.get(room_name).objects.link(cur)
-                cur.select_set(True)
-                cur.name = mesh_hash + " " + mesh_transform["id"]
-                cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
-                cur.rotation_mode = 'QUATERNION'
-                cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
-                cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
-                cur.select_set(False)
+                # if mesh_hash +"_placement" in bpy.data.objects: #not sure why there are dups sometimes
+                    # continue
+                #different instances transforms
+                positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
+                rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])).to_euler() for i in range(t_size)]
+                scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
+                #create the "fake" placement mesh
+                mesh = bpy.data.meshes.new(mesh_hash + "_placement")
+                mesh.from_pydata(positions, [], [])
+                #rotation attrib
+                attr = mesh.attributes.new(name="rotation",type='FLOAT_VECTOR',domain='POINT')
+                for i, r in enumerate(rotations):
+                    attr.data[i].vector = r
+                #scale attrib
+                attr = mesh.attributes.new(name="scale",type='FLOAT_VECTOR',domain='POINT')
+                for i, s in enumerate(scales):
+                    attr.data[i].vector = s
+
+                mesh.update()
+                attr_obj = bpy.data.objects.new(mesh_hash +"_placement", mesh)
+                bpy.context.collection.objects.link(attr_obj)
+                obj.hide_viewport = True
+
+                modifier = attr_obj.modifiers.new(name="GeometryNodes", type='NODES')
+                modifier.node_group = bpy.data.node_groups[geo_node_name]
+                modifier["Socket_2"] = obj
+                modifier["Socket_3"] = "rotation"
+                modifier["Socket_4"] = "scale"
+        else:
+            for i in range(0, t_size):
+                mesh_transform = transforms[mesh_hash][i]
+                room_name = room_names[mesh_hash][i]
+                p = mesh_transform["position"]
+                r = mesh_transform["rotate"]
+                s = mesh_transform["scale"]
+                log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
+                mesh_i += 1
+                for obj in objects:
+                    if i != 0:
+                        cur = obj.copy()
+                    else:
+                        cur = obj
+                    bpy.data.collections.get(room_name).objects.link(cur)
+                    cur.select_set(True)
+                    cur.name = mesh_hash + " " + mesh_transform["id"]
+                    cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
+                    cur.rotation_mode = 'QUATERNION'
+                    cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
+                    cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
+                    cur.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
     if len(missing_mesh_hashes) > 0:
@@ -2614,7 +2656,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
 
 
 def main():
-    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <debug logs enabled>", "main")
+    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <debug logs enabled (true | false)>", "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
@@ -2622,26 +2664,25 @@ def main():
     output_path = argv[1]
     mesh_type = argv[2]
     lod_mask = argv[3]
-    if len(argv) > 4 and argv[4] == True:
+    build_type = argv[4]
+    if len(argv) > 5 and argv[5] == "true":
         log("INFO", "Enabling debug logs", "main"),
         glacier2obj_enabled_log_levels.append("DEBUG")
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-    scenario = load_scenario(bpy.context, scene_path, output_path, mesh_type, lod_mask)
+    scenario = load_scenario(bpy.context, scene_path, output_path, mesh_type, lod_mask, build_type)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1
-    if output_path[-6:]== '.blend':
-        log("INFO", "Attempting to save blender file to :" + output_path, "main")
-        bpy.ops.wm.save_as_mainfile(filepath=output_path)
+    if output_path[-4:]== 'both':
+        save_blend_file(output_path[:-4] + "blend")
+        save_obj_file(output_path[:-4] + "obj")
+    elif output_path[-5:]== 'blend':
+        save_blend_file(output_path)
     else:
-        log("INFO", "Attempting to save obj file to :" + output_path, "main")
-        if bpy.app.version_string[0] == "3":
-            bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
-        else:
-            bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
+        save_obj_file(output_path)
 
     log("INFO", "Script finished, waiting...", "main")
     try:
@@ -2650,6 +2691,19 @@ def main():
     except OSError:
         pass
     return None
+
+
+def save_obj_file(output_path):
+    log("INFO", "Attempting to save obj file to :" + output_path, "main")
+    if bpy.app.version_string[0] == "3":
+        bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
+    else:
+        bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
+
+
+def save_blend_file(output_path):
+    log("INFO", "Attempting to save blender file to :" + output_path, "main")
+    bpy.ops.wm.save_as_mainfile(filepath=output_path)
 
 
 if __name__ == "__main__":
