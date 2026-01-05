@@ -12,6 +12,11 @@ enum MeshType {
     PRIM
 };
 
+enum SceneMeshBuildType {
+    INSTANCE,
+    COPY
+};
+
 class Obj {
     explicit Obj();
 
@@ -37,7 +42,8 @@ public:
     bool startedObjGeneration;
     bool blenderObjStarted;
     bool blenderObjGenerationDone;
-    bool blendFileOnlyExtract;
+    bool blendFileOnlyBuild;
+    bool blendFileAndObjBuild;
     bool glacier2ObjDebugLogsEnabled;
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
@@ -47,6 +53,7 @@ public:
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
     MeshType meshTypeForBuild;
+    SceneMeshBuildType sceneMeshBuildType;
     bool primLods[8];
     static HWND hObjDialog;
 
@@ -56,13 +63,15 @@ public:
 
     void loadObjMesh();
 
+    void handleBuildBlendAndObjFromSceneClicked();
+
     static void copyObjFile(const std::string &from, const std::string &to);
 
     void saveObjMesh(char *objToCopy, char *newFileName);
 
     void buildObjFromNavp(bool alsoLoadIntoUi);
 
-    void buildObj();
+    void buildObjFromScene();
 
     void finalizeObjBuild();
 
@@ -80,13 +89,15 @@ public:
 
     void handleSaveObjClicked();
 
-    bool canLoad() const;
+    [[nodiscard]] bool canLoad() const;
 
     static bool canBuildObjFromNavp();
 
-    bool canBuildObjFromScene() const;
+    [[nodiscard]] bool canBuildObjFromScene() const;
 
-    bool canBuildBlendFromScene() const;
+    [[nodiscard]] bool canBuildBlendFromScene() const;
+
+    [[nodiscard]] bool canBuildBlendAndObjFromScene() const;
 
     void handleBuildObjFromSceneClicked();
 
