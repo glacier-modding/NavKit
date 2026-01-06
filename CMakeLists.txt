@@ -28,7 +28,8 @@ find_package(simdjson CONFIG REQUIRED)
 find_package(unofficial-brotli CONFIG REQUIRED)
 find_path(SIMPLEINI_INCLUDE_DIR NAMES "SimpleIni.h" HINTS "${PROJECT_SOURCE_DIR}/extern" REQUIRED)
 
-add_library(simpleini INTERFACE IMPORTED GLOBAL)
+add_library(simpleini INTERFACE IMPORTED GLOBAL
+        include/glacier2obj/glacier2obj.h)
 set_target_properties(simpleini PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${SIMPLEINI_INCLUDE_DIR}"
 )
@@ -85,8 +86,8 @@ if(BUILD_INSTALLER)
                     RUNTIME DESTINATION .
             )
             install(FILES
+                    $<TARGET_FILE:glacier2obj>
                     $<TARGET_FILE:NavWeakness>
-                    $<TARGET_FILE:nfd::nfd>
                     $<TARGET_FILE:ResourceLib_HM3>
                     DESTINATION .
             )

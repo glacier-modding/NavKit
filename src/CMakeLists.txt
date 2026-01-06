@@ -52,6 +52,14 @@ add_library(NavKitLib STATIC
 target_compile_definitions(NavKitLib PRIVATE NOMINMAX)
 set_property(TARGET NavKitLib PROPERTY CXX_STANDARD 20)
 
+add_library(glacier2obj SHARED IMPORTED GLOBAL)
+set_target_properties(glacier2obj PROPERTIES
+        IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/glacier2obj.dll.lib"
+        IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/glacier2obj.dll.lib"
+        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/glacier2obj.dll"
+        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/glacier2obj.dll"
+)
+
 add_library(NavWeakness SHARED IMPORTED GLOBAL)
 set_target_properties(NavWeakness PROPERTIES
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.lib"
@@ -79,6 +87,7 @@ target_include_directories(NavKitLib
 )
 target_link_libraries(NavKitLib PUBLIC
         GLEW::GLEW
+        glacier2obj
         NavWeakness
         OpenGL::GL
         RecastNavigation::DebugUtils
@@ -104,6 +113,7 @@ add_executable(NavKit
 target_compile_definitions(NavKit PRIVATE NOMINMAX)
 target_link_libraries(NavKit PRIVATE NavKitLib)
 set(RUNTIME_TARGET_DEPENDENCIES
+        glacier2obj
         NavWeakness
         ResourceLib_HM3
 )
@@ -114,7 +124,6 @@ set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/NavKit.ini"
         "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py"
         "${NavKit_SOURCE_DIR}/src/resource/res.blend"
-        "${NavKit_SOURCE_DIR}/bin/glacier2Obj.exe"
 )
 set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES} PARENT_SCOPE)
 
