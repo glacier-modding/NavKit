@@ -52,7 +52,8 @@ add_library(NavKitLib STATIC
 target_compile_definitions(NavKitLib PRIVATE NOMINMAX)
 set_property(TARGET NavKitLib PROPERTY CXX_STANDARD 20)
 
-add_library(glacier2obj SHARED IMPORTED GLOBAL)
+add_library(glacier2obj SHARED IMPORTED GLOBAL
+        include/glacier2obj/glacier2obj.h)
 set_target_properties(glacier2obj PROPERTIES
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/glacier2obj.dll.lib"
         IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/glacier2obj.dll.lib"
