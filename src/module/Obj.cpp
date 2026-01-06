@@ -19,6 +19,7 @@
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/glacier2obj/glacier2obj.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 HWND Obj::hObjDialog = nullptr;
@@ -277,54 +278,43 @@ void Obj::extractAlocsOrPrimsAndStartObjBuild() {
         Menu::updateMenuState();
         return;
     }
-    const Scene &scene = Scene::getInstance();
-    const std::string &fileNameString = scene.lastLoadSceneFile;
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    std::string retailFolder = "\"";
-    retailFolder += navKitSettings.hitmanFolder;
-    retailFolder += "\\Retail\"";
-    std::string gameVersion = "HM3";
-    std::string navJsonFilePath = "\"" + fileNameString + "\"";
-    std::string runtimeFolder = "\"";
-    runtimeFolder += navKitSettings.hitmanFolder;
-    runtimeFolder += "\\Runtime\"";
-    std::string alocOrPrimFolder;
-    alocOrPrimFolder += navKitSettings.outputFolder;
-    alocOrPrimFolder += (meshTypeForBuild == ALOC) ? "\\aloc" : "\\prim";
+    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const std::string alocOrPrimFolder = navKitSettings.outputFolder + (meshTypeForBuild == ALOC ? "\\aloc" : "\\prim");
 
     struct stat folderExists{};
-    if (int statRC = stat(alocOrPrimFolder.data(), &folderExists); statRC != 0) {
+    if (const int statRC = stat(alocOrPrimFolder.data(), &folderExists); statRC != 0) {
         if (errno == ENOENT) {
-            if (int status = _mkdir(alocOrPrimFolder.c_str()); status != 0) {
+            if (const int status = _mkdir(alocOrPrimFolder.c_str()); status != 0) {
                 Logger::log(NK_ERROR, "Error creating Aloc / Prim folder");
+                errorExtracting = true;
+                return;
             }
         }
     }
-
-    std::string command = "Glacier2Obj.exe ";
-    command += retailFolder;
-    command += " ";
-    command += gameVersion;
-    command += " ";
-    command += navJsonFilePath;
-    command += " ";
-    command += runtimeFolder;
-    command += " \"";
-    command += alocOrPrimFolder;
-    command += "\" ";
-    command += (meshTypeForBuild == ALOC) ? "ALOC" : "PRIM";
+    const Scene &scene = Scene::getInstance();
+    const std::string &fileNameString = scene.lastLoadSceneFile;
+    const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
+    const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
+    const std::string gameVersion = "HM3";
+    const std::string navJsonFilePath = fileNameString;
 
     extractingAlocsOrPrims = true;
     Menu::updateMenuState();
-    std::jthread commandThread(
-        &CommandRunner::runCommand, CommandRunner::getInstance(), command,
-        "Glacier2ObjExtract.log", [this] {
-            Logger::log(NK_INFO, "Finished extracting Alocs / Prims from Rpkg files.");
-            doneExtractingAlocsOrPrims = true;
-            Menu::updateMenuState();
-        }, [this] {
-            errorExtracting = true;
-        });
+    const int result = run_extraction_wrapper(retailFolder.c_str(),
+                           gameVersion.c_str(),
+                           navJsonFilePath.c_str(),
+                           runtimeFolder.c_str(),
+                           alocOrPrimFolder.c_str(),
+                           (meshTypeForBuild == ALOC) ? "ALOC" : "PRIM",
+                           Logger::rustLogCallback);
+    if (result) {
+        Logger::log(NK_ERROR, "Error extracting Alocs / Prims from Rpkg files.");
+        errorExtracting = true;
+        return;
+    }
+    Logger::log(NK_INFO, "Finished extracting Alocs / Prims from Rpkg files.");
+    doneExtractingAlocsOrPrims = true;
+    Menu::updateMenuState();
 }
 
 char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
