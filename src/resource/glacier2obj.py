@@ -2240,6 +2240,15 @@ def load_aloc(filepath):
     log("DEBUG", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
     return aloc, [aloc_obj]
 
+def get_local_space_bbox_center(obj):
+    return 0.125 * sum((mathutils.Vector(LSCorner) for LSCorner in obj.bound_box), mathutils.Vector())
+
+def get_bounding_sphere_data(obj, WSMat, LSBBoxCenter = None):
+    if LSBBoxCenter is None:
+        LSBBoxCenter = get_local_space_bbox_center(obj)
+    WSBBoxCenter = WSMat @ LSBBoxCenter
+    radius = max((mathutils.Vector(WSMat @ mathutils.Vector(LSCorner)) - WSBBoxCenter).xy for LSCorner in obj.bound_box)
+    return WSBBoxCenter, radius.length
 
 def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type):
     start = timer()
@@ -2253,6 +2262,38 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
     room_color_index = 0
     room_folder_color_index = 0
     geo_node_name = "HitmanMapNode"
+
+    #Get the "pathfinding include" box
+    pf_include_box_info = None
+    for pf_box in data['pfBoxes']:
+        if pf_box["type"]["data"] == "PFBT_INCLUDE_MESH_COLLISION":
+            if pf_include_box_info is not None:
+                log("DEBUG", "=========================== Several include boxes found! ================", "load_scenario")
+                assert 0
+            coords = ["w","x","y","z"]
+            pf_include_box_info = [
+                mathutils.Vector([pf_box["position"][coord] for coord in coords[1:]]),
+                mathutils.Quaternion([pf_box["rotation"][coord] for coord in coords]),
+                mathutils.Vector([pf_box["scale"]["data"][coord] for coord in coords[1:]]), #is the type always vector 3? Single float for uniform scale sometimes?
+            ]
+
+    if False: #debug volumes for the pfbox, disabled by default
+        #debug pfbox
+        bpy.ops.mesh.primitive_cube_add(size=1)
+        box = bpy.context.active_object
+        box.name = "PfIncludeBox"
+        box.location = pf_include_box_info[0]
+        box.rotation_mode = "QUATERNION"
+        box.rotation_quaternion = pf_include_box_info[1]
+        box.scale = pf_include_box_info[2]
+        box.display_type = "WIRE"
+        bpy.context.view_layer.update()
+        #debug sphere
+        pf_box_bounding_sphere_center, pf_box_bounding_sphere_radius = get_bounding_sphere_data(box, box.matrix_world)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=pf_box_bounding_sphere_radius)
+        bpy.context.object.location = pf_box_bounding_sphere_center
+        bpy.context.object.display_type = 'WIRE'
+
     if build_type == "instance":
         #link the geonode
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
@@ -2375,12 +2416,25 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
             continue
         if build_type == "instance":
             for obj in objects:
-                # if mesh_hash +"_placement" in bpy.data.objects: #not sure why there are dups sometimes
-                    # continue
                 #different instances transforms
                 positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
                 rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])).to_euler() for i in range(t_size)]
                 scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
+
+                #basic culling prepass using bounding spheres
+                LSBBoxCenter = get_local_space_bbox_center(obj)
+                culled_indices = set()
+                for u, (pos, rot, scale) in enumerate(zip(positions, rotations, scales)):
+                    instMat = mathutils.Matrix.LocRotScale(pos, rot, scale)
+                    instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(obj, instMat, LSBBoxCenter)
+                    threshold = (instance_bbox_radius + pf_box_bounding_sphere_radius)
+                    if (instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
+                        culled_indices.add(u)
+
+                positions = [positions[u] for u in range(t_size) if u not in culled_indices]
+                rotations = [rotations[u] for u in range(t_size) if u not in culled_indices]
+                scales = [scales[u] for u in range(t_size) if u not in culled_indices]
+
                 #create the "fake" placement mesh
                 mesh = bpy.data.meshes.new(mesh_hash + "_placement")
                 mesh.from_pydata(positions, [], [])
