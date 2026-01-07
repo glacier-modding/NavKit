@@ -1825,7 +1825,7 @@ class Physics:
                     + os.pathsep
                     + os.environ["PATH"]
             )
-       
+
 
     def read_primitive_mesh(self, br, primitive_count, aloc_name):
         for primitive_index in range(primitive_count):  # size of box = 52
@@ -2240,15 +2240,18 @@ def load_aloc(filepath):
     log("DEBUG", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
     return aloc, [aloc_obj]
 
-def get_local_space_bbox_center(obj):
-    return 0.125 * sum((mathutils.Vector(LSCorner) for LSCorner in obj.bound_box), mathutils.Vector())
 
-def get_bounding_sphere_data(obj, WSMat, LSBBoxCenter = None):
-    if LSBBoxCenter is None:
-        LSBBoxCenter = get_local_space_bbox_center(obj)
-    WSBBoxCenter = WSMat @ LSBBoxCenter
-    radius = max((mathutils.Vector(WSMat @ mathutils.Vector(LSCorner)) - WSBBoxCenter).xy for LSCorner in obj.bound_box)
-    return WSBBoxCenter, radius.length
+def get_local_space_bbox_center(obj):
+    return 0.125 * sum((mathutils.Vector(ls_corner) for ls_corner in obj.bound_box), mathutils.Vector())
+
+
+def get_bounding_sphere_data(obj, ws_mat, lsbbox_center = None):
+    if lsbbox_center is None:
+        lsbbox_center = get_local_space_bbox_center(obj)
+    wsbbox_center = ws_mat @ lsbbox_center
+    radius = max((mathutils.Vector(ws_mat @ mathutils.Vector(ls_corner)) - wsbbox_center).xy for ls_corner in obj.bound_box)
+    return wsbbox_center, radius.length
+
 
 def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type):
     start = timer()
@@ -2265,35 +2268,31 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
 
     #Get the "pathfinding include" box
     pf_include_box_info = None
+    pf_box_bounding_sphere_center = None
+    pf_box_bounding_sphere_radius = None
     for pf_box in data['pfBoxes']:
         if pf_box["type"]["data"] == "PFBT_INCLUDE_MESH_COLLISION":
-            if pf_include_box_info is not None:
-                log("DEBUG", "=========================== Several include boxes found! ================", "load_scenario")
-                assert 0
             coords = ["w","x","y","z"]
             pf_include_box_info = [
                 mathutils.Vector([pf_box["position"][coord] for coord in coords[1:]]),
                 mathutils.Quaternion([pf_box["rotation"][coord] for coord in coords]),
-                mathutils.Vector([pf_box["scale"]["data"][coord] for coord in coords[1:]]), #is the type always vector 3? Single float for uniform scale sometimes?
+                mathutils.Vector([pf_box["scale"]["data"][coord] for coord in coords[1:]]),
             ]
-
-    if False: #debug volumes for the pfbox, disabled by default
-        #debug pfbox
+            break
+    if pf_include_box_info is not None:
         bpy.ops.mesh.primitive_cube_add(size=1)
         box = bpy.context.active_object
-        box.name = "PfIncludeBox"
         box.location = pf_include_box_info[0]
         box.rotation_mode = "QUATERNION"
         box.rotation_quaternion = pf_include_box_info[1]
         box.scale = pf_include_box_info[2]
-        box.display_type = "WIRE"
         bpy.context.view_layer.update()
-        #debug sphere
         pf_box_bounding_sphere_center, pf_box_bounding_sphere_radius = get_bounding_sphere_data(box, box.matrix_world)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=pf_box_bounding_sphere_radius)
-        bpy.context.object.location = pf_box_bounding_sphere_center
-        bpy.context.object.display_type = 'WIRE'
+        box.select_set(True)
+        bpy.context.view_layer.objects.active = box
+        bpy.ops.object.delete(use_global=False)
 
+    geo_node_name = "HitmanMapNode"
     if build_type == "instance":
         #link the geonode
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
@@ -2309,7 +2308,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
             mesh_hash = hash_and_entity['alocHash']
         else:
             mesh_hash = hash_and_entity['primHash']
-            
+
         room_folder_name = hash_and_entity["roomFolderName"][:63]
         if room_folder_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_folder_name)
@@ -2331,7 +2330,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
                      "scale": entity["scale"]["data"], "id": entity["id"]}
-        
+
         if mesh_hash not in transforms:
             transforms[mesh_hash] = []
             room_names[mesh_hash] = []
@@ -2415,25 +2414,25 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
             mesh_i += len(transforms[mesh_hash])
             continue
         if build_type == "instance":
+            #different instances transforms
+            aloc_positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
+            aloc_rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])).to_euler() for i in range(t_size)]
+            aloc_scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
             for obj in objects:
-                #different instances transforms
-                positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
-                rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])).to_euler() for i in range(t_size)]
-                scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
-
-                #basic culling prepass using bounding spheres
-                LSBBoxCenter = get_local_space_bbox_center(obj)
                 culled_indices = set()
-                for u, (pos, rot, scale) in enumerate(zip(positions, rotations, scales)):
-                    instMat = mathutils.Matrix.LocRotScale(pos, rot, scale)
-                    instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(obj, instMat, LSBBoxCenter)
-                    threshold = (instance_bbox_radius + pf_box_bounding_sphere_radius)
-                    if (instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
-                        culled_indices.add(u)
+                #basic culling prepass using bounding spheres
+                if pf_box_bounding_sphere_center is not None:
+                    lsbbox_center = get_local_space_bbox_center(obj)
+                    for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
+                        inst_mat = mathutils.Matrix.LocRotScale(pos, rot, scale)
+                        instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(obj, inst_mat, lsbbox_center)
+                        threshold = (instance_bbox_radius + pf_box_bounding_sphere_radius)
+                        if (instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
+                            culled_indices.add(u)
 
-                positions = [positions[u] for u in range(t_size) if u not in culled_indices]
-                rotations = [rotations[u] for u in range(t_size) if u not in culled_indices]
-                scales = [scales[u] for u in range(t_size) if u not in culled_indices]
+                positions = [aloc_positions[u] for u in range(t_size) if u not in culled_indices]
+                rotations = [aloc_rotations[u] for u in range(t_size) if u not in culled_indices]
+                scales = [aloc_scales[u] for u in range(t_size) if u not in culled_indices]
 
                 #create the "fake" placement mesh
                 mesh = bpy.data.meshes.new(mesh_hash + "_placement")
@@ -2458,27 +2457,51 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
         else:
-            for i in range(0, t_size):
-                mesh_transform = transforms[mesh_hash][i]
+            cur = None
+            aloc_positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
+            aloc_rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])) for i in range(t_size)]
+            aloc_scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
+            o_size = len(objects)
+            positions = []
+            rotations = []
+            scales = []
+            for o_i in range(o_size):
+                obj = objects[o_i]
+                culled_indices = set()
+                #basic culling prepass using bounding spheres
+                if pf_box_bounding_sphere_center is not None:
+                    lsbbox_center = get_local_space_bbox_center(obj)
+                    for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
+                        inst_mat = mathutils.Matrix.LocRotScale(pos, rot, scale)
+                        instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(obj, inst_mat, lsbbox_center)
+                        threshold = (instance_bbox_radius + pf_box_bounding_sphere_radius)
+                        if (instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
+                            culled_indices.add(u)
+
+                positions.append([aloc_positions[u] for u in range(t_size) if u not in culled_indices])
+                rotations.append([aloc_rotations[u] for u in range(t_size) if u not in culled_indices])
+                scales.append([aloc_scales[u] for u in range(t_size) if u not in culled_indices])
+            for i in range(t_size):
                 room_name = room_names[mesh_hash][i]
-                p = mesh_transform["position"]
-                r = mesh_transform["rotate"]
-                s = mesh_transform["scale"]
+                mesh_id = transforms[mesh_hash][i]["id"]
                 log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
                 mesh_i += 1
-                for obj in objects:
-                    if i != 0:
-                        cur = obj.copy()
-                    else:
+                for o_i in range(o_size):
+                    if i >= len(positions[o_i]):
+                        continue
+                    obj = objects[o_i]
+                    if cur is None:
                         cur = obj
                         bpy.context.scene.collection.objects.unlink(obj)
+                    else:
+                        cur = obj.copy()
                     bpy.data.collections.get(room_name).objects.link(cur)
-                    cur.name = mesh_hash + "_" + mesh_transform["id"]
+                    cur.name = mesh_hash + "_" + mesh_id
                     cur.select_set(True)
-                    cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
+                    cur.scale = mathutils.Vector((scales[o_i][i][0], scales[o_i][i][1], scales[o_i][i][2]))
                     cur.rotation_mode = 'QUATERNION'
-                    cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
-                    cur.location = mathutils.Vector((p["x"], p["y"], p["z"]))
+                    cur.rotation_quaternion = (rotations[o_i][i][0], rotations[o_i][i][1], rotations[o_i][i][2], rotations[o_i][i][3])
+                    cur.location = mathutils.Vector((positions[o_i][i][0], positions[o_i][i][1], positions[o_i][i][2]))
                     cur.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
