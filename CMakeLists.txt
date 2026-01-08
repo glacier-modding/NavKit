@@ -1,9 +1,9 @@
-﻿cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.30)
 cmake_policy(SET CMP0141 NEW)
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<CONFIG:Debug>,EditAndContinue,ProgramDatabase>" CACHE STRING "MSVC debug information format")
 project(
         NavKit
-        VERSION 2.6.0
+        VERSION 2.6.1
         DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman: World of Assassination"
         LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
