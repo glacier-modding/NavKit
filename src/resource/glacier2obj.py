@@ -2430,7 +2430,6 @@ def load_primitive_mesh_objects(aloc, aloc_name, collection, context, include_no
                 w = math.sqrt(max(0.0, 1.0 - (x * x + y * y + z * z)))
                 obj.rotation_mode = 'QUATERNION'
                 obj.rotation_quaternion = (w, x, y, z)
-
             cylinder_height = capsule.length - 2 * capsule.radius
             if cylinder_height < 0:
                 cylinder_height = 0
