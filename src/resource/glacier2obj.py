@@ -1,32 +1,17 @@
-import os
-import bpy
-import bmesh
-import ctypes
-import numpy as np
-import json
-import mathutils
-import math
 from timeit import default_timer as timer
+import bmesh
+import bpy
+import ctypes
+import enum
+import json
+import math
+import mathutils
+import numpy as np
+import os
 import struct
-
-from bpy.props import (
-    StringProperty,
-    BoolProperty,
-    BoolVectorProperty,
-    CollectionProperty,
-    PointerProperty,
-    IntProperty,
-    EnumProperty,
-    FloatProperty,
-    FloatVectorProperty,
-    IntVectorProperty,
-)
-
+import sys
 from bpy.types import (
     Context,
-    Panel,
-    Operator,
-    PropertyGroup,
 )
 glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
 
@@ -281,8 +266,6 @@ class BinaryReader:
 
 
 # PRIM
-import enum
-import sys
 
 """
 The RenderPrimitive format:
@@ -296,6 +279,30 @@ RenderPrimitive ↴
                 PrimObject
         ...
 """
+
+
+class PhysicsDataType(enum.IntEnum):
+    NONE = 0
+    CONVEX_MESH = 1
+    TRIANGLE_MESH = 2
+    CONVEX_MESH_AND_TRIANGLE_MESH = 3
+    PRIMITIVE = 4
+    CONVEX_MESH_AND_PRIMITIVE = 5
+    TRIANGLE_MESH_AND_PRIMITIVE = 6
+    UNKNOWN_129 = 129
+    UNKNOWN_130 = 130
+    KINEMATIC_LINKED = 132
+    SHATTER_LINKED = 144
+    KINEMATIC_LINKED_2 = 192
+
+
+class PhysicsCollisionType(enum.IntEnum):
+    NONE = 0
+    STATIC = 1
+    RIGIDBODY = 2
+    SHATTER_LINKED = 16
+    KINEMATIC_LINKED = 32
+    BACKWARD_COMPATIBLE = 2147483647
 
 
 class PrimObjectSubtype(enum.IntEnum):
@@ -1272,59 +1279,22 @@ class RenderPrimitive:
         return num
 
 
-def load_prim_mesh(prim, borg, prim_name: str, mesh_index: int, lod_mask):
+def load_prim_mesh(prim, prim_name: str, mesh_index: int):
     """
     Turn the prim data structure into a Blender mesh.
     Returns the generated Mesh
     """
     mesh = bpy.data.meshes.new(name=(str(prim_name) + "_" + str(mesh_index)))
 
-    use_rig = False
-    if borg is not None:
-        use_rig = True
-
     vert_locs = []
     loop_vidxs = []
-    # loop_uvs = [[]]
-    loop_cols = []
-
-    # num_joint_sets = 0
-
-    # if prim.header.property_flags.isWeightedObject() and use_rig:
-    #     num_joint_sets = 2
 
     sub_mesh = prim.header.object_table[mesh_index].sub_mesh
-    sub_mesh.prim_object.lodmask
-    # vert_joints = [
-    #     [[0] * 4 for _ in range(len(sub_mesh.vertexBuffer.vertices))]
-    #     for _ in range(num_joint_sets)
-    # ]
-    # vert_weights = [
-    #     [[0] * 4 for _ in range(len(sub_mesh.vertexBuffer.vertices))]
-    #     for _ in range(num_joint_sets)
-    # ]
 
     loop_vidxs.extend(sub_mesh.indices)
 
     for i, vert in enumerate(sub_mesh.vertexBuffer.vertices):
         vert_locs.extend([vert.position[0], vert.position[1], vert.position[2]])
-
-        # for j in range(num_joint_sets):
-        #     vert_joints[j][i] = vert.joint[j]
-        #     vert_weights[j][i] = vert.weight[j]
-
-    # for index in sub_mesh.indices:
-    #     vert = sub_mesh.vertexBuffer.vertices[index]
-    #     loop_cols.extend(
-    #         [
-    #             vert.color[0] / 255,
-    #             vert.color[1] / 255,
-    #             vert.color[2] / 255,
-    #             vert.color[3] / 255,
-    #             ]
-    #     )
-    #     for uv_i in range(sub_mesh.num_uvchannels):
-    #         loop_uvs[uv_i].extend([vert.uv[uv_i][0], 1 - vert.uv[uv_i][1]])
 
     mesh.vertices.add(len(vert_locs) // 3)
     mesh.vertices.foreach_set("co", vert_locs)
@@ -1340,44 +1310,11 @@ def load_prim_mesh(prim, borg, prim_name: str, mesh_index: int, lod_mask):
     mesh.polygons.foreach_set("loop_start", loop_starts)
     mesh.polygons.foreach_set("loop_total", loop_totals)
 
-    # for uv_i in range(sub_mesh.num_uvchannels):
-    #     name = "UVMap" if uv_i == 0 else "UVMap.%03d" % uv_i
-    #     layer = mesh.uv_layers.new(name=name)
-    #     layer.data.foreach_set("uv", loop_uvs[uv_i])
-
-    # # Skinning
-    # ob = bpy.data.objects.new("temp_obj", mesh)
-    # if num_joint_sets and use_rig:
-    #     for bone in borg.bone_definitions:
-    #         ob.vertex_groups.new(name=bone.name.decode("utf-8"))
-    #
-    #     vgs = list(ob.vertex_groups)
-    #
-    #     for i in range(num_joint_sets):
-    #         js = vert_joints[i]
-    #         ws = vert_weights[i]
-    #         for vi in range(len(vert_locs) // 3):
-    #             w0, w1, w2, w3 = ws[vi]
-    #             j0, j1, j2, j3 = js[vi]
-    #             if w0 != 0:
-    #                 vgs[j0].add((vi,), w0, "REPLACE")
-    #             if w1 != 0:
-    #                 vgs[j1].add((vi,), w1, "REPLACE")
-    #             if w2 != 0:
-    #                 vgs[j2].add((vi,), w2, "REPLACE")
-    #             if w3 != 0:
-    #                 vgs[j3].add((vi,), w3, "REPLACE")
-    # bpy.data.objects.remove(ob)
-
-    # layer = mesh.vertex_colors.new(name="Col")
-    # mesh.color_attributes[layer.name].data.foreach_set("color", loop_cols)
-
     mesh.validate()
     mesh.update()
 
     # write the additional properties to the blender structure
     prim_mesh_obj = prim.header.object_table[mesh_index].prim_object
-    prim_sub_mesh_obj = prim.header.object_table[mesh_index].sub_mesh.prim_object
 
     lod = prim_mesh_obj.lodmask
     mask = []
@@ -1387,7 +1324,7 @@ def load_prim_mesh(prim, borg, prim_name: str, mesh_index: int, lod_mask):
     return mesh
 
 
-def load_prim(operator, context, filepath, lod_mask):
+def load_prim(filepath, lod_mask):
     """Imports a mesh from the given path"""
 
     prim_name = bpy.path.display_name_from_filepath(filepath)
@@ -1399,8 +1336,6 @@ def load_prim(operator, context, filepath, lod_mask):
     prim = RenderPrimitive()
     prim.read(br)
     br.close()
-
-    borg = None
 
     objects = []
     for mesh_index in range(prim.num_objects()):
@@ -1415,79 +1350,13 @@ def load_prim(operator, context, filepath, lod_mask):
                 break
         if not include_mesh:
             continue
-        mesh = load_prim_mesh(prim, borg, prim_name, mesh_index, lod_mask)
+        mesh = load_prim_mesh(prim, prim_name, mesh_index)
         obj = bpy.data.objects.new(mesh.name, mesh)
         objects.append(obj)
 
     return objects
 
 # ALOC
-class AlocProperties(PropertyGroup):
-    """ "Stored exposed variables relevant to the Physics files"""
-
-    collision_type: BoolVectorProperty(
-        name="collision_type_mask",
-        description="Set which Collision Types should be shown",
-        default=(True, True, True, True, True, True),
-        size=6,
-        subtype="LAYER",
-    )
-
-    aloc_type: EnumProperty(
-        name="Type",
-        description="The type of the aloc",
-        items=[
-            ("PhysicsDataType.NONE", "None", ""),
-            ("PhysicsDataType.CONVEX_MESH", "Convex Mesh", "The header of an Object"),
-            ("PhysicsDataType.TRIANGLE_MESH", "Triangle Mesh", ""),
-            ("PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH", "Convex Mesh and Triangle Mesh", ""),
-            ("PhysicsDataType.PRIMITIVE", "Primitive", ""),
-            ("PhysicsDataType.CONVEX_MESH_AND_PRIMITIVE", "Convex Mesh and Primitive", ""),
-            ("PhysicsDataType.TRIANGLE_MESH_AND_PRIMITIVE", "Triangle Mesh and Primitive", ""),
-            ("PhysicsDataType.KINEMATIC_LINKED", "Kinematic Linked", ""),
-            ("PhysicsDataType.SHATTER_LINKED", "Shatter Linked", ""),
-            ("PhysicsDataType.KINEMATIC_LINKED_2", "Kinematic Linked 2", ""),
-        ],
-        default="PhysicsDataType.NONE",
-    )
-
-    aloc_subtype: EnumProperty(
-        name="Sub-Type",
-        description="The subtype of the aloc",
-        items=[
-            ("PhysicsCollisionPrimitiveType.BOX", "Box", ""),
-            ("PhysicsCollisionPrimitiveType.CAPSULE", "Capsule", ""),
-            ("PhysicsCollisionPrimitiveType.SPHERE", "Sphere", ""),
-            ("PhysicsCollisionPrimitiveType.NONE", "None", ""),
-        ],
-        default="PhysicsCollisionPrimitiveType.NONE",
-    )
-
-
-class PhysicsDataType(enum.IntEnum):
-    NONE = 0
-    CONVEX_MESH = 1
-    TRIANGLE_MESH = 2
-    CONVEX_MESH_AND_TRIANGLE_MESH = 3
-    PRIMITIVE = 4
-    CONVEX_MESH_AND_PRIMITIVE = 5
-    TRIANGLE_MESH_AND_PRIMITIVE = 6
-    UNKNOWN_129 = 129
-    UNKNOWN_130 = 130
-    KINEMATIC_LINKED = 132
-    SHATTER_LINKED = 144
-    KINEMATIC_LINKED_2 = 192
-
-
-class PhysicsCollisionType(enum.IntEnum):
-    NONE = 0
-    STATIC = 1
-    RIGIDBODY = 2
-    SHATTER_LINKED = 16
-    KINEMATIC_LINKED = 32
-    BACKWARD_COMPATIBLE = 2147483647
-
-
 class PhysicsCollisionLayerType(enum.IntEnum):
     COLLIDE_WITH_ALL = 0
     STATIC_COLLIDABLES_ONLY = 1
@@ -1590,7 +1459,44 @@ class PrimitiveSphere:
         self.position = [0.0, 0.0, 0.0]
         self.rotation = [0.0, 0.0, 0.0, 0.0]
 
-        
+
+def collidable_layer(collision_layer):
+    excluded_collision_layer_types = [
+        # PhysicsCollisionLayerType.COLLIDE_WITH_ALL,
+        # PhysicsCollisionLayerType.STATIC_COLLIDABLES_ONLY,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY,
+        # PhysicsCollisionLayerType.STAIRS,
+        # PhysicsCollisionLayerType.SHOT_ONLY_COLLISION,
+        # PhysicsCollisionLayerType.DYNAMIC_TRASH_COLLIDABLES,
+        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY,
+        # PhysicsCollisionLayerType.STATIC_COLLIDABLES_ONLY_TRANSPARENT,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_TRANSPARENT,
+        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY_TRANSPARENT,
+        # PhysicsCollisionLayerType.STAIRS_STEPS,
+        # PhysicsCollisionLayerType.STAIRS_SLOPE,
+        # PhysicsCollisionLayerType.HERO_PROXY,
+        # PhysicsCollisionLayerType.ACTOR_PROXY,
+        # PhysicsCollisionLayerType.HERO_VR,
+        # PhysicsCollisionLayerType.CLIP,
+        # PhysicsCollisionLayerType.ACTOR_RAGDOLL,
+        # PhysicsCollisionLayerType.CROWD_RAGDOLL,
+        # PhysicsCollisionLayerType.LEDGE_ANCHOR,
+        # PhysicsCollisionLayerType.ACTOR_DYN_BODY,
+        # PhysicsCollisionLayerType.HERO_DYN_BODY,
+        # PhysicsCollisionLayerType.ITEMS,
+        # PhysicsCollisionLayerType.WEAPONS,
+        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_ON,
+        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_OFF,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER,
+        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER_TRANSPARENT,
+        # PhysicsCollisionLayerType.COLLIDE_WITH_STATIC_ONLY,
+        # PhysicsCollisionLayerType.AI_VISION_BLOCKER,
+        # PhysicsCollisionLayerType.AI_VISION_BLOCKER_AMBIENT_ONLY,
+        # PhysicsCollisionLayerType.UNUSED_LAST
+    ]
+    return collision_layer not in excluded_collision_layer_types
+
+
 def read_convex_mesh(br, aloc_name):
     # Start of first convex mesh, offset = 27
     # ---- Fixed header for each Convex Mesh sizeof = 80
@@ -2148,98 +2054,30 @@ def convex_hull(bm):
     bmesh.ops.convex_hull(bm, input=bm.verts)
 
 
-def to_mesh(bm, mesh, obj, collection, context):
-    bm.to_mesh(mesh)
-    obj.data = mesh
+def finalize_mesh(bm, obj):
+    bm.to_mesh(obj.data)
     bm.free()
-    collection.objects.link(obj)
-    context.view_layer.objects.active = obj
-    obj.select_set(True)
 
 
-def set_mesh_aloc_properties(mesh, collision_type, data_type, sub_data_type, collision_layer):
-    if bpy.app.version_string[0] == "3":
-        mask = []
-        log("DEBUG", "Setting Mesh ALOC properties. Sub-data type: " + str(sub_data_type), "set_mesh_aloc_properties")
-        for col_type in PhysicsCollisionType:
-            mask.append(collision_type == col_type.value)
-        log("DEBUG", "Setting Collision type", "set_mesh_aloc_properties")
-        mesh.aloc_properties.collision_type = mask
-        log("DEBUG", "Setting Data type", "set_mesh_aloc_properties")
-        mesh.aloc_properties.aloc_type = str(PhysicsDataType(data_type))
-        log("DEBUG", "Setting Sub-data type", "set_mesh_aloc_properties")
-        mesh.aloc_properties.aloc_subtype = str(PhysicsCollisionPrimitiveType(sub_data_type))
-        pcl = PhysicsCollisionLayerType(collision_layer)
-        mesh.aloc_properties.collision_layer = f"{pcl.__class__.__name__}.{pcl.name}"
-        log("DEBUG", "Finished setting Mesh ALOC properties.", "set_mesh_aloc_properties")
-
-
-def create_new_object(aloc_name, collision_type, data_type, collision_layer):
-    log("DEBUG", "Creating new object for ALOC: " + aloc_name + " with collision type: "
+def create_new_object(name, collision_type, data_type):
+    log("DEBUG", "Creating new object for ALOC: " + name + " with collision type: "
         + str(collision_type) + " and data type: " + str(data_type), "create_new_object")
-    mesh = bpy.data.meshes.new(aloc_name)
-    set_mesh_aloc_properties(mesh, collision_type, data_type, PhysicsCollisionPrimitiveType.NONE, collision_layer)
-    obj = bpy.data.objects.new(aloc_name, mesh)
-    log("DEBUG", "Finished Creating new object for ALOC: " + aloc_name, "create_new_object")
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    log("DEBUG", "Finished Creating new object for ALOC: " + name, "create_new_object")
     return obj
 
-
-def link_new_object(aloc_name, context):
-    obj = bpy.context.active_object
-    obj.name = aloc_name
-    mesh = obj.data
-    mesh.name = aloc_name
-    context.view_layer.objects.active = obj
-    obj.select_set(True)
-
-
-def collidable_layer(collision_layer):
-    excluded_collision_layer_types = [
-        # PhysicsCollisionLayerType.COLLIDE_WITH_ALL,
-        # PhysicsCollisionLayerType.STATIC_COLLIDABLES_ONLY,
-        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY,
-        # PhysicsCollisionLayerType.STAIRS,
-        # PhysicsCollisionLayerType.SHOT_ONLY_COLLISION,
-        # PhysicsCollisionLayerType.DYNAMIC_TRASH_COLLIDABLES,
-        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY,
-        # PhysicsCollisionLayerType.STATIC_COLLIDABLES_ONLY_TRANSPARENT,
-        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_TRANSPARENT,
-        # PhysicsCollisionLayerType.KINEMATIC_COLLIDABLES_ONLY_TRANSPARENT,
-        # PhysicsCollisionLayerType.STAIRS_STEPS,
-        # PhysicsCollisionLayerType.STAIRS_SLOPE,
-        # PhysicsCollisionLayerType.HERO_PROXY,
-        # PhysicsCollisionLayerType.ACTOR_PROXY,
-        # PhysicsCollisionLayerType.HERO_VR,
-        # PhysicsCollisionLayerType.CLIP,
-        # PhysicsCollisionLayerType.ACTOR_RAGDOLL,
-        # PhysicsCollisionLayerType.CROWD_RAGDOLL,
-        # PhysicsCollisionLayerType.LEDGE_ANCHOR,
-        # PhysicsCollisionLayerType.ACTOR_DYN_BODY,
-        # PhysicsCollisionLayerType.HERO_DYN_BODY,
-        # PhysicsCollisionLayerType.ITEMS,
-        # PhysicsCollisionLayerType.WEAPONS,
-        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_ON,
-        # PhysicsCollisionLayerType.COLLISION_VOLUME_HITMAN_OFF,
-        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER,
-        # PhysicsCollisionLayerType.DYNAMIC_COLLIDABLES_ONLY_NO_CHARACTER_TRANSPARENT,
-        # PhysicsCollisionLayerType.COLLIDE_WITH_STATIC_ONLY,
-        # PhysicsCollisionLayerType.AI_VISION_BLOCKER,
-        # PhysicsCollisionLayerType.AI_VISION_BLOCKER_AMBIENT_ONLY,
-        # PhysicsCollisionLayerType.UNUSED_LAST
-    ]
-    return collision_layer not in excluded_collision_layer_types
-
-def load_triangle_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers):
-    objects = []
+def load_triangle_mesh_objects(aloc, aloc_name, bm):
     for mesh_index in range(aloc.triangle_mesh_count):
-        bm = bmesh.new()
         m = aloc.triangle_meshes[mesh_index]
-        obj = create_new_object("TriangleMeshCollider", aloc.collision_type, aloc.data_type, m.collision_layer)
         bmv = []
-        if include_non_collidable_layers or collidable_layer(m.collision_layer):
+        if collidable_layer(m.collision_layer):
+            log("DEBUG", "Adding vertices to TriangleMesh", "load_aloc")
             for v in m.vertices:
                 bmv.append(bm.verts.new(v))
             d = m.triangle_data
+            log("DEBUG", "Adding faces to TriangleMesh", "load_aloc")
             for i in range(0, len(d), 3):
                 face = (bmv[d[i]], bmv[d[i + 1]], bmv[d[i + 2]])
                 try:
@@ -2249,57 +2087,48 @@ def load_triangle_mesh_objects(aloc, aloc_name, collection, context, include_non
         else:
             log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(m.collision_layer), "load_aloc")
-        mesh = obj.data
-        to_mesh(bm, mesh, obj, collection, context)
-        objects.append(obj)
-    return objects
 
 
-def load_convex_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers):
-    objects = []
+def load_convex_mesh_objects(aloc, aloc_name, bm):
     for mesh_index in range(aloc.convex_mesh_count):
         log("DEBUG", " " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count),
             "load_aloc")
-        bm = bmesh.new()
         m = aloc.convex_meshes[mesh_index]
-        obj = create_new_object("ConvexMeshCollider", aloc.collision_type, aloc.data_type, m.collision_layer)
-        if include_non_collidable_layers or collidable_layer(m.collision_layer):
+        if collidable_layer(m.collision_layer):
+            input_verts = []
             for v in m.vertices:
-                bm.verts.new(v)
+                input_verts.append(bm.verts.new(v))
+
+            res = bmesh.ops.convex_hull(bm, input=input_verts)
+            if 'geom_unused' in res:
+                bmesh.ops.delete(bm, geom=res['geom_unused'], context='VERTS')
         else:
             log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(m.collision_layer), "load_aloc")
-        mesh = obj.data
-        bm.from_mesh(mesh)
-        convex_hull(bm)
-        to_mesh(bm, mesh, obj, collection, context)
-        objects.append(obj)
-    return objects
 
 
-def load_primitive_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers):
-    objects = []
+def load_primitive_mesh_objects(aloc, aloc_name, bm):
     log("DEBUG", "Primitive Type", "load_aloc")
     log("DEBUG", "Primitive count: " + str(aloc.primitive_count), "load_aloc")
     log("DEBUG", "Primitive Box count: " + str(aloc.primitive_boxes_count), "load_aloc")
     log("DEBUG", "Primitive Spheres count: " + str(aloc.primitive_spheres_count), "load_aloc")
     log("DEBUG", "Primitive Capsules count: " + str(aloc.primitive_capsules_count), "load_aloc")
     for mesh_index, box in enumerate(aloc.primitive_boxes):
-        if include_non_collidable_layers or collidable_layer(box.collision_layer):
+        if collidable_layer(box.collision_layer):
             log("DEBUG", "Primitive Box", "load_aloc")
-            obj = create_new_object("BoxCollider", aloc.collision_type, aloc.data_type, box.collision_layer)
-            obj.location = (box.position[0], box.position[1], box.position[2])
+
+            loc = mathutils.Vector((box.position[0], box.position[1], box.position[2]))
             if len(box.rotation) == 4:
-                obj.rotation_mode = 'QUATERNION'
-                obj.rotation_quaternion = (box.rotation[3], box.rotation[0], box.rotation[1], box.rotation[2])
+                rot = mathutils.Quaternion((box.rotation[3], box.rotation[0], box.rotation[1], box.rotation[2]))
             else:
                 x = box.rotation[0]
                 y = box.rotation[1]
                 z = box.rotation[2]
                 w = math.sqrt(max(0.0, 1.0 - (x * x + y * y + z * z)))
-                obj.rotation_mode = 'QUATERNION'
-                obj.rotation_quaternion = (w, x, y, z)
-            bm = bmesh.new()
+                rot = mathutils.Quaternion((w, x, y, z))
+
+            mat = mathutils.Matrix.LocRotScale(loc, rot, None)
+
             bmv = []
             sx = box.half_extents[0]
             sy = box.half_extents[1]
@@ -2315,137 +2144,101 @@ def load_primitive_mesh_objects(aloc, aloc_name, collection, context, include_no
                 [-sx, sy, sz]
             ]
             for v in vertices:
-                bmv.append(bm.verts.new(v))
+                bmv.append(bm.verts.new(mat @ mathutils.Vector(v)))
             bm.faces.new((bmv[0], bmv[1], bmv[2], bmv[3]))  # bottom
             bm.faces.new((bmv[4], bmv[5], bmv[6], bmv[7]))  # top
             bm.faces.new((bmv[0], bmv[1], bmv[5], bmv[4]))  # right
             bm.faces.new((bmv[2], bmv[3], bmv[7], bmv[6]))
             bm.faces.new((bmv[0], bmv[3], bmv[7], bmv[4]))
             bm.faces.new((bmv[1], bmv[2], bmv[6], bmv[5]))
-            mesh = obj.data
-            to_mesh(bm, mesh, obj, collection, context)
-            objects.append(obj)
         else:
             log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(box.collision_layer), "load_aloc")
     for mesh_index, sphere in enumerate(aloc.primitive_spheres):
-        if include_non_collidable_layers or collidable_layer(sphere.collision_layer):
+        if collidable_layer(sphere.collision_layer):
             log("DEBUG", "Primitive Sphere", "load_aloc")
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=sphere.radius,
-                location=(sphere.position[0], sphere.position[1], sphere.position[2]),
-                rotation=(sphere.rotation[0], sphere.rotation[1], sphere.rotation[2]),
-            )
-            link_new_object("SphereCollider", context)
-            obj = bpy.context.active_object
-            set_mesh_aloc_properties(obj.data, aloc.collision_type, aloc.data_type,
-                                     PhysicsCollisionPrimitiveType.SPHERE, sphere.collision_layer)
-            objects.append(obj)
-            if obj.users_collection:
-                for coll in obj.users_collection:
-                    coll.objects.unlink(obj)
-            collection.objects.link(obj)
+
+            loc = mathutils.Vector((sphere.position[0], sphere.position[1], sphere.position[2]))
+            rot = mathutils.Euler((sphere.rotation[0], sphere.rotation[1], sphere.rotation[2])).to_quaternion()
+            mat = mathutils.Matrix.LocRotScale(loc, rot, None)
+
+            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=sphere.radius, matrix=mat)
         else:
             log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(sphere.collision_layer), "load_aloc")
     for mesh_index, capsule in enumerate(aloc.primitive_capsules):
-        if include_non_collidable_layers or collidable_layer(capsule.collision_layer):
+        if collidable_layer(capsule.collision_layer):
             log("DEBUG", "Primitive Capsule", "load_aloc")
-            bpy.ops.object.select_all(action='DESELECT')
-            cylinder_height = capsule.length - 2 * capsule.radius
-            if cylinder_height < 0:
-                cylinder_height = 0
-            z_offset = cylinder_height / 2
 
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=capsule.radius,
-                location=(0, 0, z_offset),
-            )
-            top = bpy.context.active_object
-            bpy.ops.mesh.primitive_cylinder_add(
-                radius=capsule.radius,
-                depth=cylinder_height,
-                end_fill_type='NOTHING',
-                location=(0, 0, 0),
-            )
-            cylinder = bpy.context.active_object
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=capsule.radius,
-                location=(0, 0, -z_offset),
-            )
-            bot = bpy.context.active_object
-            top.select_set(True)
-            cylinder.select_set(True)
-            bot.select_set(True)
-            context.view_layer.objects.active = cylinder
-            bpy.ops.object.join()
-            obj = bpy.context.active_object
-            obj.name = "CapsuleCollider"
-            obj.location = (capsule.position[0], capsule.position[1], capsule.position[2])
+            loc = mathutils.Vector((capsule.position[0], capsule.position[1], capsule.position[2]))
             if len(capsule.rotation) == 4:
-                obj.rotation_mode = 'QUATERNION'
-                obj.rotation_quaternion = (capsule.rotation[3], capsule.rotation[0], capsule.rotation[1], capsule.rotation[2])
+                rot = mathutils.Quaternion((capsule.rotation[3], capsule.rotation[0], capsule.rotation[1], capsule.rotation[2]))
             else:
                 x = capsule.rotation[0]
                 y = capsule.rotation[1]
                 z = capsule.rotation[2]
                 w = math.sqrt(max(0.0, 1.0 - (x * x + y * y + z * z)))
-                obj.rotation_mode = 'QUATERNION'
-                obj.rotation_quaternion = (w, x, y, z)
-            set_mesh_aloc_properties(obj.data, aloc.collision_type, aloc.data_type,
-                                     PhysicsCollisionPrimitiveType.CAPSULE, capsule.collision_layer)
-            objects.append(obj)
-            if obj.users_collection:
-                for coll in obj.users_collection:
-                    coll.objects.unlink(obj)
-            collection.objects.link(obj)
+                rot = mathutils.Quaternion((w, x, y, z))
+
+            mat = mathutils.Matrix.LocRotScale(loc, rot, None)
+
+            cylinder_height = capsule.length - 2 * capsule.radius
+            if cylinder_height < 0:
+                cylinder_height = 0
+            z_offset = cylinder_height / 2
+
+            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius, matrix=mat @ mathutils.Matrix.Translation((0, 0, z_offset)))
+            bmesh.ops.create_cone(bm, cap_ends=False, cap_tris=False, segments=32, radius1=capsule.radius, radius2=capsule.radius, depth=cylinder_height, matrix=mat)
+            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius, matrix=mat @ mathutils.Matrix.Translation((0, 0, -z_offset)))
         else:
             log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(capsule.collision_layer), "load_aloc")
-    return objects
 
 
-def load_aloc(operator, context, filepath, include_non_collidable_layers):
+def load_aloc(filepath):
     """Imports an ALOC mesh from the given path"""
 
     aloc_name = bpy.path.display_name_from_filepath(filepath)
     aloc = read_aloc(filepath)
     if aloc == -1:
         log("ERROR", "Failed to read Mesh ALOC file " + filepath, "load_aloc")
-        return -1
-
+        return -1, []
+    if aloc.collision_type == PhysicsCollisionType.RIGIDBODY:
+        return aloc, []
 
     log("DEBUG", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
-    collection = context.scene.collection
-    objects = []
+    aloc_obj = create_new_object(aloc_name + "_original_" + str(aloc.collision_type) + "_" + str(aloc.data_type), aloc.collision_type, aloc.data_type)
+    bm = bmesh.new()
+
     if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
         log("DEBUG", "Converting Convex Mesh and Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
-        objects += load_convex_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
-        objects += load_triangle_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
+        load_convex_mesh_objects(aloc, aloc_name, bm)
+        load_triangle_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.CONVEX_MESH:
         log("DEBUG", "Converting Convex Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
-        objects += load_convex_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
+        load_convex_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.TRIANGLE_MESH:
         log("DEBUG", "Converting Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
-        objects += load_triangle_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
+        load_triangle_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.PRIMITIVE:
         log("DEBUG", "Converting Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
-        objects += load_primitive_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
+        load_primitive_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_PRIMITIVE:
         log("DEBUG", "Converting Convex Mesh and Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
-        objects += load_convex_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
-        objects += load_primitive_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
+        load_convex_mesh_objects(aloc, aloc_name, bm)
+        load_primitive_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.TRIANGLE_MESH_AND_PRIMITIVE:
         log("DEBUG", "Converting Vertex Mesh and Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
-        objects += load_triangle_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
-        objects += load_primitive_mesh_objects(aloc, aloc_name, collection, context, include_non_collidable_layers)
+        load_triangle_mesh_objects(aloc, aloc_name, bm)
+        load_primitive_mesh_objects(aloc, aloc_name, bm)
     else:
         log("ERROR", "Unknown data type: " + str(aloc.data_type) + " for Mesh ALOC " + aloc_name, "load_aloc")
-        return -1
+        return -1, []
 
+    finalize_mesh(bm, aloc_obj)
     log("DEBUG", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
-    return aloc.collision_type, objects
+    return aloc, [aloc_obj]
 
 
 def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type):
@@ -2459,9 +2252,9 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
     room_names = {}
     room_color_index = 0
     room_folder_color_index = 0
+    geo_node_name = "HitmanMapNode"
     if build_type == "instance":
         #link the geonode
-        geo_node_name = "HitmanMapNode"
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         print(filepath)
         with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
@@ -2549,21 +2342,14 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
         collision_type = None
         try:
             if mesh_type == "ALOC":
-                aloc_result = load_aloc(
-                    None, context, aloc_or_prim_path, False
-                )
-                if aloc_result == -1:
+                aloc, objects = load_aloc(aloc_or_prim_path)
+                if aloc == -1:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(mesh_hash) + " ================", "load_scenario")
                     error_alocs.append(mesh_hash)
                     continue
-                else:
-                    collision_type, objects = aloc_result
-                    if collision_type == -1 and objects == -1:
-                        log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(mesh_hash) + " ================", "load_scenario")
-                        error_alocs.append(mesh_hash)
-                        continue
+                collision_type = aloc.collision_type
             else:
-                objects = load_prim(None, context, aloc_or_prim_path, lod_mask)
+                objects = load_prim(aloc_or_prim_path, lod_mask)
         except struct.error as err:
             error_alocs.append("Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err))
             log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err) + " ================", "load_scenario")
@@ -2631,9 +2417,10 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
                         cur = obj.copy()
                     else:
                         cur = obj
+                        bpy.context.scene.collection.objects.unlink(obj)
                     bpy.data.collections.get(room_name).objects.link(cur)
+                    cur.name = mesh_hash + "_" + mesh_transform["id"]
                     cur.select_set(True)
-                    cur.name = mesh_hash + " " + mesh_transform["id"]
                     cur.scale = mathutils.Vector((s["x"], s["y"], s["z"]))
                     cur.rotation_mode = 'QUATERNION'
                     cur.rotation_quaternion = (r["w"], r["x"], r["y"], r["z"])
@@ -2707,11 +2494,4 @@ def save_blend_file(output_path):
 
 
 if __name__ == "__main__":
-    classes = [
-        AlocProperties,
-    ]
-    for c in classes:
-        bpy.utils.register_class(c)
-    if bpy.app.version_string[0] == "3":
-        bpy.types.Mesh.aloc_properties = PointerProperty(type=AlocProperties)
     main()
