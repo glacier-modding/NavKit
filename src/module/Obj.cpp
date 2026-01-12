@@ -35,6 +35,7 @@ Obj::Obj() : loadObjName("Load Obj"),
              blenderObjGenerationDone(false),
              blendFileOnlyBuild(false),
              blendFileAndObjBuild(false),
+             filterToIncludeBox(true),
              glacier2ObjDebugLogsEnabled(false),
              errorBuilding(false),
              skipExtractingAlocsOrPrims(false),
@@ -44,7 +45,8 @@ Obj::Obj() : loadObjName("Load Obj"),
              doObjHitTest(false),
              meshTypeForBuild(ALOC),
              sceneMeshBuildType(COPY),
-             primLods{true, true, true, true, true, true, true, true} {
+             primLods{true, true, true, true, true, true, true, true},
+             blendFileBuilt(false) {
 }
 
 void Obj::updateObjDialogControls(HWND hDlg) {
@@ -63,6 +65,7 @@ void Obj::updateObjDialogControls(HWND hDlg) {
                      obj.sceneMeshBuildType == COPY ? IDC_RADIO_BUILD_TYPE_COPY : IDC_RADIO_BUILD_TYPE_INSTANCE);
 
     CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX, obj.filterToIncludeBox ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS, obj.glacier2ObjDebugLogsEnabled ? BST_CHECKED : BST_UNCHECKED);
 }
 
@@ -71,7 +74,7 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
     switch (message) {
         case WM_INITDIALOG: {
             updateObjDialogControls(hDlg);
-            return (INT_PTR) TRUE;
+            return TRUE;
         }
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
@@ -82,7 +85,7 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
                     Logger::log(NK_INFO, "Mesh type for build set to %s.",
                                 obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
                     updateObjDialogControls(hDlg);
-                    return (INT_PTR) TRUE;
+                    return TRUE;
                 }
                 case IDC_RADIO_BUILD_TYPE_COPY:
                 case IDC_RADIO_BUILD_TYPE_INSTANCE: {
@@ -91,23 +94,33 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
                         Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
                                     obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
                         updateObjDialogControls(hDlg);
-                        return (INT_PTR) TRUE;
+                        return TRUE;
                 }
 
-                case IDC_CHECK_SKIP_RPKG_EXTRACT:
+                case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
+                        obj.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
+                        obj.saveObjSettings();
+                        Logger::log(NK_INFO, "Filter to include box set to %s.", obj.filterToIncludeBox ? "true" : "false");
+                        updateObjDialogControls(hDlg);
+                        return TRUE;
+                    }
+
+                case IDC_CHECK_SKIP_RPKG_EXTRACT: {
                         obj.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
                         obj.saveObjSettings();
                         Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.", obj.skipExtractingAlocsOrPrims ? "true" : "false");
                         updateObjDialogControls(hDlg);
+                        return TRUE;
+                    }
+                case IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS: {
+                        obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS) ? COPY : INSTANCE;
+                        obj.saveObjSettings();
+                        Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.", obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
+                        updateObjDialogControls(hDlg);
                         return (INT_PTR) TRUE;
-                case IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS:
-                    obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS) ? COPY : INSTANCE;
-                    obj.saveObjSettings();
-                    Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.", obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
-                    updateObjDialogControls(hDlg);
-                    return (INT_PTR) TRUE;
+                    }
 
-                case IDC_BUTTON_RESET_DEFAULTS:
+                case IDC_BUTTON_RESET_DEFAULTS: {
                     obj.resetDefaults();
                     updateObjDialogControls(hDlg);
                     Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
@@ -116,11 +129,11 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
                     Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
                                 obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
                     obj.saveObjSettings();
-
                     break;
+                    }
                 case WM_CLOSE:
                     DestroyWindow(hDlg);
-                    return (INT_PTR) TRUE;
+                    return TRUE;
 
                 default:
                     if (LOWORD(wParam) >= IDC_CHECK_PRIM_LOD_1 && LOWORD(wParam) <= IDC_CHECK_PRIM_LOD_8) {
@@ -229,6 +242,13 @@ void Obj::buildObjFromScene() {
         command += " instance ";
     }
 
+    if (filterToIncludeBox) {
+        command += " true";
+    } else
+    {
+        command += " false";
+    }
+
     if (glacier2ObjDebugLogsEnabled) {
         command += " true";
     }
@@ -242,6 +262,9 @@ void Obj::buildObjFromScene() {
             buildOutputFileType] {
             Logger::log(NK_INFO, "Finished generating %s from nav.json file.", buildOutputFileType.c_str());
             blenderObjGenerationDone = true;
+            if (blendFileAndObjBuild || blendFileOnlyBuild) {
+                blendFileBuilt = true;
+            }
         }, [this] {
             errorBuilding = true;
         });
@@ -361,23 +384,23 @@ void Obj::finalizeObjBuild() {
     Menu::updateMenuState();
 }
 
-void Obj::copyObjFile(const std::string &from, const std::string &to) {
+void Obj::copyFile(const std::string &from, const std::string &to, const std::string& filetype) {
     if (from == to) {
-        Logger::log(NK_ERROR, "Cannot overwrite current obj file: %s", from.c_str());
+        Logger::log(NK_ERROR, "Cannot overwrite current %s file: %s", filetype.c_str(), from.c_str());
         return;
     }
 
     const auto start = std::chrono::high_resolution_clock::now();
-    Logger::log(NK_INFO, "Copying OBJ from '%s' to '%s'...", from.c_str(), to.c_str());
+    Logger::log(NK_INFO, "Copying %s from '%s' to '%s'...", filetype.c_str(), from.c_str(), to.c_str());
 
     try {
         std::filesystem::copy(from, to, std::filesystem::copy_options::overwrite_existing);
 
         const auto end = std::chrono::high_resolution_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        Logger::log(NK_INFO, "Finished saving Obj in %lld ms.", duration.count());
+        Logger::log(NK_INFO, "Finished saving %s in %lld ms.", filetype.c_str(), duration.count());
     } catch (const std::filesystem::filesystem_error &e) {
-        Logger::log(NK_ERROR, "Error copying file: %s", e.what());
+        Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
     }
 }
 
@@ -386,7 +409,15 @@ void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
     std::string msg = "Saving Obj to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    backgroundWorker.emplace(&Obj::copyObjFile, objToCopy, newFileName);
+    backgroundWorker.emplace(&Obj::copyFile, objToCopy, newFileName, "Obj");
+}
+
+void Obj::saveBlendMesh(std::string objToCopy, std::string newFileName) {
+    const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::string msg = "Saving Blend to file at ";
+    msg += std::ctime(&start_time);
+    Logger::log(NK_INFO, msg.data());
+    backgroundWorker.emplace(&Obj::copyFile, objToCopy, newFileName, "Blend");
 }
 
 void Obj::loadObjMesh() {
@@ -399,18 +430,23 @@ void Obj::loadObjMesh() {
         recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0) {
         if (objLoadDone.empty()) {
             objLoadDone.push_back(true);
-            Scene &scene = Scene::getInstance();
-            const float pos[3] = {
-                scene.bBoxPos[0],
-                scene.bBoxPos[1],
-                scene.bBoxPos[2]
-            };
-            const float size[3] = {
-                scene.bBoxScale[0],
-                scene.bBoxScale[1],
-                scene.bBoxScale[2]
-            };
-            scene.setBBox(pos, size);
+            // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the obj.
+            // But it's pretty rare for there to not be an include box in the scene, so don't want to override
+            // a bbox that has been manually set.
+            // if (scene.includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
+                // Scene &scene = Scene::getInstance();
+                // const float pos[3] = {
+                //     scene.bBoxPos[0],
+                //     scene.bBoxPos[1],
+                //     scene.bBoxPos[2]
+                // };
+                // const float size[3] = {
+                //     scene.bBoxScale[0],
+                //     scene.bBoxScale[1],
+                //     scene.bBoxScale[2]
+                // };
+            //     scene.setBBox(pos, size);
+            // }
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
             msg = "Finished loading Obj in ";
@@ -433,14 +469,18 @@ void Obj::renderObj() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
-char *Obj::openLoadObjFileDialog(const char *lastObjFolder) {
+char *Obj::openLoadObjFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-
-char *Obj::openSaveObjFileDialog(char *lastObjFolder) {
+char *Obj::openSaveObjFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
+    return FileUtil::openNfdSaveDialog(filters, 1, "output");
+}
+
+char *Obj::openSaveBlendFileDialog() {
+    nfdu8filteritem_t filters[1] = {{"Blend files", "blend"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
@@ -458,7 +498,7 @@ void Obj::setLastSaveFileName(const char *fileName) {
 }
 
 void Obj::handleOpenObjClicked() {
-    if (const char *fileName = openLoadObjFileDialog(loadObjName.data())) {
+    if (const char *fileName = openLoadObjFileDialog()) {
         setLastLoadFileName(fileName);
         objLoaded = false;
         objToLoad = fileName;
@@ -468,11 +508,20 @@ void Obj::handleOpenObjClicked() {
 }
 
 void Obj::handleSaveObjClicked() {
-    if (const char *fileName = openSaveObjFileDialog(loadObjName.data())) {
+    if (const char *fileName = openSaveObjFileDialog()) {
         loadObjName = fileName;
         setLastSaveFileName(fileName);
         saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
         saveObjName = loadObjName;
+    }
+}
+
+void Obj::handleSaveBlendClicked() {
+    if (const char *fileName = openSaveBlendFileDialog()) {
+        const std::string fileNameStr = fileName;
+        const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+        const std::string blendOutputFileName = navKitSettings.outputFolder + "\\output.blend";
+        saveBlendMesh(blendOutputFileName, fileNameStr);
     }
 }
 
@@ -492,6 +541,10 @@ bool Obj::canBuildObjFromScene() const {
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingAlocsOrPrims && navKitSettings.blenderSet
            &&
            scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone;
+}
+
+bool Obj::canSaveBlend() const {
+    return blendFileBuilt;
 }
 
 bool Obj::canBuildBlendFromScene() const {
@@ -573,6 +626,7 @@ void Obj::loadSettings() {
     }
     sceneMeshBuildType = strcmp(persistedSettings.getValue("Obj", "sceneMeshBuildType", "COPY"), "COPY") == 0 ? COPY : INSTANCE;
     skipExtractingAlocsOrPrims = strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"), "true") == 0;
+    filterToIncludeBox = strcmp(persistedSettings.getValue("Obj", "filterToIncludeBox", "true"), "true") == 0;
     glacier2ObjDebugLogsEnabled = strcmp(persistedSettings.getValue("Obj", "glacier2ObjDebugLogsEnabled", "false"), "true") == 0;
 }
 
@@ -591,6 +645,9 @@ void Obj::saveObjSettings() const {
     const char *skipRpkgExtract = skipExtractingAlocsOrPrims ? "true" : "false";
     persistedSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
 
+    const char *filterEnabled = filterToIncludeBox ? "true" : "false";
+    persistedSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
+
     const char *debugEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
     persistedSettings.setValue("Obj", "glacier2ObjDebugLogsEnabled", debugEnabled);
 
@@ -604,6 +661,7 @@ void Obj::resetDefaults() {
     }
     sceneMeshBuildType = COPY;
     skipExtractingAlocsOrPrims = false;
+    filterToIncludeBox = true;
     glacier2ObjDebugLogsEnabled = false;
 }
 

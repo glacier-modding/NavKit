@@ -15,6 +15,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Save &Scene",                              IDM_FILE_SAVE_SCENE
         MENUITEM "Save &Obj",                                IDM_FILE_SAVE_OBJ
+        MENUITEM "Save &Blend",                              IDM_FILE_SAVE_BLEND
         MENUITEM "Save &Navp",                               IDM_FILE_SAVE_NAVP
         MENUITEM "Save &Airg",                               IDM_FILE_SAVE_AIRG
         MENUITEM SEPARATOR
@@ -64,20 +65,19 @@ BEGIN
     BEGIN
         MENUITEM "Extract &Scene from game",                 IDM_EXTRACT_SCENE
         MENUITEM "Extract Scene from game and build &Obj",   IDM_EXTRACT_SCENE_AND_BUILD_OBJ
-        MENUITEM "Extract Scene from game and build &all",   IDM_EXTRACT_SCENE_AND_BUILD_ALL
+        MENUITEM "Extract Scene, build &navp and airg",      IDM_EXTRACT_SCENE_AND_BUILD_ALL
     END
 
     POPUP "&Build"
     BEGIN
         MENUITEM "Build Obj from &Scene",                    IDM_BUILD_OBJ_FROM_SCENE
         MENUITEM "Build Obj from &Navp",                     IDM_BUILD_OBJ_FROM_NAVP
+        MENUITEM "Build Obj and Blend from &Scene"           IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE
+        MENUITEM "Build Blend from &Scene"                   IDM_BUILD_BLEND_FROM_SCENE
         MENUITEM SEPARATOR
         MENUITEM "Build &Navp from Obj and Scene",           IDM_BUILD_NAVP
         MENUITEM SEPARATOR
         MENUITEM "Build &Airg from Navp",                    IDM_BUILD_AIRG
-        MENUITEM SEPARATOR
-        MENUITEM "Build Blend from &Scene"                   IDM_BUILD_BLEND_FROM_SCENE
-        MENUITEM "Build Blend and Obj from &Scene"           IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE
     END
 
     POPUP "&Help"
@@ -252,7 +252,7 @@ BEGIN
     PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,188,490,65,14
 END
 
-IDD_OBJ_SETTINGS DIALOGEX 0, 0, 260, 285
+IDD_OBJ_SETTINGS DIALOGEX 0, 0, 260, 325
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Scene Mesh Settings"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -278,8 +278,11 @@ BEGIN
     GROUPBOX        "Skip Aloc / Prim Extraction from RPKG files",IDC_STATIC,7,180,246,35
     AUTOCHECKBOX    "Skip Extraction",IDC_CHECK_SKIP_RPKG_EXTRACT,14,195,80,10
 
-    GROUPBOX        "Show Blender Debug logs",IDC_STATIC,7,225,246,35
-    AUTOCHECKBOX    "Show Debug Logs",IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS,14,240,80,10
+    GROUPBOX        "Filter meshes to include box",IDC_STATIC,7,225,246,35
+    AUTOCHECKBOX    "Filter meshes",IDC_CHECK_FILTER_TO_INCLUDE_BOX,14,240,80,10
 
-    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,188,265,65,14
+    GROUPBOX        "Show Blender Debug logs",IDC_STATIC,7,265,246,35
+    AUTOCHECKBOX    "Show Debug Logs",IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS,14,280,80,10
+
+    PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,188,305,65,14
 END

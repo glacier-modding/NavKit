@@ -96,6 +96,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
     setMenuItemEnabled(IDM_FILE_SAVE_OBJ, isObjLoaded);
+    setMenuItemEnabled(IDM_FILE_SAVE_BLEND, obj.canSaveBlend());
 
     setMenuItemEnabled(IDM_EDIT_NAVP_STAIRS, isAreaSelected);
     setMenuItemEnabled(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.canEnterConnectWaypointMode());
@@ -161,6 +162,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                 case IDM_FILE_SAVE_OBJ:
                     Obj::getInstance().handleSaveObjClicked();
                     Logger::log(NK_DEBUG, "File -> Save Obj clicked");
+                    break;
+                case IDM_FILE_SAVE_BLEND:
+                    Obj::getInstance().handleSaveBlendClicked();
+                    Logger::log(NK_DEBUG, "File -> Save Blend clicked");
                     break;
                 case IDM_FILE_SAVE_NAVP:
                     Navp::getInstance().handleSaveNavpClicked();

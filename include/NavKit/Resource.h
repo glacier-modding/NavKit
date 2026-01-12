@@ -9,8 +9,9 @@
 #define IDM_FILE_OPEN_AIRG                      1003
 #define IDM_FILE_SAVE_SCENE                     1010
 #define IDM_FILE_SAVE_OBJ                       1011
-#define IDM_FILE_SAVE_NAVP                      1012
-#define IDM_FILE_SAVE_AIRG                      1013
+#define IDM_FILE_SAVE_BLEND                     1012
+#define IDM_FILE_SAVE_NAVP                      1013
+#define IDM_FILE_SAVE_AIRG                      1014
 #define IDM_FILE_EXIT                           1020
 #define IDM_EDIT_NAVP_STAIRS                    1100
 #define IDM_EDIT_AIRG_CONNECT_WAYPOINT          1101
@@ -143,5 +144,6 @@
 #define IDC_CHECK_PRIM_LOD_8                    30410
 #define IDC_RADIO_BUILD_TYPE_COPY               30411
 #define IDC_RADIO_BUILD_TYPE_INSTANCE           30412
-#define IDC_CHECK_SKIP_RPKG_EXTRACT             30413
-#define IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS       30414
+#define IDC_CHECK_FILTER_TO_INCLUDE_BOX         30413
+#define IDC_CHECK_SKIP_RPKG_EXTRACT             30414
+#define IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS       30415

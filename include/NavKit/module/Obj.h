@@ -44,6 +44,7 @@ public:
     bool blenderObjGenerationDone;
     bool blendFileOnlyBuild;
     bool blendFileAndObjBuild;
+    bool filterToIncludeBox;
     bool glacier2ObjDebugLogsEnabled;
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
@@ -55,6 +56,7 @@ public:
     MeshType meshTypeForBuild;
     SceneMeshBuildType sceneMeshBuildType;
     bool primLods[8];
+    bool blendFileBuilt;
     static HWND hObjDialog;
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
@@ -65,9 +67,11 @@ public:
 
     void handleBuildBlendAndObjFromSceneClicked();
 
-    static void copyObjFile(const std::string &from, const std::string &to);
+    static void copyFile(const std::string &from, const std::string &to, const std::string& filetype);
 
     void saveObjMesh(char *objToCopy, char *newFileName);
+
+    void saveBlendMesh(std::string objToCopy, std::string newFileName);
 
     void buildObjFromNavp(bool alsoLoadIntoUi);
 
@@ -77,9 +81,11 @@ public:
 
     static void renderObj();
 
-    static char *openLoadObjFileDialog(const char *lastObjFolder);
+    static char *openLoadObjFileDialog();
 
-    static char *openSaveObjFileDialog(char *lastObjFolder);
+    static char *openSaveObjFileDialog();
+
+    static char* openSaveBlendFileDialog();
 
     void setLastLoadFileName(const char *fileName);
 
@@ -88,12 +94,14 @@ public:
     void handleOpenObjClicked();
 
     void handleSaveObjClicked();
+    void handleSaveBlendClicked();
 
     [[nodiscard]] bool canLoad() const;
 
     static bool canBuildObjFromNavp();
 
     [[nodiscard]] bool canBuildObjFromScene() const;
+    bool canSaveBlend() const;
 
     [[nodiscard]] bool canBuildBlendFromScene() const;
 

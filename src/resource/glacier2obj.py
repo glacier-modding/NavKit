@@ -2253,7 +2253,7 @@ def get_bounding_sphere_data(obj, ws_mat, lsbbox_center = None):
     return wsbbox_center, radius.length
 
 
-def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type):
+def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -2264,14 +2264,14 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
     room_names = {}
     room_color_index = 0
     room_folder_color_index = 0
-    geo_node_name = "HitmanMapNode"
 
     #Get the "pathfinding include" box
     pf_include_box_info = None
     pf_box_bounding_sphere_center = None
     pf_box_bounding_sphere_radius = None
+    sapienza_include_box_id = "48b22d0153942122"
     for pf_box in data['pfBoxes']:
-        if pf_box["type"]["data"] == "PFBT_INCLUDE_MESH_COLLISION":
+        if pf_box["type"]["data"] == "PFBT_INCLUDE_MESH_COLLISION" or pf_box["id"] == sapienza_include_box_id:
             coords = ["w","x","y","z"]
             pf_include_box_info = [
                 mathutils.Vector([pf_box["position"][coord] for coord in coords[1:]]),
@@ -2279,7 +2279,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
                 mathutils.Vector([pf_box["scale"]["data"][coord] for coord in coords[1:]]),
             ]
             break
-    if pf_include_box_info is not None:
+    if filter_to_include_box and pf_include_box_info is not None:
         bpy.ops.mesh.primitive_cube_add(size=1)
         box = bpy.context.active_object
         box.location = pf_include_box_info[0]
@@ -2421,7 +2421,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
             for obj in objects:
                 culled_indices = set()
                 #basic culling prepass using bounding spheres
-                if pf_box_bounding_sphere_center is not None:
+                if filter_to_include_box and pf_box_bounding_sphere_center is not None:
                     lsbbox_center = get_local_space_bbox_center(obj)
                     for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
                         inst_mat = mathutils.Matrix.LocRotScale(pos, rot, scale)
@@ -2469,7 +2469,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
                 obj = objects[o_i]
                 culled_indices = set()
                 #basic culling prepass using bounding spheres
-                if pf_box_bounding_sphere_center is not None:
+                if filter_to_include_box and pf_box_bounding_sphere_center is not None:
                     lsbbox_center = get_local_space_bbox_center(obj)
                     for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
                         inst_mat = mathutils.Matrix.LocRotScale(pos, rot, scale)
@@ -2520,7 +2520,7 @@ def load_scenario(context, path_to_nav_json, path_to_output_obj_file, mesh_type,
 
 
 def main():
-    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <debug logs enabled (true | false)>", "main")
+    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <debug logs enabled (true | false)>", "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
@@ -2529,14 +2529,15 @@ def main():
     mesh_type = argv[2]
     lod_mask = argv[3]
     build_type = argv[4]
-    if len(argv) > 5 and argv[5] == "true":
+    filter_to_include_box = argv[5] == "true"
+    if len(argv) > 6 and argv[6] == "true":
         log("INFO", "Enabling debug logs", "main"),
         glacier2obj_enabled_log_levels.append("DEBUG")
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-    scenario = load_scenario(bpy.context, scene_path, output_path, mesh_type, lod_mask, build_type)
+    scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1

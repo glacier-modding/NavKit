@@ -384,11 +384,11 @@ void RecastAdapter::setSceneBBoxToMesh() const {
 
 void RecastAdapter::handleMeshChanged() const {
     sample->handleMeshChanged(inputGeom);
-    if (const Scene &scene = Scene::getInstance();
-        !scene.sceneLoaded ||
-        scene.includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
-        setSceneBBoxToMesh();
-    }
+    // if (const Scene &scene = Scene::getInstance();
+    //     !scene.sceneLoaded ||
+    //     scene.includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
+    //     setSceneBBoxToMesh();
+    // }
 }
 
 void RecastAdapter::cleanup() const {
