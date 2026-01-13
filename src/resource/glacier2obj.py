@@ -2252,6 +2252,84 @@ def get_bounding_sphere_data(obj, ws_mat, lsbbox_center = None):
     radius = max((mathutils.Vector(ws_mat @ mathutils.Vector(ls_corner)) - wsbbox_center).xy for ls_corner in obj.bound_box)
     return wsbbox_center, radius.length
 
+def create_volume_box(name, col_name, pos, rot, scale):
+    o = bpy.data.objects.new(name, None)
+    bpy.data.collections.get(col_name).objects.link( o )
+    o.empty_display_type = 'CUBE'
+    o.empty_display_size = 0.5
+    o.location = pos
+    o.rotation_mode = "QUATERNION"
+    o.rotation_quaternion = rot
+    o.scale = scale
+    o.show_name = True #Good idea to show names? Or makes viewport too busy?
+
+def load_volume_boxes(json_data, volume_types):
+    volume_boxes_coll = bpy.data.collections.new("Volume boxes")
+    bpy.context.scene.collection.children.link(volume_boxes_coll)
+    for volt in volume_types:
+        if volt not in json_data:
+            continue
+        if volt == "gates":
+            if volt not in bpy.data.collections:
+                gates_coll = bpy.data.collections.new(volt)
+                volume_boxes_coll.children.link(gates_coll)
+            else:
+                gates_coll = bpy.data.collections.get(volt)
+            for vol in json_data[volt]:
+                coords = ["w","x","y","z"]
+                pos, rot, scale, center = [
+                    mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
+                    mathutils.Quaternion([vol["rotation"][coord] for coord in coords]),
+                    mathutils.Vector([vol["bboxHalfSize"][coord] for coord in coords[1:]]) * 2,
+                    mathutils.Vector([vol["bboxCenter"][coord] for coord in coords[1:]])
+                ]
+                pos += center
+                create_volume_box(vol["name"], gates_coll.name, pos, rot, scale)
+        elif volt == "rooms":
+            if volt not in bpy.data.collections:
+                rooms_coll = bpy.data.collections.new(volt)
+                volume_boxes_coll.children.link(rooms_coll)
+            else:
+                rooms_coll = bpy.data.collections.get(volt)
+            for vol in json_data[volt]:
+                coords = ["w","x","y","z"]
+                pos, rot = [
+                    mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
+                    mathutils.Quaternion([vol["rotation"][coord] for coord in coords]),
+                ]                
+                scale = mathutils.Vector([vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) - mathutils.Vector([vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])
+                center = (mathutils.Vector([vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) + mathutils.Vector([vol["roomExtentMin"]["data"][coord] for coord in coords[1:]]))/2
+                pos += center
+                create_volume_box(vol["name"], rooms_coll.name, pos, rot, scale)
+        elif volt == "aiArea":
+            for ai_area_world in json_data["aiAreaWorld"]:
+                area_world_coll = bpy.data.collections.new(ai_area_world["name"])
+                volume_boxes_coll.children.link(area_world_coll)
+            #Go through the volumes and prepare the hashmap
+            id_to_box_volume = {}
+            for box_vol in json_data["volumeBoxes"]:
+                id_to_box_volume[box_vol["id"]] = box_vol
+            for ai_area in json_data[volt]:
+                area_coll = bpy.data.collections.new(ai_area["name"])
+                prev_coll = area_coll
+                for parent_coll_name in ai_area["logicalParent"]:
+                    parent_coll_name = parent_coll_name.split("(")[0][:-1]
+                    parent_coll = bpy.data.collections.get(parent_coll_name)
+                    if parent_coll is None:
+                        parent_coll = bpy.data.collections.new(parent_coll_name)
+                    if prev_coll.name not in parent_coll.children:
+                        parent_coll.children.link(prev_coll)   
+                    prev_coll = parent_coll                           
+                for vol_name in ai_area['areaVolumeNames']:                    
+                    id = vol_name.split("(")[1].split(")")[0] # name ex: VolumeBox_AIArea_02 (729b0d862bef84a2)
+                    box_vol = id_to_box_volume[id]
+                    coords = ["w","x","y","z"]
+                    pos, rot, scale = [
+                        mathutils.Vector([box_vol["position"][coord] for coord in coords[1:]]),
+                        mathutils.Quaternion([box_vol["rotation"][coord] for coord in coords]),                        
+                        mathutils.Vector([box_vol["scale"]["data"][coord] for coord in coords[1:]]),
+                    ]
+                    create_volume_box(vol_name, area_coll.name, pos, rot, scale)
 
 def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box):
     start = timer()
@@ -2264,6 +2342,8 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
     room_names = {}
     room_color_index = 0
     room_folder_color_index = 0
+
+    load_volume_boxes(data, ["gates", "rooms", "aiArea"])
 
     #Get the "pathfinding include" box
     pf_include_box_info = None
@@ -2309,7 +2389,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         else:
             mesh_hash = hash_and_entity['primHash']
 
-        room_folder_name = hash_and_entity["roomFolderName"][:63]
+        room_folder_name = hash_and_entity["roomFolderName"][:63] if hash_and_entity["roomFolderName"] else "Default"
         if room_folder_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_folder_name)
             bpy.context.scene.collection.children.link(coll)
@@ -2319,7 +2399,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
 
         room_folder_coll = bpy.data.collections.get(room_folder_name)
 
-        room_name = hash_and_entity["roomName"][:63]
+        room_name = hash_and_entity["roomName"][:63] if hash_and_entity["roomName"] else "Default"
         if room_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_name)
             room_folder_coll.children.link(coll)
