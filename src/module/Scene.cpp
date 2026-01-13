@@ -236,7 +236,7 @@ void Scene::resetBBoxDefaults() {
     setBBox(pos, scale);
 }
 
-void Scene::UpdateSceneDialogControls(HWND hDlg) const {
+void Scene::updateSceneDialogControls(HWND hDlg) const {
     // Position Sliders (-500 to 500)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, (int) (bBoxPos[0] + 500.0f));
@@ -283,12 +283,12 @@ const ZPathfinding::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &ha
     return closestMeshes[0];
 }
 
-INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK Scene::sceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     Scene &scene = getInstance();
 
     switch (message) {
         case WM_INITDIALOG:
-            scene.UpdateSceneDialogControls(hDlg);
+            scene.updateSceneDialogControls(hDlg);
             return (INT_PTR) TRUE;
 
         case WM_HSCROLL: {
@@ -330,7 +330,7 @@ INT_PTR CALLBACK Scene::SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         case WM_COMMAND:
             if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
                 scene.resetBBoxDefaults();
-                scene.UpdateSceneDialogControls(hDlg);
+                scene.updateSceneDialogControls(hDlg);
             }
             return (INT_PTR) TRUE;
 
@@ -355,7 +355,7 @@ void Scene::showSceneDialog() {
     HINSTANCE hInstance = GetModuleHandle(nullptr);
     HWND hParentWnd = Renderer::hwnd;
 
-    hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, SceneDialogProc,
+    hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, sceneDialogProc,
                                      reinterpret_cast<LPARAM>(this));
 
     if (hSceneDialog) {

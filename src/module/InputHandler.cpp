@@ -127,6 +127,10 @@ int InputHandler::handleInput() {
                                                           reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                     (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog,
                                                             reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (Obj::hObjDialog && IsDialogMessage(Obj::hObjDialog,
+                                                            reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                    (Navp::hNavpDialog && IsDialogMessage(Navp::hNavpDialog,
+                                                            reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                     (RecastAdapter::hRecastDialog && IsDialogMessage(RecastAdapter::hRecastDialog,
                                                                      reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
                     continue;

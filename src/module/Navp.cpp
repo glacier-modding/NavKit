@@ -1,11 +1,15 @@
 #include "../../include/NavKit/module/Navp.h"
 #include <numbers>
-
-#include <filesystem>
+#include <CommCtrl.h>
 #include <fstream>
+#include <functional>
+#include <filesystem>
+#include <map>
 
 #include <cpptrace/from_current.hpp>
 #include <GL/glew.h>
+
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
 #include "../../include/NavKit/module/Airg.h"
@@ -22,7 +26,6 @@
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/InputGeom.h"
-#include "../../include/ResourceLib_HM3/ResourceConverter.h"
 #include "../../include/ResourceLib_HM3/ResourceLib.h"
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
@@ -48,9 +51,18 @@ Navp::Navp()
       lastLoadNavpFile(loadNavpName),
       saveNavpName("Save Navp"),
       lastSaveNavpFile(saveNavpName) {
+    initIoiStringHashMap();
 }
 
 Navp::~Navp() = default;
+
+HWND Navp::hNavpDialog = nullptr;
+
+std::map<std::string, std::string> Navp::navpIoiStringHashMap;
+
+// Just to remove compiler warning for unused includes
+typedef JsonString j;
+typedef ResourceConverter r;
 
 void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
@@ -73,6 +85,27 @@ void Navp::renderPfSeedPoints() const {
                 outline,
                 1.0);
             i++;
+        }
+    }
+}
+
+void Navp::initIoiStringHashMap() {
+    if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.find(".NAVP") != std::string::npos) {
+                if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
+                    std::string hashPart = line.substr(0, commaPos);
+                    std::string ioiString = line.substr(commaPos + 1);
+
+                    if (!ioiString.empty() && ioiString.back() == '\r') ioiString.pop_back();
+
+                    const size_t dotPos = hashPart.find('.');
+                    const std::string hash = (dotPos != std::string::npos) ? hashPart.substr(0, dotPos) : hashPart;
+
+                    navpIoiStringHashMap[ioiString] = hash;
+                }
+            }
         }
     }
 }
@@ -704,5 +737,106 @@ void Navp::finalizeBuild() {
         navpBuildDone.store(false);
         building = false;
         Menu::updateMenuState();
+    }
+}
+
+void Navp::updateNavkitDialogControls(HWND hwnd) {
+    auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
+    SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
+
+    if (!navpIoiStringHashMap.empty()) {
+        for (auto &ioiString: navpIoiStringHashMap) {
+            SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, (LPARAM) ioiString.first.c_str());
+        }
+        SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM) 0, (LPARAM) 0);
+    }
+}
+
+INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    Navp* pNavp = nullptr;
+    if (message == WM_INITDIALOG) {
+        pNavp = reinterpret_cast<Navp*>(lParam);
+        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pNavp));
+    } else {
+        pNavp = reinterpret_cast<Navp*>(GetWindowLongPtr(hDlg, DWLP_USER));
+    }
+
+    if (!pNavp) {
+        return (INT_PTR)FALSE;
+    }
+
+    switch (message) {
+        case WM_INITDIALOG:
+            pNavp->updateNavkitDialogControls(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_COMMAND:
+
+            if(HIWORD(wParam) == CBN_SELCHANGE) {
+                const int ItemIndex = SendMessage((HWND) lParam, (UINT) CB_GETCURSEL,
+                    (WPARAM) 0, (LPARAM) 0);
+                char ListItem[256];
+                SendMessage((HWND) lParam, (UINT) CB_GETLBTEXT, (WPARAM) ItemIndex, (LPARAM) ListItem);
+                MessageBox(hDlg, (LPCSTR) ListItem, TEXT("Item Selected"), MB_OK);
+
+                return TRUE;
+            }
+            if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
+                return TRUE;
+            } else if (commandId == IDCANCEL) {
+                DestroyWindow(hDlg);
+                return TRUE;
+            }
+            return (INT_PTR) TRUE;
+
+        case WM_CLOSE:
+            DestroyWindow(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_DESTROY:
+            hNavpDialog = nullptr;
+            return (INT_PTR) TRUE;
+        default: ;
+    }
+    return (INT_PTR) FALSE;
+}
+
+void Navp::showExtractNavpDialog() {
+    if (hNavpDialog) {
+        SetForegroundWindow(hNavpDialog);
+        return;
+    }
+
+    HINSTANCE hInstance = nullptr;
+    if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           (LPCSTR)&Navp::extractNavpDialogProc, &hInstance)) {
+        Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
+        return;
+    }
+
+    HWND hParentWnd = Renderer::hwnd;
+
+    hNavpDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_NAVP_DIALOG), hParentWnd, extractNavpDialogProc,
+                                     reinterpret_cast<LPARAM>(this));
+
+    if (hNavpDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hNavpDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hNavpDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
+        RECT parentRect, dialogRect;
+        GetWindowRect(hParentWnd, &parentRect);
+        GetWindowRect(hNavpDialog, &dialogRect);
+        int parentWidth = parentRect.right - parentRect.left;
+        int parentHeight = parentRect.bottom - parentRect.top;
+        int dialogWidth = dialogRect.right - dialogRect.left;
+        int dialogHeight = dialogRect.bottom - dialogRect.top;
+        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        SetWindowPos(hNavpDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ShowWindow(hNavpDialog, SW_SHOW);
+    } else {
+        const DWORD error = GetLastError();
+        Logger::log(NK_ERROR, "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.", error);
     }
 }

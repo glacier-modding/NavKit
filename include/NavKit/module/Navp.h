@@ -2,6 +2,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #include "../model/ZPathfinding.h"
 
@@ -23,7 +25,10 @@ public:
 
     ~Navp();
 
+    static HWND hNavpDialog;
+
     void renderPfSeedPoints() const;
+    static void initIoiStringHashMap();
 
     void renderPfSeedPointsForHitTest() const;
 
@@ -37,8 +42,6 @@ public:
         return instance;
     }
 
-    void resetDefaults();
-
     void renderExclusionBoxes() const;
 
     void renderExclusionBoxesForHitTest() const;
@@ -48,6 +51,11 @@ public:
     void renderNavMeshForHitTest() const;
 
     void finalizeBuild();
+
+    static void updateNavkitDialogControls(HWND hwnd);
+
+    static INT_PTR CALLBACK extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    void showExtractNavpDialog();
 
     void buildAreaMaps();
 
@@ -106,9 +114,14 @@ public:
     void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
     std::atomic<bool> navpBuildDone{false};
+
     bool building;
+
     std::optional<std::jthread> backgroundWorker;
+
     void buildNavp();
+
+    static std::map<std::string, std::string> navpIoiStringHashMap;
 private:
 
     static void renderArea(const NavPower::Area &area, bool selected);

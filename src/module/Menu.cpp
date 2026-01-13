@@ -151,6 +151,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     Navp::getInstance().handleOpenNavpClicked();
                     Logger::log(NK_DEBUG, "File -> Open Navp clicked");
                     break;
+                case IDM_FILE_OPEN_NAVP_FROM_RPKG:
+                    Navp::getInstance().showExtractNavpDialog();
+                    Logger::log(NK_DEBUG, "File -> Open Navp from Rpkg clicked");
+                    break;
                 case IDM_FILE_OPEN_AIRG:
                     Airg::getInstance().handleOpenAirgClicked();
                     Logger::log(NK_DEBUG, "File -> Open Airg clicked");
