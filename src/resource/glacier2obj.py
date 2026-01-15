@@ -2252,10 +2252,10 @@ def get_bounding_sphere_data(obj, ws_mat, lsbbox_center = None):
     radius = max((mathutils.Vector(ws_mat @ mathutils.Vector(ls_corner)) - wsbbox_center).xy for ls_corner in obj.bound_box)
     return wsbbox_center, radius.length
 
-def create_volume_box(name, col_name, pos, rot, scale):
+def create_volume(name, col_name, pos, rot, scale, shape='CUBE'):
     o = bpy.data.objects.new(name, None)
     bpy.data.collections.get(col_name).objects.link( o )
-    o.empty_display_type = 'CUBE'
+    o.empty_display_type = shape
     o.empty_display_size = 0.5
     o.location = pos
     o.rotation_mode = "QUATERNION"
@@ -2284,7 +2284,7 @@ def load_volume_boxes(json_data, volume_types):
                     mathutils.Vector([vol["bboxCenter"][coord] for coord in coords[1:]])
                 ]
                 pos += center
-                create_volume_box(vol["name"], gates_coll.name, pos, rot, scale)
+                create_volume(vol["name"], gates_coll.name, pos, rot, scale)
         elif volt == "rooms":
             if volt not in bpy.data.collections:
                 rooms_coll = bpy.data.collections.new(volt)
@@ -2300,15 +2300,17 @@ def load_volume_boxes(json_data, volume_types):
                 scale = mathutils.Vector([vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) - mathutils.Vector([vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])
                 center = (mathutils.Vector([vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) + mathutils.Vector([vol["roomExtentMin"]["data"][coord] for coord in coords[1:]]))/2
                 pos += center
-                create_volume_box(vol["name"], rooms_coll.name, pos, rot, scale)
+                create_volume(vol["name"], rooms_coll.name, pos, rot, scale)
         elif volt == "aiArea":
             for ai_area_world in json_data["aiAreaWorld"]:
                 area_world_coll = bpy.data.collections.new(ai_area_world["name"])
                 volume_boxes_coll.children.link(area_world_coll)
             #Go through the volumes and prepare the hashmap
-            id_to_box_volume = {}
-            for box_vol in json_data["volumeBoxes"]:
-                id_to_box_volume[box_vol["id"]] = box_vol
+            id_to_trigger_volume = {}
+            for trig_vol in json_data["volumeBoxes"]:
+                id_to_trigger_volume[trig_vol["id"]] = trig_vol
+            for trig_vol in json_data["volumeSpheres"]:
+                id_to_trigger_volume[trig_vol["id"]] = trig_vol
             for ai_area in json_data[volt]:
                 area_coll = bpy.data.collections.new(ai_area["name"])
                 prev_coll = area_coll
@@ -2322,14 +2324,18 @@ def load_volume_boxes(json_data, volume_types):
                     prev_coll = parent_coll                           
                 for vol_name in ai_area['areaVolumeNames']:                    
                     id = vol_name.split("(")[1].split(")")[0] # name ex: VolumeBox_AIArea_02 (729b0d862bef84a2)
-                    box_vol = id_to_box_volume[id]
+                    trig_vol = id_to_trigger_volume[id]
                     coords = ["w","x","y","z"]
-                    pos, rot, scale = [
-                        mathutils.Vector([box_vol["position"][coord] for coord in coords[1:]]),
-                        mathutils.Quaternion([box_vol["rotation"][coord] for coord in coords]),                        
-                        mathutils.Vector([box_vol["scale"]["data"][coord] for coord in coords[1:]]),
+                    pos, rot = [
+                        mathutils.Vector([trig_vol["position"][coord] for coord in coords[1:]]),
+                        mathutils.Quaternion([trig_vol["rotation"][coord] for coord in coords]) 
                     ]
-                    create_volume_box(vol_name, area_coll.name, pos, rot, scale)
+                    if "radius" in trig_vol: #sphere volume
+                        scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
+                        create_volume(vol_name, area_coll.name, pos, rot, scale, 'SPHERE')
+                    else: #box volume
+                        scale = mathutils.Vector([trig_vol["scale"]["data"][coord] for coord in coords[1:]])
+                        create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box):
     start = timer()
