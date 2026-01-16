@@ -9,6 +9,7 @@
 #include <cpptrace/from_current.hpp>
 #include <GL/glew.h>
 
+#include "../../include/glacier2obj/glacier2obj.h"
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
@@ -50,15 +51,14 @@ Navp::Navp()
       loadNavpName("Load Navp"),
       lastLoadNavpFile(loadNavpName),
       saveNavpName("Save Navp"),
-      lastSaveNavpFile(saveNavpName) {
+      lastSaveNavpFile(saveNavpName){
     initIoiStringHashMap();
 }
 
 Navp::~Navp() = default;
-
 HWND Navp::hNavpDialog = nullptr;
-
-std::map<std::string, std::string> Navp::navpIoiStringHashMap;
+std::string Navp::selectedRpkgNavp{};
+std::map<std::string, std::string> Navp::navpHashIoiStringMap;
 
 // Just to remove compiler warning for unused includes
 typedef JsonString j;
@@ -103,7 +103,7 @@ void Navp::initIoiStringHashMap() {
                     const size_t dotPos = hashPart.find('.');
                     const std::string hash = (dotPos != std::string::npos) ? hashPart.substr(0, dotPos) : hashPart;
 
-                    navpIoiStringHashMap[ioiString] = hash;
+                    navpHashIoiStringMap[hash] = ioiString;
                 }
             }
         }
@@ -744,9 +744,18 @@ void Navp::updateNavkitDialogControls(HWND hwnd) {
     auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
     SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
 
-    if (!navpIoiStringHashMap.empty()) {
-        for (auto &ioiString: navpIoiStringHashMap) {
-            SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, (LPARAM) ioiString.first.c_str());
+    if (!navpHashIoiStringMap.empty()) {
+        for (auto & [hash, ioiString]: navpHashIoiStringMap) {
+            std::string listItemString;
+            if (ioiString.length() != 0) {
+                listItemString = ioiString;
+            } else {
+                listItemString = hash;
+            }
+            SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
+            if (selectedRpkgNavp.length() == 0) {
+                selectedRpkgNavp = ioiString;
+            }
         }
         SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM) 0, (LPARAM) 0);
     }
@@ -777,11 +786,31 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wPa
                     (WPARAM) 0, (LPARAM) 0);
                 char ListItem[256];
                 SendMessage((HWND) lParam, (UINT) CB_GETLBTEXT, (WPARAM) ItemIndex, (LPARAM) ListItem);
-                MessageBox(hDlg, (LPCSTR) ListItem, TEXT("Item Selected"), MB_OK);
+                selectedRpkgNavp = ListItem;
 
                 return TRUE;
             }
             if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
+                for (auto & [hash, ioiString]: navpHashIoiStringMap) {
+                    if (hash == selectedRpkgNavp || ioiString == selectedRpkgNavp) {
+                        MessageBox(hDlg, hash.c_str(), TEXT("Extracting Navp"), MB_OK);
+
+                        NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+                        const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
+                        const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
+                        const std::string navpFolder = navKitSettings.outputFolder + "\\navp";
+                        const char* hashesNeeded[] = { hash.c_str() };
+                        auto partitionManager = scan_packages(retailFolder.c_str(), Obj::gameVersion.c_str(), Logger::rustLogCallback);
+                        extract_resources_from_rpkg(
+                            runtimeFolder.c_str(),
+                            hashesNeeded,
+                            1,
+                            partitionManager,
+                           navpFolder.c_str(),
+                           "NAVP",
+                           Logger::rustLogCallback);
+                    }
+                }
                 return TRUE;
             } else if (commandId == IDCANCEL) {
                 DestroyWindow(hDlg);

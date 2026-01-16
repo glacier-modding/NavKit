@@ -45,12 +45,13 @@ PartitionManager *scan_packages(const char *retail_folder,
 
 void free_partition_manager(PartitionManager *ptr);
 
-void extract_alocs_or_prims(const char *runtime_folder,
-                            HashSet<String> *needed_hashes,
-                            const PartitionManager *partition_manager,
-                            const char *output_folder,
-                            const char *output_type,
-                            void (*log_callback)(const char*));
+void extract_resources_from_rpkg(const char *runtime_folder,
+                                 const char *const *needed_hashes,
+                                 size_t needed_hashes_len,
+                                 const PartitionManager *partition_manager,
+                                 const char *output_folder,
+                                 const char *resource_type,
+                                 void (*log_callback)(const char*));
 
 } // extern "C"
 

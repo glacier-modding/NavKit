@@ -86,6 +86,7 @@ public:
     bool stairsCheckboxValue;
 
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
+    static std::string selectedRpkgNavp;
 
     void setLastLoadFileName(const char *fileName);
 
@@ -121,7 +122,7 @@ public:
 
     void buildNavp();
 
-    static std::map<std::string, std::string> navpIoiStringHashMap;
+    static std::map<std::string, std::string> navpHashIoiStringMap;
 private:
 
     static void renderArea(const NavPower::Area &area, bool selected);

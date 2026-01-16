@@ -49,6 +49,7 @@ Obj::Obj() : loadObjName("Load Obj"),
              primLods{true, true, true, true, true, true, true, true},
              blendFileBuilt(false) {
 }
+std::string Obj::gameVersion = "HM3";
 
 void Obj::updateObjDialogControls(HWND hDlg) {
     Obj &obj = getInstance();
@@ -295,7 +296,6 @@ void Obj::extractAlocsOrPrimsAndStartObjBuild() {
     const std::string &fileNameString = scene.lastLoadSceneFile;
     const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
     const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
-    const std::string gameVersion = "HM3";
     const std::string navJsonFilePath = fileNameString;
 
     extractingAlocsOrPrims = true;

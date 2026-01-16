@@ -3,6 +3,7 @@
 00467462B3736B34.NAVP,[assembly:/_pro/scenes/frontend/mainmenu.navp].pc_navp
 00212E7A77EEB968.AIRG,[assembly:/_pro/scenes/frontend/mainmenu_scene.airg].pc_airg
 0072B1CA3E7D3037.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_ancestral_harebell.navp].pc_navp
+0072B1CA3E7D3038.NAVP,
 0081F0CDA499B5D0.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_ancestral_vesper.navp].pc_navp
 002E699011FE27A9.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_bulldog.navp].pc_navp
 00087426DD646847.AIRG,[assembly:/_pro/scenes/missions/ancestral/scene_bulldog_scene.airg].pc_airg
