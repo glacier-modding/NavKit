@@ -1352,6 +1352,7 @@ def load_prim(filepath, lod_mask):
             continue
         mesh = load_prim_mesh(prim, prim_name, mesh_index)
         obj = bpy.data.objects.new(mesh.name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
         objects.append(obj)
 
     return objects
@@ -2567,18 +2568,21 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 positions.append([aloc_positions[u] for u in range(t_size) if u not in culled_indices])
                 rotations.append([aloc_rotations[u] for u in range(t_size) if u not in culled_indices])
                 scales.append([aloc_scales[u] for u in range(t_size) if u not in culled_indices])
+            unlinked = [False for _ in range(o_size)]
             for i in range(t_size):
                 room_name = room_names[mesh_hash][i]
                 mesh_id = transforms[mesh_hash][i]["id"]
                 log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
                 mesh_i += 1
                 for o_i in range(o_size):
+                    obj = objects[o_i]
+                    if not unlinked[o_i]:
+                        bpy.context.scene.collection.objects.unlink(obj)
+                        unlinked[o_i] = True
                     if i >= len(positions[o_i]):
                         continue
-                    obj = objects[o_i]
                     if cur is None:
                         cur = obj
-                        bpy.context.scene.collection.objects.unlink(obj)
                     else:
                         cur = obj.copy()
                     bpy.data.collections.get(room_name).objects.link(cur)
