@@ -58,7 +58,6 @@ public:
     bool primLods[8];
     bool blendFileBuilt;
     static HWND hObjDialog;
-    static std::string gameVersion;
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 

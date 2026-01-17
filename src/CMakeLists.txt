@@ -29,6 +29,7 @@ set(MODULE_SOURCES
         module/Obj.cpp
         module/PersistedSettings.cpp
         module/Renderer.cpp
+        module/Rpkg.cpp
         module/Scene.cpp
         module/SceneExtract.cpp
 )

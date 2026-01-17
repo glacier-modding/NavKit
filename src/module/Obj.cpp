@@ -20,6 +20,7 @@
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/glacier2obj/glacier2obj.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 HWND Obj::hObjDialog = nullptr;
@@ -49,7 +50,6 @@ Obj::Obj() : loadObjName("Load Obj"),
              primLods{true, true, true, true, true, true, true, true},
              blendFileBuilt(false) {
 }
-std::string Obj::gameVersion = "HM3";
 
 void Obj::updateObjDialogControls(HWND hDlg) {
     Obj &obj = getInstance();
@@ -301,7 +301,7 @@ void Obj::extractAlocsOrPrimsAndStartObjBuild() {
     extractingAlocsOrPrims = true;
     Menu::updateMenuState();
     const int result = run_extraction_wrapper(retailFolder.c_str(),
-                           gameVersion.c_str(),
+                           Rpkg::gameVersion.c_str(),
                            navJsonFilePath.c_str(),
                            runtimeFolder.c_str(),
                            alocOrPrimFolder.c_str(),

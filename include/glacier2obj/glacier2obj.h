@@ -47,7 +47,7 @@ void free_partition_manager(PartitionManager *ptr);
 
 void extract_resources_from_rpkg(const char *runtime_folder,
                                  const char *const *needed_hashes,
-                                 size_t needed_hashes_len,
+                                 uintptr_t needed_hashes_len,
                                  const PartitionManager *partition_manager,
                                  const char *output_folder,
                                  const char *resource_type,

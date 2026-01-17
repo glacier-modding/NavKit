@@ -9,7 +9,6 @@
 #include <cpptrace/from_current.hpp>
 #include <GL/glew.h>
 
-#include "../../include/glacier2obj/glacier2obj.h"
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
@@ -21,6 +20,7 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/FileUtil.h"
@@ -29,7 +29,6 @@
 #include "../../include/RecastDemo/InputGeom.h"
 #include "../../include/ResourceLib_HM3/ResourceLib.h"
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
-
 
 Navp::Navp()
     : navMesh(new NavPower::NavMesh()),
@@ -51,8 +50,7 @@ Navp::Navp()
       loadNavpName("Load Navp"),
       lastLoadNavpFile(loadNavpName),
       saveNavpName("Save Navp"),
-      lastSaveNavpFile(saveNavpName){
-    initIoiStringHashMap();
+      lastSaveNavpFile(saveNavpName) {
 }
 
 Navp::~Navp() = default;
@@ -85,27 +83,6 @@ void Navp::renderPfSeedPoints() const {
                 outline,
                 1.0);
             i++;
-        }
-    }
-}
-
-void Navp::initIoiStringHashMap() {
-    if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
-        std::string line;
-        while (std::getline(file, line)) {
-            if (line.find(".NAVP") != std::string::npos) {
-                if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
-                    std::string hashPart = line.substr(0, commaPos);
-                    std::string ioiString = line.substr(commaPos + 1);
-
-                    if (!ioiString.empty() && ioiString.back() == '\r') ioiString.pop_back();
-
-                    const size_t dotPos = hashPart.find('.');
-                    const std::string hash = (dotPos != std::string::npos) ? hashPart.substr(0, dotPos) : hashPart;
-
-                    navpHashIoiStringMap[hash] = ioiString;
-                }
-            }
         }
     }
 }
@@ -592,6 +569,7 @@ void Navp::buildNavp() {
 }
 
 void Navp::setLastLoadFileName(const char *fileName) {
+    Logger::log(NK_INFO, ("Setting last navp loaded file name: " + std::string(fileName)).c_str());
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadNavpName = fileName;
         lastLoadNavpFile = loadNavpName.data();
@@ -605,26 +583,32 @@ void Navp::setLastSaveFileName(const char *fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
-void Navp::handleOpenNavpClicked() {
-    char *fileName = openLoadNavpFileDialog();
-    if (fileName) {
-        setLastLoadFileName(fileName);
-        std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
-        std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+void Navp::loadNavpFromFile(const std::string& fileName) {
+    Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
+    setLastLoadFileName(fileName.c_str());
+    Logger::log(NK_INFO, ("Getting extension: " + fileName).c_str());
+    std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+    Logger::log(NK_INFO, ("Checking extension: " + fileName).c_str());
 
-        if (extension == "JSON") {
-            std::string msg = "Loading Navp.json file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
-        } else if (extension == "NAVP") {
-            std::string msg = "Loading Navp file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
-        }
+    if (extension == "JSON") {
+        std::string msg = "Loading Navp.json file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
+    } else if (extension == "NAVP") {
+        std::string msg = "Loading Navp file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
+    }
+}
+
+void Navp::handleOpenNavpClicked() {
+    if (const char *fileName = openLoadNavpFileDialog()) {
+        loadNavpFromFile(fileName);
     }
 }
 
@@ -761,6 +745,14 @@ void Navp::updateNavkitDialogControls(HWND hwnd) {
     }
 }
 
+void Navp::extractNavpFromRpkgs(const std::string& hash) {
+    if (!Rpkg::extractResourceFromRpkgs(hash, NAVP)) {
+        const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\navp\\" + hash + ".NAVP";
+        Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
+        getInstance().loadNavpFromFile(fileName.c_str());
+    }
+}
+
 INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     Navp* pNavp = nullptr;
     if (message == WM_INITDIALOG) {
@@ -792,25 +784,16 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wPa
             }
             if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
                 for (auto & [hash, ioiString]: navpHashIoiStringMap) {
-                    if (hash == selectedRpkgNavp || ioiString == selectedRpkgNavp) {
-                        MessageBox(hDlg, hash.c_str(), TEXT("Extracting Navp"), MB_OK);
-
-                        NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-                        const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
-                        const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
-                        const std::string navpFolder = navKitSettings.outputFolder + "\\navp";
-                        const char* hashesNeeded[] = { hash.c_str() };
-                        auto partitionManager = scan_packages(retailFolder.c_str(), Obj::gameVersion.c_str(), Logger::rustLogCallback);
-                        extract_resources_from_rpkg(
-                            runtimeFolder.c_str(),
-                            hashesNeeded,
-                            1,
-                            partitionManager,
-                           navpFolder.c_str(),
-                           "NAVP",
-                           Logger::rustLogCallback);
+                    if (hash == selectedRpkgNavp) {
+                        getInstance().loadedNavpText = hash;
+                    } else if (ioiString == selectedRpkgNavp) {
+                        getInstance().loadedNavpText = ioiString;
+                    } else {
+                        continue;
                     }
+                    extractNavpFromRpkgs(hash);
                 }
+                DestroyWindow(hDlg);
                 return TRUE;
             } else if (commandId == IDCANCEL) {
                 DestroyWindow(hDlg);

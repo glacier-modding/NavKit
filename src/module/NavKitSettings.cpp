@@ -11,6 +11,7 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 
 HWND NavKitSettings::hSettingsDialog = nullptr;
@@ -182,8 +183,15 @@ void NavKitSettings::loadSettings() {
 void NavKitSettings::setHitmanFolder(const std::string &folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
+        bool shouldReInitExtractionData = false;
+        if (folderName != hitmanFolder) {
+            shouldReInitExtractionData = true;
+        }
         hitmanFolder = folderName;
         Logger::log(NK_INFO, ("Setting Hitman folder to: " + hitmanFolder).c_str());
+        if (shouldReInitExtractionData) {
+            Rpkg::backgroundWorker.emplace(&Rpkg::initExtractionData);
+        }
     } else {
         Logger::log(NK_WARN, ("Could not find Hitman folder: " + hitmanFolder).c_str());
     }

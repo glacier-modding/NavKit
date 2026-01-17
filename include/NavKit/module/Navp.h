@@ -28,8 +28,6 @@ public:
     static HWND hNavpDialog;
 
     void renderPfSeedPoints() const;
-    static void initIoiStringHashMap();
-
     void renderPfSeedPointsForHitTest() const;
 
     static Navp &getInstance() {
@@ -55,7 +53,10 @@ public:
     static void updateNavkitDialogControls(HWND hwnd);
 
     static INT_PTR CALLBACK extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
     void showExtractNavpDialog();
+
+    static void extractNavpFromRpkgs(const std::string& hash);
 
     void buildAreaMaps();
 
@@ -86,11 +87,16 @@ public:
     bool stairsCheckboxValue;
 
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
+
+    std::string loadedNavpText;
+
     static std::string selectedRpkgNavp;
 
     void setLastLoadFileName(const char *fileName);
 
     void setLastSaveFileName(const char *fileName);
+
+    void loadNavpFromFile(const std::string& fileName);
 
     void handleOpenNavpClicked();
 
