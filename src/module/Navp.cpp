@@ -586,10 +586,8 @@ void Navp::setLastSaveFileName(const char *fileName) {
 void Navp::loadNavpFromFile(const std::string& fileName) {
     Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
     setLastLoadFileName(fileName.c_str());
-    Logger::log(NK_INFO, ("Getting extension: " + fileName).c_str());
     std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
     std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-    Logger::log(NK_INFO, ("Checking extension: " + fileName).c_str());
 
     if (extension == "JSON") {
         std::string msg = "Loading Navp.json file: '";
@@ -729,15 +727,24 @@ void Navp::updateNavkitDialogControls(HWND hwnd) {
     SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
 
     if (!navpHashIoiStringMap.empty()) {
-        for (auto & [hash, ioiString]: navpHashIoiStringMap) {
+        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
+        auto comparator = [](const std::pair<std::string, std::string>& a,
+                             const std::pair<std::string, std::string>& b) {
+            if (a.second != b.second) {
+                return a.second < b.second;
+            }
+            return a.first < b.first;
+        };
+        std::ranges::sort(sorted_hash_ioi_string_pairs, comparator);
+        for (auto & [hash, ioiString] : sorted_hash_ioi_string_pairs) {
             std::string listItemString;
-            if (ioiString.length() != 0) {
+            if (!ioiString.empty()) {
                 listItemString = ioiString;
             } else {
                 listItemString = hash;
             }
             SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
-            if (selectedRpkgNavp.length() == 0) {
+            if (selectedRpkgNavp.empty()) {
                 selectedRpkgNavp = ioiString;
             }
         }

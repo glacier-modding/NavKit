@@ -19,7 +19,7 @@
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
-#include "../../include/glacier2obj/glacier2obj.h"
+#include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavWeakness/NavPower.h"
 
@@ -260,7 +260,7 @@ void Obj::buildObjFromScene() {
     generatedObjName = "output.obj";
 
     backgroundWorker.emplace(
-        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2ObjBlender.log", [this,
+        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2Obj.log", [this,
             buildOutputFileType] {
             Logger::log(NK_INFO, "Finished generating %s from nav.json file.", buildOutputFileType.c_str());
             blenderObjGenerationDone = true;
@@ -300,10 +300,10 @@ void Obj::extractAlocsOrPrimsAndStartObjBuild() {
 
     extractingAlocsOrPrims = true;
     Menu::updateMenuState();
-    const int result = run_extraction_wrapper(retailFolder.c_str(),
-                           Rpkg::gameVersion.c_str(),
+    const int result = extract_scene_mesh_resources(
                            navJsonFilePath.c_str(),
                            runtimeFolder.c_str(),
+                           Rpkg::partitionManager,
                            alocOrPrimFolder.c_str(),
                            (meshTypeForBuild == ALOC) ? "ALOC" : "PRIM",
                            Logger::rustLogCallback);
@@ -529,8 +529,7 @@ bool Obj::canBuildObjFromScene() const {
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingAlocsOrPrims && navKitSettings.blenderSet
-           &&
-           scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone;
+        && scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone && Rpkg::extractionDataInitComplete;
 }
 
 bool Obj::canSaveBlend() const {
