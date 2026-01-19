@@ -45,7 +45,7 @@ public:
 
     void resetBBoxDefaults();
 
-    void UpdateSceneDialogControls(HWND hDlg) const;
+    void updateSceneDialogControls(HWND hDlg) const;
 
     static Scene &getInstance() {
         static Scene instance;
@@ -73,5 +73,5 @@ private:
     std::string loadSceneName;
     std::string saveSceneName;
 
-    static INT_PTR CALLBACK SceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    static INT_PTR CALLBACK sceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

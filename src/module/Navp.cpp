@@ -1,11 +1,15 @@
 #include "../../include/NavKit/module/Navp.h"
 #include <numbers>
-
-#include <filesystem>
+#include <CommCtrl.h>
 #include <fstream>
+#include <functional>
+#include <filesystem>
+#include <map>
 
 #include <cpptrace/from_current.hpp>
 #include <GL/glew.h>
+
+#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/ZPathfinding.h"
 #include "../../include/NavKit/module/Airg.h"
@@ -16,16 +20,13 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/InputGeom.h"
-#include "../../include/ResourceLib_HM3/ResourceConverter.h"
-#include "../../include/ResourceLib_HM3/ResourceLib.h"
-#include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
-
 
 Navp::Navp()
     : navMesh(new NavPower::NavMesh()),
@@ -51,6 +52,9 @@ Navp::Navp()
 }
 
 Navp::~Navp() = default;
+HWND Navp::hNavpDialog = nullptr;
+std::string Navp::selectedRpkgNavp{};
+std::map<std::string, std::string> Navp::navpHashIoiStringMap;
 
 void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
@@ -559,6 +563,7 @@ void Navp::buildNavp() {
 }
 
 void Navp::setLastLoadFileName(const char *fileName) {
+    Logger::log(NK_INFO, ("Setting last navp loaded file name: " + std::string(fileName)).c_str());
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadNavpName = fileName;
         lastLoadNavpFile = loadNavpName.data();
@@ -572,26 +577,30 @@ void Navp::setLastSaveFileName(const char *fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
-void Navp::handleOpenNavpClicked() {
-    char *fileName = openLoadNavpFileDialog();
-    if (fileName) {
-        setLastLoadFileName(fileName);
-        std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
-        std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+void Navp::loadNavpFromFile(const std::string& fileName) {
+    Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
+    setLastLoadFileName(fileName.c_str());
+    std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
 
-        if (extension == "JSON") {
-            std::string msg = "Loading Navp.json file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
-        } else if (extension == "NAVP") {
-            std::string msg = "Loading Navp file: '";
-            msg += fileName;
-            msg += "'...";
-            Logger::log(NK_INFO, msg.data());
-            backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
-        }
+    if (extension == "JSON") {
+        std::string msg = "Loading Navp.json file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
+    } else if (extension == "NAVP") {
+        std::string msg = "Loading Navp file: '";
+        msg += fileName;
+        msg += "'...";
+        Logger::log(NK_INFO, msg.data());
+        backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
+    }
+}
+
+void Navp::handleOpenNavpClicked() {
+    if (const char *fileName = openLoadNavpFileDialog()) {
+        loadNavpFromFile(fileName);
     }
 }
 
@@ -704,5 +713,143 @@ void Navp::finalizeBuild() {
         navpBuildDone.store(false);
         building = false;
         Menu::updateMenuState();
+    }
+}
+
+void Navp::updateNavpDialogControls(HWND hwnd) {
+    auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
+    SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
+
+    if (!navpHashIoiStringMap.empty()) {
+        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
+        auto comparator = [](const std::pair<std::string, std::string>& a,
+                             const std::pair<std::string, std::string>& b) {
+            if (a.second != b.second) {
+                return a.second < b.second;
+            }
+            return a.first < b.first;
+        };
+        std::ranges::sort(sorted_hash_ioi_string_pairs, comparator);
+        for (auto & [hash, ioiString] : sorted_hash_ioi_string_pairs) {
+            std::string listItemString;
+            if (!ioiString.empty()) {
+                listItemString = ioiString;
+            } else {
+                listItemString = hash;
+            }
+            SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
+            if (selectedRpkgNavp.empty()) {
+                selectedRpkgNavp = ioiString;
+            }
+        }
+        SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM) 0, (LPARAM) 0);
+    }
+}
+
+void Navp::extractNavpFromRpkgs(const std::string& hash) {
+    if (!Rpkg::extractResourceFromRpkgs(hash, NAVP)) {
+        const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\navp\\" + hash + ".NAVP";
+        Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
+        getInstance().loadNavpFromFile(fileName);
+    }
+}
+
+INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    Navp* pNavp = nullptr;
+    if (message == WM_INITDIALOG) {
+        pNavp = reinterpret_cast<Navp*>(lParam);
+        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pNavp));
+    } else {
+        pNavp = reinterpret_cast<Navp*>(GetWindowLongPtr(hDlg, DWLP_USER));
+    }
+
+    if (!pNavp) {
+        return (INT_PTR)FALSE;
+    }
+
+    switch (message) {
+        case WM_INITDIALOG:
+            updateNavpDialogControls(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_COMMAND:
+
+            if(HIWORD(wParam) == CBN_SELCHANGE) {
+                const int ItemIndex = SendMessage((HWND) lParam, (UINT) CB_GETCURSEL,
+                    (WPARAM) 0, (LPARAM) 0);
+                char ListItem[256];
+                SendMessage((HWND) lParam, (UINT) CB_GETLBTEXT, (WPARAM) ItemIndex, (LPARAM) ListItem);
+                selectedRpkgNavp = ListItem;
+
+                return TRUE;
+            }
+            if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
+                for (auto & [hash, ioiString]: navpHashIoiStringMap) {
+                    if (hash == selectedRpkgNavp) {
+                        getInstance().loadedNavpText = hash;
+                    } else if (ioiString == selectedRpkgNavp) {
+                        getInstance().loadedNavpText = ioiString;
+                    } else {
+                        continue;
+                    }
+                    extractNavpFromRpkgs(hash);
+                }
+                DestroyWindow(hDlg);
+                return TRUE;
+            } else if (commandId == IDCANCEL) {
+                DestroyWindow(hDlg);
+                return TRUE;
+            }
+            return (INT_PTR) TRUE;
+
+        case WM_CLOSE:
+            DestroyWindow(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_DESTROY:
+            hNavpDialog = nullptr;
+            return (INT_PTR) TRUE;
+        default: ;
+    }
+    return (INT_PTR) FALSE;
+}
+
+void Navp::showExtractNavpDialog() {
+    if (hNavpDialog) {
+        SetForegroundWindow(hNavpDialog);
+        return;
+    }
+
+    HINSTANCE hInstance = nullptr;
+    if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           (LPCSTR)&Navp::extractNavpDialogProc, &hInstance)) {
+        Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
+        return;
+    }
+
+    HWND hParentWnd = Renderer::hwnd;
+
+    hNavpDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_NAVP_DIALOG), hParentWnd, extractNavpDialogProc,
+                                     reinterpret_cast<LPARAM>(this));
+
+    if (hNavpDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hNavpDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hNavpDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
+        RECT parentRect, dialogRect;
+        GetWindowRect(hParentWnd, &parentRect);
+        GetWindowRect(hNavpDialog, &dialogRect);
+        int parentWidth = parentRect.right - parentRect.left;
+        int parentHeight = parentRect.bottom - parentRect.top;
+        int dialogWidth = dialogRect.right - dialogRect.left;
+        int dialogHeight = dialogRect.bottom - dialogRect.top;
+        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        SetWindowPos(hNavpDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ShowWindow(hNavpDialog, SW_SHOW);
+    } else {
+        const DWORD error = GetLastError();
+        Logger::log(NK_ERROR, "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.", error);
     }
 }

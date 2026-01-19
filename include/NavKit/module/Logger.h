@@ -25,4 +25,5 @@ public:
     static void log(LogCategory category, const char *format, ...);
 
     static void logRunner();
+    static void rustLogCallback(const char* message);
 };

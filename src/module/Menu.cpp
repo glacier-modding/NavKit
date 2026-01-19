@@ -13,6 +13,7 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 
@@ -83,7 +84,6 @@ void Menu::updateMenuState() {
     const Airg &airg = Airg::getInstance();
     const Navp &navp = Navp::getInstance();
     const Obj &obj = Obj::getInstance();
-    const RecastAdapter recastAdapter = RecastAdapter::getInstance();
     const bool isSceneLoaded = scene.sceneLoaded;
     const bool isNavpLoaded = navp.navpLoaded;
     const bool isObjLoaded = obj.objLoaded;
@@ -91,7 +91,8 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG, airg.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_OBJ, obj.canLoad());
-
+    setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
+    setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
@@ -151,9 +152,17 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                     Navp::getInstance().handleOpenNavpClicked();
                     Logger::log(NK_DEBUG, "File -> Open Navp clicked");
                     break;
+                case IDM_FILE_OPEN_NAVP_FROM_RPKG:
+                    Navp::getInstance().showExtractNavpDialog();
+                    Logger::log(NK_DEBUG, "File -> Open Navp from Rpkg clicked");
+                    break;
                 case IDM_FILE_OPEN_AIRG:
                     Airg::getInstance().handleOpenAirgClicked();
                     Logger::log(NK_DEBUG, "File -> Open Airg clicked");
+                    break;
+                case IDM_FILE_OPEN_AIRG_FROM_RPKG:
+                    Airg::getInstance().showExtractAirgDialog();
+                    Logger::log(NK_DEBUG, "File -> Open Airg from Rpkg clicked");
                     break;
                 case IDM_FILE_SAVE_SCENE:
                     Scene::getInstance().handleSaveSceneClicked();

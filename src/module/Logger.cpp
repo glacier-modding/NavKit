@@ -43,6 +43,14 @@ Logger::Logger()
         }
     }
 }
+void Logger::rustLogCallback(const char* message) {
+    std::string msg = message;
+    if (!msg.empty() && msg.back() == '\n') {
+        msg.pop_back();
+    }
+    log(NK_INFO, msg.c_str());
+}
+
 
 void Logger::log(LogCategory category, const char *format, ...) {
     va_list args;

@@ -53,19 +53,27 @@ void Gui::drawGui() {
                  renderer.cameraEulers[0], renderer.cameraEulers[1]);
         imguiDrawText(10, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
                       imguiRGBA(255, 255, 255, 128));
-        char selectedNavpText[64];
-        Navp &navp = Navp::getInstance();
-        snprintf(selectedNavpText, sizeof selectedNavpText,
+        const Navp &navp = Navp::getInstance();
+        char loadedNavpText[256];
+        snprintf(loadedNavpText, sizeof loadedNavpText, "Loaded Navp: %s", navp.loadedNavpText.c_str());
+        imguiDrawText(10, renderer.height - 80, IMGUI_ALIGN_LEFT, loadedNavpText,
+                      imguiRGBA(255, 255, 255, 128));
+        const Airg &airg = Airg::getInstance();
+        char loadedAirgText[256];
+        snprintf(loadedAirgText, sizeof loadedAirgText, "Loaded Airg: %s", airg.loadedAirgText.c_str());
+        imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, loadedAirgText,
+                      imguiRGBA(255, 255, 255, 128));
+        char selectedNavpAreaText[64];
+        snprintf(selectedNavpAreaText, sizeof selectedNavpAreaText,
                  navp.selectedNavpAreaIndex != -1 ? "Selected Area Index: %d" : "Selected Area Index: None",
                  navp.selectedNavpAreaIndex + 1);
-        imguiDrawText(10, renderer.height - 80, IMGUI_ALIGN_LEFT, selectedNavpText,
+        imguiDrawText(10, renderer.height - 120, IMGUI_ALIGN_LEFT, selectedNavpAreaText,
                       imguiRGBA(255, 255, 255, 128));
         char selectedAirgText[64];
-        const Airg &airg = Airg::getInstance();
         snprintf(selectedAirgText, sizeof selectedAirgText,
                  airg.selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
                  airg.selectedWaypointIndex);
-        imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, selectedAirgText,
+        imguiDrawText(10, renderer.height - 140, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
         const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
 

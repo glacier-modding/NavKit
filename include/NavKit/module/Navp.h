@@ -2,6 +2,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #include "../model/ZPathfinding.h"
 
@@ -23,8 +25,9 @@ public:
 
     ~Navp();
 
-    void renderPfSeedPoints() const;
+    static HWND hNavpDialog;
 
+    void renderPfSeedPoints() const;
     void renderPfSeedPointsForHitTest() const;
 
     static Navp &getInstance() {
@@ -37,8 +40,6 @@ public:
         return instance;
     }
 
-    void resetDefaults();
-
     void renderExclusionBoxes() const;
 
     void renderExclusionBoxesForHitTest() const;
@@ -48,6 +49,14 @@ public:
     void renderNavMeshForHitTest() const;
 
     void finalizeBuild();
+
+    static void updateNavpDialogControls(HWND hwnd);
+
+    static INT_PTR CALLBACK extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+    void showExtractNavpDialog();
+
+    static void extractNavpFromRpkgs(const std::string& hash);
 
     void buildAreaMaps();
 
@@ -79,9 +88,15 @@ public:
 
     std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
 
+    std::string loadedNavpText;
+
+    static std::string selectedRpkgNavp;
+
     void setLastLoadFileName(const char *fileName);
 
     void setLastSaveFileName(const char *fileName);
+
+    void loadNavpFromFile(const std::string& fileName);
 
     void handleOpenNavpClicked();
 
@@ -106,9 +121,14 @@ public:
     void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
     std::atomic<bool> navpBuildDone{false};
+
     bool building;
+
     std::optional<std::jthread> backgroundWorker;
+
     void buildNavp();
+
+    static std::map<std::string, std::string> navpHashIoiStringMap;
 private:
 
     static void renderArea(const NavPower::Area &area, bool selected);

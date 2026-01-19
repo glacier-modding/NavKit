@@ -16,10 +16,12 @@
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/GridGenerator.h"
@@ -27,8 +29,6 @@
 #include "../../include/ResourceLib_HM3/ResourceGenerator.h"
 #include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
-
-HWND Airg::hAirgDialog = nullptr;
 
 Airg::Airg()
     : airgName("Load Airg")
@@ -52,6 +52,10 @@ Airg::Airg()
 }
 
 Airg::~Airg() = default;
+
+HWND Airg::hAirgDialog = nullptr;
+std::string Airg::selectedRpkgAirg{};
+std::map<std::string, std::string> Airg::airgHashIoiStringMap;
 
 static std::string format_float(float val) {
     std::stringstream ss;
@@ -206,24 +210,28 @@ void Airg::setLastSaveFileName(const char *fileName) {
     saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
 }
 
+void Airg::loadAirgFromFile(const std::string& fileName) {
+    setLastLoadFileName(fileName.c_str());
+    std::string fileNameStr = fileName;
+    std::string extension = airgName.substr(airgName.length() - 4, airgName.length());
+    std::ranges::transform(extension, extension.begin(), ::toupper);
+
+    if (extension == "JSON") {
+        delete reasoningGrid;
+        reasoningGrid = new ReasoningGrid();
+        Logger::log(NK_INFO, "Loading Airg.Json file: '%s'...", fileNameStr.c_str());
+        backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, true);
+    } else if (extension == "AIRG") {
+        delete reasoningGrid;
+        reasoningGrid = new ReasoningGrid();
+        Logger::log(NK_INFO, "Loading Airg file: '%s'...", fileNameStr.c_str());
+        backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, false);
+    }
+}
+
 void Airg::handleOpenAirgClicked() {
     if (const char *fileName = openAirgFileDialog(lastLoadAirgFile.data())) {
-        setLastLoadFileName(fileName);
-        std::string fileNameStr = fileName;
-        std::string extension = airgName.substr(airgName.length() - 4, airgName.length());
-        std::ranges::transform(extension, extension.begin(), ::toupper);
-
-        if (extension == "JSON") {
-            delete reasoningGrid;
-            reasoningGrid = new ReasoningGrid();
-            Logger::log(NK_INFO, "Loading Airg.Json file: '%s'...", fileNameStr.c_str());
-            backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, true);
-        } else if (extension == "AIRG") {
-            delete reasoningGrid;
-            reasoningGrid = new ReasoningGrid();
-            Logger::log(NK_INFO, "Loading Airg file: '%s'...", fileNameStr.c_str());
-            backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, false);
-        }
+        loadAirgFromFile(fileName);
     }
 }
 
@@ -265,7 +273,7 @@ void Airg::handleBuildAirgClicked() {
     airgBuilding = true;
     delete reasoningGrid;
     reasoningGrid = new ReasoningGrid();
-    std::string msg = "Building Airg from Navp";
+    std::string msg = "Building Airg from Airg";
     Logger::log(NK_INFO, msg.data());
     build();
 }
@@ -753,4 +761,142 @@ void Airg::loadAirg(Airg *airg, const std::string& fileName, bool isFromJson) {
     airg->airgLoaded = true;
     Grid::getInstance().loadBoundsFromAirg();
     Menu::updateMenuState();
+}
+
+void Airg::updateAirgDialogControls(HWND hwnd) {
+    auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_AIRG);
+    SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
+
+    if (!airgHashIoiStringMap.empty()) {
+        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(airgHashIoiStringMap.begin(), airgHashIoiStringMap.end());
+        auto comparator = [](const std::pair<std::string, std::string>& a,
+                             const std::pair<std::string, std::string>& b) {
+            if (a.second != b.second) {
+                return a.second < b.second;
+            }
+            return a.first < b.first;
+        };
+        std::ranges::sort(sorted_hash_ioi_string_pairs, comparator);
+        for (auto & [hash, ioiString] : sorted_hash_ioi_string_pairs) {
+            std::string listItemString;
+            if (!ioiString.empty()) {
+                listItemString = ioiString;
+            } else {
+                listItemString = hash;
+            }
+            SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
+            if (selectedRpkgAirg.empty()) {
+                selectedRpkgAirg = ioiString;
+            }
+        }
+        SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM) 0, (LPARAM) 0);
+    }
+}
+
+void Airg::extractAirgFromRpkgs(const std::string& hash) {
+    if (!Rpkg::extractResourceFromRpkgs(hash, AIRG)) {
+        const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\airg\\" + hash + ".AIRG";
+        Logger::log(NK_INFO, ("Loading airg from file: " + fileName).c_str());
+        getInstance().loadAirgFromFile(fileName);
+    }
+}
+
+INT_PTR CALLBACK Airg::extractAirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    Airg* pAirg = nullptr;
+    if (message == WM_INITDIALOG) {
+        pAirg = reinterpret_cast<Airg*>(lParam);
+        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pAirg));
+    } else {
+        pAirg = reinterpret_cast<Airg*>(GetWindowLongPtr(hDlg, DWLP_USER));
+    }
+
+    if (!pAirg) {
+        return (INT_PTR)FALSE;
+    }
+
+    switch (message) {
+        case WM_INITDIALOG:
+            updateAirgDialogControls(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_COMMAND:
+
+            if(HIWORD(wParam) == CBN_SELCHANGE) {
+                const int ItemIndex = SendMessage((HWND) lParam, (UINT) CB_GETCURSEL,
+                    (WPARAM) 0, (LPARAM) 0);
+                char ListItem[256];
+                SendMessage((HWND) lParam, (UINT) CB_GETLBTEXT, (WPARAM) ItemIndex, (LPARAM) ListItem);
+                selectedRpkgAirg = ListItem;
+
+                return TRUE;
+            }
+            if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_AIRG_FROM_RPKG) {
+                for (auto & [hash, ioiString]: airgHashIoiStringMap) {
+                    if (hash == selectedRpkgAirg) {
+                        getInstance().loadedAirgText = hash;
+                    } else if (ioiString == selectedRpkgAirg) {
+                        getInstance().loadedAirgText = ioiString;
+                    } else {
+                        continue;
+                    }
+                    extractAirgFromRpkgs(hash);
+                }
+                DestroyWindow(hDlg);
+                return TRUE;
+            } else if (commandId == IDCANCEL) {
+                DestroyWindow(hDlg);
+                return TRUE;
+            }
+            return (INT_PTR) TRUE;
+
+        case WM_CLOSE:
+            DestroyWindow(hDlg);
+            return (INT_PTR) TRUE;
+
+        case WM_DESTROY:
+            hAirgDialog = nullptr;
+            return (INT_PTR) TRUE;
+        default: ;
+    }
+    return (INT_PTR) FALSE;
+}
+
+void Airg::showExtractAirgDialog() {
+    if (hAirgDialog) {
+        SetForegroundWindow(hAirgDialog);
+        return;
+    }
+
+    HINSTANCE hInstance = nullptr;
+    if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           (LPCSTR)&Airg::extractAirgDialogProc, &hInstance)) {
+        Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
+        return;
+    }
+
+    HWND hParentWnd = Renderer::hwnd;
+
+    hAirgDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_AIRG_DIALOG), hParentWnd, extractAirgDialogProc,
+                                     reinterpret_cast<LPARAM>(this));
+
+    if (hAirgDialog) {
+        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
+            SendMessage(hAirgDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hAirgDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        }
+        RECT parentRect, dialogRect;
+        GetWindowRect(hParentWnd, &parentRect);
+        GetWindowRect(hAirgDialog, &dialogRect);
+        int parentWidth = parentRect.right - parentRect.left;
+        int parentHeight = parentRect.bottom - parentRect.top;
+        int dialogWidth = dialogRect.right - dialogRect.left;
+        int dialogHeight = dialogRect.bottom - dialogRect.top;
+        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        SetWindowPos(hAirgDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ShowWindow(hAirgDialog, SW_SHOW);
+    } else {
+        const DWORD error = GetLastError();
+        Logger::log(NK_ERROR, "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_AIRG_DIALOG in the DLL.", error);
+    }
 }

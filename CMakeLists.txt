@@ -85,8 +85,8 @@ if(BUILD_INSTALLER)
                     RUNTIME DESTINATION .
             )
             install(FILES
+                    $<TARGET_FILE:glacier2obj>
                     $<TARGET_FILE:NavWeakness>
-                    $<TARGET_FILE:nfd::nfd>
                     $<TARGET_FILE:ResourceLib_HM3>
                     DESTINATION .
             )

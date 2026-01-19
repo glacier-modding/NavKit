@@ -11,7 +11,9 @@ BEGIN
         MENUITEM "Open &Scene",                              IDM_FILE_OPEN_SCENE
         MENUITEM "Open &Obj",                                IDM_FILE_OPEN_OBJ
         MENUITEM "Open &Navp",                               IDM_FILE_OPEN_NAVP
+        MENUITEM "Open Navp from &Rpkg",                     IDM_FILE_OPEN_NAVP_FROM_RPKG
         MENUITEM "Open &Airg",                               IDM_FILE_OPEN_AIRG
+        MENUITEM "Open Airg from &Rpkg",                     IDM_FILE_OPEN_AIRG_FROM_RPKG
         MENUITEM SEPARATOR
         MENUITEM "Save &Scene",                              IDM_FILE_SAVE_SCENE
         MENUITEM "Save &Obj",                                IDM_FILE_SAVE_OBJ
@@ -184,12 +186,35 @@ BEGIN
     PUSHBUTTON      "Reset Defaults",IDC_BUTTON_RESET_DEFAULTS,190,135,65,14
 END
 
+IDD_EXTRACT_NAVP_DIALOG DIALOGEX 0, 0, 460, 63
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Load Navp from resource package"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Navp file in resource packages (Rpkg) to extract and load",IDC_STATIC,7,7,443,30
+    COMBOBOX IDC_COMBOBOX_NAVP, 10, 20, 432, 150, CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    DEFPUSHBUTTON   "Open Navp",IDC_BUTTON_LOAD_NAVP_FROM_RPKG,290,45,100,14
+    PUSHBUTTON      "Cancel",IDCANCEL,400,45,50,14
+END
+
+IDD_EXTRACT_AIRG_DIALOG DIALOGEX 0, 0, 460, 63
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Load Airg from resource package"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Airg file in resource packages (Rpkg) to extract and load",IDC_STATIC,7,7,443,30
+    COMBOBOX IDC_COMBOBOX_AIRG, 10, 20, 432, 150, CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    DEFPUSHBUTTON   "Open Airg",IDC_BUTTON_LOAD_AIRG_FROM_RPKG,290,45,100,14
+    PUSHBUTTON      "Cancel",IDCANCEL,400,45,50,14
+END
+
 IDD_RECAST_MENU DIALOGEX 0, 0, 260, 515
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Recast Properties"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    // Groupboxes and controls as defined in the thought process...
     GROUPBOX        "Rasterization",IDC_STATIC,7,7,246,50
     LTEXT           "Cell Size:",IDC_STATIC,14,22,60,8
     CONTROL         "",IDC_SLIDER_CELL_SIZE,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,75,20,130,15
