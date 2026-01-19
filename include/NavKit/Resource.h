@@ -8,6 +8,7 @@
 #define IDM_FILE_OPEN_NAVP                      1002
 #define IDM_FILE_OPEN_NAVP_FROM_RPKG            1003
 #define IDM_FILE_OPEN_AIRG                      1004
+#define IDM_FILE_OPEN_AIRG_FROM_RPKG            1005
 #define IDM_FILE_SAVE_SCENE                     1010
 #define IDM_FILE_SAVE_OBJ                       1011
 #define IDM_FILE_SAVE_BLEND                     1012
@@ -152,3 +153,7 @@
 #define IDD_EXTRACT_NAVP_DIALOG                 30500
 #define IDC_COMBOBOX_NAVP                       30501
 #define IDC_BUTTON_LOAD_NAVP_FROM_RPKG          30502
+
+#define IDD_EXTRACT_AIRG_DIALOG                 30600
+#define IDC_COMBOBOX_AIRG                       30601
+#define IDC_BUTTON_LOAD_AIRG_FROM_RPKG          30602

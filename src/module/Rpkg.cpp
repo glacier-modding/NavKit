@@ -2,6 +2,8 @@
 #include <fstream>
 
 #include <cpptrace/from_current.hpp>
+
+#include "../../include/NavKit/module/Airg.h"
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
@@ -29,6 +31,14 @@ void Rpkg::initExtractionData() {
             Navp::navpHashIoiStringMap[navpHash] = navpHash;
         }
     }
+    const auto airgFilesInRpkgs = get_all_resources_hashes_by_type_from_rpkg_files(
+        partitionManager, "AIRG", Logger::rustLogCallback);
+    for (int i = 0; i < airgFilesInRpkgs->length; i++) {
+        if (std::string airgHash = get_string_from_list(airgFilesInRpkgs, i); !Airg::airgHashIoiStringMap.
+            contains(airgHash)) {
+            Airg::airgHashIoiStringMap[airgHash] = airgHash;
+        }
+    }
     Logger::log(NK_INFO, "Reading hash list.");
     if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
         std::string line;
@@ -46,6 +56,22 @@ void Rpkg::initExtractionData() {
                             ? hashPart.substr(0, dotPos)
                             : hashPart; Navp::navpHashIoiStringMap.contains(navpHash)) {
                         Navp::navpHashIoiStringMap[navpHash] = ioiString;
+                    }
+                }
+            }
+            if (line.find(".AIRG") != std::string::npos) {
+                if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
+                    std::string hashPart = line.substr(0, commaPos);
+                    std::string ioiString = line.substr(commaPos + 1);
+                    if (!ioiString.empty() && ioiString.back() == '\r') {
+                        ioiString.pop_back();
+                    }
+                    const size_t dotPos = hashPart.find('.');
+                    if (const std::string airgHash =
+                        dotPos != std::string::npos
+                            ? hashPart.substr(0, dotPos)
+                            : hashPart; Airg::airgHashIoiStringMap.contains(airgHash)) {
+                        Airg::airgHashIoiStringMap[airgHash] = ioiString;
                     }
                 }
             }

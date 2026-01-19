@@ -92,6 +92,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG, airg.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_OBJ, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
+    setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
@@ -158,6 +159,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg *wmMsg) {
                 case IDM_FILE_OPEN_AIRG:
                     Airg::getInstance().handleOpenAirgClicked();
                     Logger::log(NK_DEBUG, "File -> Open Airg clicked");
+                    break;
+                case IDM_FILE_OPEN_AIRG_FROM_RPKG:
+                    Airg::getInstance().showExtractAirgDialog();
+                    Logger::log(NK_DEBUG, "File -> Open Airg from Rpkg clicked");
                     break;
                 case IDM_FILE_SAVE_SCENE:
                     Scene::getInstance().handleSaveSceneClicked();

@@ -4,6 +4,7 @@
 #include <thread>
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
+#include <map>
 #include <windows.h>
 
 struct Vec3;
@@ -74,6 +75,16 @@ public:
 
     void handleSaveAirgClicked();
 
+    void loadAirgFromFile(const std::string& fileName);
+
+    static void updateAirgDialogControls(HWND hwnd);
+
+    static INT_PTR CALLBACK extractAirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+    void showExtractAirgDialog();
+
+    static void extractAirgFromRpkgs(const std::string& hash);
+
     [[nodiscard]] bool canLoad() const;
 
     [[nodiscard]] bool canSave() const;
@@ -93,6 +104,12 @@ public:
     static void UpdateDialogControls(HWND hDlg);
 
     static HWND hAirgDialog;
+
+    std::string loadedAirgText;
+
+    static std::string selectedRpkgAirg;
+
+    static std::map<std::string, std::string> airgHashIoiStringMap;
 
 private:
     static INT_PTR CALLBACK AirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);

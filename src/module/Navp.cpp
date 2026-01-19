@@ -27,8 +27,6 @@
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/InputGeom.h"
-#include "../../include/ResourceLib_HM3/ResourceLib.h"
-#include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 Navp::Navp()
     : navMesh(new NavPower::NavMesh()),
@@ -57,10 +55,6 @@ Navp::~Navp() = default;
 HWND Navp::hNavpDialog = nullptr;
 std::string Navp::selectedRpkgNavp{};
 std::map<std::string, std::string> Navp::navpHashIoiStringMap;
-
-// Just to remove compiler warning for unused includes
-typedef JsonString j;
-typedef ResourceConverter r;
 
 void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
@@ -722,7 +716,7 @@ void Navp::finalizeBuild() {
     }
 }
 
-void Navp::updateNavkitDialogControls(HWND hwnd) {
+void Navp::updateNavpDialogControls(HWND hwnd) {
     auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
     SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
 
@@ -756,7 +750,7 @@ void Navp::extractNavpFromRpkgs(const std::string& hash) {
     if (!Rpkg::extractResourceFromRpkgs(hash, NAVP)) {
         const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\navp\\" + hash + ".NAVP";
         Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
-        getInstance().loadNavpFromFile(fileName.c_str());
+        getInstance().loadNavpFromFile(fileName);
     }
 }
 
@@ -775,7 +769,7 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wPa
 
     switch (message) {
         case WM_INITDIALOG:
-            pNavp->updateNavkitDialogControls(hDlg);
+            updateNavpDialogControls(hDlg);
             return (INT_PTR) TRUE;
 
         case WM_COMMAND:

@@ -50,7 +50,7 @@ public:
 
     void finalizeBuild();
 
-    static void updateNavkitDialogControls(HWND hwnd);
+    static void updateNavpDialogControls(HWND hwnd);
 
     static INT_PTR CALLBACK extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
