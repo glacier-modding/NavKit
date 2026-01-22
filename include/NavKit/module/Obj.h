@@ -7,6 +7,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include "../../include/NavKit/render/Model.h"
+#include "../../include/NavKit/render/Shader.h"
 enum MeshType {
     ALOC,
     PRIM
@@ -58,6 +60,7 @@ public:
     bool primLods[8];
     bool blendFileBuilt;
     static HWND hObjDialog;
+    Model model;
 
     static char *openSetBlenderFileDialog(const char *lastBlenderFile);
 
@@ -79,7 +82,9 @@ public:
 
     void finalizeObjBuild();
 
-    static void renderObj();
+    void renderObj() const;
+
+    void renderObjUsingRecast();
 
     static char *openLoadObjFileDialog();
 

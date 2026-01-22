@@ -231,6 +231,7 @@ void Airg::loadAirgFromFile(const std::string& fileName) {
 
 void Airg::handleOpenAirgClicked() {
     if (const char *fileName = openAirgFileDialog(lastLoadAirgFile.data())) {
+        loadedAirgText = fileName;
         loadAirgFromFile(fileName);
     }
 }

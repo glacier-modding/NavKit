@@ -1,10 +1,15 @@
 #include "../../include/NavKit/module/Obj.h"
 
 #include <direct.h>
+#include <SDL.h>
+#include <GL/glew.h>
 #include <filesystem>
 #include <fstream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <thread>
 #include <vector>
+#include <assimp/scene.h>
 
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -15,12 +20,12 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
-#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 HWND Obj::hObjDialog = nullptr;
@@ -452,10 +457,75 @@ void Obj::loadObjMesh() {
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();
     }
-    objToLoad.clear();
 }
 
-void Obj::renderObj() {
+void Obj::renderObj() const {
+    Renderer &renderer = Renderer::getInstance();
+
+    // 1. Enable Depth Test so objects obscure things behind them
+    glEnable(GL_DEPTH_TEST);
+    // 2. Enable Culling for performance (discards back-facing triangles)
+    glEnable(GL_CULL_FACE);
+
+    // 3. Load Texture (Lazy initialization)
+    static GLuint tileTextureID = 0;
+    if (tileTextureID == 0) {
+        SDL_Surface* loadedSurface = SDL_LoadBMP("tile.bmp");
+        if (loadedSurface) {
+            // Convert surface to a standard RGBA format that OpenGL understands easily.
+            SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(loadedSurface, SDL_PIXELFORMAT_RGBA32, 0);
+            SDL_FreeSurface(loadedSurface); // Free the original surface
+
+            if (!formattedSurface) {
+                Logger::log(NK_ERROR, "Failed to convert BMP surface: %s", SDL_GetError());
+            } else {
+            glGenTextures(1, &tileTextureID);
+            glBindTexture(GL_TEXTURE_2D, tileTextureID);
+
+            // Upload the converted RGBA data. No need for alignment or format tricks.
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, formattedSurface->w, formattedSurface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, formattedSurface->pixels);
+
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                SDL_FreeSurface(formattedSurface); // Free the converted surface
+            }
+        } else {
+             Logger::log(NK_ERROR, "Failed to load tile.bmp: %s", SDL_GetError());
+        }
+    }
+
+    renderer.shader.use();
+
+    // Bind the texture
+    if (tileTextureID != 0) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tileTextureID);
+        renderer.shader.setInt("tileTexture", 0);
+    }
+
+    const glm::mat4 projection = glm::perspective(glm::radians(45.0f), static_cast<float>(renderer.width) / static_cast<float>(renderer.height), 0.1f, 2000.0f);
+    // Fix Horizontal Translation: Negate renderer.cameraPos[0]
+    const glm::mat4 view = glm::lookAt(glm::vec3(-renderer.cameraPos[0], renderer.cameraPos[1], -renderer.cameraPos[2]),
+                                 glm::vec3(-renderer.cameraPos[0] + -sin(glm::radians(renderer.cameraEulers[1])) * cos(glm::radians(renderer.cameraEulers[0])),
+                                           renderer.cameraPos[1] + -sin(glm::radians(renderer.cameraEulers[0])),
+                                           -renderer.cameraPos[2] + cos(glm::radians(renderer.cameraEulers[1])) * cos(glm::radians(renderer.cameraEulers[0]))),
+                                 glm::vec3(0.0f, 1.0f, 0.0f));
+    auto modelTransform = glm::mat4(1.0f);
+    modelTransform = glm::translate(modelTransform, glm::vec3(0.0f, 0.0f, 0.0f));
+    modelTransform = glm::scale(modelTransform, glm::vec3(1.0f, 1.0f, 1.0f));
+    renderer.shader.setMat4("projection", projection);
+    renderer.shader.setMat4("view", view);
+    renderer.shader.setMat4("model", modelTransform);
+    renderer.shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelTransform))));
+    renderer.shader.setVec4("objectColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
+
+    model.draw(renderer.shader);
+}
+
+void Obj::renderObjUsingRecast() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
@@ -581,11 +651,16 @@ void Obj::finalizeLoad() {
 
     if (!objLoadDone.empty()) {
         if (RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
+            Logger::log(NK_INFO, "Creating OpenGL buffers for model...");
+            model.loadModel(lastObjFileName);
+            Logger::log(NK_INFO, "Finished creating OpenGL buffers.");
+
             recastAdapter.handleMeshChanged();
             Navp::updateExclusionBoxConvexVolumes();
         }
         objLoaded = true;
         objLoadDone.clear();
+        objToLoad.clear();
         Menu::updateMenuState();
         if (Navp &navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
             Logger::log(NK_INFO, "Obj load complete, building Navp...");

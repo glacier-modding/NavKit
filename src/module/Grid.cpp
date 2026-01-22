@@ -36,6 +36,7 @@ void Grid::saveSpacing(const float newSpacing) {
 }
 
 void Grid::renderGrid() const {
+    glEnable(GL_DEPTH_TEST);
     const Vec3 color = {0.6, 0.6, 0.6};
     float zOffset = 0;
     Airg &airg = Airg::getInstance();

@@ -33,6 +33,11 @@ set(MODULE_SOURCES
         module/Scene.cpp
         module/SceneExtract.cpp
 )
+set(RENDER_SOURCES
+        render/Mesh.cpp
+        render/Model.cpp
+        render/Shader.cpp
+)
 set(UTIL_SOURCES
         util/CommandRunner.cpp
         util/ErrorHandler.cpp
@@ -48,14 +53,15 @@ add_library(NavKitLib STATIC
         ${RECAST_DEMO_SOURCES}
         ${MODEL_SOURCES}
         ${MODULE_SOURCES}
+        ${RENDER_SOURCES}
         ${UTIL_SOURCES}
 )
 target_compile_definitions(NavKitLib PRIVATE NOMINMAX)
 set_property(TARGET NavKitLib PROPERTY CXX_STANDARD 20)
 
-add_library(glacier2obj SHARED IMPORTED GLOBAL
+add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
         include/navkit-rpkg-lib/navkit-rpkg-lib.h)
-set_target_properties(glacier2obj PROPERTIES
+set_target_properties(navkit-rpkg-lib PROPERTIES
         IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll.lib"
         IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll.lib"
         IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll"
@@ -89,7 +95,7 @@ target_include_directories(NavKitLib
 )
 target_link_libraries(NavKitLib PUBLIC
         GLEW::GLEW
-        glacier2obj
+        navkit-rpkg-lib
         NavWeakness
         OpenGL::GL
         RecastNavigation::DebugUtils
@@ -100,8 +106,10 @@ target_link_libraries(NavKitLib PUBLIC
         ResourceLib_HM3
         SDL2::SDL2
         SDL2::SDL2main
+        assimp::assimp
         cpptrace::cpptrace
         ftgl
+        glm::glm
         httplib::httplib
         nfd::nfd
         simdjson::simdjson
@@ -115,7 +123,7 @@ add_executable(NavKit
 target_compile_definitions(NavKit PRIVATE NOMINMAX)
 target_link_libraries(NavKit PRIVATE NavKitLib)
 set(RUNTIME_TARGET_DEPENDENCIES
-        glacier2obj
+        navkit-rpkg-lib
         NavWeakness
         ResourceLib_HM3
 )
@@ -127,6 +135,9 @@ set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py"
         "${NavKit_SOURCE_DIR}/src/resource/hash_list_filtered.txt"
         "${NavKit_SOURCE_DIR}/src/resource/res.blend"
+        "${NavKit_SOURCE_DIR}/src/resource/vertex.glsl"
+        "${NavKit_SOURCE_DIR}/src/resource/fragment.glsl"
+        "${NavKit_SOURCE_DIR}/src/resource/tile.bmp"
 )
 set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES} PARENT_SCOPE)
 

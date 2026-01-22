@@ -600,6 +600,7 @@ void Navp::loadNavpFromFile(const std::string& fileName) {
 
 void Navp::handleOpenNavpClicked() {
     if (const char *fileName = openLoadNavpFileDialog()) {
+        loadedNavpText = fileName;
         loadNavpFromFile(fileName);
     }
 }

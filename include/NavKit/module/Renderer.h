@@ -3,6 +3,7 @@
 #include <SDL_syswm.h>
 #include "../../NavWeakness/Vec3.h"
 #include "../util/Math.h"
+#include "../render/Shader.h"
 class FTPixmapFont;
 
 typedef double GLdouble;
@@ -32,6 +33,8 @@ public:
     ~Renderer();
 
     void handleMoved();
+
+    void initShaders();
 
     static Renderer &getInstance() {
         static Renderer instance;
@@ -82,6 +85,7 @@ public:
     GLdouble projectionMatrix[16];
     GLdouble modelviewMatrix[16];
     GLint viewport[4];
+    Shader shader;
 
     SDL_Window *window;
     static HWND hwnd;

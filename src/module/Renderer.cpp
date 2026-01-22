@@ -213,6 +213,11 @@ void Renderer::handleMoved() {
     persistedSettings.save();
 }
 
+void Renderer::initShaders() {
+    shader = Shader();
+    shader.loadShaders("vertex.glsl", "fragment.glsl");
+}
+
 void Renderer::handleResize() {
     width = SDL_GetWindowSurface(window)->w;
     height = SDL_GetWindowSurface(window)->h;
@@ -293,7 +298,7 @@ void Renderer::renderFrame() {
         recastAirgAdapter.renderRecastNavmesh(true);
     }
     if (const Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
-        Obj::renderObj();
+        obj.renderObj();
     }
     // Marker
     GLdouble x, y, z;
@@ -315,11 +320,14 @@ void Renderer::renderFrame() {
     if (grid.showGrid) {
         grid.renderGridText();
     }
-    glClear(GL_DEPTH_BUFFER_BIT);
+
+    glUseProgram(0);
+    glDisable(GL_DEPTH_TEST); // Disable depth testing for UI overlays
     if (scene.showBBox) {
         drawBounds();
     }
     drawAxes();
+    glEnable(GL_DEPTH_TEST); // Re-enable for the next frame
 }
 
 void Renderer::finalizeFrame() const {
