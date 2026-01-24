@@ -30,7 +30,6 @@
 #include "../include/NavKit/module/Obj.h"
 #include "../include/NavKit/module/PersistedSettings.h"
 #include "../include/NavKit/module/Renderer.h"
-#include "../include/NavKit/module/Rpkg.h"
 #include "../include/NavKit/module/SceneExtract.h"
 #include "../include/NavKit/util/ErrorHandler.h"
 #include "../include/NavKit/util/FileUtil.h"
@@ -48,6 +47,7 @@ int SDL_main(const int argc, char **argv) {
             if (!renderer.initWindowAndRenderer()) {
                 return -1;
             }
+            renderer.initShaders();
             SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 
             UpdateChecker &updateChecker = UpdateChecker::getInstance();

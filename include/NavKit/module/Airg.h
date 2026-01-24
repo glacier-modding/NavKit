@@ -5,7 +5,11 @@
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
 #include <map>
+#include <GL/glew.h>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <windows.h>
+#include "../model/ReasoningGrid.h"
 
 struct Vec3;
 struct ResourceConverter;
@@ -16,11 +20,22 @@ enum CellColorDataSource {
     OFF, AIRG_BITMAP, VISION_DATA, LAYER
 };
 
+struct AirgVertex {
+    glm::vec3 pos;
+    glm::vec3 normal;
+    glm::vec4 color;
+};
 class Airg {
 public:
     explicit Airg();
 
     ~Airg();
+
+    static GLuint airgLineVAO;
+
+    static GLuint airgTriVBO;
+
+    static GLuint airgTriVAO;
 
     static Airg &getInstance() {
         static Airg instance;
@@ -51,8 +66,10 @@ public:
 
     void finalizeSave();
 
-    void build();
+    int visibilityDataSize(ReasoningGrid* reasoningGrid, int waypointIndex);
 
+    void build();
+    static void addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts, const Waypoint& waypoint, bool selected, const glm::vec4& color, bool forceFan = false);
     void renderLayerIndices(int waypointIndex) const;
 
     void renderCellBitmaps(int waypointIndex, bool selected);
@@ -112,6 +129,22 @@ public:
     static std::map<std::string, std::string> airgHashIoiStringMap;
 
 private:
+    static GLuint airgLineVBO;
+
+    static int airgTriCount;
+
+    static int airgLineCount;
+
+    static bool airgDirty;
+
+    static GLuint airgHitTestVAO;
+
+    static GLuint airgHitTestVBO;
+
+    static int airgHitTestCount;
+
+    static bool airgHitTestDirty;
+
     static INT_PTR CALLBACK AirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
     static char *openSaveAirgFileDialog(char *lastAirgFolder);

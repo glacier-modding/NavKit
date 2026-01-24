@@ -3,7 +3,10 @@
 #include <SDL_syswm.h>
 #include "../../NavWeakness/Vec3.h"
 #include "../util/Math.h"
-class FTPixmapFont;
+#include "../render/Shader.h"
+#include <glm/mat4x4.hpp>
+
+class FTPolygonFont;
 
 typedef double GLdouble;
 typedef int GLint;
@@ -32,6 +35,8 @@ public:
     ~Renderer();
 
     void handleMoved();
+
+    void initShaders();
 
     static Renderer &getInstance() {
         static Renderer instance;
@@ -70,7 +75,7 @@ public:
     unsigned int framebuffer;
     unsigned int color_rb;
     unsigned int depth_rb;
-    FTPixmapFont *font;
+    FTPolygonFont* font;
     int width;
     int height;
     float frameRate;
@@ -82,8 +87,11 @@ public:
     GLdouble projectionMatrix[16];
     GLdouble modelviewMatrix[16];
     GLint viewport[4];
+    Shader shader;
 
     SDL_Window *window;
+    glm::mat4 projection;
+    glm::mat4 view;
     static HWND hwnd;
     Uint32 prevFrameTime;
 };

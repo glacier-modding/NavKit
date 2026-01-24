@@ -3,7 +3,7 @@ cmake_policy(SET CMP0141 NEW)
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<CONFIG:Debug>,EditAndContinue,ProgramDatabase>" CACHE STRING "MSVC debug information format")
 project(
         NavKit
-        VERSION 2.9.0
+        VERSION 2.10.0
         DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman: World of Assassination"
         LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
@@ -20,8 +20,10 @@ find_package(OpenSSL CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(assimp CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(cpptrace CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 find_package(nfd CONFIG REQUIRED)
 find_package(recastnavigation CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
@@ -41,9 +43,11 @@ endif ()
 set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:GLEW::glew>"
         "$<TARGET_FILE:SDL2::SDL2>"
+        "$<TARGET_FILE:assimp::assimp>"
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"
         "$<TARGET_FILE:ftgl>"
+        "$<TARGET_FILE:glm::glm>"
         "$<TARGET_FILE:nfd::nfd>"
         "$<TARGET_FILE:simdjson::simdjson>"
         "$<TARGET_FILE:unofficial::brotli::brotlicommon>"
@@ -85,7 +89,7 @@ if(BUILD_INSTALLER)
                     RUNTIME DESTINATION .
             )
             install(FILES
-                    $<TARGET_FILE:glacier2obj>
+                    $<TARGET_FILE:navkit-rpkg-lib>
                     $<TARGET_FILE:NavWeakness>
                     $<TARGET_FILE:ResourceLib_HM3>
                     DESTINATION .

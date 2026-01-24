@@ -1,10 +1,16 @@
 #include "../../include/NavKit/module/Obj.h"
 
 #include <direct.h>
+#include <SDL.h>
+#include <GL/glew.h>
 #include <filesystem>
 #include <fstream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <thread>
 #include <vector>
+#include <future>
+#include <assimp/scene.h>
 
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -15,15 +21,13 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
-#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavWeakness/NavPower.h"
-
-HWND Obj::hObjDialog = nullptr;
 
 Obj::Obj() : loadObjName("Load Obj"),
              saveObjName("Save Obj"),
@@ -49,6 +53,35 @@ Obj::Obj() : loadObjName("Load Obj"),
              sceneMeshBuildType(COPY),
              primLods{true, true, true, true, true, true, true, true},
              blendFileBuilt(false) {
+}
+
+HWND Obj::hObjDialog = nullptr;
+
+GLuint Obj::tileTextureId = 0;
+
+void Obj::loadTileTexture() {
+    if (tileTextureId != 0) return;
+
+    if (SDL_Surface* loadedSurface = SDL_LoadBMP("tile.bmp")) {
+        SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(loadedSurface, SDL_PIXELFORMAT_RGBA32, 0);
+        SDL_FreeSurface(loadedSurface);
+
+        if (!formattedSurface) {
+            Logger::log(NK_ERROR, "Failed to convert BMP surface: %s", SDL_GetError());
+        } else {
+            glGenTextures(1, &tileTextureId);
+            glBindTexture(GL_TEXTURE_2D, tileTextureId);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, formattedSurface->w, formattedSurface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, formattedSurface->pixels);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            SDL_FreeSurface(formattedSurface);
+        }
+    } else {
+        Logger::log(NK_ERROR, "Failed to load tile.bmp: %s", SDL_GetError());
+    }
 }
 
 void Obj::updateObjDialogControls(HWND hDlg) {
@@ -416,8 +449,23 @@ void Obj::loadObjMesh() {
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     const auto start = std::chrono::high_resolution_clock::now();
-    if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0) {
+
+    auto recastFuture = std::async(std::launch::async, [this]() {
+        Logger::log(NK_INFO, "Loading Obj model data to Recast...");
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        int result = recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0;
+        Logger::log(NK_INFO, "Done loading Obj model data to Recast.");
+        return result;
+    });
+
+    auto modelFuture = std::async(std::launch::async, [this]() {
+        Logger::log(NK_INFO, "Loading Obj model data to rendering system...");
+        model.loadModelData(objToLoad);
+        Logger::log(NK_INFO, "Done loading Obj model data to rendering system.");
+    });
+
+    if (recastFuture.get()) {
+        modelFuture.wait();
         if (objLoadDone.empty()) {
             objLoadDone.push_back(true);
             // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the obj.
@@ -445,17 +493,45 @@ void Obj::loadObjMesh() {
             Logger::log(NK_INFO, msg.data());
         }
     } else {
+        modelFuture.wait();
         Logger::log(NK_ERROR, "Error loading obj.");
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         if (recastAdapter.getVertCount() == 0) {
             Logger::log(NK_ERROR, "Cannot load Obj, Obj has 0 vertices.");
         }
+        model.meshes.clear();
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();
     }
-    objToLoad.clear();
 }
 
-void Obj::renderObj() {
+void Obj::renderObj() const {
+    Renderer &renderer = Renderer::getInstance();
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+
+    renderer.shader.use();
+
+    if (tileTextureId != 0) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tileTextureId);
+        renderer.shader.setInt("tileTexture", 0);
+    }
+
+    auto modelTransform = glm::mat4(1.0f);
+    modelTransform = glm::translate(modelTransform, glm::vec3(0.0f, 0.0f, 0.0f));
+    modelTransform = glm::scale(modelTransform, glm::vec3(1.0f, 1.0f, 1.0f));
+    renderer.shader.setMat4("projection", renderer.projection);
+    renderer.shader.setMat4("view", renderer.view);
+    renderer.shader.setMat4("model", modelTransform);
+    renderer.shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelTransform))));
+    renderer.shader.setVec4("objectColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
+
+    model.draw(renderer.shader, renderer.projection * renderer.view);
+}
+
+void Obj::renderObjUsingRecast() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
@@ -581,11 +657,17 @@ void Obj::finalizeLoad() {
 
     if (!objLoadDone.empty()) {
         if (RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
+            Logger::log(NK_INFO, "Creating OpenGL buffers for model...");
+            loadTileTexture();
+            model.initGL();
+            Logger::log(NK_INFO, "Finished creating OpenGL buffers.");
+
             recastAdapter.handleMeshChanged();
             Navp::updateExclusionBoxConvexVolumes();
         }
         objLoaded = true;
         objLoadDone.clear();
+        objToLoad.clear();
         Menu::updateMenuState();
         if (Navp &navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
             Logger::log(NK_INFO, "Obj load complete, building Navp...");

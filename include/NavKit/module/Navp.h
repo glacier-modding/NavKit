@@ -4,6 +4,7 @@
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <GL/glew.h>
 
 #include "../model/ZPathfinding.h"
 
@@ -25,7 +26,35 @@ public:
 
     ~Navp();
 
+    static int navMeshTriCount;
+
+    static GLuint hitTestVBO;
+
+    static GLuint hitTestVAO;
+
+    static GLuint navMeshLineVBO;
+
+    static GLuint navMeshLineVAO;
+
+    static GLuint navMeshTriVBO;
+
+    static GLuint navMeshTriVAO;
+
     static HWND hNavpDialog;
+
+    static int navMeshLineCount;
+
+    static int hitTestTriCount;
+
+    static bool navMeshDirty;
+
+    static bool hitTestDirty;
+
+    static int lastSelectedArea;
+
+    static void updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIndex);
+
+    static void updateHitTestBuffers(const NavPower::NavMesh* navMesh);
 
     void renderPfSeedPoints() const;
     void renderPfSeedPointsForHitTest() const;
