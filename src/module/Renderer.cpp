@@ -274,6 +274,12 @@ void Renderer::renderFrame() {
 
     glFrontFace(GL_CW);
 
+    // Reset shader state to ensure objects render with lighting/textures by default
+    shader.use();
+    shader.setBool("useFlatColor", false);
+    shader.setBool("useVertexColor", false);
+    glUseProgram(0);
+
     if (const Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
         obj.renderObj();
         glUseProgram(0);

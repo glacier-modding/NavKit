@@ -5,9 +5,9 @@
 #include <functional>
 #include <filesystem>
 #include <map>
-
+#include <vector>
+#include <glm/glm.hpp>
 #include <cpptrace/from_current.hpp>
-#include <GL/glew.h>
 
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -55,6 +55,183 @@ Navp::~Navp() = default;
 HWND Navp::hNavpDialog = nullptr;
 std::string Navp::selectedRpkgNavp{};
 std::map<std::string, std::string> Navp::navpHashIoiStringMap;
+
+GLuint Navp::navMeshTriVAO = 0;
+GLuint Navp::navMeshTriVBO = 0;
+GLuint Navp::navMeshLineVAO = 0;
+GLuint Navp::navMeshLineVBO = 0;
+GLuint Navp::hitTestVAO = 0;
+GLuint Navp::hitTestVBO = 0;
+int Navp::navMeshTriCount = 0;
+int Navp::navMeshLineCount = 0;
+int Navp::hitTestTriCount = 0;
+bool Navp::navMeshDirty = true;
+bool Navp::hitTestDirty = true;
+int Navp::lastSelectedArea = -2;
+
+struct NavVertex {
+    glm::vec3 pos;
+    glm::vec3 normal;
+    glm::vec4 color;
+};
+
+void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIndex) {
+    if (!navMesh) return;
+
+    std::vector<NavVertex> triVertices;
+    std::vector<NavVertex> lineVertices;
+
+    for (int i = 0; i < navMesh->m_areas.size(); ++i) {
+        const auto& area = navMesh->m_areas[i];
+        bool selected = (i == selectedIndex);
+
+        // Determine Area Color
+        glm::vec4 areaColor;
+        bool isStairs = area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
+        if (isStairs) {
+            areaColor = selected ? glm::vec4(1.0, 1.0, 0.5, 1.0) : glm::vec4(0.5, 0.5, 0.0, 1.0);
+        } else {
+            areaColor = selected ? glm::vec4(0.0, 0.9, 0.0, 1.0) : glm::vec4(0.0, 0.5, 0.0, 1.0);
+        }
+
+        // Triangulate (Fan)
+        if (area.m_edges.size() >= 3) {
+            const auto& v0 = area.m_edges[0];
+            glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
+
+            for (size_t j = 1; j < area.m_edges.size() - 1; ++j) {
+                const auto& v1 = area.m_edges[j];
+                const auto& v2 = area.m_edges[j+1];
+
+                glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
+                glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
+
+                triVertices.push_back({p0, glm::vec3(0,1,0), areaColor});
+                triVertices.push_back({p1, glm::vec3(0,1,0), areaColor});
+                triVertices.push_back({p2, glm::vec3(0,1,0), areaColor});
+            }
+        }
+
+        // Lines
+        for (size_t j = 0; j < area.m_edges.size(); ++j) {
+            auto vStart = area.m_edges[j];
+            auto vEnd = area.m_edges[(j + 1) % area.m_edges.size()];
+
+            glm::vec3 pStart(vStart->m_pos.X, vStart->m_pos.Z + 0.01f, -vStart->m_pos.Y);
+            glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + 0.01f, -vEnd->m_pos.Y);
+
+            auto getEdgeColor = [&](const NavPower::Binary::Edge* v) {
+                if (v->GetType() == NavPower::EdgeType::EDGE_PORTAL) return glm::vec4(1.0, 1.0, 1.0, 1.0);
+                return selected ? glm::vec4(0.0, 1.0, 1.0, 1.0) : glm::vec4(0.0, 1.0, 0.0, 1.0);
+            };
+
+            lineVertices.push_back({pStart, glm::vec3(0,1,0), getEdgeColor(vStart)});
+            lineVertices.push_back({pEnd, glm::vec3(0,1,0), getEdgeColor(vEnd)});
+        }
+
+        // Portal Loops (Circles)
+        for (auto vertex : area.m_edges) {
+            if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
+                const float r = 0.05f;
+                glm::vec4 circleColor(1.0, 1.0, 1.0, 1.0);
+
+                for (int k = 0; k < 8; ++k) {
+                    float a1 = (float)k / 8.0f * std::numbers::pi * 2;
+                    float a2 = (float)(k+1) / 8.0f * std::numbers::pi * 2;
+
+                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1)*r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a1)*r));
+                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2)*r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a2)*r));
+
+                    lineVertices.push_back({glP1, glm::vec3(0,1,0), circleColor});
+                    lineVertices.push_back({glP2, glm::vec3(0,1,0), circleColor});
+                }
+            }
+        }
+    }
+
+    // Upload Triangles
+    if (navMeshTriVAO == 0) glGenVertexArrays(1, &navMeshTriVAO);
+    if (navMeshTriVBO == 0) glGenBuffers(1, &navMeshTriVBO);
+
+    glBindVertexArray(navMeshTriVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, navMeshTriVBO);
+    glBufferData(GL_ARRAY_BUFFER, triVertices.size() * sizeof(NavVertex), triVertices.data(), GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0); // Pos
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, pos));
+    glEnableVertexAttribArray(1); // Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, normal));
+    glEnableVertexAttribArray(2); // Color
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, color));
+
+    navMeshTriCount = triVertices.size();
+
+    // Upload Lines
+    if (navMeshLineVAO == 0) glGenVertexArrays(1, &navMeshLineVAO);
+    if (navMeshLineVBO == 0) glGenBuffers(1, &navMeshLineVBO);
+
+    glBindVertexArray(navMeshLineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, navMeshLineVBO);
+    glBufferData(GL_ARRAY_BUFFER, lineVertices.size() * sizeof(NavVertex), lineVertices.data(), GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, pos));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, normal));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, color));
+
+    navMeshLineCount = lineVertices.size();
+
+    glBindVertexArray(0);
+}
+
+void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
+    if (!navMesh) return;
+    std::vector<NavVertex> vertices;
+
+    for (int i = 0; i < navMesh->m_areas.size(); ++i) {
+        const auto& area = navMesh->m_areas[i];
+
+        float r = (float)NAVMESH_AREA / 255.0f;
+        float g = (float)(i / 255) / 255.0f;
+        float b = (float)(i % 255) / 255.0f;
+        glm::vec4 color(r, g, b, 1.0f);
+
+        if (area.m_edges.size() >= 3) {
+            const auto& v0 = area.m_edges[0];
+            glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
+
+            for (size_t j = 1; j < area.m_edges.size() - 1; ++j) {
+                const auto& v1 = area.m_edges[j];
+                const auto& v2 = area.m_edges[j+1];
+                glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
+                glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
+
+                vertices.push_back({p0, glm::vec3(0), color});
+                vertices.push_back({p1, glm::vec3(0), color});
+                vertices.push_back({p2, glm::vec3(0), color});
+            }
+        }
+    }
+
+    if (hitTestVAO == 0) glGenVertexArrays(1, &hitTestVAO);
+    if (hitTestVBO == 0) glGenBuffers(1, &hitTestVBO);
+
+    glBindVertexArray(hitTestVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, hitTestVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(NavVertex), vertices.data(), GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, pos));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, normal));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(NavVertex), (void*)offsetof(NavVertex, color));
+
+    hitTestTriCount = vertices.size();
+    glBindVertexArray(0);
+}
 
 void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
@@ -193,77 +370,6 @@ void Navp::setStairsFlags() const {
     }
 }
 
-void Navp::renderArea(const NavPower::Area &area, const bool selected) {
-    if (areaIsStairs(area)) {
-        if (!selected) {
-            glColor4f(0.5, 0.5, 0.0, 1.0);
-        } else {
-            glColor4f(1.0, 1.0, 0.5, 1.0);
-        }
-    } else {
-        if (!selected) {
-            glColor4f(0.0, 0.5, 0.0, 1.0);
-        } else {
-            glColor4f(0.0, 0.9, 0.0, 1.0);
-        }
-    }
-    glBegin(GL_POLYGON);
-    for (const auto vertex: area.m_edges) {
-        glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
-    }
-    glEnd();
-    glBegin(GL_LINES);
-    bool previousWasPortal = false;
-    bool isFirstVertex = true;
-    const Vec3 firstVertex{area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Z + 0.01f, -area.m_edges[0]->m_pos.Y};
-    for (const auto vertex: area.m_edges) {
-        if (!isFirstVertex) {
-            if (previousWasPortal) {
-                glColor3f(1.0, 1.0, 1.0);
-            } else {
-                if (!selected) {
-                    glColor3f(0.0, 1.0, 0.0);
-                } else {
-                    glColor3f(0.0, 1.0, 1.0);
-                }
-            }
-            glVertex3f(vertex->m_pos.X, vertex->m_pos.Z + 0.01f, -vertex->m_pos.Y);
-        } else {
-            isFirstVertex = false;
-        }
-        if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
-            glColor3f(1.0, 1.0, 1.0);
-        } else {
-            if (!selected) {
-                glColor3f(0.0, 1.0, 0.0);
-            } else {
-                glColor3f(0.0, 1.0, 1.0);
-            }
-        }
-        previousWasPortal = vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL;
-        glVertex3f(vertex->m_pos.X, vertex->m_pos.Z + 0.01f, -vertex->m_pos.Y);
-    }
-    glVertex3f(firstVertex.X, firstVertex.Y, firstVertex.Z);
-    glEnd();
-
-    // Render Portal vertices as line loop
-    glColor3f(1.0, 1.0, 1.0);
-    for (auto vertex: area.m_edges) {
-        const float r = 0.05f;
-        if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
-            glBegin(GL_LINE_LOOP);
-            for (int i = 0; i < 8; i++) {
-                const float a = (float) i / 8.0f * std::numbers::pi * 2;
-                const float fx = (float) vertex->m_pos.X + cosf(a) * r;
-                const float fy = (float) vertex->m_pos.Y + sinf(a) * r;
-                const float fz = (float) vertex->m_pos.Z;
-                glVertex3f(fx, fz, -fy);
-            }
-            glEnd();
-        }
-    }
-}
-
 void Navp::setSelectedNavpAreaIndex(const int index) {
     if (index == -1 && selectedNavpAreaIndex != -1) {
         Logger::log(NK_INFO, ("Deselected area: " + std::to_string(selectedNavpAreaIndex + 1)).c_str());
@@ -379,18 +485,38 @@ void Navp::setSelectedExclusionBoxIndex(int index) {
 
 void Navp::renderNavMesh() {
     if (!loading) {
-        int areaIndex = 0;
-        for (const NavPower::Area &area: navMesh->m_areas) {
-            renderArea(area, areaIndex == selectedNavpAreaIndex);
-            areaIndex++;
+        Renderer &renderer = Renderer::getInstance();
+
+        if (navMeshDirty || selectedNavpAreaIndex != lastSelectedArea) {
+            updateNavMeshBuffers(navMesh, selectedNavpAreaIndex);
+            lastSelectedArea = selectedNavpAreaIndex;
+            navMeshDirty = false;
         }
+
+        renderer.shader.use();
+        renderer.shader.setMat4("view", renderer.view);
+        renderer.shader.setMat4("projection", renderer.projection);
+        renderer.shader.setMat4("model", glm::mat4(1.0f));
+        renderer.shader.setBool("useFlatColor", true);
+        renderer.shader.setBool("useVertexColor", true);
+
+        if (navMeshTriCount > 0) {
+            glBindVertexArray(navMeshTriVAO);
+            glDrawArrays(GL_TRIANGLES, 0, navMeshTriCount);
+        }
+        if (navMeshLineCount > 0) {
+            glBindVertexArray(navMeshLineVAO);
+            glDrawArrays(GL_LINES, 0, navMeshLineCount);
+        }
+        glBindVertexArray(0);
+        renderer.shader.setBool("useVertexColor", false);
+
         Vec3 colorRed = {1.0f, 0.4f, 0.4f};
         Vec3 colorGreen = {.7f, 1.0f, .7f};
         Vec3 colorBlue = {.7f, .7f, 1.0f};
         Vec3 colorPink = {1.0f, .7f, 1.0f};
         if (showNavpIndices) {
-            areaIndex = 0;
-            Renderer &renderer = Renderer::getInstance();
+            int areaIndex = 0;
             for (const NavPower::Area &area: navMesh->m_areas) {
                 renderer.drawText(std::to_string(areaIndex + 1), {
                                       area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y
@@ -422,16 +548,23 @@ void Navp::renderNavMesh() {
 
 void Navp::renderNavMeshForHitTest() const {
     if (!loading && showNavp && navpLoaded) {
-        int areaIndex = 0;
-        for (const NavPower::Area &area: navMesh->m_areas) {
-            glColor3ub(NAVMESH_AREA, areaIndex / 255, areaIndex % 255);
-            areaIndex++;
-            glBegin(GL_POLYGON);
-            for (auto vertex: area.m_edges) {
-                glVertex3f(vertex->m_pos.X, vertex->m_pos.Z, -vertex->m_pos.Y);
-            }
-            glEnd();
+        if (hitTestDirty) {
+            updateHitTestBuffers(navMesh);
+            hitTestDirty = false;
         }
+
+        Renderer &renderer = Renderer::getInstance();
+        renderer.shader.use();
+        renderer.shader.setMat4("view", renderer.view);
+        renderer.shader.setMat4("projection", renderer.projection);
+        renderer.shader.setMat4("model", glm::mat4(1.0f));
+        renderer.shader.setBool("useFlatColor", true);
+        renderer.shader.setBool("useVertexColor", true);
+
+        glBindVertexArray(hitTestVAO);
+        glDrawArrays(GL_TRIANGLES, 0, hitTestTriCount);
+        glBindVertexArray(0);
+        renderer.shader.setBool("useVertexColor", false);
     }
 }
 
@@ -510,6 +643,8 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     setSelectedNavpAreaIndex(-1);
     loading = false;
     navpLoaded = true;
+    navMeshDirty = true;
+    hitTestDirty = true;
     Menu::updateMenuState();
     buildAreaMaps();
     if (Airg &airg = Airg::getInstance(); SceneExtract::getInstance().alsoBuildAll && airg.canBuildAirg()) {
@@ -683,6 +818,7 @@ void Navp::handleEditStairsClicked() const {
                                         : "AREA_STEPS";
         Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
         navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
+        navMeshDirty = true;
         Menu::updateMenuState();
     }
 }

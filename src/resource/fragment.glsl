@@ -3,15 +3,21 @@ out vec4 FragColor;
 
 in vec3 Normal;
 in vec3 FragPos;
+in vec4 VertexColor;
 
 uniform vec4 objectColor;
 uniform sampler2D tileTexture;
 uniform bool useFlatColor;
+uniform bool useVertexColor;
 
 void main()
 {
     if (useFlatColor) {
-        FragColor = objectColor;
+        if (useVertexColor) {
+            FragColor = VertexColor;
+        } else {
+            FragColor = objectColor;
+        }
         return;
     }
 

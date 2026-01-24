@@ -1,5 +1,6 @@
 #pragma once
 #include "Mesh.h"
+#include <future>
 #include <assimp/scene.h>
 
 struct SortContext {
@@ -19,9 +20,4 @@ public:
     void loadModelData(std::string const& path);
 
     void draw(Shader& shader, const glm::mat4& viewProj) const;
-
-private:
-    void processNode(const aiNode* node, const aiScene* scene);
-
-    static Mesh processMesh(aiMesh* mesh, const aiScene* scene);
 };
