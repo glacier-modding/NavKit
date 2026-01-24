@@ -18,16 +18,18 @@
 
 #include <GL/glew.h>
 #include <GL/glu.h>
-#include <SDL_opengl.h>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/util/Math.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 HWND Renderer::hwnd = nullptr;
 
-Renderer::Renderer() {
+Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     framebuffer = 0;
     color_rb = 0;
     depth_rb = 0;
@@ -40,9 +42,11 @@ Renderer::Renderer() {
     cameraEulers[0] = 45.0, cameraEulers[1] = -45.0;
     cameraPos[0] = 10, cameraPos[1] = 15, cameraPos[2] = 10;
     camr = 1000;
-    origCameraEulers[0] = 0, origCameraEulers[1] = 0; // Used to compute rotational changes across frames.
+    origCameraEulers[0] = 0,
+    origCameraEulers[1] = 0;
     prevFrameTime = 0;
-    font = new FTGLPixmapFont("DroidSans.ttf");
+    font = new FTGLPolygonFont("DroidSans.ttf");
+    font->FaceSize(72);
 }
 
 Renderer::~Renderer() {
@@ -53,7 +57,6 @@ Renderer::~Renderer() {
 
 void Renderer::initFrameBuffer(const int width, const int height) {
     glewInit();
-    // Build the framebuffer.
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
@@ -89,26 +92,21 @@ void Renderer::updateFrameRate() {
 }
 
 bool Renderer::initWindowAndRenderer() {
-    // Init SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
         return false;
     }
 
-    // Use OpenGL render driver.
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 
-    // Enable depth buffer.
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 12);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-    // Set color channel depth.
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 2);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 2);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 2);
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 2);
 
-    // 4x MSAA.
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
 
@@ -158,7 +156,6 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
 
-    // Fog.
     NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const float backgroundColor = navKitSettings.backgroundColor;
     float fogColor[4] = {backgroundColor, backgroundColor, backgroundColor, 1.0f};
@@ -231,11 +228,9 @@ void Renderer::handleResize() {
 }
 
 void Renderer::renderFrame() {
-    // Set the viewport.
     glViewport(0, 0, width, height);
     glGetIntegerv(GL_VIEWPORT, viewport);
 
-    // Clear the screen
     NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     float backgroundColor = navKitSettings.backgroundColor;
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
@@ -245,25 +240,31 @@ void Renderer::renderFrame() {
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_DEPTH_TEST);
 
-    // Compute the projection matrix.
+    projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
+    view = glm::lookAt(glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]),
+                       glm::vec3(cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+                                 cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
+                                 cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
+                       glm::vec3(0.0f, 1.0f, 0.0f));
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(50.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
 
     glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix);
 
-    // Compute the modelview matrix.
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glRotatef(cameraEulers[0], 1, 0, 0);
-    glRotatef(cameraEulers[1], 0, 1, 0);
-    glTranslatef(-cameraPos[0], -cameraPos[1], -cameraPos[2]);
+    gluLookAt(cameraPos[0], cameraPos[1], cameraPos[2],
+              cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+              cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
+              cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+              0.0, 1.0, 0.0);
     glGetDoublev(GL_MODELVIEW_MATRIX, modelviewMatrix);
     const Uint32 time = SDL_GetTicks();
     const float dt = static_cast<float>(time - prevFrameTime) / 1000.0f;
     prevFrameTime = time;
 
-    // Clamp the framerate so that we do not hog all the CPU.
     if (const float MIN_FRAME_TIME = 1.0f / frameRate; dt < MIN_FRAME_TIME) {
         int ms = static_cast<int>((MIN_FRAME_TIME - dt) * 1000.0f);
         if (ms > 10) ms = 10;
@@ -272,9 +273,11 @@ void Renderer::renderFrame() {
     InputHandler::getInstance().handleMovement(dt, modelviewMatrix);
 
     glFrontFace(GL_CW);
-    Grid grid = Grid::getInstance();
-    if (grid.showGrid) {
-        grid.renderGrid();
+
+    if (const Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
+        obj.renderObj();
+        glUseProgram(0);
+        glDisable(GL_CULL_FACE);
     }
     if (Navp &navp = Navp::getInstance(); navp.navpLoaded && navp.showNavp) {
         navp.renderNavMesh();
@@ -297,13 +300,12 @@ void Renderer::renderFrame() {
         RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
         recastAirgAdapter.renderRecastNavmesh(true);
     }
-    if (const Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
-        obj.renderObj();
+
+    Grid grid = Grid::getInstance();
+    if (grid.showGrid) {
+        grid.renderGrid();
     }
-    // Marker
-    GLdouble x, y, z;
     if (recastAdapter.markerPositionSet) {
-        // Draw marker circle
         glLineWidth(5.0f);
         glColor4f(240, 220, 0, 196);
         glBegin(GL_LINE_LOOP);
@@ -322,12 +324,12 @@ void Renderer::renderFrame() {
     }
 
     glUseProgram(0);
-    glDisable(GL_DEPTH_TEST); // Disable depth testing for UI overlays
+    glDisable(GL_DEPTH_TEST);
     if (scene.showBBox) {
         drawBounds();
     }
     drawAxes();
-    glEnable(GL_DEPTH_TEST); // Re-enable for the next frame
+    glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::finalizeFrame() const {
@@ -402,17 +404,23 @@ void Renderer::drawText(const std::string &text, const Vec3 pos, const Vec3 colo
     if (font->Error())
         return;
 
-    Vec3 camPos{cameraPos[0], cameraPos[1], cameraPos[2]};
-    float distance = camPos.DistanceTo(pos);
-    float fontSize = 10 * size / (distance != 0 ? distance : 0.001);
-    if (fontSize < 15) {
-        return;
-    }
-    glColor3f(color.X, color.Y, color.Z);
+    glPushMatrix();
+    glTranslatef(pos.X, pos.Y, pos.Z);
 
-    font->FaceSize(fontSize);
-    glRasterPos3f(pos.X, pos.Y, pos.Z);
+    float modelview[16];
+    glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+    for(int i=0; i<3; i++) 
+        for(int j=0; j<3; j++) 
+            modelview[i*4+j] = (i==j ? 1.0f : 0.0f);
+    glLoadMatrixf(modelview);
+
+    float scale = static_cast<float>(size) * 0.0002f;
+    glScalef(scale, scale, scale);
+
+    glColor3f(color.X, color.Y, color.Z);
     font->Render(text.c_str());
+
+    glPopMatrix();
 }
 
 void Renderer::drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,

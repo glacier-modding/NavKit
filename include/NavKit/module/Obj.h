@@ -6,6 +6,7 @@
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <GL/glew.h>
 
 #include "../../include/NavKit/render/Model.h"
 #include "../../include/NavKit/render/Shader.h"
@@ -21,6 +22,10 @@ enum SceneMeshBuildType {
 
 class Obj {
     explicit Obj();
+
+    static GLuint tileTextureId;
+
+    static void loadTileTexture();
 
     static void updateObjDialogControls(HWND hDlg);
 

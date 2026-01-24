@@ -4,24 +4,27 @@ out vec4 FragColor;
 in vec3 Normal;
 in vec3 FragPos;
 
-uniform vec4 objectColor; // A color passed in from the application
+uniform vec4 objectColor;
 uniform sampler2D tileTexture;
+uniform bool useFlatColor;
 
 void main()
 {
-    // Ambient lighting
+    if (useFlatColor) {
+        FragColor = objectColor;
+        return;
+    }
+
     float ambientStrength = 0.3;
     vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
 
-    // Diffuse lighting (60 degrees from horizontal)
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(vec3(0.0, 0.866, 0.5)); // Y=sin(60), Z=cos(60)
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
 
-    // Triplanar Mapping
     vec3 blending = abs(normalize(Normal));
-    blending = normalize(max(blending, 0.00001)); // Force weights to sum to 1.0 (approx)
+    blending = normalize(max(blending, 0.00001));
     float b = (blending.x + blending.y + blending.z);
     blending /= b;
 

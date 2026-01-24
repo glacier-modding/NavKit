@@ -28,8 +28,6 @@
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavWeakness/NavPower.h"
 
-HWND Obj::hObjDialog = nullptr;
-
 Obj::Obj() : loadObjName("Load Obj"),
              saveObjName("Save Obj"),
              lastObjFileName("Load Obj"),
@@ -54,6 +52,35 @@ Obj::Obj() : loadObjName("Load Obj"),
              sceneMeshBuildType(COPY),
              primLods{true, true, true, true, true, true, true, true},
              blendFileBuilt(false) {
+}
+
+HWND Obj::hObjDialog = nullptr;
+
+GLuint Obj::tileTextureId = 0;
+
+void Obj::loadTileTexture() {
+    if (tileTextureId != 0) return;
+
+    if (SDL_Surface* loadedSurface = SDL_LoadBMP("tile.bmp")) {
+        SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(loadedSurface, SDL_PIXELFORMAT_RGBA32, 0);
+        SDL_FreeSurface(loadedSurface);
+
+        if (!formattedSurface) {
+            Logger::log(NK_ERROR, "Failed to convert BMP surface: %s", SDL_GetError());
+        } else {
+            glGenTextures(1, &tileTextureId);
+            glBindTexture(GL_TEXTURE_2D, tileTextureId);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, formattedSurface->w, formattedSurface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, formattedSurface->pixels);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            SDL_FreeSurface(formattedSurface);
+        }
+    } else {
+        Logger::log(NK_ERROR, "Failed to load tile.bmp: %s", SDL_GetError());
+    }
 }
 
 void Obj::updateObjDialogControls(HWND hDlg) {
@@ -423,6 +450,7 @@ void Obj::loadObjMesh() {
     const auto start = std::chrono::high_resolution_clock::now();
     if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0) {
+        model.loadModelData(objToLoad);
         if (objLoadDone.empty()) {
             objLoadDone.push_back(true);
             // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the obj.
@@ -462,67 +490,27 @@ void Obj::loadObjMesh() {
 void Obj::renderObj() const {
     Renderer &renderer = Renderer::getInstance();
 
-    // 1. Enable Depth Test so objects obscure things behind them
     glEnable(GL_DEPTH_TEST);
-    // 2. Enable Culling for performance (discards back-facing triangles)
     glEnable(GL_CULL_FACE);
-
-    // 3. Load Texture (Lazy initialization)
-    static GLuint tileTextureID = 0;
-    if (tileTextureID == 0) {
-        SDL_Surface* loadedSurface = SDL_LoadBMP("tile.bmp");
-        if (loadedSurface) {
-            // Convert surface to a standard RGBA format that OpenGL understands easily.
-            SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(loadedSurface, SDL_PIXELFORMAT_RGBA32, 0);
-            SDL_FreeSurface(loadedSurface); // Free the original surface
-
-            if (!formattedSurface) {
-                Logger::log(NK_ERROR, "Failed to convert BMP surface: %s", SDL_GetError());
-            } else {
-            glGenTextures(1, &tileTextureID);
-            glBindTexture(GL_TEXTURE_2D, tileTextureID);
-
-            // Upload the converted RGBA data. No need for alignment or format tricks.
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, formattedSurface->w, formattedSurface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, formattedSurface->pixels);
-
-            glGenerateMipmap(GL_TEXTURE_2D);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                SDL_FreeSurface(formattedSurface); // Free the converted surface
-            }
-        } else {
-             Logger::log(NK_ERROR, "Failed to load tile.bmp: %s", SDL_GetError());
-        }
-    }
 
     renderer.shader.use();
 
-    // Bind the texture
-    if (tileTextureID != 0) {
+    if (tileTextureId != 0) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, tileTextureID);
+        glBindTexture(GL_TEXTURE_2D, tileTextureId);
         renderer.shader.setInt("tileTexture", 0);
     }
 
-    const glm::mat4 projection = glm::perspective(glm::radians(45.0f), static_cast<float>(renderer.width) / static_cast<float>(renderer.height), 0.1f, 2000.0f);
-    // Fix Horizontal Translation: Negate renderer.cameraPos[0]
-    const glm::mat4 view = glm::lookAt(glm::vec3(-renderer.cameraPos[0], renderer.cameraPos[1], -renderer.cameraPos[2]),
-                                 glm::vec3(-renderer.cameraPos[0] + -sin(glm::radians(renderer.cameraEulers[1])) * cos(glm::radians(renderer.cameraEulers[0])),
-                                           renderer.cameraPos[1] + -sin(glm::radians(renderer.cameraEulers[0])),
-                                           -renderer.cameraPos[2] + cos(glm::radians(renderer.cameraEulers[1])) * cos(glm::radians(renderer.cameraEulers[0]))),
-                                 glm::vec3(0.0f, 1.0f, 0.0f));
     auto modelTransform = glm::mat4(1.0f);
     modelTransform = glm::translate(modelTransform, glm::vec3(0.0f, 0.0f, 0.0f));
     modelTransform = glm::scale(modelTransform, glm::vec3(1.0f, 1.0f, 1.0f));
-    renderer.shader.setMat4("projection", projection);
-    renderer.shader.setMat4("view", view);
+    renderer.shader.setMat4("projection", renderer.projection);
+    renderer.shader.setMat4("view", renderer.view);
     renderer.shader.setMat4("model", modelTransform);
     renderer.shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelTransform))));
     renderer.shader.setVec4("objectColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
 
-    model.draw(renderer.shader);
+    model.draw(renderer.shader, renderer.projection * renderer.view);
 }
 
 void Obj::renderObjUsingRecast() {
@@ -652,7 +640,8 @@ void Obj::finalizeLoad() {
     if (!objLoadDone.empty()) {
         if (RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             Logger::log(NK_INFO, "Creating OpenGL buffers for model...");
-            model.loadModel(lastObjFileName);
+            loadTileTexture();
+            model.initGL();
             Logger::log(NK_INFO, "Finished creating OpenGL buffers.");
 
             recastAdapter.handleMeshChanged();

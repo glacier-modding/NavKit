@@ -4,7 +4,9 @@
 #include "../../NavWeakness/Vec3.h"
 #include "../util/Math.h"
 #include "../render/Shader.h"
-class FTPixmapFont;
+#include <glm/mat4x4.hpp>
+
+class FTPolygonFont;
 
 typedef double GLdouble;
 typedef int GLint;
@@ -73,7 +75,7 @@ public:
     unsigned int framebuffer;
     unsigned int color_rb;
     unsigned int depth_rb;
-    FTPixmapFont *font;
+    FTPolygonFont* font;
     int width;
     int height;
     float frameRate;
@@ -88,6 +90,8 @@ public:
     Shader shader;
 
     SDL_Window *window;
+    glm::mat4 projection;
+    glm::mat4 view;
     static HWND hwnd;
     Uint32 prevFrameTime;
 };
