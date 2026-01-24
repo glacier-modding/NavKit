@@ -9,7 +9,6 @@
 #include <SDL.h>
 #include <sstream>
 #include <string>
-#include <GL/glew.h>
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/VisionData.h"
@@ -57,6 +56,20 @@ HWND Airg::hAirgDialog = nullptr;
 std::string Airg::selectedRpkgAirg{};
 std::map<std::string, std::string> Airg::airgHashIoiStringMap;
 
+
+GLuint Airg::airgTriVAO = 0;
+GLuint Airg::airgTriVBO = 0;
+GLuint Airg::airgLineVAO = 0;
+GLuint Airg::airgLineVBO = 0;
+int Airg::airgTriCount = 0;
+int Airg::airgLineCount = 0;
+bool Airg::airgDirty = true;
+
+GLuint Airg::airgHitTestVAO = 0;
+GLuint Airg::airgHitTestVBO = 0;
+int Airg::airgHitTestCount = 0;
+bool Airg::airgHitTestDirty = true;
+
 static std::string format_float(float val) {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) << val;
@@ -83,17 +96,20 @@ INT_PTR CALLBACK Airg::AirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             if (oldSpacing != grid.spacing) {
                 grid.saveSpacing(grid.spacing);
                 UpdateDialogControls(hDlg);
+                airgDirty = true;
             }
         }
         else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_XOFFSET)) {
             int pos = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
             grid.xOffset = -grid.spacing + (pos * 0.05f);
             SetDlgItemText(hDlg, IDC_STATIC_XOFFSET_VAL, format_float(grid.xOffset).c_str());
+            airgDirty = true;
         }
         else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_ZOFFSET)) {
             int pos = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
             grid.yOffset = -grid.spacing + (pos * 0.05f);
             SetDlgItemText(hDlg, IDC_STATIC_ZOFFSET_VAL, format_float(grid.yOffset).c_str());
+            airgDirty = true;
         }
         return (INT_PTR)TRUE;
     }
@@ -103,6 +119,7 @@ INT_PTR CALLBACK Airg::AirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LP
             Logger::log(NK_INFO, "Resetting Airg Default settings");
             resetDefaults();
             UpdateDialogControls(hDlg);
+            airgDirty = true;
         }
         return (INT_PTR)TRUE;
     }
@@ -227,6 +244,7 @@ void Airg::loadAirgFromFile(const std::string& fileName) {
         Logger::log(NK_INFO, "Loading Airg file: '%s'...", fileNameStr.c_str());
         backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, false);
     }
+    airgDirty = true;
 }
 
 void Airg::handleOpenAirgClicked() {
@@ -356,32 +374,39 @@ char *Airg::openSaveAirgFileDialog(char *lastAirgFolder) {
     return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
 
-void renderWaypoint(const Waypoint &waypoint, const bool fan) {
-    if (fan) {
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex3f(waypoint.vPos.x, waypoint.vPos.z + 0.03, -waypoint.vPos.y);
-    } else {
-        glBegin(GL_LINE_LOOP);
-    }
-
+void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts, const Waypoint& waypoint, bool selected, const glm::vec4& color, bool forceFan) {
     const float r = 0.1f;
-    for (int i = 0; i < 8; i++) {
-        const float a = (float) i / 8.0f * std::numbers::pi * 2;
-        const float fx = (float) waypoint.vPos.x + cosf(a) * r;
-        const float fy = (float) waypoint.vPos.y + sinf(a) * r;
-        const float fz = (float) waypoint.vPos.z + 0.03f;
-        glVertex3f(fx, fz, -fy);
+    const float z = waypoint.vPos.z + 0.03f;
+    glm::vec3 center(waypoint.vPos.x, z, -waypoint.vPos.y);
+
+    if (selected || forceFan) {
+        for (int i = 0; i < 8; i++) {
+            float a1 = (float)i / 8.0f * std::numbers::pi * 2;
+            float a2 = (float)(i + 1) / 8.0f * std::numbers::pi * 2;
+
+            glm::vec3 p1(waypoint.vPos.x + cosf(a1) * r, z, -(waypoint.vPos.y + sinf(a1) * r));
+            glm::vec3 p2(waypoint.vPos.x + cosf(a2) * r, z, -(waypoint.vPos.y + sinf(a2) * r));
+
+            triVerts.push_back({center, glm::vec3(0,1,0), color});
+            triVerts.push_back({p1, glm::vec3(0,1,0), color});
+            triVerts.push_back({p2, glm::vec3(0,1,0), color});
+        }
+    } else {
+        // Line Loop
+        for (int i = 0; i < 8; i++) {
+            float a1 = (float)i / 8.0f * std::numbers::pi * 2;
+            float a2 = (float)(i + 1) / 8.0f * std::numbers::pi * 2;
+
+            glm::vec3 p1(waypoint.vPos.x + cosf(a1) * r, z, -(waypoint.vPos.y + sinf(a1) * r));
+            glm::vec3 p2(waypoint.vPos.x + cosf(a2) * r, z, -(waypoint.vPos.y + sinf(a2) * r));
+
+            lineVerts.push_back({p1, glm::vec3(0,1,0), color});
+            lineVerts.push_back({p2, glm::vec3(0,1,0), color});
+        }
     }
-    if (fan) {
-        const float fx = (float) waypoint.vPos.x + cosf(0) * r;
-        const float fy = (float) waypoint.vPos.y + sinf(0) * r;
-        const float fz = (float) waypoint.vPos.z + 0.03f;
-        glVertex3f(fx, fz, -fy);
-    }
-    glEnd();
 }
 
-int visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
+int Airg::visibilityDataSize(ReasoningGrid *reasoningGrid, int waypointIndex) {
     int offset1 = reasoningGrid->m_WaypointList[waypointIndex].nVisionDataOffset;
     int offset2;
     if (waypointIndex < (reasoningGrid->m_WaypointList.size() - 1)) {
@@ -396,167 +421,169 @@ void Airg::build() {
     backgroundWorker.emplace(&GridGenerator::build, &GridGenerator::getInstance());
 }
 
-// Render Layer Index
-void Airg::renderLayerIndices(int waypointIndex) const {
-    const Waypoint &waypoint = reasoningGrid->m_WaypointList[waypointIndex];
-    float minX = reasoningGrid->m_Properties.vMin.x;
-    float minY = reasoningGrid->m_Properties.vMin.y;
-    int xi = (int) floor((waypoint.vPos.x - minX) / reasoningGrid->m_Properties.fGridSpacing);
-    int yi = (int) floor((waypoint.vPos.y - minY) / reasoningGrid->m_Properties.fGridSpacing);
-
-    float x = xi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 + minX;
-    float y = yi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 + minY;
-
-    glColor4f(0.8, 0.8, 0.8, 0.6);
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glEnd();
-    glBegin(GL_POLYGON);
-
-    const unsigned int colorRgb = (waypoint.nLayerIndex << 6) | 0x80000000;
-    unsigned char a = (colorRgb >> 24) & 0xFF;
-    unsigned char b = (colorRgb >> 16) & 0xFF;
-    unsigned char g = (colorRgb >> 8) & 0xFF;
-    unsigned char r = colorRgb & 0xFF;
-    Vec4 color{r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f};
-    glColor4f(color.x, color.y, color.z, color.w);
-
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glEnd();
-}
-
-void Airg::renderCellBitmaps(int waypointIndex, bool selected) {
-    float size = 25;
-    const Waypoint &waypoint = reasoningGrid->m_WaypointList[waypointIndex];
-    float minX = reasoningGrid->m_Properties.vMin.x;
-    float minY = reasoningGrid->m_Properties.vMin.y;
-    float x = waypoint.xi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 +
-              minX;
-    float y = waypoint.yi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 +
-              minY;
-    std::vector<uint8_t> waypointVisionData;
-    for (int i = 0; i < 25; i++) {
-        waypointVisionData.push_back(waypoint.cellBitmap[i] * 255);
-    }
-    glColor4f(0.8, 0.8, 0.8, 0.6);
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glEnd();
-    float bw = reasoningGrid->m_Properties.fGridSpacing / sqrt(size);
-    int numBoxesPerSide = reasoningGrid->m_Properties.fGridSpacing / bw;
-    for (int byi = 0; byi < numBoxesPerSide; byi++) {
-        for (int bxi = 0; bxi < numBoxesPerSide; bxi++) {
-            float bx = x - reasoningGrid->m_Properties.fGridSpacing / 2 + bxi * bw;
-            float by = -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw);
-            uint8_t boxVisionData = waypointVisionData[numBoxesPerSide * byi + bxi];
-            float color = boxVisionData / 255.0;
-            glColor4f(color, color, color, 0.3);
-            glBegin(GL_POLYGON);
-            float zChange = selected ? 0.001 : 0.01;
-            glVertex3f(bx, waypoint.vPos.z + zChange, by);
-            glVertex3f(bx, waypoint.vPos.z + zChange, by + bw);
-            glVertex3f(bx + bw, waypoint.vPos.z + zChange, by + bw);
-            glVertex3f(bx + bw, waypoint.vPos.z + zChange, by);
-            glEnd();
-        }
-    }
-}
-
-void Airg::renderVisionData(int waypointIndex, bool selected) const {
-    const float size = visibilityDataSize(reasoningGrid, waypointIndex);
-    const Waypoint &waypoint = reasoningGrid->m_WaypointList[waypointIndex];
-    const float x = waypoint.vPos.x;
-    const float y = waypoint.vPos.y;
-    const std::vector<uint8_t> waypointVisionData = reasoningGrid->getWaypointVisionData(waypointIndex);
-    glColor4f(0.8, 0.8, 0.8, 0.6);
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x - reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-    glVertex3f(x + reasoningGrid->m_Properties.fGridSpacing / 2, waypoint.vPos.z + 0.01,
-               -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-    glEnd();
-    float bw = reasoningGrid->m_Properties.fGridSpacing / sqrt(size);
-    int numBoxesPerSide = reasoningGrid->m_Properties.fGridSpacing / bw;
-    for (int byi = 0; byi < numBoxesPerSide; byi++) {
-        for (int bxi = 0; bxi < numBoxesPerSide; bxi++) {
-            float bx = x - reasoningGrid->m_Properties.fGridSpacing / 2 + bxi * bw;
-            float by = -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
-            uint8_t boxVisionData = waypointVisionData[numBoxesPerSide * byi + bxi];
-            float color = boxVisionData / 255.0;
-            glColor4f(0.0, color, 0.0, 0.3);
-            glBegin(GL_POLYGON);
-            float zChange = selected ? 0.001 : 0.01;
-            glVertex3f(bx, waypoint.vPos.z + zChange, by);
-            glVertex3f(bx, waypoint.vPos.z + zChange, by + bw);
-            glVertex3f(bx + bw, waypoint.vPos.z + zChange, by + bw);
-            glVertex3f(bx + bw, waypoint.vPos.z + zChange, by);
-            glEnd();
-        }
-    }
-}
-
 void Airg::renderAirg() {
     if (selectedWaypointIndex >= reasoningGrid->m_WaypointList.size()) {
         selectedWaypointIndex = -1;
     }
-    int numWaypoints = reasoningGrid->m_WaypointList.size();
-    for (size_t i = 0; i < numWaypoints; i++) {
-        const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
-        int size = visibilityDataSize(reasoningGrid, i);
-        // cellColorSource options: 0 Off, 1 Bitmap, 2 Vision Data, 3 Layer
-        if (cellColorSource == CellColorDataSource::AIRG_BITMAP) {
-            renderCellBitmaps(i, i == selectedWaypointIndex);
-        }
-        if (cellColorSource == LAYER) {
-            renderVisionData(i, i == selectedWaypointIndex);
-        }
-        if (cellColorSource == VISION_DATA) {
-            renderLayerIndices(i);
-        }
 
-        Vec4 color{0, 0, 1, 0.5};
+    static int lastSelectedWaypoint = -1;
+    static int lastCellColorSource = -1;
+    static float lastSpacing = -1.0f;
+    static float lastXOffset = -1.0f;
+    static float lastYOffset = -1.0f;
 
-        glColor4f(color.x, color.y, color.z, color.w);
-        renderWaypoint(waypoint, selectedWaypointIndex == i);
+    Grid& grid = Grid::getInstance();
+    if (selectedWaypointIndex != lastSelectedWaypoint ||
+        cellColorSource != lastCellColorSource ||
+        grid.spacing != lastSpacing ||
+        grid.xOffset != lastXOffset ||
+        grid.yOffset != lastYOffset) {
+        airgDirty = true;
+        lastSelectedWaypoint = selectedWaypointIndex;
+        lastCellColorSource = cellColorSource;
+        lastSpacing = grid.spacing;
+        lastXOffset = grid.xOffset;
+        lastYOffset = grid.yOffset;
+    }
 
-        for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
-            if (waypoint.nNeighbors[neighborIndex] != 65535 && waypoint.nNeighbors[neighborIndex] < reasoningGrid->
-                m_WaypointList.size()) {
-                const Waypoint &neighbor = reasoningGrid->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
-                glBegin(GL_LINES);
-                glVertex3f(waypoint.vPos.x, waypoint.vPos.z + 0.01f, -waypoint.vPos.y);
-                glVertex3f(neighbor.vPos.x, neighbor.vPos.z + 0.01f, -neighbor.vPos.y);
-                glEnd();
+    if (airgDirty) {
+        std::vector<AirgVertex> triVerts;
+        std::vector<AirgVertex> lineVerts;
+
+        for (int i = 0; i < reasoningGrid->m_WaypointList.size(); i++) {
+            const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
+            bool selected = (i == selectedWaypointIndex);
+
+            // Grid Cells Logic
+            if (cellColorSource != OFF) {
+                float minX = reasoningGrid->m_Properties.vMin.x;
+                float minY = reasoningGrid->m_Properties.vMin.y;
+                float x = waypoint.xi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 + minX;
+                float y = waypoint.yi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 + minY;
+                float z = waypoint.vPos.z + 0.01f;
+
+                // Boundary
+                glm::vec4 boundaryColor(0.8, 0.8, 0.8, 0.6);
+                glm::vec3 p1(x - reasoningGrid->m_Properties.fGridSpacing / 2, z, -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
+                glm::vec3 p2(x - reasoningGrid->m_Properties.fGridSpacing / 2, z, -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
+                glm::vec3 p3(x + reasoningGrid->m_Properties.fGridSpacing / 2, z, -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
+                glm::vec3 p4(x + reasoningGrid->m_Properties.fGridSpacing / 2, z, -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
+
+                lineVerts.push_back({p1, glm::vec3(0,1,0), boundaryColor}); lineVerts.push_back({p2, glm::vec3(0,1,0), boundaryColor});
+                lineVerts.push_back({p2, glm::vec3(0,1,0), boundaryColor}); lineVerts.push_back({p3, glm::vec3(0,1,0), boundaryColor});
+                lineVerts.push_back({p3, glm::vec3(0,1,0), boundaryColor}); lineVerts.push_back({p4, glm::vec3(0,1,0), boundaryColor});
+                lineVerts.push_back({p4, glm::vec3(0,1,0), boundaryColor}); lineVerts.push_back({p1, glm::vec3(0,1,0), boundaryColor});
+
+                if (cellColorSource == VISION_DATA) {
+                    const unsigned int colorRgb = (waypoint.nLayerIndex << 6) | 0x80000000;
+                    unsigned char a = (colorRgb >> 24) & 0xFF;
+                    unsigned char b = (colorRgb >> 16) & 0xFF;
+                    unsigned char g = (colorRgb >> 8) & 0xFF;
+                    unsigned char r = colorRgb & 0xFF;
+                    glm::vec4 color(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
+
+                    triVerts.push_back({p1, glm::vec3(0,1,0), color}); triVerts.push_back({p2, glm::vec3(0,1,0), color}); triVerts.push_back({p3, glm::vec3(0,1,0), color});
+                    triVerts.push_back({p1, glm::vec3(0,1,0), color}); triVerts.push_back({p3, glm::vec3(0,1,0), color}); triVerts.push_back({p4, glm::vec3(0,1,0), color});
+                } else {
+                    std::vector<uint8_t> data;
+                    float size = 0;
+                    if (cellColorSource == AIRG_BITMAP) {
+                        size = 25;
+                        for (int k = 0; k < 25; k++) data.push_back(waypoint.cellBitmap[k] * 255);
+                    } else if (cellColorSource == LAYER) { // Render Vision Data
+                        size = visibilityDataSize(reasoningGrid, i);
+                        data = reasoningGrid->getWaypointVisionData(i);
+                    }
+
+                    float bw = reasoningGrid->m_Properties.fGridSpacing / sqrt(size);
+                    int numBoxesPerSide = reasoningGrid->m_Properties.fGridSpacing / bw;
+                    for (int byi = 0; byi < numBoxesPerSide; byi++) {
+                        for (int bxi = 0; bxi < numBoxesPerSide; bxi++) {
+                            float bx = x - reasoningGrid->m_Properties.fGridSpacing / 2 + bxi * bw;
+                            float by_raw = (cellColorSource == AIRG_BITMAP) ?
+                                           -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw) :
+                                           -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
+
+                            uint8_t val = data[numBoxesPerSide * byi + bxi];
+                            float c = val / 255.0f;
+                            glm::vec4 cellColor = (cellColorSource == AIRG_BITMAP) ? glm::vec4(c, c, c, 0.3) : glm::vec4(0.0, c, 0.0, 0.3);
+
+                            float zChange = selected ? 0.001 : 0.01;
+                            float zc = waypoint.vPos.z + zChange;
+
+                            glm::vec3 cp1(bx, zc, by_raw);
+                            glm::vec3 cp2(bx, zc, by_raw + bw);
+                            glm::vec3 cp3(bx + bw, zc, by_raw + bw);
+                            glm::vec3 cp4(bx + bw, zc, by_raw);
+
+                            triVerts.push_back({cp1, glm::vec3(0,1,0), cellColor}); triVerts.push_back({cp2, glm::vec3(0,1,0), cellColor}); triVerts.push_back({cp3, glm::vec3(0,1,0), cellColor});
+                            triVerts.push_back({cp1, glm::vec3(0,1,0), cellColor}); triVerts.push_back({cp3, glm::vec3(0,1,0), cellColor}); triVerts.push_back({cp4, glm::vec3(0,1,0), cellColor});
+                        }
+                    }
+                }
+            }
+
+            // Waypoint
+            glm::vec4 wpColor(0, 0, 1, 0.5);
+            addWaypointGeometry(triVerts, lineVerts, waypoint, selected, wpColor);
+
+            // Neighbors
+            for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
+                if (waypoint.nNeighbors[neighborIndex] != 65535 && waypoint.nNeighbors[neighborIndex] < reasoningGrid->m_WaypointList.size()) {
+                    const Waypoint &neighbor = reasoningGrid->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
+                    glm::vec3 pStart(waypoint.vPos.x, waypoint.vPos.z + 0.01f, -waypoint.vPos.y);
+                    glm::vec3 pEnd(neighbor.vPos.x, neighbor.vPos.z + 0.01f, -neighbor.vPos.y);
+                    lineVerts.push_back({pStart, glm::vec3(0,1,0), wpColor});
+                    lineVerts.push_back({pEnd, glm::vec3(0,1,0), wpColor});
+                }
             }
         }
+
+        if (airgTriVAO == 0) glGenVertexArrays(1, &airgTriVAO);
+        if (airgTriVBO == 0) glGenBuffers(1, &airgTriVBO);
+        glBindVertexArray(airgTriVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, airgTriVBO);
+        glBufferData(GL_ARRAY_BUFFER, triVerts.size() * sizeof(AirgVertex), triVerts.data(), GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, pos));
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, normal));
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, color));
+        airgTriCount = triVerts.size();
+
+        if (airgLineVAO == 0) glGenVertexArrays(1, &airgLineVAO);
+        if (airgLineVBO == 0) glGenBuffers(1, &airgLineVBO);
+        glBindVertexArray(airgLineVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, airgLineVBO);
+        glBufferData(GL_ARRAY_BUFFER, lineVerts.size() * sizeof(AirgVertex), lineVerts.data(), GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, pos));
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, normal));
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, color));
+        airgLineCount = lineVerts.size();
+
+        glBindVertexArray(0);
+        airgDirty = false;
     }
+
     Renderer &renderer = Renderer::getInstance();
+    renderer.shader.use();
+    renderer.shader.setMat4("view", renderer.view);
+    renderer.shader.setMat4("projection", renderer.projection);
+    renderer.shader.setMat4("model", glm::mat4(1.0f));
+    renderer.shader.setBool("useFlatColor", true);
+    renderer.shader.setBool("useVertexColor", true);
+
+    if (airgTriCount > 0) {
+        glBindVertexArray(airgTriVAO);
+        glDrawArrays(GL_TRIANGLES, 0, airgTriCount);
+    }
+    if (airgLineCount > 0) {
+        glBindVertexArray(airgLineVAO);
+        glDrawArrays(GL_LINES, 0, airgLineCount);
+    }
+    glBindVertexArray(0);
+    renderer.shader.setBool("useVertexColor", false);
+
     if (showAirgIndices) {
+        int numWaypoints = reasoningGrid->m_WaypointList.size();
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
             renderer.drawText(std::to_string(i), {waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y},
@@ -567,12 +594,45 @@ void Airg::renderAirg() {
 
 void Airg::renderAirgForHitTest() const {
     if (showAirg && airgLoaded) {
-        const int numWaypoints = reasoningGrid->m_WaypointList.size();
-        for (size_t i = 0; i < numWaypoints; i++) {
-            const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
-            glColor3ub(AIRG_WAYPOINT, i / 255, i % 255);
-            renderWaypoint(waypoint, true);
+        if (airgHitTestDirty) {
+            std::vector<AirgVertex> triVerts;
+            std::vector<AirgVertex> lineVerts; // Unused for hit test, but needed for helper
+
+            const int numWaypoints = reasoningGrid->m_WaypointList.size();
+            for (size_t i = 0; i < numWaypoints; i++) {
+                const Waypoint &waypoint = reasoningGrid->m_WaypointList[i];
+                float r = (float)AIRG_WAYPOINT / 255.0f;
+                float g = (float)(i / 255) / 255.0f;
+                float b = (float)(i % 255) / 255.0f;
+                glm::vec4 color(r, g, b, 1.0f);
+                addWaypointGeometry(triVerts, lineVerts, waypoint, true, color, true);
+            }
+
+            if (airgHitTestVAO == 0) glGenVertexArrays(1, &airgHitTestVAO);
+            if (airgHitTestVBO == 0) glGenBuffers(1, &airgHitTestVBO);
+            glBindVertexArray(airgHitTestVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, airgHitTestVBO);
+            glBufferData(GL_ARRAY_BUFFER, triVerts.size() * sizeof(AirgVertex), triVerts.data(), GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, pos));
+            glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, normal));
+            glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, color));
+            airgHitTestCount = triVerts.size();
+            glBindVertexArray(0);
+            airgHitTestDirty = false;
         }
+
+        Renderer &renderer = Renderer::getInstance();
+        renderer.shader.use();
+        renderer.shader.setMat4("view", renderer.view);
+        renderer.shader.setMat4("projection", renderer.projection);
+        renderer.shader.setMat4("model", glm::mat4(1.0f));
+        renderer.shader.setBool("useFlatColor", true);
+        renderer.shader.setBool("useVertexColor", true);
+
+        glBindVertexArray(airgHitTestVAO);
+        glDrawArrays(GL_TRIANGLES, 0, airgHitTestCount);
+        glBindVertexArray(0);
+        renderer.shader.setBool("useVertexColor", false);
     }
 }
 
@@ -584,6 +644,7 @@ void Airg::setSelectedAirgWaypointIndex(int index) {
     if (index == -1 && selectedWaypointIndex != -1) {
         Logger::log(NK_INFO, ("Deselected waypoint: " + std::to_string(selectedWaypointIndex)).c_str());
     }
+    airgDirty = true;
     selectedWaypointIndex = index;
     if (index != -1 && index < reasoningGrid->m_WaypointList.size()) {
         Waypoint waypoint = reasoningGrid->m_WaypointList[index];
@@ -760,6 +821,8 @@ void Airg::loadAirg(Airg *airg, const std::string& fileName, bool isFromJson) {
 
     airg->airgLoading = false;
     airg->airgLoaded = true;
+    airgDirty = true;
+    airgHitTestDirty = true;
     Grid::getInstance().loadBoundsFromAirg();
     Menu::updateMenuState();
 }
