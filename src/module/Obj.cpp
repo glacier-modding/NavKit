@@ -9,6 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <thread>
 #include <vector>
+#include <future>
 #include <assimp/scene.h>
 
 #include "../../include/NavKit/Resource.h"
@@ -448,9 +449,23 @@ void Obj::loadObjMesh() {
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     const auto start = std::chrono::high_resolution_clock::now();
-    if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0) {
+
+    auto recastFuture = std::async(std::launch::async, [this]() {
+        Logger::log(NK_INFO, "Loading Obj model data to Recast...");
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        int result = recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0;
+        Logger::log(NK_INFO, "Done loading Obj model data to Recast.");
+        return result;
+    });
+
+    auto modelFuture = std::async(std::launch::async, [this]() {
+        Logger::log(NK_INFO, "Loading Obj model data to rendering system...");
         model.loadModelData(objToLoad);
+        Logger::log(NK_INFO, "Done loading Obj model data to rendering system.");
+    });
+
+    if (recastFuture.get()) {
+        modelFuture.wait();
         if (objLoadDone.empty()) {
             objLoadDone.push_back(true);
             // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the obj.
@@ -478,10 +493,13 @@ void Obj::loadObjMesh() {
             Logger::log(NK_INFO, msg.data());
         }
     } else {
+        modelFuture.wait();
         Logger::log(NK_ERROR, "Error loading obj.");
+        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         if (recastAdapter.getVertCount() == 0) {
             Logger::log(NK_ERROR, "Cannot load Obj, Obj has 0 vertices.");
         }
+        model.meshes.clear();
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();
     }
