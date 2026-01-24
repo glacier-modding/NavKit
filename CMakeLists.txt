@@ -24,7 +24,10 @@ find_package(assimp CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(cpptrace CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(unofficial-minizip CONFIG REQUIRED)
 find_package(nfd CONFIG REQUIRED)
+find_package(poly2tri CONFIG REQUIRED)
+find_package(pugixml CONFIG REQUIRED)
 find_package(recastnavigation CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(unofficial-brotli CONFIG REQUIRED)
@@ -47,11 +50,13 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"
         "$<TARGET_FILE:ftgl>"
-        "$<TARGET_FILE:glm::glm>"
+        "$<TARGET_FILE:unofficial::minizip::minizip>"
         "$<TARGET_FILE:nfd::nfd>"
         "$<TARGET_FILE:simdjson::simdjson>"
         "$<TARGET_FILE:unofficial::brotli::brotlicommon>"
         "$<TARGET_FILE:unofficial::brotli::brotlidec>"
+        "$<TARGET_FILE_DIR:assimp::assimp>/poly2tri.dll"
+        "$<TARGET_FILE_DIR:assimp::assimp>/pugixml.dll"
         "$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2.dll"
         "$<TARGET_FILE_DIR:OpenSSL::Crypto>/../bin/libcrypto-3-x64.dll"
         "$<TARGET_FILE_DIR:OpenSSL::SSL>/../bin/libssl-3-x64.dll"
