@@ -52,7 +52,9 @@ Obj::Obj() : loadObjName("Load Obj"),
              meshTypeForBuild(ALOC),
              sceneMeshBuildType(COPY),
              primLods{true, true, true, true, true, true, true, true},
-             blendFileBuilt(false) {
+             blendFileBuilt(false),
+             extractTextures(false),
+             applyTextures(false) {
 }
 
 HWND Obj::hObjDialog = nullptr;
@@ -305,21 +307,23 @@ void Obj::buildObjFromScene() {
         });
 }
 
-void Obj::extractAlocsOrPrimsAndStartObjBuild() {
+void Obj::extractResourcesAndStartObjBuild() {
+    const std::string meshFileType = meshTypeForBuild == ALOC ? "ALOC" : "PRIM";
+    const std::string meshFileTypeLower = meshTypeForBuild == ALOC ? "aloc" : "prim";
     if (skipExtractingAlocsOrPrims) {
-        Logger::log(NK_INFO, "Skipping extraction of Alocs / Prims from Rpkg files.");
+        Logger::log(NK_INFO, "Skipping extraction of %ss from Rpkg files.", meshFileType.c_str());
         doneExtractingAlocsOrPrims = true;
         Menu::updateMenuState();
         return;
     }
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    const std::string alocOrPrimFolder = navKitSettings.outputFolder + (meshTypeForBuild == ALOC ? "\\aloc" : "\\prim");
+    const std::string alocOrPrimFolder = navKitSettings.outputFolder + "\\" + meshFileTypeLower;
 
     struct stat folderExists{};
     if (const int statRC = stat(alocOrPrimFolder.data(), &folderExists); statRC != 0) {
         if (errno == ENOENT) {
             if (const int status = _mkdir(alocOrPrimFolder.c_str()); status != 0) {
-                Logger::log(NK_ERROR, "Error creating Aloc / Prim folder");
+                Logger::log(NK_ERROR, "Error creating %s folder", meshFileType.c_str());
                 errorExtracting = true;
                 return;
             }
@@ -338,14 +342,59 @@ void Obj::extractAlocsOrPrimsAndStartObjBuild() {
                            runtimeFolder.c_str(),
                            Rpkg::partitionManager,
                            alocOrPrimFolder.c_str(),
-                           (meshTypeForBuild == ALOC) ? "ALOC" : "PRIM",
+                           meshFileType.c_str(),
                            Logger::rustLogCallback);
     if (result) {
-        Logger::log(NK_ERROR, "Error extracting Alocs / Prims from Rpkg files.");
+        Logger::log(NK_ERROR, "Error extracting %ss from Rpkg files.", meshFileType.c_str());
         errorExtracting = true;
         return;
     }
-    Logger::log(NK_INFO, "Finished extracting Alocs / Prims from Rpkg files.");
+
+    if (shouldExtractTextures()) {
+        simdjson::ondemand::parser parser;
+        Logger::log(NK_INFO, "Extracting MATIs from Rpkg files.");
+        primHashToMatiHash.clear();
+        for (auto mesh : scene.meshes) {
+            const auto referencesRustList = get_all_referenced_hashes_by_hash_from_rpkg_files(
+                mesh.primHash.c_str(),
+                Rpkg::partitionManager,
+                Logger::rustLogCallback);
+            if (referencesRustList == nullptr) {
+                Logger::log(NK_ERROR, "Error getting references from %ss from Rpkg files.", mesh.primHash.c_str());
+                continue;
+                // errorExtracting = true;
+                // return;
+            }
+            for (int i = 0; i < referencesRustList->length; i++) {
+                std::string matiHash = get_string_from_list(referencesRustList, i);
+                if (!primHashToMatiHash.contains(matiHash)) {
+                    primHashToMatiHash.insert({mesh.primHash, {}});
+                }
+                primHashToMatiHash[mesh.primHash].push_back(matiHash);
+
+                if (char* matiJson = get_mati_json_by_hash(matiHash.c_str(), Rpkg::hashList, Rpkg::partitionManager,
+                                                           Logger::rustLogCallback); matiJson != nullptr) {
+                    std::string matiJsonString = matiJson;
+                    const auto json = simdjson::padded_string(matiJsonString);
+                    auto jsonDocument = parser.iterate(json);
+                    Json::Mati mati;
+                    matiHashToMati.insert({matiHash, mati});
+                    try {
+                        mati.readJson(jsonDocument);
+                    } catch (const std::exception& e) {
+                        Logger::log(NK_ERROR, e.what());
+                        free_string(matiJson);
+                        return;
+                    }
+                    free_string(matiJson);
+                    Logger::log(NK_INFO, "Found diffuse texture %s for mati %s with mati id %s for mesh %s.",
+                                mati.properties.diffuseIoiString.value.c_str(), matiHash.c_str(), mati.id.c_str(),
+                                mesh.primHash.c_str());
+                }
+            }
+        }
+    }
+    Logger::log(NK_INFO, "Finished extracting {}s from Rpkg files.", meshFileType.c_str());
     doneExtractingAlocsOrPrims = true;
     Menu::updateMenuState();
 }
@@ -355,7 +404,7 @@ char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-void Obj::finalizeExtractAlocsOrPrims() {
+void Obj::finalizeExtractResources() {
     if (errorExtracting) {
         errorBuilding = false;
         startedObjGeneration = false;
@@ -377,6 +426,11 @@ void Obj::finalizeExtractAlocsOrPrims() {
         errorExtracting = false;
     }
     Menu::updateMenuState();
+}
+
+bool Obj::shouldExtractTextures() const {
+    return true;
+    // return applyTextures && extractTextures;
 }
 
 void Obj::finalizeObjBuild() {
@@ -471,7 +525,7 @@ void Obj::loadObjMesh() {
             // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the obj.
             // But it's pretty rare for there to not be an include box in the scene, so don't want to override
             // a bbox that has been manually set.
-            // if (scene.includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
+            // if (scene.includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
                 // Scene &scene = Scene::getInstance();
                 // const float pos[3] = {
                 //     scene.bBoxPos[0],
@@ -623,17 +677,17 @@ bool Obj::canBuildBlendAndObjFromScene() const {
 }
 
 void Obj::handleBuildObjFromSceneClicked() {
-    backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
+    backgroundWorker.emplace(&Obj::extractResourcesAndStartObjBuild, this);
 }
 
 void Obj::handleBuildBlendFromSceneClicked() {
     blendFileOnlyBuild = true;
-    backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
+    backgroundWorker.emplace(&Obj::extractResourcesAndStartObjBuild, this);
 }
 
 void Obj::handleBuildBlendAndObjFromSceneClicked() {
     blendFileAndObjBuild = true;
-    backgroundWorker.emplace(&Obj::extractAlocsOrPrimsAndStartObjBuild, this);
+    backgroundWorker.emplace(&Obj::extractResourcesAndStartObjBuild, this);
 }
 
 void Obj::handleBuildObjFromNavpClicked() {
@@ -643,7 +697,6 @@ void Obj::handleBuildObjFromNavpClicked() {
 void Obj::finalizeLoad() {
     if (loadObj) {
         lastObjFileName = objToLoad;
-        objectTriangleRanges.clear();
         RecastAdapter &recastAdapter = RecastAdapter::getInstance();
         recastAdapter.selectedObject = "";
         recastAdapter.markerPositionSet = false;

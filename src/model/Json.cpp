@@ -1,48 +1,48 @@
-#include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Scene.h"
 
-void ZPathfinding::Vec3::readJson(simdjson::ondemand::object json) {
+void Json::Vec3::readJson(simdjson::ondemand::object json) {
     x = static_cast<float>(static_cast<double>(json["x"]));
     y = static_cast<float>(static_cast<double>(json["y"]));
     z = static_cast<float>(static_cast<double>(json["z"]));
 }
 
-void ZPathfinding::Vec3::writeJson(std::ostream &f) const {
+void Json::Vec3::writeJson(std::ostream &f) const {
     f << R"("position":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << "}";
 }
 
-void ZPathfinding::Rotation::readJson(simdjson::ondemand::object json) {
+void Json::Rotation::readJson(simdjson::ondemand::object json) {
     x = static_cast<float>(static_cast<double>(json["x"]));
     y = static_cast<float>(static_cast<double>(json["y"]));
     z = static_cast<float>(static_cast<double>(json["z"]));
     w = static_cast<float>(static_cast<double>(json["w"]));
 }
 
-void ZPathfinding::Rotation::writeJson(std::ostream &f) const {
+void Json::Rotation::writeJson(std::ostream &f) const {
     f << R"("rotation":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << R"(,"w": )" << w << "}";
 }
 
-void ZPathfinding::PfBoxType::readJson(simdjson::ondemand::object json) {
+void Json::PfBoxType::readJson(simdjson::ondemand::object json) {
     type = std::string{std::string_view(json["type"])};
     data = std::string{std::string_view(json["data"])};
 }
 
-void ZPathfinding::PfBoxType::writeJson(std::ostream &f) const {
+void Json::PfBoxType::writeJson(std::ostream &f) const {
     f << R"("type":{"type":"EPathFinderBoxType","data":")" << data << R"("})";
 }
 
-void ZPathfinding::Scale::readJson(simdjson::ondemand::object json) {
+void Json::Scale::readJson(simdjson::ondemand::object json) {
     type = std::string{std::string_view(json["type"])};
     simdjson::ondemand::object dataJson = json["data"];
     data.readJson(dataJson);
 }
 
-void ZPathfinding::Scale::writeJson(std::ostream &f) const {
+void Json::Scale::writeJson(std::ostream &f) const {
     f << R"("scale":{"type":"SVector3","data":{"x":)" << data.x << R"(,"y":)" << data.y << R"(,"z": )" << data.z <<
             "}}";
 }
 
-void ZPathfinding::Entity::readJson(simdjson::ondemand::object json) {
+void Json::Entity::readJson(simdjson::ondemand::object json) {
     auto result = json["id"];
     if (result.error() == simdjson::SUCCESS) {
         id = std::string{std::string_view(json["id"])};
@@ -71,7 +71,7 @@ void ZPathfinding::Entity::readJson(simdjson::ondemand::object json) {
     }
 }
 
-void ZPathfinding::HashesAndEntity::readJson(simdjson::ondemand::object json) {
+void Json::HashesAndEntity::readJson(simdjson::ondemand::object json) {
     alocHash = std::string{std::string_view(json["alocHash"])};
     primHash = std::string{std::string_view(json["primHash"])};
     roomName = std::string{std::string_view(json["roomName"])};
@@ -80,7 +80,7 @@ void ZPathfinding::HashesAndEntity::readJson(simdjson::ondemand::object json) {
     entity.readJson(entityJson);
 }
 
-void ZPathfinding::Mesh::writeJson(std::ostream &f) const {
+void Json::Mesh::writeJson(std::ostream &f) const {
     f << R"({"alocHash":")" << alocHash <<
             R"(","primHash":")" << primHash <<
             R"(","roomName":")" << roomName <<
@@ -96,7 +96,7 @@ void ZPathfinding::Mesh::writeJson(std::ostream &f) const {
     f << "}}";
 }
 
-ZPathfinding::Meshes::Meshes(simdjson::ondemand::array alocs) {
+Json::Meshes::Meshes(simdjson::ondemand::array alocs) {
     for (simdjson::ondemand::value hashAndEntityJson: alocs) {
         HashesAndEntity hashAndEntity;
         hashAndEntity.readJson(hashAndEntityJson);
@@ -104,7 +104,7 @@ ZPathfinding::Meshes::Meshes(simdjson::ondemand::array alocs) {
     }
 }
 
-std::vector<ZPathfinding::Mesh> ZPathfinding::Meshes::readMeshes() const {
+std::vector<Json::Mesh> Json::Meshes::readMeshes() const {
     std::vector<Mesh> meshes;
     for (const HashesAndEntity &hashAndEntity: hashesAndEntities) {
         Mesh mesh;
@@ -123,7 +123,7 @@ std::vector<ZPathfinding::Mesh> ZPathfinding::Meshes::readMeshes() const {
     return meshes;
 }
 
-void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
+void Json::PfBox::writeJson(std::ostream &f) const {
     f << R"({"id":")" << id <<
             R"(","name":")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
@@ -138,7 +138,7 @@ void ZPathfinding::PfBox::writeJson(std::ostream &f) const {
     f << "}";
 }
 
-ZPathfinding::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
+Json::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
     for (simdjson::ondemand::value entityJson: pfBoxes) {
         Entity entity;
         entity.readJson(entityJson);
@@ -146,7 +146,7 @@ ZPathfinding::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
     }
 }
 
-void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
+void Json::PfBoxes::readPathfindingBBoxes() {
     Scene &scene = Scene::getInstance();
     scene.exclusionBoxes.clear();
     bool includeBoxFound = false;
@@ -188,7 +188,7 @@ void ZPathfinding::PfBoxes::readPathfindingBBoxes() {
     }
 }
 
-void ZPathfinding::PfSeedPoint::writeJson(std::ostream &f) const {
+void Json::PfSeedPoint::writeJson(std::ostream &f) const {
     f << R"({"id":")" << id <<
             R"(","name":")" << name <<
             R"(","tblu":")" << tblu << R"(",)";
@@ -198,7 +198,7 @@ void ZPathfinding::PfSeedPoint::writeJson(std::ostream &f) const {
     f << "}";
 }
 
-ZPathfinding::PfSeedPoints::PfSeedPoints(simdjson::ondemand::array pfSeedPoints) {
+Json::PfSeedPoints::PfSeedPoints(simdjson::ondemand::array pfSeedPoints) {
     for (simdjson::ondemand::value entityJson: pfSeedPoints) {
         Entity entity;
         entity.readJson(entityJson);
@@ -206,7 +206,7 @@ ZPathfinding::PfSeedPoints::PfSeedPoints(simdjson::ondemand::array pfSeedPoints)
     }
 }
 
-std::vector<ZPathfinding::PfSeedPoint> ZPathfinding::PfSeedPoints::readPfSeedPoints() const {
+std::vector<Json::PfSeedPoint> Json::PfSeedPoints::readPfSeedPoints() const {
     std::vector<PfSeedPoint> pfSeedPoints;
     for (const Entity &entity: entities) {
         std::string id = entity.id;
@@ -217,4 +217,24 @@ std::vector<ZPathfinding::PfSeedPoint> ZPathfinding::PfSeedPoints::readPfSeedPoi
         pfSeedPoints.emplace_back(id, name, tblu, p, r);
     }
     return pfSeedPoints;
+}
+
+void Json::MatiProperty::readJson(simdjson::ondemand::object json) {
+    value = std::string{std::string_view(json["value"])};
+}
+
+void Json::MatiProperties::readJson(simdjson::ondemand::object json) {
+    const simdjson::ondemand::object diffuseIoiStringJson = json["mapTexture2D_01"];
+    diffuseIoiString.readJson(diffuseIoiStringJson);
+    const simdjson::ondemand::object normalIoiStringJson = json["mapTexture2DNormal_01"];
+    normalIoiString.readJson(normalIoiStringJson);
+    const simdjson::ondemand::object specularIoiStringJson = json["mapTexture2D_03"];
+    specularIoiString.readJson(specularIoiStringJson);
+}
+
+void Json::Mati::readJson(simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+    id = std::string{std::string_view(jsonDocument["id"])};
+    className = std::string{std::string_view(jsonDocument["class"])};
+    const simdjson::ondemand::object diffuseIoiStringJson = jsonDocument["properties"];
+    properties.readJson(diffuseIoiStringJson);
 }

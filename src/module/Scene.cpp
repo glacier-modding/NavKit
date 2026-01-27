@@ -58,9 +58,9 @@ void Scene::setLastSaveFileName(char *fileName) {
 
 void Scene::loadMeshes(const std::function<void()> &errorCallback,
                       simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
-    ZPathfinding::Meshes newMeshes;
+    Json::Meshes newMeshes;
     try {
-        newMeshes = ZPathfinding::Meshes(jsonDocument["meshes"]);
+        newMeshes = Json::Meshes(jsonDocument["meshes"]);
     } catch (const std::exception &e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
@@ -71,16 +71,16 @@ void Scene::loadMeshes(const std::function<void()> &errorCallback,
 
 void Scene::loadPfBoxes(const std::function<void()> &errorCallback,
                         simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
-    ZPathfinding::PfBoxes pfBoxes;
+    Json::PfBoxes pfBoxes;
     try {
-        pfBoxes = ZPathfinding::PfBoxes(jsonDocument["pfBoxes"]);
+        pfBoxes = Json::PfBoxes(jsonDocument["pfBoxes"]);
     } catch (const std::exception &e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
     }
     pfBoxes.readPathfindingBBoxes();
-    if (includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
+    if (includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
         if (Obj::getInstance().objLoaded) {
             RecastAdapter::getInstance().setSceneBBoxToMesh();
         }
@@ -104,9 +104,9 @@ void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document> 
 
 void Scene::loadPfSeedPoints(const std::function<void()> &errorCallback,
                              simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
-    ZPathfinding::PfSeedPoints newPfSeedPoints;
+    Json::PfSeedPoints newPfSeedPoints;
     try {
-        newPfSeedPoints = ZPathfinding::PfSeedPoints(jsonDocument["pfSeedPoints"]);
+        newPfSeedPoints = Json::PfSeedPoints(jsonDocument["pfSeedPoints"]);
     } catch (const std::exception &e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
@@ -264,9 +264,9 @@ void Scene::updateSceneDialogControls(HWND hDlg) const {
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
 }
 
-const ZPathfinding::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const {
-    std::vector<const ZPathfinding::Mesh *> closestMeshes;
-    for (const ZPathfinding::Mesh& mesh : meshes) {
+const Json::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const {
+    std::vector<const Json::Mesh *> closestMeshes;
+    for (const Json::Mesh& mesh : meshes) {
         if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.id == id) {
             closestMeshes.push_back(&mesh);
         }
@@ -275,7 +275,7 @@ const ZPathfinding::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &ha
         return nullptr;
     }
     Vec3 posVec = {pos[0], pos[1], pos[2]};
-    std::ranges::sort(closestMeshes, [posVec](const ZPathfinding::Mesh *a, const ZPathfinding::Mesh *b) {
+    std::ranges::sort(closestMeshes, [posVec](const Json::Mesh *a, const Json::Mesh *b) {
         const Vec3 aPos = {a->pos.x, a->pos.y, a->pos.z};
         const Vec3 bPos = {b->pos.x, b->pos.y, b->pos.z};
         return posVec.DistanceSquaredTo(aPos) < posVec.DistanceSquaredTo(bPos);

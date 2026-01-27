@@ -2,7 +2,7 @@
 #include <fstream>
 
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/GameConnection.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -126,7 +126,7 @@ void SceneExtract::finalizeExtractScene() {
                 const std::string &fileNameString = sceneFile;
                 sceneScoped.lastLoadSceneFile = sceneFile;
                 if ((alsoBuildObj || alsoBuildAll) && !obj.startedObjGeneration) {
-                    obj.extractAlocsOrPrimsAndStartObjBuild();
+                    obj.extractResourcesAndStartObjBuild();
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();

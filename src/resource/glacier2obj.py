@@ -1279,7 +1279,7 @@ class RenderPrimitive:
         return num
 
 
-def load_prim_mesh(prim, prim_name: str, mesh_index: int):
+def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
     """
     Turn the prim data structure into a Blender mesh.
     Returns the generated Mesh
@@ -1288,9 +1288,11 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int):
 
     vert_locs = []
     loop_vidxs = []
+    loop_cols = []
 
     sub_mesh = prim.header.object_table[mesh_index].sub_mesh
 
+    loop_uvs = [[] for _ in range(sub_mesh.num_uvchannels)]
     loop_vidxs.extend(sub_mesh.indices)
 
     for i, vert in enumerate(sub_mesh.vertexBuffer.vertices):
@@ -1309,6 +1311,28 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int):
     loop_totals = np.full(num_faces, 3)
     mesh.polygons.foreach_set("loop_start", loop_starts)
     mesh.polygons.foreach_set("loop_total", loop_totals)
+
+    if load_textures:
+        for index in sub_mesh.indices:
+            vert = sub_mesh.vertexBuffer.vertices[index]
+            loop_cols.extend(
+                [
+                    vert.color[0] / 255,
+                    vert.color[1] / 255,
+                    vert.color[2] / 255,
+                    vert.color[3] / 255,
+                    ]
+            )
+            for uv_i in range(sub_mesh.num_uvchannels):
+                loop_uvs[uv_i].extend([vert.uv[uv_i][0], 1 - vert.uv[uv_i][1]])
+
+        for uv_i in range(sub_mesh.num_uvchannels):
+            name = "UVMap" if uv_i == 0 else "UVMap.%03d" % uv_i
+            layer = mesh.uv_layers.new(name=name)
+            layer.data.foreach_set("uv", loop_uvs[uv_i])
+
+        layer = mesh.vertex_colors.new(name="Col")
+        mesh.color_attributes[layer.name].data.foreach_set("color", loop_cols)
 
     mesh.validate()
     mesh.update()

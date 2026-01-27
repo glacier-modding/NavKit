@@ -2,7 +2,7 @@
 #include <functional>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include "../model/ZPathfinding.h"
+#include "../model/Json.h"
 
 class Scene {
 public:
@@ -55,11 +55,11 @@ public:
     std::string lastLoadSceneFile;
     bool sceneLoaded;
 
-    std::vector<ZPathfinding::Mesh> meshes;
-    std::vector<ZPathfinding::Mesh> prims;
-    ZPathfinding::PfBox includeBox;
-    std::vector<ZPathfinding::PfBox> exclusionBoxes;
-    std::vector<ZPathfinding::PfSeedPoint> pfSeedPoints;
+    std::vector<Json::Mesh> meshes;
+    std::vector<Json::Mesh> prims;
+    Json::PfBox includeBox;
+    std::vector<Json::PfBox> exclusionBoxes;
+    std::vector<Json::PfSeedPoint> pfSeedPoints;
     std::optional<std::jthread> backgroundWorker;
     float bBoxPos[3]{};
     float bBoxScale[3]{};
@@ -67,7 +67,7 @@ public:
     int version;
     static HWND hSceneDialog;
 
-    const ZPathfinding::Mesh *findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const;
+    const Json::Mesh *findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const;
 
 private:
     std::string loadSceneName;

@@ -10,6 +10,8 @@
 
 #include "../../include/NavKit/render/Model.h"
 #include "../../include/NavKit/render/Shader.h"
+#include "../model/Json.h"
+
 enum MeshType {
     ALOC,
     PRIM
@@ -64,6 +66,10 @@ public:
     SceneMeshBuildType sceneMeshBuildType;
     bool primLods[8];
     bool blendFileBuilt;
+    bool extractTextures;
+    bool applyTextures;
+    std::map<std::string, std::vector<std::string>> primHashToMatiHash;
+    std::map<std::string, Json::Mati> matiHashToMati;
     static HWND hObjDialog;
     Model model;
 
@@ -137,7 +143,9 @@ public:
 
     std::optional<std::jthread> backgroundWorker;
 
-    void finalizeExtractAlocsOrPrims();
+    void finalizeExtractResources();
 
-    void extractAlocsOrPrimsAndStartObjBuild();
+    bool shouldExtractTextures() const;
+
+    void extractResourcesAndStartObjBuild();
 };

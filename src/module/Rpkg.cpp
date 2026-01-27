@@ -14,6 +14,7 @@ class NavKitSettings;
 std::string Rpkg::gameVersion = "HM3";
 bool Rpkg::extractionDataInitComplete = false;
 PartitionManager* Rpkg::partitionManager = nullptr;
+HashList* Rpkg::hashList = nullptr;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
 void Rpkg::initExtractionData() {
@@ -39,7 +40,7 @@ void Rpkg::initExtractionData() {
             Airg::airgHashIoiStringMap[airgHash] = airgHash;
         }
     }
-    Logger::log(NK_INFO, "Reading hash list.");
+    Logger::log(NK_INFO, "Reading filtered hash list.");
     if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
         std::string line;
         while (std::getline(file, line)) {
@@ -77,7 +78,10 @@ void Rpkg::initExtractionData() {
             }
         }
     }
-    Logger::log(NK_INFO, "Done reading hash list.");
+    Logger::log(NK_INFO, "Done reading filtered hash list.");
+    Logger::log(NK_INFO, "Getting full hash list.");
+    getHashList();
+    Logger::log(NK_INFO, "Done getting full hash list.");
     Menu::updateMenuState();
 }
 
@@ -112,5 +116,14 @@ int Rpkg::extractResourceFromRpkgs(const std::string& hash, const ResourceType t
         Logger::log(NK_ERROR, ("Error extracting Resource: " + hash).c_str());
         return -1;
     }
+    return 0;
+}
+
+int Rpkg::getHashList() {
+    const auto ret = get_hash_list_from_file_or_repo(NavKitSettings::getInstance().outputFolder.c_str(), Logger::rustLogCallback);
+    if (ret == nullptr) {
+        return -1;
+    }
+    hashList = ret;
     return 0;
 }

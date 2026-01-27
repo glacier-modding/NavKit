@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <GL/glew.h>
 
-#include "../model/ZPathfinding.h"
+#include "../model/Json.h"
 
 struct Vec3;
 

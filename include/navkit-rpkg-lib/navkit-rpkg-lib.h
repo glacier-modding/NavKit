@@ -9,6 +9,7 @@
 #include <ostream>
 #include <new>
 struct PartitionManager;
+struct HashList;
 
 struct EntitiesJson;
 
@@ -47,9 +48,25 @@ RustStringList *get_all_resources_hashes_by_type_from_rpkg_files(const Partition
                                                                  const char *resource_type,
                                                                  void (*log_callback)(const char*));
 
+HashList *get_hash_list_from_file_or_repo(const char *output_folder,
+                                          void (*log_callback)(const char*));
+
+RustStringList *get_all_referenced_hashes_by_hash_from_rpkg_files(const char *resource_hash,
+                                                                  const PartitionManager *partition_manager,
+                                                                  void (*log_callback)(const char*));
+
+char *get_mati_json_by_hash(const char *resource_hash,
+                            const HashList *hash_list,
+                            const PartitionManager *partition_manager,
+                            void (*log_callback)(const char*));
+
 const char *get_string_from_list(RustStringList *list, uintptr_t index);
 
 void free_entities_json(EntitiesJson *ptr);
+
+void free_string(char *ptr);
+
+void free_hash_list(HashList *ptr);
 
 void free_hashset_string(HashSet<String> *ptr);
 

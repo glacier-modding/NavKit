@@ -5,7 +5,7 @@
 #include <vector>
 #include "../../../extern/simdjson/simdjson.h"
 
-namespace ZPathfinding {
+namespace Json {
     class Vec3 {
     public:
         Vec3(): x(0), y(0), z(0) {
@@ -189,5 +189,31 @@ namespace ZPathfinding {
         std::vector<PfSeedPoint> readPfSeedPoints() const;
 
         std::vector<Entity> entities{};
+    };
+
+    class MatiProperty {
+    public:
+        MatiProperty() = default;
+        void readJson(simdjson::ondemand::object json);
+        std::string value;
+    };
+
+    class MatiProperties {
+    public:
+        MatiProperties() = default;
+        void readJson(simdjson::ondemand::object json);
+        MatiProperty diffuseIoiString;
+        MatiProperty normalIoiString;
+        MatiProperty specularIoiString;
+    };
+
+    class Mati {
+    public:
+        Mati() = default;
+
+        void readJson(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        std::string id;
+        std::string className;
+        MatiProperties properties;
     };
 }
