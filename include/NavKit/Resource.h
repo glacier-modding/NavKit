@@ -133,7 +133,7 @@
 #define IDC_STATIC_TILING_INFO_MAX_TILES        30336
 #define IDC_STATIC_TILING_INFO_MAX_POLYS        30337
 
-#define IDD_OBJ_SETTINGS                        30400
+#define IDD_SCENE_MESH_SETTINGS                 30400
 #define IDC_RADIO_MESH_TYPE_ALOC                30401
 #define IDC_RADIO_MESH_TYPE_PRIM                30402
 #define IDC_CHECK_PRIM_LOD_1                    30403
@@ -149,6 +149,8 @@
 #define IDC_CHECK_FILTER_TO_INCLUDE_BOX         30413
 #define IDC_CHECK_SKIP_RPKG_EXTRACT             30414
 #define IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS       30415
+#define IDC_CHECK_EXTRACT_TEXTURE_FILES         30416
+#define IDC_CHECK_APPLY_TEXTURES                30417
 
 #define IDD_EXTRACT_NAVP_DIALOG                 30500
 #define IDC_COMBOBOX_NAVP                       30501

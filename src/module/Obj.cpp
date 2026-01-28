@@ -104,6 +104,8 @@ void Obj::updateObjDialogControls(HWND hDlg) {
     CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX, obj.filterToIncludeBox ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS, obj.glacier2ObjDebugLogsEnabled ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES, obj.extractTextures ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
 }
 
 INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -153,6 +155,20 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wPar
                         obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS) ? COPY : INSTANCE;
                         obj.saveObjSettings();
                         Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.", obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
+                        updateObjDialogControls(hDlg);
+                        return (INT_PTR) TRUE;
+                    }
+                case IDC_CHECK_EXTRACT_TEXTURE_FILES: {
+                        obj.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
+                        obj.saveObjSettings();
+                        Logger::log(NK_INFO, "Extract textures set to %s.", obj.extractTextures ? "true" : "false");
+                        updateObjDialogControls(hDlg);
+                        return (INT_PTR) TRUE;
+                    }
+                case IDC_CHECK_APPLY_TEXTURES: {
+                        obj.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
+                        obj.saveObjSettings();
+                        Logger::log(NK_INFO, "Apply textures set to %s.", obj.applyTextures ? "true" : "false");
                         updateObjDialogControls(hDlg);
                         return (INT_PTR) TRUE;
                     }
@@ -337,7 +353,7 @@ void Obj::extractResourcesAndStartObjBuild() {
 
     extractingAlocsOrPrims = true;
     Menu::updateMenuState();
-    const int result = extract_scene_mesh_resources(
+    int result = extract_scene_mesh_resources(
                            navJsonFilePath.c_str(),
                            runtimeFolder.c_str(),
                            Rpkg::partitionManager,
@@ -349,7 +365,7 @@ void Obj::extractResourcesAndStartObjBuild() {
         errorExtracting = true;
         return;
     }
-
+    std::set<std::string> neededTextHashes{};
     if (shouldExtractTextures()) {
         simdjson::ondemand::parser parser;
         Logger::log(NK_INFO, "Extracting MATIs from Rpkg files.");
@@ -360,7 +376,7 @@ void Obj::extractResourcesAndStartObjBuild() {
                 Rpkg::partitionManager,
                 Logger::rustLogCallback);
             if (referencesRustList == nullptr) {
-                Logger::log(NK_ERROR, "Error getting references from %ss from Rpkg files.", mesh.primHash.c_str());
+                Logger::log(NK_ERROR, "Error getting references from %s from Rpkg files.", mesh.primHash.c_str());
                 continue;
                 // errorExtracting = true;
                 // return;
@@ -382,24 +398,49 @@ void Obj::extractResourcesAndStartObjBuild() {
                     try {
                         mati.readJson(jsonDocument);
                     } catch (const std::exception& e) {
-                        Logger::log(NK_ERROR, e.what());
+                        Logger::log(NK_ERROR, "Error getting Mati JSON for %s: %s", matiHash.c_str(), e.what());
                         free_string(matiJson);
-                        return;
+                        continue;
+                        // errorExtracting = true;
+                        // return;
                     }
                     free_string(matiJson);
                     Logger::log(NK_INFO, "Found diffuse texture %s for mati %s with mati id %s for mesh %s.",
                                 mati.properties.diffuseIoiString.value.c_str(), matiHash.c_str(), mati.id.c_str(),
                                 mesh.primHash.c_str());
+                    auto diffuseIoiString = mati.properties.diffuseIoiString.value;
+                    auto normalIoiString = mati.properties.normalIoiString.value;
+                    auto specularIoiString = mati.properties.specularIoiString.value;
+                    if (Rpkg::ioiStringToHashListEntryMap.contains(diffuseIoiString)) {
+                        neededTextHashes.insert(Rpkg::ioiStringToHashListEntryMap.at(diffuseIoiString).hash);
+                    }
+                    if (Rpkg::ioiStringToHashListEntryMap.contains(normalIoiString)) {
+                        neededTextHashes.insert(Rpkg::ioiStringToHashListEntryMap.at(normalIoiString).hash);
+                    }
+                    if (Rpkg::ioiStringToHashListEntryMap.contains(specularIoiString)) {
+                        neededTextHashes.insert(Rpkg::ioiStringToHashListEntryMap.at(specularIoiString).hash);
+                    }
                 }
             }
         }
+        Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
+        std::vector neededTextHashesVec (neededTextHashes.begin(), neededTextHashes.end());
+
+        result = Rpkg::extractResourcesFromRpkgs(
+            neededTextHashesVec,
+            TEXT);
+        if (result != 0) {
+            Logger::log(NK_ERROR, "Error extracting Text files from Rpkg files.");
+        } else {
+            Logger::log(NK_INFO, "Finished extracting %s Text files from Rpkg files.", neededTextHashes.size());
+        }
     }
-    Logger::log(NK_INFO, "Finished extracting {}s from Rpkg files.", meshFileType.c_str());
-    doneExtractingAlocsOrPrims = true;
+    Logger::log(NK_INFO, "Finished extracting %ss from Rpkg files.", meshFileType.c_str());
+    // doneExtractingAlocsOrPrims = true;
     Menu::updateMenuState();
 }
 
-char *Obj::openSetBlenderFileDialog(const char *lastBlenderFile) {
+char *Obj::openSetBlenderFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
@@ -752,6 +793,8 @@ void Obj::loadSettings() {
     skipExtractingAlocsOrPrims = strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"), "true") == 0;
     filterToIncludeBox = strcmp(persistedSettings.getValue("Obj", "filterToIncludeBox", "true"), "true") == 0;
     glacier2ObjDebugLogsEnabled = strcmp(persistedSettings.getValue("Obj", "glacier2ObjDebugLogsEnabled", "false"), "true") == 0;
+    extractTextures = strcmp(persistedSettings.getValue("Obj", "extractTextures", "false"), "true") == 0;
+    applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
 }
 
 void Obj::saveObjSettings() const {
@@ -774,6 +817,12 @@ void Obj::saveObjSettings() const {
 
     const char *debugEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
     persistedSettings.setValue("Obj", "glacier2ObjDebugLogsEnabled", debugEnabled);
+
+    const char *extractTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    persistedSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
+
+    const char *applyTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    persistedSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
 
     persistedSettings.save();
 }
@@ -798,7 +847,7 @@ void Obj::showObjDialog() {
     HWND hParentWnd = Renderer::hwnd;
     hObjDialog = CreateDialogParam(
         hInstance,
-        MAKEINTRESOURCE(IDD_OBJ_SETTINGS),
+        MAKEINTRESOURCE(IDD_SCENE_MESH_SETTINGS),
         hParentWnd,
         ObjSettingsDialogProc,
         reinterpret_cast<LPARAM>(this)

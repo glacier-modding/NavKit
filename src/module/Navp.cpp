@@ -884,7 +884,7 @@ void Navp::updateNavpDialogControls(HWND hwnd) {
 }
 
 void Navp::extractNavpFromRpkgs(const std::string& hash) {
-    if (!Rpkg::extractResourceFromRpkgs(hash, NAVP)) {
+    if (!Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
         const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\navp\\" + hash + ".NAVP";
         Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
         getInstance().loadNavpFromFile(fileName);

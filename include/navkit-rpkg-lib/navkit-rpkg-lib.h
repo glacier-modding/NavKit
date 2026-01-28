@@ -60,7 +60,19 @@ char *get_mati_json_by_hash(const char *resource_hash,
                             const PartitionManager *partition_manager,
                             void (*log_callback)(const char*));
 
+uint32_t hash_list_get_version(const HashList *list);
+
+RustStringList *hash_list_get_all_hashes(const HashList *list);
+
+char *hash_list_get_path_by_hash(const HashList *list, const char *resource_hash);
+
+char *hash_list_get_hint_by_hash(const HashList *list, const char *resource_hash);
+
+uint32_t hash_list_get_resource_type_by_hash(const HashList *list, const char *resource_hash);
+
 const char *get_string_from_list(RustStringList *list, uintptr_t index);
+
+void free_rust_string_list(RustStringList *ptr);
 
 void free_entities_json(EntitiesJson *ptr);
 

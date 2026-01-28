@@ -858,7 +858,7 @@ void Airg::updateAirgDialogControls(HWND hwnd) {
 }
 
 void Airg::extractAirgFromRpkgs(const std::string& hash) {
-    if (!Rpkg::extractResourceFromRpkgs(hash, AIRG)) {
+    if (!Rpkg::extractResourcesFromRpkgs({hash}, AIRG)) {
         const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\airg\\" + hash + ".AIRG";
         Logger::log(NK_INFO, ("Loading airg from file: " + fileName).c_str());
         getInstance().loadAirgFromFile(fileName);

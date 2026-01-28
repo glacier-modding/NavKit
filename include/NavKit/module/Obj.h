@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
+#include <set>
 #include <windows.h>
 #include <GL/glew.h>
 
@@ -73,7 +74,7 @@ public:
     static HWND hObjDialog;
     Model model;
 
-    static char *openSetBlenderFileDialog(const char *lastBlenderFile);
+    static char *openSetBlenderFileDialog();
 
     void loadSettings();
 
