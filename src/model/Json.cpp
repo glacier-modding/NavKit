@@ -69,6 +69,13 @@ void Json::Entity::readJson(simdjson::ondemand::object json) {
         const simdjson::ondemand::object scaleJson = json["scale"];
         scale.readJson(scaleJson);
     }
+    result = json["matiHashes"];
+    if (result.error() == simdjson::SUCCESS) {
+        for (simdjson::ondemand::array matiHashesJson = json["matiHashes"];
+            simdjson::ondemand::value matiHashJson: matiHashesJson) {
+            matiHashes.push_back(std::string{std::string_view(matiHashJson)});
+        }
+    }
 }
 
 void Json::HashesAndEntity::readJson(simdjson::ondemand::object json) {
@@ -93,7 +100,18 @@ void Json::Mesh::writeJson(std::ostream &f) const {
     rotation.writeJson(f);
     f << ",";
     scale.writeJson(f);
-    f << "}}";
+    f << R"(,"matiHashes":[)";
+    bool first = true;
+    for (auto hash : matiHashes) {
+        if (!first) {
+            f << ",";
+        } else {
+            first = false;
+        }
+        f << R"(")" << hash << R"(")";
+    }
+
+    f << "]}}";
 }
 
 Json::Meshes::Meshes(simdjson::ondemand::array alocs) {
@@ -118,6 +136,7 @@ std::vector<Json::Mesh> Json::Meshes::readMeshes() const {
         mesh.pos = hashAndEntity.entity.position;
         mesh.rotation = hashAndEntity.entity.rotation;
         mesh.scale = hashAndEntity.entity.scale;
+        mesh.matiHashes = hashAndEntity.entity.matiHashes;
         meshes.emplace_back(mesh);
     }
     return meshes;
@@ -219,22 +238,40 @@ std::vector<Json::PfSeedPoint> Json::PfSeedPoints::readPfSeedPoints() const {
     return pfSeedPoints;
 }
 
-void Json::MatiProperty::readJson(simdjson::ondemand::object json) {
-    value = std::string{std::string_view(json["value"])};
-}
-
-void Json::MatiProperties::readJson(simdjson::ondemand::object json) {
-    const simdjson::ondemand::object diffuseIoiStringJson = json["mapTexture2D_01"];
-    diffuseIoiString.readJson(diffuseIoiStringJson);
-    const simdjson::ondemand::object normalIoiStringJson = json["mapTexture2DNormal_01"];
-    normalIoiString.readJson(normalIoiStringJson);
-    const simdjson::ondemand::object specularIoiStringJson = json["mapTexture2D_03"];
-    specularIoiString.readJson(specularIoiStringJson);
-}
-
-void Json::Mati::readJson(simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
-    id = std::string{std::string_view(jsonDocument["id"])};
+void Json::Mati::readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+    hash = std::string{std::string_view(jsonDocument["id"])};
     className = std::string{std::string_view(jsonDocument["class"])};
-    const simdjson::ondemand::object diffuseIoiStringJson = jsonDocument["properties"];
-    properties.readJson(diffuseIoiStringJson);
+    simdjson::ondemand::object propertiesJson = jsonDocument["properties"];
+    simdjson::ondemand::object diffuseJson = propertiesJson["mapTexture2D_01"];
+    diffuse = std::string{std::string_view(diffuseJson["value"])};
+    simdjson::ondemand::object normalJson = propertiesJson["mapTexture2DNormal_01"];
+    normal = std::string{std::string_view(normalJson["value"])};
+    simdjson::ondemand::object specularJson = propertiesJson["mapTexture2D_03"];
+    specular = std::string{std::string_view(specularJson["value"])};
+}
+
+void Json::Mati::readJsonFromScene(simdjson::ondemand::object jsonDocument) {
+    hash = std::string{std::string_view(jsonDocument["hash"])};
+    className = std::string{std::string_view(jsonDocument["class"])};
+    diffuse = std::string{std::string_view(jsonDocument["diffuse"])};
+    normal = std::string{std::string_view(jsonDocument["normal"])};
+    specular = std::string{std::string_view(jsonDocument["specular"])};
+}
+
+
+void Json::Mati::writeJson(std::ostream &f) const {
+    f << R"({"hash":")" << hash <<
+            R"(","class":")" << className <<
+            R"(","diffuse":")" << diffuse <<
+            R"(","normal":")" << normal <<
+            R"(","specular":")" << specular;
+    f << R"("})";
+}
+
+Json::Matis::Matis(simdjson::ondemand::array matisJson) {
+    for (simdjson::ondemand::value matiJson: matisJson) {
+        Mati mati;
+        mati.readJsonFromScene(matiJson);
+        matis.push_back(mati);
+    }
 }

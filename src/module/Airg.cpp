@@ -287,13 +287,17 @@ bool Airg::canBuildAirg() const {
 }
 
 void Airg::handleBuildAirgClicked() {
+    if (const Navp &navp = Navp::getInstance(); navp.navMesh->m_areas.size() > 65535) {
+        Logger::log(
+            NK_ERROR,
+            "Loaded NAVP has too many areas. Ensure the scene has PF Seed Points and has a fully contained boundary.");
+    }
     airgLoaded = false;
     Menu::updateMenuState();
     airgBuilding = true;
     delete reasoningGrid;
     reasoningGrid = new ReasoningGrid();
-    std::string msg = "Building Airg from Airg";
-    Logger::log(NK_INFO, msg.data());
+    Logger::log(NK_INFO, "Building Airg from Airg");
     build();
 }
 
@@ -759,18 +763,6 @@ void Airg::loadAirg(Airg *airg, const std::string& fileName, bool isFromJson) {
     if (!isFromJson) {
         std::filesystem::remove(jsonFileName);
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    msg = "Finished loading Airg in ";
-    msg += std::to_string(duration.count());
-    msg += " seconds";
-    Logger::log(NK_INFO, msg.data());
-    Logger::log(NK_INFO,
-                ("Waypoint count: " + std::to_string(airg->reasoningGrid->m_WaypointList.size()) +
-                 ", Visibility Data size: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) +
-                 ", Visibility Data points per waypoint: " + std::to_string(
-                     static_cast<double>(airg->reasoningGrid->m_pVisibilityData.size()) / static_cast<double>(airg
-                         ->reasoningGrid->m_WaypointList.size()))).c_str());
     int lastVisionDataSize = 0;
     int count = 1;
     int total = 0;
@@ -800,7 +792,7 @@ void Airg::loadAirg(Airg *airg, const std::string& fileName, bool isFromJson) {
     }
     int finalVisionDataSize = airg->reasoningGrid->m_pVisibilityData.size() - airg->reasoningGrid->m_WaypointList[
                                   airg->reasoningGrid->m_WaypointList.size() - 1].nVisionDataOffset;
-    Logger::log(NK_INFO,
+    Logger::log(NK_DEBUG,
                 ("Vision Data Offset[" + std::to_string(airg->reasoningGrid->m_WaypointList.size() - 1) + "]: " +
                  std::to_string(
                      airg->reasoningGrid->m_WaypointList[airg->reasoningGrid->m_WaypointList.size() - 1].
@@ -808,17 +800,29 @@ void Airg::loadAirg(Airg *airg, const std::string& fileName, bool isFromJson) {
                      airg->reasoningGrid->m_pVisibilityData.size()) + " Difference : " + std::to_string(
                      finalVisionDataSize)).c_str());
     total += finalVisionDataSize;
-    Logger::log(NK_INFO,
+    Logger::log(NK_DEBUG,
                 ("Total: " + std::to_string(total) + " Max Visibility: " + std::to_string(
                      airg->reasoningGrid->m_pVisibilityData.size())).c_str());
-    Logger::log(NK_INFO, "Visibility data offset map:");
+    Logger::log(NK_DEBUG, "Visibility data offset map:");
     for (auto &pair: visionDataOffsetCounts) {
         VisionData visionData = VisionData::GetVisionDataType(pair.first);
-        Logger::log(NK_INFO,
+        Logger::log(NK_DEBUG,
                     ("Offset difference: " + std::to_string(pair.first) + " Color: " + visionData.getName() +
                      " Count: " + std::to_string(pair.second)).c_str());
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    msg = "Finished loading Airg in ";
+    msg += std::to_string(duration.count());
+    msg += " seconds";
+    Logger::log(NK_INFO, msg.data());
+    Logger::log(NK_INFO,
+                ("Waypoint count: " + std::to_string(airg->reasoningGrid->m_WaypointList.size()) +
+                 ", Visibility Data size: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) +
+                 ", Visibility Data points per waypoint: " + std::to_string(
+                     static_cast<double>(airg->reasoningGrid->m_pVisibilityData.size()) / static_cast<double>(airg
+                         ->reasoningGrid->m_WaypointList.size()))).c_str());
     airg->airgLoading = false;
     airg->airgLoaded = true;
     airgDirty = true;

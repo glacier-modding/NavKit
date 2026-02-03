@@ -70,7 +70,6 @@ public:
     bool extractTextures;
     bool applyTextures;
     std::map<std::string, std::vector<std::string>> primHashToMatiHash;
-    std::map<std::string, Json::Mati> matiHashToMati;
     static HWND hObjDialog;
     Model model;
 

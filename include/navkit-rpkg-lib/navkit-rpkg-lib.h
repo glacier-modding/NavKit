@@ -56,7 +56,6 @@ RustStringList *get_all_referenced_hashes_by_hash_from_rpkg_files(const char *re
                                                                   void (*log_callback)(const char*));
 
 char *get_mati_json_by_hash(const char *resource_hash,
-                            const HashList *hash_list,
                             const PartitionManager *partition_manager,
                             void (*log_callback)(const char*));
 

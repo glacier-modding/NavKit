@@ -86,19 +86,21 @@ void Rpkg::initExtractionData() {
     Logger::log(NK_INFO, "Loading hash list into memory.");
 
     RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
-    Logger::log(NK_INFO, "Adding each entry.");
+    Logger::log(NK_INFO, "Total hash list entries: %d, adding each entry...", hashListRustStringList->length);
     for (int i = 0; i < hashListRustStringList->length; i++) {
+        if (i % 100000 == 0) {
+            Logger::log(NK_INFO, "Added %d entries.", i);
+        }
         std::string hash = hashListRustStringList->entries[i];
-        Logger::log(NK_INFO, "hash_list_get_path_by_hash.");
-        std::string path = hash_list_get_path_by_hash(hashList, hash.c_str());
-        Logger::log(NK_INFO, "hash_list_get_hint_by_hash.");
-        std::string ioiString = hash_list_get_hint_by_hash(hashList, hash.c_str());
-        Logger::log(NK_INFO, "hash_list_get_resource_type_by_hash.");
+        const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
+        std::string path = pathCStr ? pathCStr : "";
+        const char* hintCStr = hash_list_get_hint_by_hash(hashList, hash.c_str());
+        std::string ioiString = hintCStr ? hintCStr : "";
         auto typeInt = hash_list_get_resource_type_by_hash(hashList, hash.c_str());
         char typeChars[4];
         std::memcpy(typeChars, &typeInt, sizeof(typeInt));
         std::string type(typeChars, sizeof(typeChars));
-        Logger::log(NK_INFO, "Adding HashEntry to map.");
+
         hashToHashListEntryMap.insert({hash, {hash, ioiString, type}});
         ioiStringToHashListEntryMap.insert({ioiString, {hash, ioiString, type}});
     }
@@ -115,7 +117,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
         {
             const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
             const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
-            const std::string navpFolder = navKitSettings.outputFolder + "\\" + (type == NAVP
+            const std::string resourceFolder = navKitSettings.outputFolder + "\\" + (type == NAVP
                 ? "navp"
                 : type == AIRG
                 ? "airg"
@@ -131,7 +133,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
                 hashesNeeded,
                 hashes.size(),
                 partitionManager,
-                navpFolder.c_str(),
+                resourceFolder.c_str(),
                 type == NAVP ? "NAVP" : type == AIRG ? "AIRG" : "TEXT",
                 Logger::rustLogCallback);
         }

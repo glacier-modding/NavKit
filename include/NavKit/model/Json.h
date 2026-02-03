@@ -78,6 +78,7 @@ namespace Json {
         Rotation rotation;
         PfBoxType type;
         Scale scale;
+        std::vector<std::string> matiHashes;
 
         void readJson(simdjson::ondemand::object json);
     };
@@ -109,6 +110,7 @@ namespace Json {
         Vec3 pos{};
         Scale scale{};
         Rotation rotation{};
+        std::vector<std::string> matiHashes;
 
         void writeJson(std::ostream &f) const;
     };
@@ -191,29 +193,30 @@ namespace Json {
         std::vector<Entity> entities{};
     };
 
-    class MatiProperty {
-    public:
-        MatiProperty() = default;
-        void readJson(simdjson::ondemand::object json);
-        std::string value;
-    };
-
-    class MatiProperties {
-    public:
-        MatiProperties() = default;
-        void readJson(simdjson::ondemand::object json);
-        MatiProperty diffuseIoiString;
-        MatiProperty normalIoiString;
-        MatiProperty specularIoiString;
-    };
-
     class Mati {
     public:
         Mati() = default;
 
-        void readJson(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
-        std::string id;
+        void readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+
+        void readJsonFromScene(simdjson::ondemand::object jsonDocument);
+
+        void writeJson(std::ostream& f) const;
+
+        std::string hash;
         std::string className;
-        MatiProperties properties;
+        std::string diffuse;
+        std::string normal;
+        std::string specular;
+    };
+
+    class Matis {
+    public:
+        Matis() {
+        }
+
+        Matis(simdjson::ondemand::array matis);
+
+        std::vector<Mati> matis{};
     };
 }

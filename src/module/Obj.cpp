@@ -345,7 +345,7 @@ void Obj::extractResourcesAndStartObjBuild() {
             }
         }
     }
-    const Scene &scene = Scene::getInstance();
+    Scene &scene = Scene::getInstance();
     const std::string &fileNameString = scene.lastLoadSceneFile;
     const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
     const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
@@ -367,10 +367,11 @@ void Obj::extractResourcesAndStartObjBuild() {
     }
     std::set<std::string> neededTextHashes{};
     if (shouldExtractTextures()) {
+        scene.matis.clear();
         simdjson::ondemand::parser parser;
         Logger::log(NK_INFO, "Extracting MATIs from Rpkg files.");
         primHashToMatiHash.clear();
-        for (auto mesh : scene.meshes) {
+        for (auto& mesh : scene.meshes) {
             const auto referencesRustList = get_all_referenced_hashes_by_hash_from_rpkg_files(
                 mesh.primHash.c_str(),
                 Rpkg::partitionManager,
@@ -386,17 +387,21 @@ void Obj::extractResourcesAndStartObjBuild() {
                 if (!primHashToMatiHash.contains(matiHash)) {
                     primHashToMatiHash.insert({mesh.primHash, {}});
                 }
-                primHashToMatiHash[mesh.primHash].push_back(matiHash);
 
-                if (char* matiJson = get_mati_json_by_hash(matiHash.c_str(), Rpkg::hashList, Rpkg::partitionManager,
+                mesh.matiHashes.push_back(matiHash);
+                Logger::log(NK_INFO, "Added %s to %s mati hashes.", matiHash.c_str(), mesh.primHash.c_str());
+                if (scene.matis.contains(matiHash)) {
+                    continue;
+                }
+                if (char* matiJson = get_mati_json_by_hash(matiHash.c_str(), Rpkg::partitionManager,
                                                            Logger::rustLogCallback); matiJson != nullptr) {
                     std::string matiJsonString = matiJson;
                     const auto json = simdjson::padded_string(matiJsonString);
                     auto jsonDocument = parser.iterate(json);
                     Json::Mati mati;
-                    matiHashToMati.insert({matiHash, mati});
                     try {
-                        mati.readJson(jsonDocument);
+                        mati.readJsonFromMatiFile(jsonDocument);
+                        scene.matis.insert({matiHash, mati});
                     } catch (const std::exception& e) {
                         Logger::log(NK_ERROR, "Error getting Mati JSON for %s: %s", matiHash.c_str(), e.what());
                         free_string(matiJson);
@@ -406,33 +411,30 @@ void Obj::extractResourcesAndStartObjBuild() {
                     }
                     free_string(matiJson);
                     Logger::log(NK_INFO, "Found diffuse texture %s for mati %s with mati id %s for mesh %s.",
-                                mati.properties.diffuseIoiString.value.c_str(), matiHash.c_str(), mati.id.c_str(),
+                                mati.diffuse.c_str(), matiHash.c_str(), mati.hash.c_str(),
                                 mesh.primHash.c_str());
-                    auto diffuseIoiString = mati.properties.diffuseIoiString.value;
-                    auto normalIoiString = mati.properties.normalIoiString.value;
-                    auto specularIoiString = mati.properties.specularIoiString.value;
-                    if (Rpkg::ioiStringToHashListEntryMap.contains(diffuseIoiString)) {
-                        neededTextHashes.insert(Rpkg::ioiStringToHashListEntryMap.at(diffuseIoiString).hash);
-                    }
-                    if (Rpkg::ioiStringToHashListEntryMap.contains(normalIoiString)) {
-                        neededTextHashes.insert(Rpkg::ioiStringToHashListEntryMap.at(normalIoiString).hash);
-                    }
-                    if (Rpkg::ioiStringToHashListEntryMap.contains(specularIoiString)) {
-                        neededTextHashes.insert(Rpkg::ioiStringToHashListEntryMap.at(specularIoiString).hash);
-                    }
+                    auto diffuseHash = mati.diffuse;
+                    auto normalHash = mati.normal;
+                    auto specularHash = mati.specular;
+                    neededTextHashes.insert(diffuseHash);
+                    neededTextHashes.insert(normalHash);
+                    neededTextHashes.insert(specularHash);
                 }
             }
         }
         Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
-        std::vector neededTextHashesVec (neededTextHashes.begin(), neededTextHashes.end());
-
-        result = Rpkg::extractResourcesFromRpkgs(
-            neededTextHashesVec,
-            TEXT);
-        if (result != 0) {
-            Logger::log(NK_ERROR, "Error extracting Text files from Rpkg files.");
+        if (neededTextHashes.size() > 0) {
+            std::vector neededTextHashesVec (neededTextHashes.begin(), neededTextHashes.end());
+            result = Rpkg::extractResourcesFromRpkgs(
+                neededTextHashesVec,
+                TEXT);
+            if (result != 0) {
+                Logger::log(NK_ERROR, "Error extracting Text files from Rpkg files.");
+            } else {
+                Logger::log(NK_INFO, "Finished extracting %d Text files from Rpkg files.", neededTextHashes.size());
+            }
         } else {
-            Logger::log(NK_INFO, "Finished extracting %s Text files from Rpkg files.", neededTextHashes.size());
+                Logger::log(NK_INFO, "No text files to extract from Rpkg files.");
         }
     }
     Logger::log(NK_INFO, "Finished extracting %ss from Rpkg files.", meshFileType.c_str());

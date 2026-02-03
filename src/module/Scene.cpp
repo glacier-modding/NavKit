@@ -115,6 +115,20 @@ void Scene::loadPfSeedPoints(const std::function<void()> &errorCallback,
     pfSeedPoints = newPfSeedPoints.readPfSeedPoints();
 }
 
+void Scene::loadMatis(const std::function<void()>& errorCallback,
+                     simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    try {
+        for (const auto matiVec = Json::Matis(jsonDocument["matis"]).matis;
+            auto mati : matiVec) {
+            matis[mati.hash] = mati;
+        }
+    } catch (const std::exception &e) {
+        Logger::log(NK_INFO, "No MATIs found in scene file.");
+    } catch (...) {
+        errorCallback();
+    }
+}
+
 void Scene::loadScene(const std::string &fileName, const std::function<void()> &callback,
                       const std::function<void()> &errorCallback) {
     sceneLoaded = false;
@@ -128,6 +142,7 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
     loadMeshes(errorCallback, jsonDocument);
     loadPfBoxes(errorCallback, jsonDocument);
     loadPfSeedPoints(errorCallback, jsonDocument);
+    loadMatis(errorCallback, jsonDocument);
 
     callback();
 }
@@ -156,6 +171,13 @@ void Scene::saveScene(char *fileName) const {
     for (auto &pfSeedPoint: pfSeedPoints) {
         ss << separator;
         pfSeedPoint.writeJson(ss);
+        separator = ",";
+    }
+    ss << R"(],"matis":[)";
+    separator = "";
+    for (const auto& mati : matis | std::views::values) {
+        ss << separator;
+        mati.writeJson(ss);
         separator = ",";
     }
     ss << "]}";
