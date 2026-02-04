@@ -69,13 +69,6 @@ void Json::Entity::readJson(simdjson::ondemand::object json) {
         const simdjson::ondemand::object scaleJson = json["scale"];
         scale.readJson(scaleJson);
     }
-    result = json["matiHashes"];
-    if (result.error() == simdjson::SUCCESS) {
-        for (simdjson::ondemand::array matiHashesJson = json["matiHashes"];
-            simdjson::ondemand::value matiHashJson: matiHashesJson) {
-            matiHashes.push_back(std::string{std::string_view(matiHashJson)});
-        }
-    }
 }
 
 void Json::HashesAndEntity::readJson(simdjson::ondemand::object json) {
@@ -100,18 +93,7 @@ void Json::Mesh::writeJson(std::ostream &f) const {
     rotation.writeJson(f);
     f << ",";
     scale.writeJson(f);
-    f << R"(,"matiHashes":[)";
-    bool first = true;
-    for (auto hash : matiHashes) {
-        if (!first) {
-            f << ",";
-        } else {
-            first = false;
-        }
-        f << R"(")" << hash << R"(")";
-    }
-
-    f << "]}}";
+    f << "}}";
 }
 
 Json::Meshes::Meshes(simdjson::ondemand::array alocs) {
@@ -136,7 +118,6 @@ std::vector<Json::Mesh> Json::Meshes::readMeshes() const {
         mesh.pos = hashAndEntity.entity.position;
         mesh.rotation = hashAndEntity.entity.rotation;
         mesh.scale = hashAndEntity.entity.scale;
-        mesh.matiHashes = hashAndEntity.entity.matiHashes;
         meshes.emplace_back(mesh);
     }
     return meshes;
@@ -273,5 +254,36 @@ Json::Matis::Matis(simdjson::ondemand::array matisJson) {
         Mati mati;
         mati.readJsonFromScene(matiJson);
         matis.push_back(mati);
+    }
+}
+
+void Json::PrimMati::readJson(simdjson::ondemand::object jsonDocument) {
+    primHash = std::string{std::string_view(jsonDocument["primHash"])};
+    simdjson::ondemand::array matiHashesJson = jsonDocument["matiHashes"];
+    matiHashes.clear();
+    for (simdjson::ondemand::value matiHashJson: matiHashesJson) {
+        matiHashes.push_back(std::string{std::string_view(matiHashJson)});
+    }
+}
+
+void Json::PrimMati::writeJson(std::ostream& f) const {
+    f << R"({"primHash":")" << primHash << R"(","matiHashes":[)";
+    bool first = true;
+    for (auto matiHash : matiHashes) {
+        if (!first) {
+            f << ",";
+        } else {
+            first = false;
+        }
+        f << R"(")" << matiHash << R"(")";
+    }
+    f << R"(]})";
+}
+
+Json::PrimMatis::PrimMatis(simdjson::ondemand::array primMatisJson) {
+    for (const simdjson::ondemand::object primMatiJson: primMatisJson) {
+        PrimMati primMati;
+        primMati.readJson(primMatiJson);
+        primMatis.push_back(primMati);
     }
 }

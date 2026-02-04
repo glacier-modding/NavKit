@@ -69,7 +69,6 @@ public:
     bool blendFileBuilt;
     bool extractTextures;
     bool applyTextures;
-    std::map<std::string, std::vector<std::string>> primHashToMatiHash;
     static HWND hObjDialog;
     Model model;
 

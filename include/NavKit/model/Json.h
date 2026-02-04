@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 #include "../../../extern/simdjson/simdjson.h"
@@ -78,7 +79,6 @@ namespace Json {
         Rotation rotation;
         PfBoxType type;
         Scale scale;
-        std::vector<std::string> matiHashes;
 
         void readJson(simdjson::ondemand::object json);
     };
@@ -110,7 +110,6 @@ namespace Json {
         Vec3 pos{};
         Scale scale{};
         Rotation rotation{};
-        std::vector<std::string> matiHashes;
 
         void writeJson(std::ostream &f) const;
     };
@@ -215,8 +214,30 @@ namespace Json {
         Matis() {
         }
 
-        Matis(simdjson::ondemand::array matis);
+        Matis(simdjson::ondemand::array matisJson);
 
         std::vector<Mati> matis{};
+    };
+
+    class PrimMati {
+    public:
+        PrimMati() {
+
+        }
+        std::string primHash;
+        std::vector<std::string> matiHashes{};
+        void readJson(simdjson::ondemand::object jsonDocument);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class PrimMatis {
+    public:
+        PrimMatis() {
+        }
+
+        PrimMatis(simdjson::ondemand::array primMatisJson);
+
+        std::vector<PrimMati> primMatis{};
     };
 }

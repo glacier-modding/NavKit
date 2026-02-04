@@ -43,6 +43,9 @@ public:
     void loadMatis(const std::function<void()>& errorCallback,
                      simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
+    void loadPrimMatis(const std::function<void()>& errorCallback,
+                       simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+
     void showSceneDialog();
 
     void setBBox(const float *pos, const float *scale);
@@ -65,6 +68,7 @@ public:
     std::vector<Json::PfBox> exclusionBoxes;
     std::vector<Json::PfSeedPoint> pfSeedPoints;
     std::map<std::string, Json::Mati> matis;
+    std::map<std::string, Json::PrimMati> primMatis;
     std::optional<std::jthread> backgroundWorker;
     float bBoxPos[3]{};
     float bBoxScale[3]{};

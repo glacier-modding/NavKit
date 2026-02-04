@@ -121,7 +121,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
                 ? "navp"
                 : type == AIRG
                 ? "airg"
-                : "text");
+                : "tga");
             char** hashesNeeded = new char*[hashes.size()];
 
             for (size_t i = 0; i < hashes.size(); ++i) {

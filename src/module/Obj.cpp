@@ -368,27 +368,27 @@ void Obj::extractResourcesAndStartObjBuild() {
     std::set<std::string> neededTextHashes{};
     if (shouldExtractTextures()) {
         scene.matis.clear();
+        scene.primMatis.clear();
         simdjson::ondemand::parser parser;
         Logger::log(NK_INFO, "Extracting MATIs from Rpkg files.");
-        primHashToMatiHash.clear();
         for (auto& mesh : scene.meshes) {
-            const auto referencesRustList = get_all_referenced_hashes_by_hash_from_rpkg_files(
+            const auto primMatis = get_all_referenced_hashes_by_hash_from_rpkg_files(
                 mesh.primHash.c_str(),
                 Rpkg::partitionManager,
                 Logger::rustLogCallback);
-            if (referencesRustList == nullptr) {
+            if (primMatis == nullptr) {
                 Logger::log(NK_ERROR, "Error getting references from %s from Rpkg files.", mesh.primHash.c_str());
                 continue;
                 // errorExtracting = true;
                 // return;
             }
-            for (int i = 0; i < referencesRustList->length; i++) {
-                std::string matiHash = get_string_from_list(referencesRustList, i);
-                if (!primHashToMatiHash.contains(matiHash)) {
-                    primHashToMatiHash.insert({mesh.primHash, {}});
+            for (int i = 0; i < primMatis->length; i++) {
+                std::string matiHash = get_string_from_list(primMatis, i);
+                if (!scene.primMatis.contains(mesh.primHash)) {
+                    scene.primMatis.insert({mesh.primHash, {}});
+                    scene.primMatis[mesh.primHash].primHash = mesh.primHash;
                 }
-
-                mesh.matiHashes.push_back(matiHash);
+                scene.primMatis[mesh.primHash].matiHashes.push_back(matiHash);
                 Logger::log(NK_INFO, "Added %s to %s mati hashes.", matiHash.c_str(), mesh.primHash.c_str());
                 if (scene.matis.contains(matiHash)) {
                     continue;

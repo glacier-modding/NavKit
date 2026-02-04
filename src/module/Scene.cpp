@@ -123,7 +123,20 @@ void Scene::loadMatis(const std::function<void()>& errorCallback,
             matis[mati.hash] = mati;
         }
     } catch (const std::exception &e) {
-        Logger::log(NK_INFO, "No MATIs found in scene file.");
+        Logger::log(NK_INFO, "No Matis found in scene file.");
+    } catch (...) {
+        errorCallback();
+    }
+}
+
+void Scene::loadPrimMatis(const std::function<void()>& errorCallback,
+                     simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    try {
+        for (const auto primMati : Json::PrimMatis(jsonDocument["primMatis"]).primMatis) {
+            primMatis[primMati.primHash] = primMati;
+        }
+    } catch (const std::exception &e) {
+        Logger::log(NK_INFO, "No Prim Matis found in scene file.");
     } catch (...) {
         errorCallback();
     }
@@ -143,6 +156,7 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
     loadPfBoxes(errorCallback, jsonDocument);
     loadPfSeedPoints(errorCallback, jsonDocument);
     loadMatis(errorCallback, jsonDocument);
+    loadPrimMatis(errorCallback, jsonDocument);
 
     callback();
 }
@@ -178,6 +192,13 @@ void Scene::saveScene(char *fileName) const {
     for (const auto& mati : matis | std::views::values) {
         ss << separator;
         mati.writeJson(ss);
+        separator = ",";
+    }
+    ss << R"(],"primMatis":[)";
+    separator = "";
+    for (const auto& primMati : primMatis | std::views::values) {
+        ss << separator;
+        primMati.writeJson(ss);
         separator = ",";
     }
     ss << "]}";
