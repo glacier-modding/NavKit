@@ -1,4 +1,6 @@
 from timeit import default_timer as timer
+from typing import Any
+
 import bmesh
 import bpy
 import ctypes
@@ -2266,6 +2268,55 @@ def load_aloc(filepath):
     return aloc, [aloc_obj]
 
 
+def add_texture(obj, tga_file_path):
+    # 1. Configuration: Set your .tga file path here
+    material_name = "TGA_Material"
+
+    # 2. Get the active object
+
+    # 3. Create a new material
+    mat = bpy.data.materials.new(name=material_name)
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+
+    # Clear existing nodes to start fresh
+    nodes.clear()
+
+    # 4. Create Nodes
+    # Create Output Node
+    node_output = nodes.new(type='ShaderNodeOutputMaterial')
+    node_output.location = (400, 0)
+
+    # Create Principled BSDF Node
+    node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    node_bsdf.location = (0, 0)
+
+    # Create Image Texture Node
+    node_texture = nodes.new(type='ShaderNodeTexImage')
+    node_texture.location = (-400, 0)
+
+    # 5. Load the TGA Image
+    if os.path.exists(tga_file_path):
+        img = bpy.data.images.load(tga_file_path)
+        node_texture.image = img
+    else:
+        print(f"Error: File not found at {tga_file_path}")
+
+    # 6. Link Nodes
+    # Connect Texture Color to BSDF Base Color
+    links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
+    # Connect BSDF to Output
+    links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+
+    # 7. Assign Material to Object
+    if obj.data.materials:
+        obj.data.materials[0] = mat
+    else:
+        obj.data.materials.append(mat)
+
+    print(f"Texture {tga_file_path} applied to {obj.name}")
+
 def get_local_space_bbox_center(obj):
     return 0.125 * sum((mathutils.Vector(ls_corner) for ls_corner in obj.bound_box), mathutils.Vector())
 
@@ -2362,7 +2413,7 @@ def load_volume_boxes(json_data, volume_types):
                         scale = mathutils.Vector([trig_vol["scale"]["data"][coord] for coord in coords[1:]])
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
-def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box):
+def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box, apply_textures):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -2414,6 +2465,15 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             else:
                 log("DEBUG", "=========================== Error Loading the resource blend file ================", "load_scenario")
                 assert 0
+    matis = {}
+    prim_matis = {}
+    if apply_textures:
+        matis_list = data['matis']
+        for mati in matis_list:
+            matis[mati["hash"]] = mati
+        prim_matis_list = data['primMatis']
+        for prim_mati in prim_matis_list:
+            prim_matis[prim_mati["primHash"]] = prim_mati
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
             mesh_hash = hash_and_entity['alocHash']
@@ -2567,6 +2627,8 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 modifier["Socket_2"] = obj
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
+                if mesh_type == "PRIM" and apply_textures:
+                    add_textures(cur, matis, mesh_hash, output_dir, prim_matis)
         else:
             cur = None
             aloc_positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
@@ -2616,6 +2678,8 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                     cur.rotation_mode = 'QUATERNION'
                     cur.rotation_quaternion = (rotations[o_i][i][0], rotations[o_i][i][1], rotations[o_i][i][2], rotations[o_i][i][3])
                     cur.location = mathutils.Vector((positions[o_i][i][0], positions[o_i][i][1], positions[o_i][i][2]))
+                    if mesh_type == "PRIM" and apply_textures:
+                        add_textures(cur, matis, mesh_hash, output_dir, prim_matis)
                     cur.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
@@ -2633,8 +2697,25 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
     return 0
 
 
+def add_textures(obj, matis, mesh_hash, output_dir, prim_matis):
+    log("INFO", "Adding texture to prim hash: " + mesh_hash, "add_textures")
+    log("INFO", "Prim Mati: " + str(prim_matis[mesh_hash]), "add_textures")
+    log("INFO", "Mati hashes: " + str(prim_matis[mesh_hash]["matiHashes"]), "add_textures")
+    log("INFO", "Mati hash: " + str(prim_matis[mesh_hash]["matiHashes"][0]), "add_textures")
+    mati_hash = prim_matis[mesh_hash]["matiHashes"][0]
+    if mati_hash not in matis:
+        log("ERROR", "Mati hash not found in matis: " + mati_hash, "add_textures")
+        return
+    mati = matis[mati_hash]
+    log("INFO", "Diffuse hash: " + mati["diffuse"], "add_textures")
+    diffuse_hash = mati["diffuse"]
+    path_to_tga_dir = "%s\\tga" % output_dir
+    diffuse_tga_path = "%s\\%s.tga" % (path_to_tga_dir, diffuse_hash)
+    add_texture(obj, diffuse_tga_path)
+
+
 def main():
-    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <debug logs enabled (true | false)>", "main")
+    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textyres (true | false)> <debug logs enabled (true | false)>", "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
@@ -2644,14 +2725,15 @@ def main():
     lod_mask = argv[3]
     build_type = argv[4]
     filter_to_include_box = argv[5] == "true"
-    if len(argv) > 6 and argv[6] == "true":
+    apply_textures = argv[5] == "true"
+    if len(argv) > 7 and argv[7] == "true":
         log("INFO", "Enabling debug logs", "main"),
         glacier2obj_enabled_log_levels.append("DEBUG")
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-    scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box)
+    scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box, apply_textures)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
         return 1

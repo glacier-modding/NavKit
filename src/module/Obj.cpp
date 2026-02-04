@@ -302,6 +302,13 @@ void Obj::buildObjFromScene() {
         command += " false";
     }
 
+    if (applyTextures) {
+        command += " true";
+    } else
+    {
+        command += " false";
+    }
+
     if (glacier2ObjDebugLogsEnabled) {
         command += " true";
     }
@@ -378,9 +385,8 @@ void Obj::extractResourcesAndStartObjBuild() {
                 Logger::rustLogCallback);
             if (primMatis == nullptr) {
                 Logger::log(NK_ERROR, "Error getting references from %s from Rpkg files.", mesh.primHash.c_str());
-                continue;
-                // errorExtracting = true;
-                // return;
+                errorExtracting = true;
+                return;
             }
             for (int i = 0; i < primMatis->length; i++) {
                 std::string matiHash = get_string_from_list(primMatis, i);
@@ -438,7 +444,7 @@ void Obj::extractResourcesAndStartObjBuild() {
         }
     }
     Logger::log(NK_INFO, "Finished extracting %ss from Rpkg files.", meshFileType.c_str());
-    // doneExtractingAlocsOrPrims = true;
+    doneExtractingAlocsOrPrims = true;
     Menu::updateMenuState();
 }
 
@@ -472,8 +478,7 @@ void Obj::finalizeExtractResources() {
 }
 
 bool Obj::shouldExtractTextures() const {
-    return true;
-    // return applyTextures && extractTextures;
+    return meshTypeForBuild == PRIM && applyTextures && extractTextures;
 }
 
 void Obj::finalizeObjBuild() {
