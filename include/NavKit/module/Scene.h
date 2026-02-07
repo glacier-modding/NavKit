@@ -19,6 +19,9 @@ public:
 
     void setLastSaveFileName(char *file_name);
 
+    void loadRoomsAndVolumes(const std::function<void()> &errorCallback,
+                   simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument);
+
     void saveScene(const std::string& fileName) const;
 
     void handleOpenSceneClicked();
@@ -62,6 +65,12 @@ public:
     std::string lastLoadSceneFile;
     bool sceneLoaded;
 
+    std::vector<Json::Gate> gates;
+    std::vector<Json::Room> rooms;
+    std::vector<Json::AiAreaWorld> aiAreaWorlds;
+    std::vector<Json::AiArea> aiAreas;
+    std::vector<Json::Entity> volumeBoxes;
+    std::vector<Json::VolumeSphere> volumeSpheres;
     std::vector<Json::Mesh> meshes;
     std::vector<Json::Mesh> prims;
     Json::PfBox includeBox;

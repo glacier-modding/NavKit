@@ -75,7 +75,7 @@ void SceneExtract::extractFromGame(const std::function<void()> &callback, const 
         errorCallback();
         return;
     }
-    if (gameConnection.listAlocPfBoxAndSeedPointEntities()) {
+    if (gameConnection.listNavKitSceneEntities()) {
         errorCallback();
         return;
     }

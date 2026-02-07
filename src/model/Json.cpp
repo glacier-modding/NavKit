@@ -9,8 +9,8 @@ void Json::Vec3::readJson(simdjson::ondemand::object json) {
     z = static_cast<float>(static_cast<double>(json["z"]));
 }
 
-void Json::Vec3::writeJson(std::ostream &f) const {
-    f << R"("position":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << "}";
+void Json::Vec3::writeJson(std::ostream &f, const std::string& propertyName) const {
+    f << R"(")" << propertyName << R"(":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << "}";
 }
 
 void Json::Rotation::readJson(simdjson::ondemand::object json) {
@@ -33,14 +33,14 @@ void Json::PfBoxType::writeJson(std::ostream &f) const {
     f << R"("type":{"type":"EPathFinderBoxType","data":")" << data << R"("})";
 }
 
-void Json::Scale::readJson(simdjson::ondemand::object json) {
+void Json::Vec3Wrapped::readJson(simdjson::ondemand::object json) {
     type = std::string{std::string_view(json["type"])};
     simdjson::ondemand::object dataJson = json["data"];
     data.readJson(dataJson);
 }
 
-void Json::Scale::writeJson(std::ostream &f) const {
-    f << R"("scale":{"type":"SVector3","data":{"x":)" << data.x << R"(,"y":)" << data.y << R"(,"z": )" << data.z <<
+void Json::Vec3Wrapped::writeJson(std::ostream &f, std::string propertyName) const {
+    f << R"(")" << propertyName << R"(":{"type":")" << type << R"(","data":{"x":)" << data.x << R"(,"y":)" << data.y << R"(,"z": )" << data.z <<
             "}}";
 }
 
@@ -71,6 +71,23 @@ void Json::Entity::readJson(simdjson::ondemand::object json) {
         const simdjson::ondemand::object scaleJson = json["scale"];
         scale.readJson(scaleJson);
     }
+}
+
+void Json::Entity::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name <<
+            R"(","tblu":")" << tblu << R"(",)";
+    position.writeJson(f);
+    f << ",";
+    rotation.writeJson(f);
+    f << ",";
+    if (!type.data.empty()) {
+        type.writeJson(f);
+        f << ",";
+    }
+    const Vec3Wrapped scaleJson("SVector3", {scale.data.x, scale.data.y, scale.data.z});
+    scaleJson.writeJson(f);
+    f << "}";
 }
 
 void Json::HashesAndEntity::readJson(simdjson::ondemand::object json) {
@@ -133,9 +150,11 @@ void Json::PfBox::writeJson(std::ostream &f) const {
     f << ",";
     rotation.writeJson(f);
     f << ",";
-    type.writeJson(f);
-    f << ",";
-    Scale scaleJson("SVector3", scale);
+    if (!type.data.empty()) {
+        type.writeJson(f);
+        f << ",";
+    }
+    const Vec3Wrapped scaleJson("SVector3", scale);
     scaleJson.writeJson(f);
     f << "}";
 }
@@ -186,7 +205,276 @@ void Json::PfBoxes::readPathfindingBBoxes() {
         std::string name;
         std::string tblu;
         PfBoxType type;
+        type.type = "EPathFinderBoxType";
+        type.data = INCLUDE_TYPE;
         scene.includeBox = {id, name, tblu, pos, scale, r, type};
+    }
+}
+
+Json::Gates::Gates(simdjson::ondemand::array gatesJson) {
+    for (simdjson::ondemand::value gateJson: gatesJson) {
+        Gate gate;
+        gate.readJson(gateJson);
+        gates.push_back(gate);
+    }
+}
+
+void Json::Room::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name <<
+            R"(","tblu":")" << tblu << R"(",)";
+    position.writeJson(f);
+    f << ",";
+    rotation.writeJson(f);
+    f << ",";
+    roomExtentMin.writeJson(f, "roomExtentMin");
+    f << ",";
+    roomExtentMax.writeJson(f, "roomExtentMax");
+    f << "}";
+}
+
+void Json::Room::readJson(simdjson::ondemand::object json) {
+    auto result = json["id"];
+    if (result.error() == simdjson::SUCCESS) {
+        id = std::string{std::string_view(json["id"])};
+    }
+    result = json["name"];
+    if (result.error() == simdjson::SUCCESS) {
+        name = std::string{std::string_view(json["name"])};
+    }
+    result = json["tblu"];
+    if (result.error() == simdjson::SUCCESS) {
+        tblu = std::string{std::string_view(json["tblu"])};
+    }
+    const simdjson::ondemand::object positionJson = json["position"];
+    position.readJson(positionJson);
+    const simdjson::ondemand::object rotationJson = json["rotation"];
+    rotation.readJson(rotationJson);
+    const simdjson::ondemand::object roomExtentMinJson = json["roomExtentMin"];
+    roomExtentMin.readJson(roomExtentMinJson);
+    const simdjson::ondemand::object roomExtentMaxJson = json["roomExtentMax"];
+    roomExtentMax.readJson(roomExtentMaxJson);
+}
+
+Json::Rooms::Rooms(simdjson::ondemand::array roomsJson) {
+    for (simdjson::ondemand::value roomJson: roomsJson) {
+        Room room;
+        room.readJson(roomJson);
+        rooms.push_back(room);
+    }
+}
+
+void Json::Gate::writeJson(std::ostream &f) const {
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name <<
+            R"(","tblu":")" << tblu << R"(",)";
+    position.writeJson(f);
+    f << ",";
+    rotation.writeJson(f);
+    f << ",";
+    bboxCenter.writeJson(f, "bboxCenter");
+    f << ",";
+    bboxHalfSize.writeJson(f, "bboxHalfSize");
+    f << "}";
+}
+
+void Json::Gate::readJson(simdjson::ondemand::object json) {
+    auto result = json["id"];
+    if (result.error() == simdjson::SUCCESS) {
+        id = std::string{std::string_view(json["id"])};
+    }
+    result = json["name"];
+    if (result.error() == simdjson::SUCCESS) {
+        name = std::string{std::string_view(json["name"])};
+    }
+    result = json["tblu"];
+    if (result.error() == simdjson::SUCCESS) {
+        tblu = std::string{std::string_view(json["tblu"])};
+    }
+    const simdjson::ondemand::object positionJson = json["position"];
+    position.readJson(positionJson);
+    const simdjson::ondemand::object rotationJson = json["rotation"];
+    rotation.readJson(rotationJson);
+    const simdjson::ondemand::object bboxCenterJson = json["bboxCenter"];
+    bboxCenter.readJson(bboxCenterJson);
+    const simdjson::ondemand::object bboxHalfSizeJson = json["bboxHalfSize"];
+    bboxHalfSize.readJson(bboxHalfSizeJson);
+}
+
+void Json::AiAreaWorld::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name;
+    if (!tblu.empty()) {
+        f << R"(","tblu":")" << tblu;
+    }
+    f <<R"(",)";
+    rotation.writeJson(f);
+    f << "}";
+}
+
+void Json::AiAreaWorld::readJson(simdjson::ondemand::object json) {
+    auto result = json["id"];
+    if (result.error() == simdjson::SUCCESS) {
+        id = std::string{std::string_view(json["id"])};
+    }
+    result = json["name"];
+    if (result.error() == simdjson::SUCCESS) {
+        name = std::string{std::string_view(json["name"])};
+    }
+    result = json["tblu"];
+    if (result.error() == simdjson::SUCCESS) {
+        tblu = std::string{std::string_view(json["tblu"])};
+    }
+    const simdjson::ondemand::object rotationJson = json["rotation"];
+    rotation.readJson(rotationJson);
+}
+
+Json::AiAreaWorlds::AiAreaWorlds(simdjson::ondemand::array aiAreaWorldsJson) {
+    for (simdjson::ondemand::value aiAreaWorldJson: aiAreaWorldsJson) {
+        AiAreaWorld aiAreaWorld;
+        aiAreaWorld.readJson(aiAreaWorldJson);
+        aiAreaWorlds.push_back(aiAreaWorld);
+    }
+}
+
+void Json::ParentData::writeJson(std::ostream& f) const {
+    f << R"("data":{"id":")" << id <<
+            R"(","name":")" << name <<
+            R"(","source":")" << source <<
+            R"(","tblu":")" << tblu <<
+            R"(","type":")" << type << R"("})";
+}
+
+void Json::ParentData::readJson(simdjson::ondemand::object json) {
+    id = std::string{std::string_view(json["id"])};
+    name = std::string{std::string_view(json["name"])};
+    source = std::string{std::string_view(json["source"])};
+    tblu = std::string{std::string_view(json["tblu"])};
+    type = std::string{std::string_view(json["type"])};}
+
+void Json::Parent::writeJson(std::ostream& f) const {
+    f << R"("parent":{"type":")" << type <<
+            R"(",)";
+    data.writeJson(f);
+    f << "}";
+}
+
+void Json::Parent::readJson(simdjson::ondemand::object json) {
+    type = std::string{std::string_view(json["type"])};
+    const simdjson::ondemand::object dataJson = json["data"];
+    data.readJson(dataJson);
+}
+
+void Json::AiArea::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name <<
+            R"(","tblu":")" << tblu << R"(",)";
+    rotation.writeJson(f);
+    f << R"(,"logicalParent":[)";
+    auto separator = "";
+    for (auto logicalParent : logicalParents) {
+        f << separator;
+        f << R"(")" << logicalParent << R"(")";
+        separator = ",";
+    }
+    f << R"(],"areaVolumeNames":[)";
+    separator = "";
+    for (auto areaVolumeName : areaVolumeNames) {
+        f << separator;
+        f << R"(")" << areaVolumeName << R"(")";
+        separator = ",";
+    }
+    f << R"(],)";
+    parent.writeJson(f);
+    f << "}";
+}
+
+void Json::AiArea::readJson(simdjson::ondemand::object json) {
+    auto result = json["id"];
+    if (result.error() == simdjson::SUCCESS) {
+        id = std::string{std::string_view(json["id"])};
+    }
+    result = json["name"];
+    if (result.error() == simdjson::SUCCESS) {
+        name = std::string{std::string_view(json["name"])};
+    }
+    result = json["tblu"];
+    if (result.error() == simdjson::SUCCESS) {
+        tblu = std::string{std::string_view(json["tblu"])};
+    }
+    const simdjson::ondemand::object rotationJson = json["rotation"];
+    rotation.readJson(rotationJson);
+    logicalParents.clear();
+    for (simdjson::ondemand::array logicalParentsJson = json["logicalParent"];
+        auto logicalParentJson : logicalParentsJson) {
+        logicalParents.push_back(std::string{std::string_view(logicalParentJson)});
+    }
+    areaVolumeNames.clear();
+    for (simdjson::ondemand::array areaVolumeNamesJson = json["areaVolumeNames"];
+        auto areaVolumeNameJson : areaVolumeNamesJson) {
+        areaVolumeNames.push_back(std::string{std::string_view(areaVolumeNameJson)});
+    }
+    const simdjson::ondemand::object parentJson = json["parent"];
+    parent.readJson(parentJson);
+}
+
+Json::AiAreas::AiAreas(simdjson::ondemand::array aiAreasJson) {
+    for (simdjson::ondemand::value aiAreaJson: aiAreasJson) {
+        AiArea aiArea;
+        aiArea.readJson(aiAreaJson);
+        aiAreas.push_back(aiArea);
+    }
+}
+
+Json::VolumeBoxes::VolumeBoxes(simdjson::ondemand::array volumeBoxesJson) {
+    for (simdjson::ondemand::value volumeBoxJson: volumeBoxesJson) {
+        Entity volumeBox;
+        volumeBox.readJson(volumeBoxJson);
+        volumeBoxes.push_back(volumeBox);
+    }
+}
+
+void Json::Radius::writeJson(std::ostream& f) const {
+    f << R"("radius":{"type":")" << type <<
+            R"(","data":")" << data << R"("})";
+}
+
+void Json::Radius::readJson(simdjson::ondemand::object json) {
+    type = std::string{std::string_view(json["type"])};
+    data = static_cast<float>(static_cast<double>(json["data"]));
+}
+
+void Json::VolumeSphere::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << id <<
+            R"(","name":")" << name << R"(",)";
+    position.writeJson(f);
+    f << ",";
+    rotation.writeJson(f);
+    f << ",";
+    radius.writeJson(f);
+    f << "}";
+}
+
+void Json::VolumeSphere::readJson(simdjson::ondemand::object json) {
+    auto result = json["id"];
+    if (result.error() == simdjson::SUCCESS) {
+        id = std::string{std::string_view(json["id"])};
+    }
+    result = json["name"];
+    if (result.error() == simdjson::SUCCESS) {
+        name = std::string{std::string_view(json["name"])};
+    }
+    const simdjson::ondemand::object positionJson = json["position"];
+    position.readJson(positionJson);
+    const simdjson::ondemand::object radiusJson = json["radius"];
+    radius.readJson(radiusJson);
+}
+
+Json::VolumeSpheres::VolumeSpheres(simdjson::ondemand::array volumeSpheresJson) {
+    for (simdjson::ondemand::value volumeSphereJson: volumeSpheresJson) {
+        VolumeSphere volumeSphere;
+        volumeSphere.readJson(volumeSphereJson);
+        volumeSpheres.push_back(volumeSphere);
     }
 }
 

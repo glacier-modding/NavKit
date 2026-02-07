@@ -21,7 +21,7 @@ namespace Json {
 
         void readJson(simdjson::ondemand::object json);
 
-        void writeJson(std::ostream &f) const;
+        void writeJson(std::ostream &f, const std::string& propertyName = "position") const;
     };
 
     class Rotation {
@@ -53,34 +53,36 @@ namespace Json {
         void writeJson(std::ostream &f) const;
     };
 
-    class Scale {
+    class Vec3Wrapped {
     public:
-        Scale() {
+        Vec3Wrapped() {
         };
 
-        Scale(std::string type, Vec3 data) : type(type), data(data) {
+        Vec3Wrapped(const std::string& type, const Vec3 data) : type(type), data(data) {
         };
         std::string type{};
         Vec3 data{};
 
         void readJson(simdjson::ondemand::object json);
 
-        void writeJson(std::ostream &f) const;
+        void writeJson(std::ostream& f, std::string propertyName = "scale") const;
     };
 
     class Entity {
     public:
         Entity() {
-        };
+        }
         std::string id;
         std::string name;
         std::string tblu;
         Vec3 position;
         Rotation rotation;
         PfBoxType type;
-        Scale scale;
+        Vec3Wrapped scale;
 
         void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream &f) const;
     };
 
     class HashesAndEntity {
@@ -108,7 +110,7 @@ namespace Json {
         std::string name;
         std::string tblu;
         Vec3 pos{};
-        Scale scale{};
+        Vec3Wrapped scale{};
         Rotation rotation{};
 
         void writeJson(std::ostream &f) const;
@@ -130,9 +132,9 @@ namespace Json {
     public:
         PfBox() = default;
 
-        PfBox(const std::string &id, const std::string &name, const std::string &tblu, const Vec3 pos, const Vec3 scale,
-              const Rotation rotation, const PfBoxType &type) : id(id), name(name), tblu(tblu), pos(pos), scale(scale),
-                                                                rotation(rotation), type(type) {
+        PfBox(const std::string &id, const std::string &name, const std::string &tblu, const Vec3 pos,
+            const Vec3 scale, const Rotation rotation, const PfBoxType &type) :
+            id(id), name(name), tblu(tblu), pos(pos), scale(scale), rotation(rotation), type(type) {
         }
 
         std::string id{};
@@ -161,6 +163,206 @@ namespace Json {
         void readPathfindingBBoxes();
 
         std::vector<Entity> entities{};
+    };
+
+    class Gate {
+    public:
+        Gate() = default;
+
+        Gate(const std::string &id, const std::string &name, const std::string &tblu, const Vec3 position,
+                    Rotation rotation, const Vec3 bboxCenter, const Vec3 bboxHalfSize) : id(id), name(name), tblu(tblu), position(position), rotation(rotation),
+                    bboxCenter(bboxCenter), bboxHalfSize(bboxHalfSize) {
+        }
+
+        std::string id;
+        std::string name;
+        std::string tblu;
+        Vec3 position{};
+        Rotation rotation{};
+        Vec3 bboxCenter{};
+        Vec3 bboxHalfSize{};
+
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class Gates {
+    public:
+        Gates() = default;
+
+        explicit Gates(simdjson::ondemand::array gatesJson);
+
+        std::vector<Gate> gates{};
+    };
+
+    class Room {
+    public:
+        Room() = default;
+
+        Room(const std::string &id, const std::string &name, const std::string &tblu, const Vec3 position,
+                    Rotation rotation, const Vec3Wrapped& roomExtentMin, const Vec3Wrapped& roomExtentMax) : id(id), name(name), tblu(tblu), position(position), rotation(rotation),
+                    roomExtentMin(roomExtentMin), roomExtentMax(roomExtentMax) {
+        }
+
+        std::string id;
+        std::string name;
+        std::string tblu;
+        Vec3 position{};
+        Rotation rotation{};
+        Vec3Wrapped roomExtentMin{};
+        Vec3Wrapped roomExtentMax{};
+
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class Rooms {
+    public:
+        Rooms() = default;
+
+        explicit Rooms(simdjson::ondemand::array roomsJson);
+
+        std::vector<Room> rooms{};
+    };
+
+    class AiAreaWorld {
+    public:
+        AiAreaWorld() = default;
+
+        AiAreaWorld(const std::string &id, const std::string &name, const std::string &tblu,
+                    const Rotation rotation) : id(id), name(name), tblu(tblu), rotation(rotation) {
+        }
+
+        std::string id;
+        std::string name;
+        std::string tblu;
+        Rotation rotation{};
+
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class AiAreaWorlds {
+    public:
+        AiAreaWorlds() = default;
+
+        explicit AiAreaWorlds(simdjson::ondemand::array aiAreaWorldsJson);
+
+        std::vector<AiAreaWorld> aiAreaWorlds{};
+    };
+
+    class ParentData {
+    public:
+        ParentData() = default;
+
+        ParentData(const std::string &id, const std::string &name, const std::string &source, const std::string &tblu, const std::string &type) : id(id), name(name), source(source), tblu(tblu), type(type) {
+        }
+
+        std::string id;
+        std::string name;
+        std::string source;
+        std::string tblu;
+        std::string type;
+
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class Parent {
+    public:
+        Parent() = default;
+
+        Parent(const std::string &type, const ParentData &data) : type(type), data(data) {
+        }
+
+        std::string type;
+        ParentData data{};
+
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class AiArea {
+    public:
+        AiArea() = default;
+
+        AiArea(const std::string &id, const std::string &name, const std::string &tblu,
+                    const Rotation rotation, Parent parent) : id(id), name(name), tblu(tblu),
+                    rotation(rotation), parent(parent) {
+        }
+
+        std::string id;
+        std::string name;
+        std::string tblu;
+        Rotation rotation{};
+        std::vector<std::string> logicalParents;
+        std::vector<std::string> areaVolumeNames;
+        Parent parent{};
+
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class AiAreas {
+    public:
+        AiAreas() = default;
+
+        explicit AiAreas(simdjson::ondemand::array aiAreasJson);
+
+        std::vector<AiArea> aiAreas{};
+    };
+
+    class VolumeBoxes {
+    public:
+        VolumeBoxes() = default;
+        explicit VolumeBoxes(simdjson::ondemand::array volumeBoxesJson);
+        std::vector<Entity> volumeBoxes{};
+    };
+
+    class Radius {
+    public:
+        Radius() = default;
+
+        Radius(const std::string &type, const float data) : type(type), data(data) {
+        }
+
+        std::string type;
+        float data;
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class VolumeSphere {
+    public:
+        VolumeSphere() = default;
+
+        VolumeSphere(const std::string &id, const std::string &name, const Vec3 &position,
+                    const Rotation &rotation, const Radius &radius) : id(id), name(name), position(position),
+                    rotation(rotation), radius(radius) {
+        }
+
+        std::string id;
+        std::string name;
+        Vec3 position{};
+        Rotation rotation{};
+        Radius radius{};
+        void writeJson(std::ostream &f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class VolumeSpheres {
+    public:
+        VolumeSpheres() = default;
+        explicit VolumeSpheres(simdjson::ondemand::array volumeSpheresJson);
+        std::vector<VolumeSphere> volumeSpheres{};
     };
 
     class PfSeedPoint {

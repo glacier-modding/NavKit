@@ -100,7 +100,7 @@ int GameConnection::rebuildEntityTree() const {
     return 0;
 }
 
-int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
+int GameConnection::listNavKitSceneEntities() const {
     std::stringstream m;
     m << R"({"type":"listAlocPfBoxAndSeedPointEntities"})";
     const std::string msg = m.str();

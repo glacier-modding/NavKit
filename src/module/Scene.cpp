@@ -115,6 +115,28 @@ void Scene::loadPfSeedPoints(const std::function<void()> &errorCallback,
     pfSeedPoints = newPfSeedPoints.readPfSeedPoints();
 }
 
+void Scene::loadRoomsAndVolumes(const std::function<void()>& errorCallback,
+simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    try {
+        Logger::log(NK_INFO, "Loading Gates.");
+        gates = Json::Gates(jsonDocument["gates"]).gates;
+        Logger::log(NK_INFO, "Loading Rooms.");
+        rooms = Json::Rooms(jsonDocument["rooms"]).rooms;
+        Logger::log(NK_INFO, "Loading Ai Area Worlds.");
+        aiAreaWorlds = Json::AiAreaWorlds(jsonDocument["aiAreaWorld"]).aiAreaWorlds;
+        Logger::log(NK_INFO, "Loading Ai Areas.");
+        aiAreas = Json::AiAreas(jsonDocument["aiArea"]).aiAreas;
+        Logger::log(NK_INFO, "Loading Volume Boxes.");
+        volumeBoxes = Json::VolumeBoxes(jsonDocument["volumeBoxes"]).volumeBoxes;
+        Logger::log(NK_INFO, "Loading Volume Spheres.");
+        volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"]).volumeSpheres;
+    } catch (const std::exception &e) {
+        Logger::log(NK_ERROR, e.what());
+    } catch (...) {
+        errorCallback();
+    }
+}
+
 void Scene::loadMatis(const std::function<void()>& errorCallback,
                      simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
@@ -155,6 +177,7 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
     loadMeshes(errorCallback, jsonDocument);
     loadPfBoxes(errorCallback, jsonDocument);
     loadPfSeedPoints(errorCallback, jsonDocument);
+    loadRoomsAndVolumes(errorCallback, jsonDocument);
     loadMatis(errorCallback, jsonDocument);
     loadPrimMatis(errorCallback, jsonDocument);
 
@@ -174,9 +197,15 @@ void Scene::saveScene(const std::string& fileName) const {
     }
 
     ss << R"(],"pfBoxes":[)";
-    includeBox.writeJson(ss);
+    if (includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
+        separator = "";
+    } else {
+        includeBox.writeJson(ss);
+        separator = ",";
+    }
     for (const auto &pfBox: exclusionBoxes) {
-        ss << ",";
+        ss << separator;
+        separator = ",";
         pfBox.writeJson(ss);
     }
 
@@ -199,6 +228,54 @@ void Scene::saveScene(const std::string& fileName) const {
     for (const auto& primMati : primMatis | std::views::values) {
         ss << separator;
         primMati.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"gates":[)";
+    separator = "";
+    for (auto &gate: gates) {
+        ss << separator;
+        gate.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"rooms":[)";
+    separator = "";
+    for (auto &room: rooms) {
+        ss << separator;
+        room.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"aiAreaWorld":[)";
+    separator = "";
+    for (auto &aiAreaWorld: aiAreaWorlds) {
+        ss << separator;
+        aiAreaWorld.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"aiArea":[)";
+    separator = "";
+    for (auto &aiArea: aiAreas) {
+        ss << separator;
+        aiArea.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"volumeBoxes":[)";
+    separator = "";
+    for (auto &volumeBox: volumeBoxes) {
+        ss << separator;
+        volumeBox.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"volumeSpheres":[)";
+    separator = "";
+    for (auto &volumeSphere: volumeSpheres) {
+        ss << separator;
+        volumeSphere.writeJson(ss);
         separator = ",";
     }
     ss << "]}";
