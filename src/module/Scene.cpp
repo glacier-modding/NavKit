@@ -161,7 +161,7 @@ void Scene::loadScene(const std::string &fileName, const std::function<void()> &
     callback();
 }
 
-void Scene::saveScene(char *fileName) const {
+void Scene::saveScene(const std::string& fileName) const {
     std::stringstream ss;
 
     ss << R"({"version":)" << version << ",";
@@ -240,12 +240,13 @@ void Scene::handleOpenSceneClicked() {
 
 void Scene::handleSaveSceneClicked() {
     if (char *fileName = openSaveSceneFileDialog()) {
+        std::string fileNameStr = fileName;
         setLastSaveFileName(fileName);
         std::string msg = "Saving NavKit Scene file: '";
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&Scene::saveScene, this, fileName);
+        backgroundWorker.emplace(&Scene::saveScene, this, fileNameStr);
     }
 }
 

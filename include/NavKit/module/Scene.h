@@ -19,7 +19,7 @@ public:
 
     void setLastSaveFileName(char *file_name);
 
-    void saveScene(char *fileName) const;
+    void saveScene(const std::string& fileName) const;
 
     void handleOpenSceneClicked();
 
@@ -78,6 +78,7 @@ public:
 
     const Json::Mesh *findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const;
 
+    static inline const std::string OUTPUT_SCENE_FILE_NAME = "output.nav.json";
 private:
     std::string loadSceneName;
     std::string saveSceneName;

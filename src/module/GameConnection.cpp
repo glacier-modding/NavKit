@@ -10,7 +10,7 @@
 #include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavWeakness/NavPower.h"
 
@@ -115,10 +115,10 @@ int GameConnection::listAlocPfBoxAndSeedPointEntities() const {
     std::thread writer_thread([&] {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
         const std::string outputFolder = NavKitSettings::getInstance().outputFolder;
-        std::ofstream f(outputFolder + "\\output.nav.json", std::ios::app);
+        std::ofstream f(outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME, std::ios::app);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
-                        (outputFolder + "\\output.nav.json").c_str());
+                        (outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME).c_str());
             return;
         }
 

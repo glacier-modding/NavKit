@@ -429,7 +429,7 @@ void Obj::extractResourcesAndStartObjBuild() {
             }
         }
         Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
-        if (neededTextHashes.size() > 0) {
+        if (!neededTextHashes.empty()) {
             std::vector neededTextHashesVec (neededTextHashes.begin(), neededTextHashes.end());
             result = Rpkg::extractResourcesFromRpkgs(
                 neededTextHashesVec,
@@ -442,6 +442,9 @@ void Obj::extractResourcesAndStartObjBuild() {
         } else {
                 Logger::log(NK_INFO, "No text files to extract from Rpkg files.");
         }
+
+        Logger::log(NK_INFO, "Saving texture data to %s scene file.", Scene::OUTPUT_SCENE_FILE_NAME.c_str());
+        scene.saveScene(Scene::OUTPUT_SCENE_FILE_NAME);
     }
     Logger::log(NK_INFO, "Finished extracting %ss from Rpkg files.", meshFileType.c_str());
     doneExtractingAlocsOrPrims = true;
