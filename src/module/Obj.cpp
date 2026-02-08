@@ -46,7 +46,7 @@ Obj::Obj() : loadObjName("Load Obj"),
              errorBuilding(false),
              skipExtractingAlocsOrPrims(false),
              errorExtracting(false),
-             extractingAlocsOrPrims(false),
+             extractingResources(false),
              doneExtractingAlocsOrPrims(false),
              doObjHitTest(false),
              meshTypeForBuild(ALOC),
@@ -331,14 +331,10 @@ void Obj::buildObjFromScene() {
 }
 
 void Obj::extractResourcesAndStartObjBuild() {
+    extractingResources = true;
+    Menu::updateMenuState();
     const std::string meshFileType = meshTypeForBuild == ALOC ? "ALOC" : "PRIM";
     const std::string meshFileTypeLower = meshTypeForBuild == ALOC ? "aloc" : "prim";
-    if (skipExtractingAlocsOrPrims) {
-        Logger::log(NK_INFO, "Skipping extraction of %ss from Rpkg files.", meshFileType.c_str());
-        doneExtractingAlocsOrPrims = true;
-        Menu::updateMenuState();
-        return;
-    }
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const std::string alocOrPrimFolder = navKitSettings.outputFolder + "\\" + meshFileTypeLower;
 
@@ -357,20 +353,22 @@ void Obj::extractResourcesAndStartObjBuild() {
     const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
     const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
     const std::string navJsonFilePath = fileNameString;
-
-    extractingAlocsOrPrims = true;
-    Menu::updateMenuState();
-    int result = extract_scene_mesh_resources(
-                           navJsonFilePath.c_str(),
-                           runtimeFolder.c_str(),
-                           Rpkg::partitionManager,
-                           alocOrPrimFolder.c_str(),
-                           meshFileType.c_str(),
-                           Logger::rustLogCallback);
-    if (result) {
-        Logger::log(NK_ERROR, "Error extracting %ss from Rpkg files.", meshFileType.c_str());
-        errorExtracting = true;
-        return;
+    if (skipExtractingAlocsOrPrims) {
+        Logger::log(NK_INFO, "Skipping extraction of %ss from Rpkg files.", meshFileType.c_str());
+    } else {
+        Menu::updateMenuState();
+        int result = extract_scene_mesh_resources(
+                               navJsonFilePath.c_str(),
+                               runtimeFolder.c_str(),
+                               Rpkg::partitionManager,
+                               alocOrPrimFolder.c_str(),
+                               meshFileType.c_str(),
+                               Logger::rustLogCallback);
+        if (result) {
+            Logger::log(NK_ERROR, "Error extracting %ss from Rpkg files.", meshFileType.c_str());
+            errorExtracting = true;
+            return;
+        }
     }
     std::set<std::string> neededTextHashes{};
     if (shouldExtractTextures()) {
@@ -394,6 +392,10 @@ void Obj::extractResourcesAndStartObjBuild() {
                     scene.primMatis.insert({mesh.primHash, {}});
                     scene.primMatis[mesh.primHash].primHash = mesh.primHash;
                 }
+                if (std::ranges::find(scene.primMatis[mesh.primHash].matiHashes, matiHash) != scene.primMatis[mesh.primHash].matiHashes.end()) {
+                    Logger::log(NK_INFO, "Duplicate mati hash %s found in references for %s.", matiHash.c_str(), mesh.primHash.c_str());
+                    continue;
+                }
                 scene.primMatis[mesh.primHash].matiHashes.push_back(matiHash);
                 Logger::log(NK_INFO, "Added %s to %s mati hashes.", matiHash.c_str(), mesh.primHash.c_str());
                 if (scene.matis.contains(matiHash)) {
@@ -406,8 +408,10 @@ void Obj::extractResourcesAndStartObjBuild() {
                     auto jsonDocument = parser.iterate(json);
                     Json::Mati mati;
                     try {
+                        Logger::log(NK_INFO, "Reading mati json for %s.", matiHash.c_str());
                         mati.readJsonFromMatiFile(jsonDocument);
                         scene.matis.insert({matiHash, mati});
+                        Logger::log(NK_INFO, "Added %s to scene mati hashes.", matiHash.c_str());
                     } catch (const std::exception& e) {
                         Logger::log(NK_ERROR, "Error getting Mati JSON for %s: %s", matiHash.c_str(), e.what());
                         free_string(matiJson);
@@ -423,15 +427,15 @@ void Obj::extractResourcesAndStartObjBuild() {
                     auto normalHash = mati.normal;
                     auto specularHash = mati.specular;
                     neededTextHashes.insert(diffuseHash);
-                    neededTextHashes.insert(normalHash);
-                    neededTextHashes.insert(specularHash);
+                    // neededTextHashes.insert(normalHash);
+                    // neededTextHashes.insert(specularHash);
                 }
             }
         }
         Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
         if (!neededTextHashes.empty()) {
             std::vector neededTextHashesVec (neededTextHashes.begin(), neededTextHashes.end());
-            result = Rpkg::extractResourcesFromRpkgs(
+            int result = Rpkg::extractResourcesFromRpkgs(
                 neededTextHashesVec,
                 TEXT);
             if (result != 0) {
@@ -440,11 +444,11 @@ void Obj::extractResourcesAndStartObjBuild() {
                 Logger::log(NK_INFO, "Finished extracting %d Text files from Rpkg files.", neededTextHashes.size());
             }
         } else {
-                Logger::log(NK_INFO, "No text files to extract from Rpkg files.");
+            Logger::log(NK_INFO, "No text files to extract from Rpkg files.");
         }
 
         Logger::log(NK_INFO, "Saving texture data to %s scene file.", Scene::OUTPUT_SCENE_FILE_NAME.c_str());
-        scene.saveScene(Scene::OUTPUT_SCENE_FILE_NAME);
+        scene.saveScene(scene.lastLoadSceneFile);
     }
     Logger::log(NK_INFO, "Finished extracting %ss from Rpkg files.", meshFileType.c_str());
     doneExtractingAlocsOrPrims = true;
@@ -463,7 +467,7 @@ void Obj::finalizeExtractResources() {
         blenderObjStarted = false;
         blenderObjGenerationDone = false;
         errorExtracting = false;
-        extractingAlocsOrPrims = false;
+        extractingResources = false;
         SceneExtract &sceneExtract = SceneExtract::getInstance();
         sceneExtract.alsoBuildAll = false;
         sceneExtract.alsoBuildObj = false;
@@ -472,7 +476,7 @@ void Obj::finalizeExtractResources() {
         doneExtractingAlocsOrPrims = false;
         const Scene &scene = Scene::getInstance();
         const std::string &fileNameString = scene.lastLoadSceneFile;
-        extractingAlocsOrPrims = false;
+        extractingResources = false;
         buildObjFromScene();
         Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
         errorExtracting = false;
@@ -709,7 +713,7 @@ bool Obj::canBuildObjFromNavp() {
 bool Obj::canBuildObjFromScene() const {
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
-    return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingAlocsOrPrims && navKitSettings.blenderSet
+    return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingResources && navKitSettings.blenderSet
         && scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone && Rpkg::extractionDataInitComplete;
 }
 

@@ -59,7 +59,7 @@ public:
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
     bool errorExtracting;
-    bool extractingAlocsOrPrims;
+    bool extractingResources;
     bool doneExtractingAlocsOrPrims;
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;

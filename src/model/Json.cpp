@@ -1,4 +1,6 @@
 #include "../../include/NavKit/model/Json.h"
+
+#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Scene.h"
 
 void Json::Vec3::readJson(simdjson::ondemand::object json) {
@@ -223,12 +225,23 @@ void Json::Mati::readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondema
     hash = std::string{std::string_view(jsonDocument["id"])};
     className = std::string{std::string_view(jsonDocument["class"])};
     simdjson::ondemand::object propertiesJson = jsonDocument["properties"];
-    simdjson::ondemand::object diffuseJson = propertiesJson["mapTexture2D_01"];
-    diffuse = std::string{std::string_view(diffuseJson["value"])};
-    simdjson::ondemand::object normalJson = propertiesJson["mapTexture2DNormal_01"];
-    normal = std::string{std::string_view(normalJson["value"])};
-    simdjson::ondemand::object specularJson = propertiesJson["mapTexture2D_03"];
-    specular = std::string{std::string_view(specularJson["value"])};
+    auto result = propertiesJson["mapTexture2D_01"];
+    if (result.error() == simdjson::SUCCESS) {
+        simdjson::ondemand::object diffuseJson = propertiesJson["mapTexture2D_01"];
+        diffuse = std::string{std::string_view(diffuseJson["value"])};
+    } else {
+        Logger::log(NK_ERROR, "No diffuse texture found for %s", hash.c_str());
+    }
+    result = propertiesJson["mapTexture2DNormal_01"];
+    if (result.error() == simdjson::SUCCESS) {
+        simdjson::ondemand::object normalJson = propertiesJson["mapTexture2DNormal_01"];
+        normal = std::string{std::string_view(normalJson["value"])};
+    }
+    result = propertiesJson["mapTexture2D_03"];
+    if (result.error() == simdjson::SUCCESS) {
+        simdjson::ondemand::object specularJson = propertiesJson["mapTexture2D_03"];
+        specular = std::string{std::string_view(specularJson["value"])};
+    }
 }
 
 void Json::Mati::readJsonFromScene(simdjson::ondemand::object jsonDocument) {
