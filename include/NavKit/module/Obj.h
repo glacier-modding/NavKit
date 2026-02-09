@@ -5,11 +5,14 @@
 #include <thread>
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
+#include <set>
 #include <windows.h>
 #include <GL/glew.h>
 
 #include "../../include/NavKit/render/Model.h"
 #include "../../include/NavKit/render/Shader.h"
+#include "../model/Json.h"
+
 enum MeshType {
     ALOC,
     PRIM
@@ -56,7 +59,7 @@ public:
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
     bool errorExtracting;
-    bool extractingAlocsOrPrims;
+    bool extractingResources;
     bool doneExtractingAlocsOrPrims;
     std::map<std::string, std::pair<int, int> > objectTriangleRanges;
     bool doObjHitTest;
@@ -64,10 +67,12 @@ public:
     SceneMeshBuildType sceneMeshBuildType;
     bool primLods[8];
     bool blendFileBuilt;
+    bool extractTextures;
+    bool applyTextures;
     static HWND hObjDialog;
     Model model;
 
-    static char *openSetBlenderFileDialog(const char *lastBlenderFile);
+    static char *openSetBlenderFileDialog();
 
     void loadSettings();
 
@@ -137,7 +142,9 @@ public:
 
     std::optional<std::jthread> backgroundWorker;
 
-    void finalizeExtractAlocsOrPrims();
+    void finalizeExtractResources();
 
-    void extractAlocsOrPrimsAndStartObjBuild();
+    bool shouldExtractTextures() const;
+
+    void extractResourcesAndStartObjBuild();
 };

@@ -11,7 +11,7 @@
 
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
-#include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -237,7 +237,7 @@ void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (const ZPathfinding::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
+        for (const Json::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
             Vec3 fill = {0, 0, 0.6};
             Vec3 outline = {0, 0, 0.8};
             if (selectedPfSeedPointIndex == i) {
@@ -262,7 +262,7 @@ void Navp::renderPfSeedPointsForHitTest() const {
     if (showPfSeedPoints && Scene::getInstance().sceneLoaded) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (const ZPathfinding::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
+        for (const Json::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
             const int highByte = (i >> 8) & 0xFF;
             const int lowByte = i & 0xFF;
             renderer.drawBox(
@@ -283,7 +283,7 @@ void Navp::renderExclusionBoxes() const {
     if (showPfExclusionBoxes) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (const ZPathfinding::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
+        for (const Json::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
             Vec3 fill = {0.6, 0, 0};
             Vec3 outline = {0.8, 0, 0};
             if (selectedExclusionBoxIndex == i) {
@@ -308,7 +308,7 @@ void Navp::renderExclusionBoxesForHitTest() const {
     if (showPfExclusionBoxes && Scene::getInstance().sceneLoaded) {
         Renderer &renderer = Renderer::getInstance();
         int i = 0;
-        for (const ZPathfinding::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
+        for (const Json::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
             const int highByte = (i >> 8) & 0xFF;
             const int lowByte = i & 0xFF;
             renderer.drawBox(
@@ -339,7 +339,7 @@ void Navp::updateExclusionBoxConvexVolumes() {
     if (Obj::getInstance().objLoaded) {
         if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             recastAdapter.clearConvexVolumes();
-            for (ZPathfinding::PfBox exclusionBox: Scene::getInstance().exclusionBoxes) {
+            for (Json::PfBox exclusionBox: Scene::getInstance().exclusionBoxes) {
                 recastAdapter.addConvexVolume(exclusionBox);
             }
         }
@@ -884,7 +884,7 @@ void Navp::updateNavpDialogControls(HWND hwnd) {
 }
 
 void Navp::extractNavpFromRpkgs(const std::string& hash) {
-    if (!Rpkg::extractResourceFromRpkgs(hash, NAVP)) {
+    if (!Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
         const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\navp\\" + hash + ".NAVP";
         Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
         getInstance().loadNavpFromFile(fileName);

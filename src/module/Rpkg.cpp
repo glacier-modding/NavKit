@@ -14,6 +14,9 @@ class NavKitSettings;
 std::string Rpkg::gameVersion = "HM3";
 bool Rpkg::extractionDataInitComplete = false;
 PartitionManager* Rpkg::partitionManager = nullptr;
+HashList* Rpkg::hashList = nullptr;
+std::map<std::string, HashListEntry> Rpkg::hashToHashListEntryMap{};
+std::map<std::string, HashListEntry> Rpkg::ioiStringToHashListEntryMap{};
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
 void Rpkg::initExtractionData() {
@@ -39,7 +42,7 @@ void Rpkg::initExtractionData() {
             Airg::airgHashIoiStringMap[airgHash] = airgHash;
         }
     }
-    Logger::log(NK_INFO, "Reading hash list.");
+    Logger::log(NK_INFO, "Reading filtered hash list.");
     if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
         std::string line;
         while (std::getline(file, line)) {
@@ -77,7 +80,31 @@ void Rpkg::initExtractionData() {
             }
         }
     }
-    Logger::log(NK_INFO, "Done reading hash list.");
+    Logger::log(NK_INFO, "Done reading filtered hash list.");
+    Logger::log(NK_INFO, "Getting full hash list.");
+    getHashList();
+    Logger::log(NK_INFO, "Loading hash list into memory.");
+
+    RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
+    Logger::log(NK_INFO, "Total hash list entries: %d, adding each entry...", hashListRustStringList->length);
+    for (int i = 0; i < hashListRustStringList->length; i++) {
+        if (i % 100000 == 0) {
+            Logger::log(NK_INFO, "Added %d entries.", i);
+        }
+        std::string hash = hashListRustStringList->entries[i];
+        const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
+        std::string path = pathCStr ? pathCStr : "";
+        const char* hintCStr = hash_list_get_hint_by_hash(hashList, hash.c_str());
+        std::string ioiString = hintCStr ? hintCStr : "";
+        auto typeInt = hash_list_get_resource_type_by_hash(hashList, hash.c_str());
+        char typeChars[4];
+        std::memcpy(typeChars, &typeInt, sizeof(typeInt));
+        std::string type(typeChars, sizeof(typeChars));
+
+        hashToHashListEntryMap.insert({hash, {hash, ioiString, type}});
+        ioiStringToHashListEntryMap.insert({ioiString, {hash, ioiString, type}});
+    }
+    Logger::log(NK_INFO, "Done getting full hash list.");
     Menu::updateMenuState();
 }
 
@@ -85,32 +112,51 @@ bool Rpkg::canExtract() {
     return extractionDataInitComplete;
 }
 
-int Rpkg::extractResourceFromRpkgs(const std::string& hash, const ResourceType type) {
+int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, const ResourceType type) {
     CPPTRACE_TRY
         {
             const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
             const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
-            const std::string navpFolder = navKitSettings.outputFolder + "\\" + (type == NAVP ? "navp" : "airg");
-            const char* hashesNeeded[] = {hash.c_str()};
+            const std::string resourceFolder = navKitSettings.outputFolder + "\\" + (type == NAVP
+                ? "navp"
+                : type == AIRG
+                ? "airg"
+                : "tga");
+            char** hashesNeeded = new char*[hashes.size()];
+
+            for (size_t i = 0; i < hashes.size(); ++i) {
+                hashesNeeded[i] = new char[hashes[i].size() + 1];
+                std::strcpy(hashesNeeded[i], hashes[i].c_str());
+            }
             extract_resources_from_rpkg(
                 runtimeFolder.c_str(),
                 hashesNeeded,
-                1,
+                hashes.size(),
                 partitionManager,
-                navpFolder.c_str(),
-                type == NAVP ? "NAVP" : "AIRG",
+                resourceFolder.c_str(),
+                type == NAVP ? "NAVP" : type == AIRG ? "AIRG" : "TEXT",
                 Logger::rustLogCallback);
         }
     CPPTRACE_CATCH(const std::exception& e) {
-        std::string msg = "Error extracting Resource: " + hash + " ";
+        std::string msg = "Error extracting Resources.";
         msg += e.what();
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
         return -1;
     } catch (...) {
-        Logger::log(NK_ERROR, ("Error extracting Resource: " + hash).c_str());
+        Logger::log(NK_ERROR, "Error extracting Resource.");
         return -1;
     }
+    return 0;
+}
+
+int Rpkg::getHashList() {
+    const auto ret = get_hash_list_from_file_or_repo(NavKitSettings::getInstance().outputFolder.c_str(),
+                                                     Logger::rustLogCallback);
+    if (ret == nullptr) {
+        return -1;
+    }
+    hashList = ret;
     return 0;
 }

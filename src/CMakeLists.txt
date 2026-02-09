@@ -14,7 +14,7 @@ set(RECAST_DEMO_SOURCES
 set(MODEL_SOURCES
         model/ReasoningGrid.cpp
         model/VisionData.cpp
-        model/ZPathfinding.cpp
+        model/Json.cpp
 )
 set(MODULE_SOURCES
         module/Airg.cpp

@@ -3,7 +3,7 @@
 #include "../../include/NavKit/util/Pathfinding.h"
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
-#include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/util/GridGenerator.h"
 #include "../../include/NavKit/util/Math.h"
 

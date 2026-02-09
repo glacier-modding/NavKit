@@ -21,8 +21,8 @@ CommandRunner::~CommandRunner() {
     }
 }
 
-void CommandRunner::runCommand(std::string command, std::string logFileName, std::function<void()> callback,
-                               std::function<void()> errorCallback) {
+void CommandRunner::runCommand(const std::string& command, const std::string& logFileName, const std::function<void()>& callback,
+                               const std::function<void()>& errorCallback) {
     int commandIndex = commandsRun;
     commandsRun++;
     handles.emplace(std::pair<int, std::vector<HANDLE> >(commandIndex, {}));

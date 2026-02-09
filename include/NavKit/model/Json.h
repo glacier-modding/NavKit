@@ -1,11 +1,12 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 #include "../../../extern/simdjson/simdjson.h"
 
-namespace ZPathfinding {
+namespace Json {
     class Vec3 {
     public:
         Vec3(): x(0), y(0), z(0) {
@@ -189,5 +190,54 @@ namespace ZPathfinding {
         std::vector<PfSeedPoint> readPfSeedPoints() const;
 
         std::vector<Entity> entities{};
+    };
+
+    class Mati {
+    public:
+        Mati() = default;
+
+        void readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+
+        void readJsonFromScene(simdjson::ondemand::object jsonDocument);
+
+        void writeJson(std::ostream& f) const;
+
+        std::string hash;
+        std::string className;
+        std::string diffuse;
+        std::string normal;
+        std::string specular;
+    };
+
+    class Matis {
+    public:
+        Matis() {
+        }
+
+        Matis(simdjson::ondemand::array matisJson);
+
+        std::vector<Mati> matis{};
+    };
+
+    class PrimMati {
+    public:
+        PrimMati() {
+
+        }
+        std::string primHash;
+        std::vector<std::string> matiHashes{};
+        void readJson(simdjson::ondemand::object jsonDocument);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class PrimMatis {
+    public:
+        PrimMatis() {
+        }
+
+        PrimMatis(simdjson::ondemand::array primMatisJson);
+
+        std::vector<PrimMati> primMatis{};
     };
 }

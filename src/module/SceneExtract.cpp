@@ -2,7 +2,7 @@
 #include <fstream>
 
 #include "../../include/NavKit/module/SceneExtract.h"
-#include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/GameConnection.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -67,7 +67,7 @@ void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
 void SceneExtract::extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback) {
     GameConnection &gameConnection = GameConnection::getInstance();
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    std::ofstream f(navKitSettings.outputFolder + "\\output.nav.json");
+    std::ofstream f(navKitSettings.outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME);
     f.clear();
     f.close();
 
@@ -112,7 +112,7 @@ void SceneExtract::finalizeExtractScene() {
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
         Scene &scene = Scene::getInstance();
         std::string sceneFile = navKitSettings.outputFolder;
-        sceneFile += "\\output.nav.json";
+        sceneFile += "\\" + Scene::OUTPUT_SCENE_FILE_NAME;
         Logger::log(NK_INFO, "Loading nav.json file: '%s'.", sceneFile.c_str());
 
         backgroundWorker.emplace(
@@ -126,7 +126,7 @@ void SceneExtract::finalizeExtractScene() {
                 const std::string &fileNameString = sceneFile;
                 sceneScoped.lastLoadSceneFile = sceneFile;
                 if ((alsoBuildObj || alsoBuildAll) && !obj.startedObjGeneration) {
-                    obj.extractAlocsOrPrimsAndStartObjBuild();
+                    obj.extractResourcesAndStartObjBuild();
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();

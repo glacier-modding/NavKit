@@ -75,7 +75,7 @@ int SDL_main(const int argc, char **argv) {
                 navp.finalizeBuild();
                 obj.finalizeLoad();
                 airg.finalizeSave();
-                obj.finalizeExtractAlocsOrPrims();
+                obj.finalizeExtractResources();
                 renderer.finalizeFrame();
             }
 

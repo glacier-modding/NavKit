@@ -5,7 +5,7 @@
 
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
-#include "../../include/NavKit/model/ZPathfinding.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Obj.h"
@@ -386,7 +386,7 @@ void RecastAdapter::handleMeshChanged() const {
     sample->handleMeshChanged(inputGeom);
     // if (const Scene &scene = Scene::getInstance();
     //     !scene.sceneLoaded ||
-    //     scene.includeBox.id == ZPathfinding::PfBoxes::NO_INCLUDE_BOX_FOUND) {
+    //     scene.includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
     //     setSceneBBoxToMesh();
     // }
 }
@@ -695,7 +695,7 @@ std::deque<std::string> &RecastAdapter::getLogBuffer() const {
     return buildContext->m_logBuffer;
 }
 
-void RecastAdapter::addConvexVolume(ZPathfinding::PfBox &pfBox) const {
+void RecastAdapter::addConvexVolume(Json::PfBox &pfBox) const {
     float verts[4 * 3];
     verts[0] = -pfBox.scale.x / 2;
     verts[1] = -pfBox.scale.y / 2;

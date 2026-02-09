@@ -78,7 +78,7 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(HWND hDlg, UINT message, WPA
                     SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
                 }
             } else if (commandId == IDC_BUTTON_BROWSE_BLENDER) {
-                if (const char *blenderFileName = Obj::openSetBlenderFileDialog(navKitSettings->blenderPath.data())) {
+                if (const char *blenderFileName = Obj::openSetBlenderFileDialog()) {
                     tempSettings->blenderPath = blenderFileName;
                     SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings->blenderPath.c_str());
                 }

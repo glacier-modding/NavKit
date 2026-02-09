@@ -14,7 +14,7 @@
 
 struct ConvexVolume;
 
-namespace ZPathfinding {
+namespace Json {
     class Vec3;
     class PfBox;
 }
@@ -93,7 +93,7 @@ public:
 
     std::deque<std::string> &getLogBuffer() const;
 
-    void addConvexVolume(ZPathfinding::PfBox &pfBox) const;
+    void addConvexVolume(Json::PfBox &pfBox) const;
 
     [[nodiscard]] const ConvexVolume *getConvexVolumes() const;
 

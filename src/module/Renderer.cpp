@@ -39,7 +39,7 @@ Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     frameRate = 60.0f;
     window = 0;
 
-    cameraEulers[0] = 45.0, cameraEulers[1] = -45.0;
+    cameraEulers[0] = 45.0, cameraEulers[1] = 135.0;
     cameraPos[0] = 10, cameraPos[1] = 15, cameraPos[2] = 10;
     camr = 1000;
     origCameraEulers[0] = 0,
