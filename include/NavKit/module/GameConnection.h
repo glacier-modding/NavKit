@@ -33,7 +33,7 @@ public:
 
     [[nodiscard]] int rebuildEntityTree() const;
 
-    [[nodiscard]] int listAlocPfBoxAndSeedPointEntities() const;
+    [[nodiscard]] int listNavKitSceneEntities() const;
 
 private:
     void sendHelloMessage() const;
