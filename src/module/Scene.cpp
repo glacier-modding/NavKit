@@ -131,7 +131,7 @@ simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
         Logger::log(NK_INFO, "Loading Volume Spheres.");
         volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"]).volumeSpheres;
     } catch (const std::exception &e) {
-        Logger::log(NK_ERROR, e.what());
+        Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
     } catch (...) {
         errorCallback();
     }

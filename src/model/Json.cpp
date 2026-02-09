@@ -440,8 +440,15 @@ void Json::Radius::writeJson(std::ostream& f) const {
 }
 
 void Json::Radius::readJson(simdjson::ondemand::object json) {
-    type = std::string{std::string_view(json["type"])};
-    data = static_cast<float>(static_cast<double>(json["data"]));
+    auto result = json["type"];
+    if (result.error() == simdjson::SUCCESS) {
+        type = std::string{std::string_view(json["type"])};
+    }
+    result = json["data"];
+    if (result.error() == simdjson::SUCCESS) {
+        const auto dataString = std::string{std::string_view(json["data"])};
+        data = std::stod(dataString);
+    }
 }
 
 void Json::VolumeSphere::writeJson(std::ostream& f) const {
@@ -464,10 +471,11 @@ void Json::VolumeSphere::readJson(simdjson::ondemand::object json) {
     if (result.error() == simdjson::SUCCESS) {
         name = std::string{std::string_view(json["name"])};
     }
-    const simdjson::ondemand::object positionJson = json["position"];
-    position.readJson(positionJson);
-    const simdjson::ondemand::object radiusJson = json["radius"];
-    radius.readJson(radiusJson);
+    result = json["radius"];
+    if (result.error() == simdjson::SUCCESS) {
+        const simdjson::ondemand::object radiusJson = json["radius"];
+        radius.readJson(radiusJson);
+    }
 }
 
 Json::VolumeSpheres::VolumeSpheres(simdjson::ondemand::array volumeSpheresJson) {
