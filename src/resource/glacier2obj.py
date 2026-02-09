@@ -2284,21 +2284,29 @@ def add_texture(obj, tga_file_path):
     nodes.clear()
     node_output = nodes.new(type='ShaderNodeOutputMaterial')
     node_output.location = (400, 0)
-    node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-    node_bsdf.location = (0, 0)
     node_texture = nodes.new(type='ShaderNodeTexImage')
     node_texture.location = (-400, 0)
     img = bpy.data.images.load(tga_file_path)
     node_texture.image = img
-    links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
-    links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+
+    if "HitmanTextureNode" in bpy.data.node_groups:
+        node_group = nodes.new(type='ShaderNodeGroup')
+        node_group.node_tree = bpy.data.node_groups["HitmanTextureNode"]
+        node_group.location = (0, 0)
+        links.new(node_texture.outputs['Color'], node_group.inputs[0])
+        links.new(node_group.outputs[0], node_output.inputs['Surface'])
+    else:
+        node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+        node_bsdf.location = (0, 0)
+        links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
+        links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
 
     if obj.data.materials:
         obj.data.materials[0] = mat
     else:
         obj.data.materials.append(mat)
 
-    log("INFO", "Texture " + tga_file_path + " applied to " + obj.name, "add_textures")
+    log("DEBUG", "Texture " + tga_file_path + " applied to " + obj.name, "add_textures")
 
 def get_local_space_bbox_center(obj):
     return 0.125 * sum((mathutils.Vector(ls_corner) for ls_corner in obj.bound_box), mathutils.Vector())
@@ -2439,17 +2447,18 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
 
     geo_node_name = "HitmanMapNode"
     if build_type == "instance":
-        #link the geonode
+        # link the geonode
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
-        print(filepath)
+        log("INFO", "Loading geometry node from the resource blend file: " + filepath, "load_scenario")
         with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
             if geo_node_name in data_from.node_groups:
                 data_to.node_groups.append(geo_node_name)
             else:
-                log("DEBUG", "=========================== Error Loading the resource blend file ================", "load_scenario")
+                log("ERROR", "=========================== Error Loading the resource blend file ================", "load_scenario")
                 assert 0
     matis = {}
     prim_matis = {}
+    texture_node_name = "HitmanTextureNode"
     if apply_textures:
         matis_list = data['matis']
         for mati in matis_list:
@@ -2457,6 +2466,26 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         prim_matis_list = data['primMatis']
         for prim_mati in prim_matis_list:
             prim_matis[prim_mati["primHash"]] = prim_mati
+        # link the shading node
+        filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
+        print(filepath)
+        with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
+            log("INFO", "Loading texture node from the resource blend file:" + filepath, "load_scenario")
+            if texture_node_name in data_from.materials:
+                data_to.node_groups.append(texture_node_name)
+            else:
+                log("ERROR", "=========================== Error Loading the resource blend file ================", "load_scenario")
+                assert 0
+        log("INFO", "Adding light", "load_scenario")
+
+        light_data = bpy.data.lights.new(name="Sun", type='SUN')
+        light_object = bpy.data.objects.new(name="Sun", object_data=light_data)
+        bpy.context.collection.objects.link(light_object)
+
+        light_data.energy = 2.5
+        light_data.angle = math.radians(180)
+        light_object.rotation_euler = (0, 0, 0)
+
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
             mesh_hash = hash_and_entity['alocHash']
@@ -2612,7 +2641,11 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
                 if mesh_type == "PRIM" and apply_textures:
-                    add_textures(obj, matis, mesh_hash, output_dir, prim_matis, obj_i, material_indices[obj_i])
+                    log("DEBUG", "Adding texture", "load_scenario")
+                    try:
+                        add_textures(obj, matis, mesh_hash, output_dir, prim_matis, obj_i, material_indices[obj_i])
+                    except struct.error as err:
+                        log("ERROR", "Error adding texture " + str(err), "load_scenario")
         else:
             cur = None
             aloc_positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
@@ -2644,9 +2677,9 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 mesh_id = transforms[mesh_hash][i]["id"]
                 log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
                 mesh_i += 1
-                log("INFO", "Total submeshes: " + str(o_size), "load_scenario")
+                log("DEBUG", "Total submeshes: " + str(o_size), "load_scenario")
                 for o_i in range(o_size):
-                    log("INFO", "Processing submesh: " + str(o_i), "load_scenario")
+                    log("DEBUG", "Processing submesh: " + str(o_i), "load_scenario")
 
                     obj = objects[o_i]
                     if not unlinked[o_i]:
@@ -2669,9 +2702,9 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                     cur.rotation_mode = 'QUATERNION'
                     cur.rotation_quaternion = (rotations[o_i][i][0], rotations[o_i][i][1], rotations[o_i][i][2], rotations[o_i][i][3])
                     cur.location = mathutils.Vector((positions[o_i][i][0], positions[o_i][i][1], positions[o_i][i][2]))
-                    log("INFO", "Adding texture ", "load_scenario")
 
                     if mesh_type == "PRIM" and apply_textures:
+                        log("DEBUG", "Adding texture", "load_scenario")
                         try:
                             add_textures(cur, matis, mesh_hash, output_dir, prim_matis, o_i, material_indices[o_i])
                         except struct.error as err:
@@ -2727,7 +2760,7 @@ def main():
     lod_mask = argv[3]
     build_type = argv[4]
     filter_to_include_box = argv[5] == "true"
-    apply_textures = argv[5] == "true"
+    apply_textures = argv[6] == "true"
     if len(argv) > 7 and argv[7] == "true":
         log("INFO", "Enabling debug logs", "main"),
         glacier2obj_enabled_log_levels.append("DEBUG")

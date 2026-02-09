@@ -265,6 +265,7 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
 }
 
 void Obj::buildObjFromScene() {
+    const auto start = std::chrono::high_resolution_clock::now();
     const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
     const Scene &scene = Scene::getInstance();
     objLoaded = false;
@@ -302,7 +303,7 @@ void Obj::buildObjFromScene() {
         command += " false";
     }
 
-    if (applyTextures) {
+    if (applyTextures && meshTypeForBuild == PRIM) {
         command += " true";
     } else
     {
@@ -319,8 +320,11 @@ void Obj::buildObjFromScene() {
 
     backgroundWorker.emplace(
         &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2Obj.log", [this,
-            buildOutputFileType] {
-            Logger::log(NK_INFO, "Finished generating %s from nav.json file.", buildOutputFileType.c_str());
+            buildOutputFileType, start] {
+
+            const auto end = std::chrono::high_resolution_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(), duration.count());
             blenderObjGenerationDone = true;
             if (blendFileAndObjBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
@@ -377,6 +381,11 @@ void Obj::extractResourcesAndStartObjBuild() {
         simdjson::ondemand::parser parser;
         Logger::log(NK_INFO, "Extracting MATIs from Rpkg files.");
         for (auto& mesh : scene.meshes) {
+            if (scene.primMatis.contains(mesh.primHash)) {
+                continue;
+            }
+            scene.primMatis.insert({mesh.primHash, {}});
+            scene.primMatis[mesh.primHash].primHash = mesh.primHash;
             const auto primMatis = get_all_referenced_hashes_by_hash_from_rpkg_files(
                 mesh.primHash.c_str(),
                 Rpkg::partitionManager,
@@ -388,16 +397,12 @@ void Obj::extractResourcesAndStartObjBuild() {
             }
             for (int i = 0; i < primMatis->length; i++) {
                 std::string matiHash = get_string_from_list(primMatis, i);
-                if (!scene.primMatis.contains(mesh.primHash)) {
-                    scene.primMatis.insert({mesh.primHash, {}});
-                    scene.primMatis[mesh.primHash].primHash = mesh.primHash;
-                }
                 if (std::ranges::find(scene.primMatis[mesh.primHash].matiHashes, matiHash) != scene.primMatis[mesh.primHash].matiHashes.end()) {
-                    Logger::log(NK_INFO, "Duplicate mati hash %s found in references for %s.", matiHash.c_str(), mesh.primHash.c_str());
+                    Logger::log(NK_DEBUG, "Duplicate mati hash %s found in references for %s.", matiHash.c_str(), mesh.primHash.c_str());
                     continue;
                 }
                 scene.primMatis[mesh.primHash].matiHashes.push_back(matiHash);
-                Logger::log(NK_INFO, "Added %s to %s mati hashes.", matiHash.c_str(), mesh.primHash.c_str());
+                Logger::log(NK_DEBUG, "Added %s to %s mati hashes.", matiHash.c_str(), mesh.primHash.c_str());
                 if (scene.matis.contains(matiHash)) {
                     continue;
                 }
@@ -408,10 +413,10 @@ void Obj::extractResourcesAndStartObjBuild() {
                     auto jsonDocument = parser.iterate(json);
                     Json::Mati mati;
                     try {
-                        Logger::log(NK_INFO, "Reading mati json for %s.", matiHash.c_str());
+                        Logger::log(NK_DEBUG, "Reading mati json for %s.", matiHash.c_str());
                         mati.readJsonFromMatiFile(jsonDocument);
                         scene.matis.insert({matiHash, mati});
-                        Logger::log(NK_INFO, "Added %s to scene mati hashes.", matiHash.c_str());
+                        Logger::log(NK_DEBUG, "Added %s to scene mati hashes.", matiHash.c_str());
                     } catch (const std::exception& e) {
                         Logger::log(NK_ERROR, "Error getting Mati JSON for %s: %s", matiHash.c_str(), e.what());
                         free_string(matiJson);
