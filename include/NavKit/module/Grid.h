@@ -14,7 +14,7 @@ public:
 
     void renderGridText() const;
 
-    static Grid &getInstance() {
+    static Grid& getInstance() {
         static Grid instance;
         return instance;
     }

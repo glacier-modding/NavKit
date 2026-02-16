@@ -88,9 +88,6 @@ void Rpkg::initExtractionData() {
     RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
     Logger::log(NK_INFO, "Total hash list entries: %d, adding each entry...", hashListRustStringList->length);
     for (int i = 0; i < hashListRustStringList->length; i++) {
-        if (i % 100000 == 0) {
-            Logger::log(NK_INFO, "Added %d entries.", i);
-        }
         std::string hash = hashListRustStringList->entries[i];
         const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
         std::string path = pathCStr ? pathCStr : "";
@@ -114,37 +111,43 @@ bool Rpkg::canExtract() {
 
 int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, const ResourceType type) {
     CPPTRACE_TRY
-        {
-            const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    {
+            const NavKitSettings & navKitSettings = NavKitSettings::getInstance();
             const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
             const std::string resourceFolder = navKitSettings.outputFolder + "\\" + (type == NAVP
-                ? "navp"
-                : type == AIRG
-                ? "airg"
-                : "tga");
-            char** hashesNeeded = new char*[hashes.size()];
+            ? "navp"
+            : type == AIRG
+            ? "airg"
+            : "tga");
+            char**hashesNeeded = new char*[hashes.size()];
 
             for (size_t i = 0; i < hashes.size(); ++i) {
-                hashesNeeded[i] = new char[hashes[i].size() + 1];
-                std::strcpy(hashesNeeded[i], hashes[i].c_str());
-            }
-            extract_resources_from_rpkg(
-                runtimeFolder.c_str(),
-                hashesNeeded,
-                hashes.size(),
-                partitionManager,
-                resourceFolder.c_str(),
-                type == NAVP ? "NAVP" : type == AIRG ? "AIRG" : "TEXT",
-                Logger::rustLogCallback);
+            hashesNeeded[i] = new char[hashes[i].size() + 1];
+            std::strcpy(hashesNeeded[i], hashes[i].c_str());
+            
         }
-    CPPTRACE_CATCH(const std::exception& e) {
+        extract_resources_from_rpkg(
+            runtimeFolder.c_str(),
+            hashesNeeded,
+            hashes.size(),
+            partitionManager,
+            resourceFolder.c_str(),
+            type == NAVP ? "NAVP" : type == AIRG ? "AIRG" : "TEXT",
+            Logger::rustLogCallback);
+        
+    }
+    CPPTRACE_CATCH(const std::exception & e)
+    {
         std::string msg = "Error extracting Resources.";
         msg += e.what();
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
         return -1;
-    } catch (...) {
+    }
+    catch
+    (...)
+    {
         Logger::log(NK_ERROR, "Error extracting Resource.");
         return -1;
     }

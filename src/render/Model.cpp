@@ -11,6 +11,8 @@
 #include <numeric>
 
 #include "../../include/NavKit/render/Model.h"
+
+#include <ranges>
 std::map<const Model*, SortContext> Model::sortContexts;
 
 Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch) {
@@ -80,8 +82,7 @@ void Model::loadModelData(std::string const& path) {
         std::string name = mesh->mName.C_Str();
 
         std::string batchId = name;
-        size_t underscorePos = name.find('_');
-        if (underscorePos != std::string::npos) {
+        if (const size_t underscorePos = name.find('_'); underscorePos != std::string::npos) {
             batchId = name.substr(0, underscorePos);
         }
 
@@ -90,18 +91,18 @@ void Model::loadModelData(std::string const& path) {
         batches[key].push_back(mesh);
     }
 
-    for (auto& entry : batches) {
-        meshes.push_back(processBatchedMeshes(entry.second));
+    for (auto& val : batches | std::views::values) {
+        meshes.push_back(processBatchedMeshes(val));
     }
 }
 
-void Model::initGL() {
+void Model::initGl() {
     for (unsigned int i = 0; i < meshes.size(); i++) {
         meshes[i].setupMesh();
     }
 }
 
-void Model::draw(Shader& shader, const glm::mat4& viewProj) const {
+void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
     std::array<glm::vec4, 6> planes;
     for (int i = 0; i < 6; ++i) {
         planes[i] = glm::vec4(
@@ -112,28 +113,27 @@ void Model::draw(Shader& shader, const glm::mat4& viewProj) const {
         );
     }
 
-    SortContext& ctx = sortContexts[this];
+    auto& [drawOrder, sortFuture] = sortContexts[this];
 
-    if (ctx.drawOrder.size() != meshes.size()) {
-        ctx.drawOrder.resize(meshes.size());
-        std::iota(ctx.drawOrder.begin(), ctx.drawOrder.end(), 0);
+    if (drawOrder.size() != meshes.size()) {
+        drawOrder.resize(meshes.size());
+        std::iota(drawOrder.begin(), drawOrder.end(), 0);
     }
 
-    if (ctx.sortFuture.valid() && ctx.sortFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        std::vector<unsigned int> newOrder = ctx.sortFuture.get();
-        if (newOrder.size() == meshes.size()) {
-            ctx.drawOrder = std::move(newOrder);
+    if (sortFuture.valid() && sortFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (std::vector<unsigned int> newOrder = sortFuture.get(); newOrder.size() == meshes.size()) {
+            drawOrder = std::move(newOrder);
         }
     }
 
-    if (!ctx.sortFuture.valid()) {
+    if (!sortFuture.valid()) {
         std::vector<glm::vec3> centers;
         centers.reserve(meshes.size());
         for (const auto& mesh : meshes) {
             centers.push_back((mesh.aabbMin + mesh.aabbMax) * 0.5f);
         }
 
-        ctx.sortFuture = std::async(std::launch::async, [centers = std::move(centers), viewProj]() {
+        sortFuture = std::async(std::launch::async, [centers = std::move(centers), viewProj]() {
             std::vector<unsigned int> indices(centers.size());
             std::iota(indices.begin(), indices.end(), 0);
 
@@ -149,7 +149,7 @@ void Model::draw(Shader& shader, const glm::mat4& viewProj) const {
         });
     }
 
-    for (unsigned int i : ctx.drawOrder) {
+    for (const unsigned int i : drawOrder) {
         const Mesh& mesh = meshes[i];
         const glm::vec3 center = (mesh.aabbMin + mesh.aabbMax) * 0.5f;
         const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;
@@ -157,8 +157,7 @@ void Model::draw(Shader& shader, const glm::mat4& viewProj) const {
         for (const auto& plane : planes) {
             const float r = extents.x * std::abs(plane.x) + extents.y * std::abs(plane.y) + extents.z *
                 std::abs(plane.z);
-            const float d = glm::dot(glm::vec3(plane), center) + plane.w;
-            if (d < -r) {
+            if (const float d = glm::dot(glm::vec3(plane), center) + plane.w; d < -r) {
                 inside = false;
                 break;
             }

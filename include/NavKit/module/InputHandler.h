@@ -5,7 +5,7 @@ class InputHandler {
     explicit InputHandler();
 
 public:
-    static InputHandler &getInstance() {
+    static InputHandler& getInstance() {
         static InputHandler instance;
         return instance;
     }
@@ -14,8 +14,7 @@ public:
 
     void hitTest() const;
 
-
-    void handleMovement(float dt, const double *modelviewMatrix);
+    void handleMovement(float dt, const double* modelviewMatrix);
 
     int mousePos[2]{};
     int origMousePos[2]{};

@@ -9,16 +9,16 @@ struct DialogSettings {
 };
 
 class NavKitSettings {
-    static void resetDefaults(DialogSettings &settings);
+    static void resetDefaults(DialogSettings& settings);
 
-    static void setDialogInputs(HWND hDlg, const DialogSettings &tempSettings);
+    static void setDialogInputs(HWND hDlg, const DialogSettings& tempSettings);
 
     static INT_PTR SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
     explicit NavKitSettings();
 
 public:
-    static NavKitSettings &getInstance() {
+    static NavKitSettings& getInstance() {
         static NavKitSettings instance;
         return instance;
     }
@@ -32,11 +32,11 @@ public:
     std::string blenderPath;
     static HWND hSettingsDialog;
 
-    void setHitmanFolder(const std::string &folderName);
+    void setHitmanFolder(const std::string& folderName);
 
-    void setOutputFolder(const std::string &folderName);
+    void setOutputFolder(const std::string& folderName);
 
-    void setBlenderFile(const std::string &fileName);
+    void setBlenderFile(const std::string& fileName);
 
     void showNavKitSettingsDialog();
 

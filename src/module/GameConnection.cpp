@@ -15,13 +15,12 @@
 #include "../../include/NavWeakness/NavPower.h"
 
 // 46735 is a phoneword for HMSDK
-constinit const char *c_EditorHost = "127.0.0.1";
+constinit const char* c_EditorHost = "127.0.0.1";
 constexpr uint16_t c_EditorPort = 46735;
 
 using easywsclient::WebSocket;
 
-GameConnection::GameConnection() {
-}
+GameConnection::GameConnection() {}
 
 GameConnection::~GameConnection() {
     WSACleanup();
@@ -51,24 +50,34 @@ int GameConnection::closeConnection() const {
     wsp->close();
 
     using clock = std::chrono::steady_clock;
-    auto start_time = clock::now();
-    auto timeout = std::chrono::seconds(2);
+    const auto start_time = clock::now();
+    const auto timeout = std::chrono::seconds(2);
 
-    while (ws && ws->getReadyState() != WebSocket::CLOSED) {
+    while (ws&& ws
+    ->
+    getReadyState() != WebSocket::CLOSED
+    )
+    {
         if (clock::now() - start_time > timeout) {
             Logger::log(NK_WARN, "GameConnection: Timeout waiting for socket to close.");
             break;
         }
 
         ws->poll(10);
-        ws->dispatch([&](const std::string &message) {
+        ws->dispatch([&](const std::string& message) {
             Logger::log(NK_INFO, ("GameConnection: Received message during close attempt: " + message).c_str());
         });
     }
 
-    if (ws && ws->getReadyState() == WebSocket::CLOSED) {
+    if (ws&& ws
+    ->
+    getReadyState() == WebSocket::CLOSED
+    )
+    {
         Logger::log(NK_INFO, "GameConnection: Editor connection closed.");
-    } else if (!ws) {
+    }
+    else
+    if (!ws) {
         Logger::log(NK_WARN, "GameConnection: Editor connection became invalid during close polling.");
     } else {
         Logger::log(NK_WARN, "GameConnection: Socket state is still '%d' after close attempt.",
@@ -90,7 +99,7 @@ int GameConnection::rebuildEntityTree() const {
     bool done = false;
     while (!done) {
         ws->poll();
-        ws->dispatch([&](const std::string &message) {
+        ws->dispatch([&](const std::string& message) {
             Logger::log(NK_INFO, ("Received message: " + message).c_str());
             if (message == R"({"type":"entityTreeRebuilt"})") {
                 done = true;
@@ -110,7 +119,7 @@ int GameConnection::listNavKitSceneEntities() const {
             NK_ERROR, "GameConnection: listAlocPfBoxAndSeedPointEntities failed because the socket is not open.");
         return 1;
     }
-    auto file_write_queue = std::make_unique<rsj::ConcurrentQueue<std::string> >();
+    const auto file_write_queue = std::make_unique<rsj::ConcurrentQueue<std::string>>();
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
     std::thread writer_thread([&] {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
@@ -141,7 +150,7 @@ int GameConnection::listNavKitSceneEntities() const {
     int messagesReceived = 0;
     while (!done) {
         ws->poll(10);
-        ws->dispatch([&](const std::string &message) {
+        ws->dispatch([&](const std::string& message) {
             messagesReceived++;
             if (message == "Done sending entities.") {
                 done = true;

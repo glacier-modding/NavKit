@@ -15,12 +15,11 @@ namespace NavPower {
 
 using easywsclient::WebSocket;
 
-
 class GameConnection {
     explicit GameConnection();
 
 public:
-    static GameConnection &getInstance() {
+    static GameConnection& getInstance() {
         static GameConnection instance;
         return instance;
     }

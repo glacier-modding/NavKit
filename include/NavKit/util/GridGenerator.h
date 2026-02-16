@@ -9,19 +9,19 @@ class Properties;
 
 class GridGenerator {
 public:
-    static GridGenerator &getInstance() {
+    static GridGenerator& getInstance() {
         static GridGenerator instance;
         return instance;
     }
 
     bool initRecastAirgAdapter();
 
-    std::unordered_map<int, std::vector<int> > m_WaypointMap{};
-    std::map<int, std::vector<Pathfinding::SGCell> > waypointCells{};
+    std::unordered_map<int, std::vector<int>> m_WaypointMap{};
+    std::map<int, std::vector<Pathfinding::SGCell>> waypointCells{};
 
     void build();
 
-    static void addVisibilityData(ReasoningGrid *grid);
+    static void addVisibilityData(ReasoningGrid* grid);
 
     void GenerateGrid();
 
@@ -37,23 +37,24 @@ public:
 
     void GenerateLayerIndices();
 
-    static Pathfinding::ZPFLocation *MapLocation_Internal(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation *result,
-                                                          const float4 *vPosNavPower, float fAcceptance, dtPolyRef startPolyRef);
+    static Pathfinding::ZPFLocation* MapLocation_Internal(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation* result,
+                                                          const float4* vPosNavPower, float fAcceptance,
+                                                          dtPolyRef startPolyRef);
 
-    static bool MapLocation(dtNavMeshQuery *navQuery, const float4 *vNavPowerPos, Pathfinding::ZPFLocation *lMapped);
+    static bool MapLocation(dtNavMeshQuery* navQuery, const float4* vNavPowerPos, Pathfinding::ZPFLocation* lMapped);
 
-    static float4 MapToCell(dtNavMeshQuery *navQuery, const float4 *vCellNavPowerUpperLeft, const NavPower::Area &area);
+    static float4 MapToCell(dtNavMeshQuery* navQuery, const float4* vCellNavPowerUpperLeft, const NavPower::Area& area);
 
-    static bool IsInside(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation *location);
+    static bool IsInside(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation* location);
 
-    static bool NearestOuterEdge(dtNavMeshQuery *navQuery, Pathfinding::ZPFLocation &lFrom, float fRadius,
-                                 float4 *edgeNavPowerResult, float4 *edgeNavPowerNormal);
+    static bool NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation& lFrom, float fRadius,
+                                 float4* edgeNavPowerResult, float4* edgeNavPowerNormal);
 
     static void buildVisionAndDeadEndData();
 
-    static void CalculateConnectivity(const bool *cellBitmap, int *pCellConnectivity);
+    static void CalculateConnectivity(const bool* cellBitmap, int* pCellConnectivity);
 
-    static void GetCellBitmap(const float4 *vNavPowerPosition, bool *pBitmap);
+    static void GetCellBitmap(const float4* vNavPowerPosition, bool* pBitmap);
 
     std::optional<std::jthread> backgroundWorker;
 };

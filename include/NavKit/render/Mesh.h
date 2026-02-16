@@ -18,6 +18,7 @@ struct Texture {
     std::string type;
     aiString path;
 };
+
 class Mesh {
 public:
     std::vector<Vertex> vertices;
@@ -27,9 +28,10 @@ public:
     glm::vec3 aabbMin;
     glm::vec3 aabbMax;
 
-    Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures);
+    Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices,
+         const std::vector<Texture>& textures);
 
-    void draw(Shader& shader) const;
+    void draw(const Shader& shader) const;
 
     void setupMesh();
 };

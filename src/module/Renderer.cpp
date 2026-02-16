@@ -37,13 +37,13 @@ Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     width = 0;
     initialFrameRate = 60.0f;
     frameRate = 60.0f;
-    window = 0;
+    window = nullptr;
 
     cameraEulers[0] = 45.0, cameraEulers[1] = 135.0;
     cameraPos[0] = 10, cameraPos[1] = 15, cameraPos[2] = 10;
     camr = 1000;
     origCameraEulers[0] = 0,
-    origCameraEulers[1] = 0;
+        origCameraEulers[1] = 0;
     prevFrameTime = 0;
     font = new FTGLPolygonFont("DroidSans.ttf");
     font->FaceSize(72);
@@ -113,10 +113,10 @@ bool Renderer::initWindowAndRenderer() {
     SDL_DisplayMode displayMode;
     SDL_GetCurrentDisplayMode(0, &displayMode);
     constexpr Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
-    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     if (const float
-                settingsWidth = atof(persistedSettings.getValue("Renderer", "windowWidth", "-1.0f")),
-                settingsHeight = atof(persistedSettings.getValue("Renderer", "windowHeight", "-1.0f"));
+            settingsWidth = atof(persistedSettings.getValue("Renderer", "windowWidth", "-1.0f")),
+            settingsHeight = atof(persistedSettings.getValue("Renderer", "windowHeight", "-1.0f"));
         settingsWidth == -1.0f || settingsHeight == -1) {
         constexpr float aspect = 16.0f / 9.0f;
         width = std::min(displayMode.w, static_cast<int>(static_cast<float>(displayMode.h) * aspect)) - 120;
@@ -139,13 +139,17 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
     const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
-            y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
+                y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
     if (x == -1.0f || y == -1.0f) {
         SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     } else {
         SDL_SetWindowPosition(window, x, y);
     }
-    const std::string navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
+    const std::string navKitVersion = NavKit_VERSION_MAJOR
+    "."
+    NavKit_VERSION_MINOR
+    "."
+    NavKit_VERSION_PATCH;
     std::string title = "NavKit ";
     title += navKitVersion;
     SDL_SetWindowTitle(window, title.data());
@@ -156,9 +160,9 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
 
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const float backgroundColor = navKitSettings.backgroundColor;
-    float fogColor[4] = {backgroundColor, backgroundColor, backgroundColor, 1.0f};
+    const float fogColor[4] = {backgroundColor, backgroundColor, backgroundColor, 1.0f};
     glEnable(GL_FOG);
     glFogi(GL_FOG_MODE, GL_LINEAR);
     glFogf(GL_FOG_START, camr * 0.1f);
@@ -178,9 +182,9 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
     hwnd = wmInfo.info.win.window;
-    HINSTANCE hInstance = wmInfo.info.win.hinstance;
+    const HINSTANCE hInstance = wmInfo.info.win.hinstance;
 
-    if (HMENU hMenu = LoadMenu(hInstance, MAKEINTRESOURCE(IDR_NAVKITMENU))) {
+    if (const HMENU hMenu = LoadMenu(hInstance, MAKEINTRESOURCE(IDR_NAVKITMENU))) {
         SetMenu(hwnd, hMenu);
     } else {
         Logger::log(NK_ERROR, "Failed to load menu resource.");
@@ -194,13 +198,13 @@ void Renderer::closeWindow() const {
 }
 
 void Renderer::loadSettings() {
-    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     initFrameRate(static_cast<float>(atof(persistedSettings.getValue("Renderer", "frameRate", "-1.0f"))));
 }
 
 void Renderer::handleMoved() {
     updateFrameRate();
-    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     int x;
     int y;
     SDL_GetWindowPosition(window, &x, &y);
@@ -220,7 +224,7 @@ void Renderer::handleResize() {
     height = SDL_GetWindowSurface(window)->h;
     Logger::log(NK_INFO,
                 ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
-    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     persistedSettings.setValue("Renderer", "windowWidth", std::to_string(width));
     persistedSettings.setValue("Renderer", "windowHeight", std::to_string(height));
     persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
@@ -231,8 +235,8 @@ void Renderer::renderFrame() {
     glViewport(0, 0, width, height);
     glGetIntegerv(GL_VIEWPORT, viewport);
 
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    float backgroundColor = navKitSettings.backgroundColor;
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const float backgroundColor = navKitSettings.backgroundColor;
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_BLEND);
@@ -240,11 +244,13 @@ void Renderer::renderFrame() {
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_DEPTH_TEST);
 
-    projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
+    projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 1.0f,
+                                  camr);
     view = glm::lookAt(glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]),
-                       glm::vec3(cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
-                                 cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
-                                 cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
+                       glm::vec3(
+                           cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+                           cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
+                           cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
                        glm::vec3(0.0f, 1.0f, 0.0f));
 
     glMatrixMode(GL_PROJECTION);
@@ -267,8 +273,12 @@ void Renderer::renderFrame() {
 
     if (const float MIN_FRAME_TIME = 1.0f / frameRate; dt < MIN_FRAME_TIME) {
         int ms = static_cast<int>((MIN_FRAME_TIME - dt) * 1000.0f);
-        if (ms > 10) ms = 10;
-        if (ms >= 0) SDL_Delay(ms);
+        if (ms > 10) {
+            ms = 10;
+        }
+        if (ms >= 0) {
+            SDL_Delay(ms);
+        }
     }
     InputHandler::getInstance().handleMovement(dt, modelviewMatrix);
 
@@ -280,34 +290,34 @@ void Renderer::renderFrame() {
     shader.setBool("useVertexColor", false);
     glUseProgram(0);
 
-    if (const Obj &obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
+    if (const Obj& obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
         obj.renderObj();
         glUseProgram(0);
         glDisable(GL_CULL_FACE);
     }
-    if (Navp &navp = Navp::getInstance(); navp.navpLoaded && navp.showNavp) {
+    if (Navp& navp = Navp::getInstance(); navp.navpLoaded && navp.showNavp) {
         navp.renderNavMesh();
     }
-    RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    if (Navp &navp = Navp::getInstance(); navp.navpLoaded && navp.showRecastDebugInfo) {
+    const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+    if (const Navp& navp = Navp::getInstance(); navp.navpLoaded && navp.showRecastDebugInfo) {
         recastAdapter.renderRecastNavmesh(false);
     }
-    Scene &scene = Scene::getInstance();
-    if (Navp &navp = Navp::getInstance(); navp.showPfExclusionBoxes && scene.sceneLoaded) {
+    const Scene& scene = Scene::getInstance();
+    if (const Navp& navp = Navp::getInstance(); navp.showPfExclusionBoxes && scene.sceneLoaded) {
         navp.renderExclusionBoxes();
     }
-    if (Navp &navp = Navp::getInstance(); navp.showPfSeedPoints && scene.sceneLoaded) {
+    if (const Navp& navp = Navp::getInstance(); navp.showPfSeedPoints && scene.sceneLoaded) {
         navp.renderPfSeedPoints();
     }
-    if (Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showAirg) {
+    if (Airg& airg = Airg::getInstance(); airg.airgLoaded && airg.showAirg) {
         airg.renderAirg();
     }
-    if (const Airg &airg = Airg::getInstance(); airg.airgLoaded && airg.showRecastDebugInfo) {
-        RecastAdapter &recastAirgAdapter = RecastAdapter::getAirgInstance();
+    if (const Airg& airg = Airg::getInstance(); airg.airgLoaded && airg.showRecastDebugInfo) {
+        const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
         recastAirgAdapter.renderRecastNavmesh(true);
     }
 
-    Grid grid = Grid::getInstance();
+    const Grid grid = Grid::getInstance();
     if (grid.showGrid) {
         grid.renderGrid();
     }
@@ -320,7 +330,7 @@ void Renderer::renderFrame() {
             const float a = static_cast<float>(i) / 20.0f * std::numbers::pi * 2;
             glVertex3f(recastAdapter.markerPosition[0] + cosf(a) * r,
                        recastAdapter.markerPosition[1],
-                       (GLdouble) recastAdapter.markerPosition[2] + sinf(a) * r);
+                       static_cast<GLdouble>(recastAdapter.markerPosition[2]) + sinf(a) * r);
         }
         glEnd();
         glLineWidth(1.0f);
@@ -357,23 +367,23 @@ void drawLine(const Vec3 s, const Vec3 e, const Vec3 color = {-1, -1, -1}) {
 
 void Renderer::drawBounds() {
     glDepthMask(GL_FALSE);
-    Scene &scene = Scene::getInstance();
-    float *p = scene.bBoxPos;
-    float *s = scene.bBoxScale;
-    float l = p[0] - s[0] / 2;
-    float r = p[0] + s[0] / 2;
-    float u = p[2] + s[2] / 2;
-    float d = p[2] - s[2] / 2;
-    float f = p[1] - s[1] / 2;
-    float b = p[1] + s[1] / 2;
-    Vec3 lfu = {l, f, u};
-    Vec3 rfu = {r, f, u};
-    Vec3 lbu = {l, b, u};
-    Vec3 rbu = {r, b, u};
-    Vec3 lfd = {l, f, d};
-    Vec3 rfd = {r, f, d};
-    Vec3 lbd = {l, b, d};
-    Vec3 rbd = {r, b, d};
+    Scene& scene = Scene::getInstance();
+    const float* p = scene.bBoxPos;
+    const float* s = scene.bBoxScale;
+    const float l = p[0] - s[0] / 2;
+    const float r = p[0] + s[0] / 2;
+    const float u = p[2] + s[2] / 2;
+    const float d = p[2] - s[2] / 2;
+    const float f = p[1] - s[1] / 2;
+    const float b = p[1] + s[1] / 2;
+    const Vec3 lfu = {l, f, u};
+    const Vec3 rfu = {r, f, u};
+    const Vec3 lbu = {l, b, u};
+    const Vec3 rbu = {r, b, u};
+    const Vec3 lfd = {l, f, d};
+    const Vec3 rfd = {r, f, d};
+    const Vec3 lbd = {l, b, d};
+    const Vec3 rbd = {r, b, d};
     glColor3f(0.0, 1.0, 1.0);
     drawLine(lfu, rfu);
     drawLine(lfu, lbu);
@@ -406,21 +416,24 @@ void Renderer::drawAxes() {
     drawText("Z", z * -1, z);
 }
 
-void Renderer::drawText(const std::string &text, const Vec3 pos, const Vec3 color, const double size) {
-    if (font->Error())
+void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 color, const double size) const {
+    if (font->Error()) {
         return;
+    }
 
     glPushMatrix();
     glTranslatef(pos.X, pos.Y, pos.Z);
 
     float modelview[16];
     glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-    for(int i=0; i<3; i++) 
-        for(int j=0; j<3; j++) 
-            modelview[i*4+j] = (i==j ? 1.0f : 0.0f);
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            modelview[i * 4 + j] = (i == j ? 1.0f : 0.0f);
+        }
+    }
     glLoadMatrixf(modelview);
 
-    float scale = static_cast<float>(size) * 0.0002f;
+    const float scale = static_cast<float>(size) * 0.0002f;
     glScalef(scale, scale, scale);
 
     glColor3f(color.X, color.Y, color.Z);
@@ -429,8 +442,8 @@ void Renderer::drawText(const std::string &text, const Vec3 pos, const Vec3 colo
     glPopMatrix();
 }
 
-void Renderer::drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
-                       Vec3 outlineColor, float alpha) {
+void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled, const Vec3 fillColor, const bool outlined,
+                       const Vec3 outlineColor, const float alpha) {
     // Bottom face
     Vec3 rotated1 = rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
     Vec3 rotated2 = rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
@@ -576,9 +589,8 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     glClearColor(1.0, 1.0, 1.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) {
-        Logger::log(NK_ERROR, ("FB error, status: 0x" + std::to_string((int) status)).c_str());
+    if (const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); status != GL_FRAMEBUFFER_COMPLETE) {
+        Logger::log(NK_ERROR, ("FB error, status: 0x" + std::to_string(static_cast<int>(status))).c_str());
 
         printf("FB error, status: 0x%x\n", status);
         return HitTestResult(NONE, -1);
@@ -587,7 +599,7 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     Navp::getInstance().renderPfSeedPointsForHitTest();
     Navp::getInstance().renderExclusionBoxesForHitTest();
     Airg::getInstance().renderAirgForHitTest();
-    Obj &obj = Obj::getInstance();
+    const Obj& obj = Obj::getInstance();
     if (obj.showObj && obj.objLoaded) {
         obj.renderObj();
     }
@@ -595,19 +607,19 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     glReadBuffer(GL_COLOR_ATTACHMENT0);
     glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    int selectedIndex = int(pixel[1]) * 255 + int(pixel[2]);
+    const int selectedIndex = static_cast<int>(pixel[1]) * 255 + static_cast<int>(pixel[2]);
 
     if (selectedIndex == 65280) {
         return HitTestResult(NONE, -1);
     }
     HitTestType result = NONE;
-    if (int(pixel[0]) == NAVMESH_AREA) {
+    if (static_cast<int>(pixel[0]) == NAVMESH_AREA) {
         result = NAVMESH_AREA;
-    } else if (int(pixel[0]) == AIRG_WAYPOINT) {
+    } else if (static_cast<int>(pixel[0]) == AIRG_WAYPOINT) {
         result = AIRG_WAYPOINT;
-    } else if (int(pixel[0]) == PF_SEED_POINT) {
+    } else if (static_cast<int>(pixel[0]) == PF_SEED_POINT) {
         result = PF_SEED_POINT;
-    } else if (int(pixel[0]) == PF_EXCLUSION_BOX) {
+    } else if (static_cast<int>(pixel[0]) == PF_EXCLUSION_BOX) {
         result = PF_EXCLUSION_BOX;
     }
     return HitTestResult(result, result != NONE ? selectedIndex : -1);

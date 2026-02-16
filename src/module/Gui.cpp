@@ -31,8 +31,8 @@ void Gui::drawGui() {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const InputHandler &inputHandler = InputHandler::getInstance();
-    const Renderer &renderer = Renderer::getInstance();
+    const InputHandler& inputHandler = InputHandler::getInstance();
+    const Renderer& renderer = Renderer::getInstance();
     gluOrtho2D(0, renderer.width, 0, renderer.height);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -41,7 +41,7 @@ void Gui::drawGui() {
                     inputHandler.mouseButtonMask, inputHandler.mouseScroll);
     if (showMenu) {
         constexpr char msg[] =
-                "W/S/A/D/Q/E: Move  LMB: Select / Deselect RMB: Rotate  Tab: Show / Hide UI  Ctrl: Slow camera movement  Shift: Fast camera movement";
+            "W/S/A/D/Q/E: Move  LMB: Select / Deselect RMB: Rotate  Tab: Show / Hide UI  Ctrl: Slow camera movement  Shift: Fast camera movement";
         imguiDrawText(10, renderer.height - 20, IMGUI_ALIGN_LEFT, msg, imguiRGBA(255, 255, 255, 128));
         char cameraPosMessage[128];
         snprintf(cameraPosMessage, sizeof cameraPosMessage, "Camera position: %f, %f, %f",
@@ -53,12 +53,12 @@ void Gui::drawGui() {
                  renderer.cameraEulers[0], renderer.cameraEulers[1]);
         imguiDrawText(10, renderer.height - 60, IMGUI_ALIGN_LEFT, cameraAngleMessage,
                       imguiRGBA(255, 255, 255, 128));
-        const Navp &navp = Navp::getInstance();
+        const Navp& navp = Navp::getInstance();
         char loadedNavpText[256];
         snprintf(loadedNavpText, sizeof loadedNavpText, "Loaded Navp: %s", navp.loadedNavpText.c_str());
         imguiDrawText(10, renderer.height - 80, IMGUI_ALIGN_LEFT, loadedNavpText,
                       imguiRGBA(255, 255, 255, 128));
-        const Airg &airg = Airg::getInstance();
+        const Airg& airg = Airg::getInstance();
         char loadedAirgText[256];
         snprintf(loadedAirgText, sizeof loadedAirgText, "Loaded Airg: %s", airg.loadedAirgText.c_str());
         imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, loadedAirgText,
@@ -75,7 +75,7 @@ void Gui::drawGui() {
                  airg.selectedWaypointIndex);
         imguiDrawText(10, renderer.height - 140, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
-        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
 
         if (showLog) {
             if (imguiBeginScrollArea("Log", 20, 20,
@@ -88,7 +88,7 @@ void Gui::drawGui() {
             }
             std::lock_guard lock(recastAdapter.getLogMutex());
 
-            const std::deque<std::string> &logBuffer = recastAdapter.getLogBuffer();
+            const std::deque<std::string>& logBuffer = recastAdapter.getLogBuffer();
             for (auto it = logBuffer.cbegin();
                  it != logBuffer.cend(); ++it) {
                 imguiLabel(it->c_str());

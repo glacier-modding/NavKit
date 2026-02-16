@@ -6,35 +6,34 @@
 #include <vector>
 
 Logger::Logger()
-    : logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string> > >()),
-      debugLogsEnabled(false) {
-}
+    : logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()),
+      debugLogsEnabled(false) {}
 
 [[noreturn]] void Logger::logRunner() {
-    if (const BuildContext *buildContext = RecastAdapter::getInstance().buildContext; buildContext == nullptr) {
+    if (const BuildContext* buildContext = RecastAdapter::getInstance().buildContext; buildContext == nullptr) {
         throw std::exception("Logger not initialized.");
     }
-    const Logger &logger = getInstance();
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const Logger& logger = getInstance();
+    const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     while (true) {
-        if (std::optional<std::pair<LogCategory, std::string> > message = logger.logQueue->try_pop(); message.
+        if (std::optional<std::pair<LogCategory, std::string>> message = logger.logQueue->try_pop(); message.
             has_value()) {
             std::string msg;
             switch (message.value().first) {
-                case NK_ERROR:
-                    msg = "[ERROR] ";
-                    break;
-                case NK_WARN:
-                    msg = "[WARN] ";
-                    break;
-                case NK_DEBUG:
-                    if (!logger.debugLogsEnabled) {
-                        continue;
-                    };
-                    msg = "[DEBUG] ";
-                    break;
-                default:
-                    break;
+            case NK_ERROR:
+                msg = "[ERROR] ";
+                break;
+            case NK_WARN:
+                msg = "[WARN] ";
+                break;
+            case NK_DEBUG:
+                if (!logger.debugLogsEnabled) {
+                    continue;
+                };
+                msg = "[DEBUG] ";
+                break;
+            default:
+                break;
             }
             msg += message.value().second;
             recastAdapter.log(message.value().first, msg);
@@ -43,6 +42,7 @@ Logger::Logger()
         }
     }
 }
+
 void Logger::rustLogCallback(const char* message) {
     std::string msg = message;
     if (!msg.empty() && msg.back() == '\n') {
@@ -51,8 +51,7 @@ void Logger::rustLogCallback(const char* message) {
     log(NK_INFO, msg.c_str());
 }
 
-
-void Logger::log(LogCategory category, const char *format, ...) {
+void Logger::log(LogCategory category, const char* format, ...) {
     va_list args;
     va_start(args, format);
 

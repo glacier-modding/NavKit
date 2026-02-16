@@ -21,8 +21,7 @@ enum HitTestType {
 
 class HitTestResult {
 public:
-    HitTestResult(HitTestType type, int selectedIndex): type(type), selectedIndex(selectedIndex) {
-    }
+    HitTestResult(HitTestType type, int selectedIndex) : type(type), selectedIndex(selectedIndex) {}
 
     HitTestType type;
     int selectedIndex;
@@ -38,17 +37,17 @@ public:
 
     void initShaders();
 
-    static Renderer &getInstance() {
+    static Renderer& getInstance() {
         static Renderer instance;
         return instance;
     }
 
     void initFrameBuffer(int width, int height);
 
-    void drawText(const std::string &text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0);
+    void drawText(const std::string& text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0) const;
 
-    void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
-                 Vec3 outlineColor, float alpha);
+    static void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
+                        Vec3 outlineColor, float alpha);
 
     bool initWindowAndRenderer();
 
@@ -89,7 +88,7 @@ public:
     GLint viewport[4];
     Shader shader;
 
-    SDL_Window *window;
+    SDL_Window* window;
     glm::mat4 projection;
     glm::mat4 view;
     static HWND hwnd;

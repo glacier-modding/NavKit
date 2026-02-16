@@ -21,9 +21,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 DWORD WINAPI UpdaterThread(LPVOID lpParam);
 
-void LogMessage(const std::string &msg);
+void LogMessage(const std::string& msg);
 
-std::string ConvertWideToUTF8(const wchar_t *wstr);
+std::string ConvertWideToUTF8(const wchar_t* wstr);
 
 struct UpdaterThreadArgs {
     std::filesystem::path msi_path;
@@ -35,13 +35,15 @@ struct UpdaterThreadArgs {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
     int argc;
-    LPWSTR *argvW = CommandLineToArgvW(GetCommandLineW(), &argc);
+    LPWSTR* argvW = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argvW == nullptr || argc < 5) {
         MessageBoxW(
             nullptr,
             L"Updater: Invalid arguments.\n\nUsage: updater.exe <path_to_msi> <parent_process_id> <new_version> <install_dir>",
             L"Argument Error", MB_OK | MB_ICONERROR);
-        if (argvW) LocalFree(argvW);
+        if (argvW) {
+            LocalFree(argvW);
+        }
         return 1;
     }
 
@@ -52,7 +54,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         args->new_version_str = ConvertWideToUTF8(argvW[3]);
         args->install_dir = argvW[4];
         args->updater_exe_path = argvW[0];
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         std::string error_msg_str = "Updater: Failed to parse arguments. Error: ";
         error_msg_str += e.what();
         const std::wstring error_msg_wstr(error_msg_str.begin(), error_msg_str.end());
@@ -77,7 +79,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         CW_USEDEFAULT, CW_USEDEFAULT, 500, 300,
         nullptr, nullptr, hInstance, nullptr);
 
-    if (g_hMainWnd == nullptr) return 0;
+    if (g_hMainWnd == nullptr) {
+        return 0;
+    }
 
     const HANDLE hThread = CreateThread(nullptr, 0, UpdaterThread, args.release(), 0, nullptr);
     if (hThread == nullptr) {
@@ -99,56 +103,58 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-        case WM_CREATE: {
-            g_hEditLog = CreateWindowExW(
-                WS_EX_CLIENTEDGE, L"EDIT", L"",
-                WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-                10, 10, 465, 200, hwnd, reinterpret_cast<HMENU>(IDC_EDIT_LOG), GetModuleHandle(nullptr), nullptr);
+    case WM_CREATE: {
+        g_hEditLog = CreateWindowExW(
+            WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+            10, 10, 465, 200, hwnd, reinterpret_cast<HMENU>(IDC_EDIT_LOG), GetModuleHandle(nullptr), nullptr);
 
-            g_hCloseButton = CreateWindowExW(
-                0, L"BUTTON", L"Close",
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_DISABLED,
-                385, 220, 90, 25, hwnd, reinterpret_cast<HMENU>(IDC_CLOSE_BUTTON), GetModuleHandle(nullptr), nullptr);
+        g_hCloseButton = CreateWindowExW(
+            0, L"BUTTON", L"Close",
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_DISABLED,
+            385, 220, 90, 25, hwnd, reinterpret_cast<HMENU>(IDC_CLOSE_BUTTON), GetModuleHandle(nullptr), nullptr);
 
-            auto hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-            SendMessage(g_hEditLog, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-            SendMessage(g_hCloseButton, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-            return 0;
+        auto hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+        SendMessage(g_hEditLog, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+        SendMessage(g_hCloseButton, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+        return 0;
+    }
+    case WM_APP_LOG_MESSAGE: {
+        char* msg = reinterpret_cast<char*>(lParam);
+        const int len = GetWindowTextLength(g_hEditLog);
+        SendMessage(g_hEditLog, EM_SETSEL, len, len);
+        SendMessageA(g_hEditLog, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>(msg));
+        SendMessageA(g_hEditLog, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>("\r\n"));
+        delete[] msg;
+        return 0;
+    }
+    case WM_APP_UPDATE_COMPLETE: {
+        if (wParam == 1) {
+            DestroyWindow(hwnd);
+        } else {
+            EnableWindow(g_hCloseButton, TRUE);
+            SetFocus(g_hCloseButton);
         }
-        case WM_APP_LOG_MESSAGE: {
-            char *msg = reinterpret_cast<char *>(lParam);
-            const int len = GetWindowTextLength(g_hEditLog);
-            SendMessage(g_hEditLog, EM_SETSEL, len, len);
-            SendMessageA(g_hEditLog, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>(msg));
-            SendMessageA(g_hEditLog, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>("\r\n"));
-            delete[] msg;
-            return 0;
+        return 0;
+    }
+    case WM_COMMAND: {
+        if (LOWORD(wParam) == IDC_CLOSE_BUTTON) {
+            DestroyWindow(hwnd);
         }
-        case WM_APP_UPDATE_COMPLETE: {
-            if (wParam == 1) {
-                DestroyWindow(hwnd);
-            } else {
-                EnableWindow(g_hCloseButton, TRUE);
-                SetFocus(g_hCloseButton);
-            }
-            return 0;
-        }
-        case WM_COMMAND: {
-            if (LOWORD(wParam) == IDC_CLOSE_BUTTON) {
-                DestroyWindow(hwnd);
-            }
-            return 0;
-        }
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-        default: ;
+        return 0;
+    }
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    default: ;
     }
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
-std::string ConvertWideToUTF8(const wchar_t *wstr) {
-    if (wstr == nullptr || wstr[0] == L'\0') return std::string();
+std::string ConvertWideToUTF8(const wchar_t* wstr) {
+    if (wstr == nullptr || wstr[0] == L'\0') {
+        return std::string();
+    }
     const int wstr_len = static_cast<int>(wcslen(wstr));
     const int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, wstr_len, nullptr, 0, nullptr, nullptr);
     std::string strTo(size_needed, 0);
@@ -156,7 +162,7 @@ std::string ConvertWideToUTF8(const wchar_t *wstr) {
     return strTo;
 }
 
-void LogMessage(const std::string &msg) {
+void LogMessage(const std::string& msg) {
     const size_t len = msg.length() + 1;
     auto msg_copy = new char[len];
     strcpy_s(msg_copy, len, msg.c_str());
@@ -164,7 +170,7 @@ void LogMessage(const std::string &msg) {
 }
 
 DWORD WINAPI UpdaterThread(LPVOID lpParam) {
-    std::unique_ptr<UpdaterThreadArgs> args(static_cast<UpdaterThreadArgs *>(lpParam));
+    std::unique_ptr<UpdaterThreadArgs> args(static_cast<UpdaterThreadArgs*>(lpParam));
 
     if (const HANDLE parent_handle = OpenProcess(SYNCHRONIZE, FALSE, args->parent_pid)) {
         LogMessage("Updater: Waiting for NavKit to close (PID: " + std::to_string(args->parent_pid) + ")...");
@@ -177,13 +183,13 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
             "). Continuing anyway.");
     }
 
-    const std::filesystem::path &install_dir = args->install_dir;
+    const std::filesystem::path& install_dir = args->install_dir;
     LogMessage("Updater: Target installation directory: " + install_dir.string());
 
     const std::filesystem::path log_path = install_dir / ("NavKit_Update_MSI_Log_" + args->new_version_str + ".txt");
 
     std::string msi_args = "/i \"" + args->msi_path.string() + "\" /passive /norestart /L*v \"" + log_path.string() +
-                           "\" MSIRESTARTMANAGERCONTROL=Disable";
+        "\" MSIRESTARTMANAGERCONTROL=Disable";
     std::string command_line_str = "msiexec.exe " + msi_args;
     std::vector command_line_buf(command_line_str.begin(), command_line_str.end());
     command_line_buf.push_back('\0');
@@ -215,7 +221,7 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
             std::filesystem::copy_file(temp_settings_path, old_settings_destination_path,
                                        std::filesystem::copy_options::overwrite_existing);
             LogMessage("Updater: Copied old settings to " + old_settings_destination_path.string());
-        } catch (const std::exception &e) {
+        } catch (const std::exception& e) {
             LogMessage("Updater: Failed to stage old settings for merging. Error: " + std::string(e.what()));
         }
     } else {
@@ -248,7 +254,7 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
             std::string temp_updater_path_str = args->updater_exe_path.string();
             std::string temp_dir_path_str = args->updater_exe_path.parent_path().string();
             std::string self_delete_cmd = "cmd.exe /C start /B \"\" cmd /C \"ping 127.0.0.1 -n 4 > nul && del /Q /F \""
-                                          + temp_updater_path_str + "\" && rmdir \"" + temp_dir_path_str + "\"\"";
+                + temp_updater_path_str + "\" && rmdir \"" + temp_dir_path_str + "\"\"";
 
             STARTUPINFOA si_del = {sizeof(STARTUPINFOA)};
             PROCESS_INFORMATION pi_del = {};

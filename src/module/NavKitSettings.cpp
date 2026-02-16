@@ -17,112 +17,111 @@
 HWND NavKitSettings::hSettingsDialog = nullptr;
 #pragma comment(lib, "comctl32.lib")
 
-
-void NavKitSettings::resetDefaults(DialogSettings &settings) {
+void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.backgroundColor = 0.16f;
     settings.hitmanFolder = R"(C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)";
     settings.outputFolder = R"(D:\workspace\output)";
     settings.blenderPath = R"(C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)";
 }
 
-void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings &tempSettings) {
+void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings& tempSettings) {
     const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
-    SendMessage(hSlider, TBM_SETRANGE, (WPARAM) TRUE, (LPARAM) MAKELONG(0, 100)); // Range 0-100
-    SendMessage(hSlider, TBM_SETPOS, (WPARAM) TRUE, (LPARAM) (tempSettings.backgroundColor * 100.0f));
+    SendMessage(hSlider, TBM_SETRANGE, TRUE, MAKELONG(0, 100)); // Range 0-100
+    SendMessage(hSlider, TBM_SETPOS, TRUE, tempSettings.backgroundColor * 100.0f);
     SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings.hitmanFolder.c_str());
     SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings.outputFolder.c_str());
     SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings.blenderPath.c_str());
 }
 
-INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    auto navKitSettings = reinterpret_cast<NavKitSettings *>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
+INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+    auto navKitSettings = reinterpret_cast<NavKitSettings*>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
 
     switch (message) {
-        case WM_INITDIALOG: {
-            navKitSettings = reinterpret_cast<NavKitSettings *>(lParam);
-            SetWindowLongPtr(hDlg, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(navKitSettings));
+    case WM_INITDIALOG: {
+        navKitSettings = reinterpret_cast<NavKitSettings*>(lParam);
+        SetWindowLongPtr(hDlg, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(navKitSettings));
 
-            auto tempSettings = new DialogSettings();
-            tempSettings->backgroundColor = navKitSettings->backgroundColor;
-            tempSettings->hitmanFolder = navKitSettings->hitmanFolder;
-            tempSettings->outputFolder = navKitSettings->outputFolder;
-            tempSettings->blenderPath = navKitSettings->blenderPath;
-            SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(tempSettings));
+        auto tempSettings = new DialogSettings();
+        tempSettings->backgroundColor = navKitSettings->backgroundColor;
+        tempSettings->hitmanFolder = navKitSettings->hitmanFolder;
+        tempSettings->outputFolder = navKitSettings->outputFolder;
+        tempSettings->blenderPath = navKitSettings->blenderPath;
+        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(tempSettings));
 
+        setDialogInputs(hDlg, *tempSettings);
+
+        return TRUE;
+    }
+
+    case WM_HSCROLL: {
+        if (const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER))) {
+            const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
+            tempSettings->backgroundColor = static_cast<float>(SendMessage(hSlider, TBM_GETPOS, 0, 0)) / 100.0f;
+        }
+        return TRUE;
+    }
+
+    case WM_COMMAND: {
+        const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER));
+
+        if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_BROWSE_HITMAN) {
+            if (const char* folderName =
+                SceneExtract::openHitmanFolderDialog(navKitSettings->hitmanFolder.data())) {
+                tempSettings->hitmanFolder = folderName;
+                SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings->hitmanFolder.c_str());
+            }
+        } else if (commandId == IDC_BUTTON_BROWSE_OUTPUT) {
+            if (const char* folderName =
+                SceneExtract::openOutputFolderDialog(navKitSettings->outputFolder.data())) {
+                tempSettings->outputFolder = folderName;
+                SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
+            }
+        } else if (commandId == IDC_BUTTON_BROWSE_BLENDER) {
+            if (const char* blenderFileName = Obj::openSetBlenderFileDialog()) {
+                tempSettings->blenderPath = blenderFileName;
+                SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings->blenderPath.c_str());
+            }
+        } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
+            navKitSettings->resetDefaults(*tempSettings);
             setDialogInputs(hDlg, *tempSettings);
+        } else if (commandId == IDOK || commandId == IDC_APPLY) {
+            if (tempSettings) {
+                navKitSettings->setHitmanFolder(tempSettings->hitmanFolder);
+                navKitSettings->setOutputFolder(tempSettings->outputFolder);
+                navKitSettings->setBlenderFile(tempSettings->blenderPath);
+                navKitSettings->backgroundColor = tempSettings->backgroundColor;
 
-            return TRUE;
-        }
-
-        case WM_HSCROLL: {
-            if (const auto tempSettings = reinterpret_cast<DialogSettings *>(GetWindowLongPtr(hDlg, DWLP_USER))) {
-                const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
-                tempSettings->backgroundColor = static_cast<float>(SendMessage(hSlider, TBM_GETPOS, 0, 0)) / 100.0f;
+                PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+                persistedSettings.setValue("NavKit", "hitman", tempSettings->hitmanFolder);
+                persistedSettings.setValue("NavKit", "output", tempSettings->outputFolder);
+                persistedSettings.setValue("NavKit", "blender", tempSettings->blenderPath);
+                persistedSettings.setValue("NavKit", "backgroundColor",
+                                           std::to_string(navKitSettings->backgroundColor));
+                persistedSettings.save();
             }
-            return TRUE;
-        }
-
-        case WM_COMMAND: {
-            const auto tempSettings = reinterpret_cast<DialogSettings *>(GetWindowLongPtr(hDlg, DWLP_USER));
-
-            if (UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_BROWSE_HITMAN) {
-                if (const char *folderName =
-                        SceneExtract::openHitmanFolderDialog(navKitSettings->hitmanFolder.data())) {
-                    tempSettings->hitmanFolder = folderName;
-                    SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings->hitmanFolder.c_str());
-                }
-            } else if (commandId == IDC_BUTTON_BROWSE_OUTPUT) {
-                if (const char *folderName =
-                        SceneExtract::openOutputFolderDialog(navKitSettings->outputFolder.data())) {
-                    tempSettings->outputFolder = folderName;
-                    SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
-                }
-            } else if (commandId == IDC_BUTTON_BROWSE_BLENDER) {
-                if (const char *blenderFileName = Obj::openSetBlenderFileDialog()) {
-                    tempSettings->blenderPath = blenderFileName;
-                    SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings->blenderPath.c_str());
-                }
-            } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
-                navKitSettings->resetDefaults(*tempSettings);
-                setDialogInputs(hDlg, *tempSettings);
-            } else if (commandId == IDOK || commandId == IDC_APPLY) {
-                if (tempSettings) {
-                    navKitSettings->setHitmanFolder(tempSettings->hitmanFolder);
-                    navKitSettings->setOutputFolder(tempSettings->outputFolder);
-                    navKitSettings->setBlenderFile(tempSettings->blenderPath);
-                    navKitSettings->backgroundColor = tempSettings->backgroundColor;
-
-                    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
-                    persistedSettings.setValue("NavKit", "hitman", tempSettings->hitmanFolder);
-                    persistedSettings.setValue("NavKit", "output", tempSettings->outputFolder);
-                    persistedSettings.setValue("NavKit", "blender", tempSettings->blenderPath);
-                    persistedSettings.setValue("NavKit", "backgroundColor",
-                                               std::to_string(navKitSettings->backgroundColor));
-                    persistedSettings.save();
-                }
-                if (commandId == IDOK) {
-                    DestroyWindow(hDlg);
-                }
-                return TRUE;
-            } else if (commandId == IDCANCEL) {
+            if (commandId == IDOK) {
                 DestroyWindow(hDlg);
-                return TRUE;
             }
-            break;
-        }
-
-        case WM_CLOSE: {
+            return TRUE;
+        } else if (commandId == IDCANCEL) {
             DestroyWindow(hDlg);
             return TRUE;
         }
+        break;
+    }
 
-        case WM_DESTROY: {
-            const auto tempSettings = reinterpret_cast<DialogSettings *>(GetWindowLongPtr(hDlg, DWLP_USER));
-            delete tempSettings;
-            hSettingsDialog = nullptr;
-            return TRUE;
-        }
-        default: ;
+    case WM_CLOSE: {
+        DestroyWindow(hDlg);
+        return TRUE;
+    }
+
+    case WM_DESTROY: {
+        const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER));
+        delete tempSettings;
+        hSettingsDialog = nullptr;
+        return TRUE;
+    }
+    default: ;
     }
     return FALSE;
 }
@@ -131,8 +130,7 @@ NavKitSettings::NavKitSettings() : backgroundColor(0.30f),
                                    hitmanSet(false),
                                    outputSet(false),
                                    blenderSet(false),
-                                   blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")") {
-}
+                                   blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")") {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
     if (hSettingsDialog) {
@@ -158,29 +156,29 @@ void NavKitSettings::showNavKitSettingsDialog() {
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hSettingsDialog, &dialogRect);
 
-        int parentWidth = parentRect.right - parentRect.left;
-        int parentHeight = parentRect.bottom - parentRect.top;
-        int dialogWidth = dialogRect.right - dialogRect.left;
-        int dialogHeight = dialogRect.bottom - dialogRect.top;
+        const int parentWidth = parentRect.right - parentRect.left;
+        const int parentHeight = parentRect.bottom - parentRect.top;
+        const int dialogWidth = dialogRect.right - dialogRect.left;
+        const int dialogHeight = dialogRect.bottom - dialogRect.top;
 
-        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
 
-        SetWindowPos(hSettingsDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hSettingsDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
         ShowWindow(hSettingsDialog, SW_SHOW);
     }
 }
 
 void NavKitSettings::loadSettings() {
-    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     setHitmanFolder(persistedSettings.getValue("NavKit", "hitman", "default"));
     setOutputFolder(persistedSettings.getValue("NavKit", "output", "default"));
     setBlenderFile(persistedSettings.getValue("NavKit", "blender", "default"));
     backgroundColor = static_cast<float>(atof(persistedSettings.getValue("NavKit", "backgroundColor", "0.16f")));
 }
 
-void NavKitSettings::setHitmanFolder(const std::string &folderName) {
+void NavKitSettings::setHitmanFolder(const std::string& folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
         bool shouldReInitExtractionData = false;
@@ -197,7 +195,7 @@ void NavKitSettings::setHitmanFolder(const std::string &folderName) {
     }
 }
 
-void NavKitSettings::setOutputFolder(const std::string &folderName) {
+void NavKitSettings::setOutputFolder(const std::string& folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         outputSet = true;
         outputFolder = folderName;
@@ -207,7 +205,7 @@ void NavKitSettings::setOutputFolder(const std::string &folderName) {
     }
 }
 
-void NavKitSettings::setBlenderFile(const std::string &fileName) {
+void NavKitSettings::setBlenderFile(const std::string& fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         blenderSet = true;
         blenderPath = fileName;

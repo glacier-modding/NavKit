@@ -28,31 +28,31 @@ class RecastAdapter {
     RecastAdapter();
 
 public:
-    static RecastAdapter &getInstance() {
+    static RecastAdapter& getInstance() {
         static RecastAdapter instance;
         return instance;
     }
 
-    static RecastAdapter &getAirgInstance() {
+    static RecastAdapter& getAirgInstance() {
         static RecastAdapter airgInstance;
         return airgInstance;
     }
 
-    void log(int category, const std::string &message) const;
+    void log(int category, const std::string& message) const;
 
     void showRecastDialog();
 
     void drawInputGeom() const;
 
-    [[nodiscard]] bool loadInputGeom(const std::string &fileName) const;
+    [[nodiscard]] bool loadInputGeom(const std::string& fileName) const;
 
-    void setTileSettings(const float *bBoxMin, const float *bBoxMax) const;
+    void setTileSettings(const float* bBoxMin, const float* bBoxMax) const;
 
-    void setMeshBBox(const float *bBoxMin, const float *bBoxMax) const;
+    void setMeshBBox(const float* bBoxMin, const float* bBoxMax) const;
 
-    [[nodiscard]] const float *getBBoxMin() const;
+    [[nodiscard]] const float* getBBoxMin() const;
 
-    [[nodiscard]] const float *getBBoxMax() const;
+    [[nodiscard]] const float* getBBoxMax() const;
 
     [[nodiscard]] std::pair<int, int> getGridSize() const;
 
@@ -74,16 +74,16 @@ public:
 
     dtPolyRef getPoly(int tileIndex, int polyIndex) const;
 
-    dtStatus findNearestPoly(const float *recastPos, dtPolyRef *polyRef, float *nearestPt,
+    dtStatus findNearestPoly(const float* recastPos, dtPolyRef* polyRef, float* nearestPt,
                              bool includeExcludedAreas) const;
 
     void findPfSeedPointAreas();
 
-    void excludeNonReachableAreas();
+    void excludeNonReachableAreas() const;
 
-    void save(const std::string &data) const;
+    void save(const std::string& data) const;
 
-    [[nodiscard]] std::mutex &getLogMutex() const;
+    [[nodiscard]] std::mutex& getLogMutex() const;
 
     [[nodiscard]] int getVertCount() const;
 
@@ -91,19 +91,19 @@ public:
 
     [[nodiscard]] int getLogCount() const;
 
-    std::deque<std::string> &getLogBuffer() const;
+    std::deque<std::string>& getLogBuffer() const;
 
-    void addConvexVolume(Json::PfBox &pfBox) const;
+    void addConvexVolume(Json::PfBox& pfBox) const;
 
-    [[nodiscard]] const ConvexVolume *getConvexVolumes() const;
+    [[nodiscard]] const ConvexVolume* getConvexVolumes() const;
 
     int getConvexVolumeCount() const;
 
     void clearConvexVolumes() const;
 
-    dtPolyRef getPolyRefForLink(const dtLink &link) const;
+    dtPolyRef getPolyRefForLink(const dtLink& link) const;
 
-    bool PFLineBlocked(const Vec3 &recastStart, const Vec3 &recastEnd) const;
+    bool pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd) const;
 
     dtPolyRef getAdjacentPoly(dtPolyRef poly, int edgeIndex) const;
 
@@ -123,21 +123,21 @@ public:
 
     Vec3 calculateCentroid(dtPolyRef polyRef) const;
 
-    const dtNavMesh *getNavMesh() const;
+    const dtNavMesh* getNavMesh() const;
 
     std::vector<dtPolyRef> getClosestReachablePolys(
-        dtNavMeshQuery *navQuery, Vec3 navpowerPos, dtPolyRef navpowerStart, int maxPolys) const;
+        dtNavMeshQuery* navQuery, Vec3 navpowerPos, dtPolyRef navpowerStart, int maxPolys) const;
 
     std::vector<dtPolyRef> getClosestPolys(
-        dtNavMeshQuery *navQuery, Vec3 navPowerPos, int maxPolys) const;
+        dtNavMeshQuery* navQuery, Vec3 navPowerPos, int maxPolys) const;
 
-    Sample_TileMesh *sample;
-    BuildContext *buildContext;
-    InputGeom *inputGeom;
-    DebugDrawGL *debugDraw;
+    Sample_TileMesh* sample;
+    BuildContext* buildContext;
+    InputGeom* inputGeom;
+    DebugDrawGL* debugDraw;
 
-    dtQueryFilter *filter;
-    dtQueryFilter *filterWithExcluded;
+    dtQueryFilter* filter;
+    dtQueryFilter* filterWithExcluded;
     bool markerPositionSet;
     bool processHitTestShift;
     float markerPosition[3]{};

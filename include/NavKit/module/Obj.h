@@ -33,7 +33,7 @@ class Obj {
     static void updateObjDialogControls(HWND hDlg);
 
 public:
-    static Obj &getInstance() {
+    static Obj& getInstance() {
         static Obj instance;
         return instance;
     }
@@ -61,7 +61,7 @@ public:
     bool errorExtracting;
     bool extractingResources;
     bool doneExtractingAlocsOrPrims;
-    std::map<std::string, std::pair<int, int> > objectTriangleRanges;
+    std::map<std::string, std::pair<int, int>> objectTriangleRanges;
     bool doObjHitTest;
     MeshType meshTypeForBuild;
     SceneMeshBuildType sceneMeshBuildType;
@@ -72,7 +72,7 @@ public:
     static HWND hObjDialog;
     Model model;
 
-    static char *openSetBlenderFileDialog();
+    static char* openSetBlenderFileDialog();
 
     void loadSettings();
 
@@ -80,9 +80,9 @@ public:
 
     void handleBuildBlendAndObjFromSceneClicked();
 
-    static void copyFile(const std::string &from, const std::string &to, const std::string& filetype);
+    static void copyFile(const std::string& from, const std::string& to, const std::string& filetype);
 
-    void saveObjMesh(char *objToCopy, char *newFileName);
+    void saveObjMesh(char* objToCopy, char* newFileName);
 
     void saveBlendMesh(std::string objToCopy, std::string newFileName);
 
@@ -94,21 +94,22 @@ public:
 
     void renderObj() const;
 
-    void renderObjUsingRecast();
+    static void renderObjUsingRecast();
 
-    static char *openLoadObjFileDialog();
+    static char* openLoadObjFileDialog();
 
-    static char *openSaveObjFileDialog();
+    static char* openSaveObjFileDialog();
 
     static char* openSaveBlendFileDialog();
 
-    void setLastLoadFileName(const char *fileName);
+    void setLastLoadFileName(const char* fileName);
 
-    void setLastSaveFileName(const char *fileName);
+    void setLastSaveFileName(const char* fileName);
 
     void handleOpenObjClicked();
 
     void handleSaveObjClicked();
+
     void handleSaveBlendClicked();
 
     [[nodiscard]] bool canLoad() const;
@@ -116,6 +117,7 @@ public:
     static bool canBuildObjFromNavp();
 
     [[nodiscard]] bool canBuildObjFromScene() const;
+
     bool canSaveBlend() const;
 
     [[nodiscard]] bool canBuildBlendFromScene() const;

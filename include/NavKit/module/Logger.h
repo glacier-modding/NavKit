@@ -12,18 +12,19 @@ enum LogCategory {
 class Logger {
     explicit Logger();
 
-    std::unique_ptr<rsj::ConcurrentQueue<std::pair<LogCategory, std::string> > > logQueue;
+    std::unique_ptr<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>> logQueue;
 
     bool debugLogsEnabled;
 
 public:
-    static Logger &getInstance() {
+    static Logger& getInstance() {
         static Logger instance;
         return instance;
     }
 
-    static void log(LogCategory category, const char *format, ...);
+    static void log(LogCategory category, const char* format, ...);
 
     static void logRunner();
+
     static void rustLogCallback(const char* message);
 };

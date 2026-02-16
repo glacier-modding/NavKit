@@ -11,7 +11,8 @@ struct SortContext {
 class Model {
 public:
     std::vector<Mesh> meshes;
-    void initGL();
+
+    void initGl();
 
     static std::map<const Model*, SortContext> sortContexts;
 
@@ -19,5 +20,5 @@ public:
 
     void loadModelData(std::string const& path);
 
-    void draw(Shader& shader, const glm::mat4& viewProj) const;
+    void draw(const Shader& shader, const glm::mat4& viewProj) const;
 };

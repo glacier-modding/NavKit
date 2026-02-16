@@ -9,7 +9,7 @@ public:
 
     ~CommandRunner();
 
-    static CommandRunner &getInstance() {
+    static CommandRunner& getInstance() {
         static CommandRunner instance;
         return instance;
     }
@@ -21,5 +21,5 @@ public:
     int commandsRun;
 
 private:
-    std::map<int, std::vector<HANDLE> > handles;
+    std::map<int, std::vector<HANDLE>> handles;
 };

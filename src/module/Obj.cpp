@@ -54,15 +54,16 @@ Obj::Obj() : loadObjName("Load Obj"),
              primLods{true, true, true, true, true, true, true, true},
              blendFileBuilt(false),
              extractTextures(false),
-             applyTextures(false) {
-}
+             applyTextures(false) {}
 
 HWND Obj::hObjDialog = nullptr;
 
 GLuint Obj::tileTextureId = 0;
 
 void Obj::loadTileTexture() {
-    if (tileTextureId != 0) return;
+    if (tileTextureId != 0) {
+        return;
+    }
 
     if (SDL_Surface* loadedSurface = SDL_LoadBMP("tile.bmp")) {
         SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(loadedSurface, SDL_PIXELFORMAT_RGBA32, 0);
@@ -73,7 +74,8 @@ void Obj::loadTileTexture() {
         } else {
             glGenTextures(1, &tileTextureId);
             glBindTexture(GL_TEXTURE_2D, tileTextureId);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, formattedSurface->w, formattedSurface->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, formattedSurface->pixels);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, formattedSurface->w, formattedSurface->h, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, formattedSurface->pixels);
             glGenerateMipmap(GL_TEXTURE_2D);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -86,15 +88,15 @@ void Obj::loadTileTexture() {
     }
 }
 
-void Obj::updateObjDialogControls(HWND hDlg) {
-    Obj &obj = getInstance();
+void Obj::updateObjDialogControls(const HWND hDlg) {
+    const Obj& obj = getInstance();
     CheckRadioButton(hDlg, IDC_RADIO_MESH_TYPE_ALOC, IDC_RADIO_MESH_TYPE_PRIM,
                      obj.meshTypeForBuild == ALOC ? IDC_RADIO_MESH_TYPE_ALOC : IDC_RADIO_MESH_TYPE_PRIM);
 
     for (int i = 0; i < 8; ++i) {
         CheckDlgButton(hDlg, IDC_CHECK_PRIM_LOD_1 + i, obj.primLods[i] ? BST_CHECKED : BST_UNCHECKED);
     }
-    bool isPrim = obj.meshTypeForBuild == PRIM;
+    const bool isPrim = obj.meshTypeForBuild == PRIM;
     for (int i = 0; i < 8; ++i) {
         EnableWindow(GetDlgItem(hDlg, IDC_CHECK_PRIM_LOD_1 + i), isPrim);
     }
@@ -103,132 +105,137 @@ void Obj::updateObjDialogControls(HWND hDlg) {
 
     CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX, obj.filterToIncludeBox ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS, obj.glacier2ObjDebugLogsEnabled ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS,
+                   obj.glacier2ObjDebugLogsEnabled ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES, obj.extractTextures ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
 }
 
-INT_PTR CALLBACK Obj::ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    Obj &obj = getInstance();
+INT_PTR CALLBACK Obj::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
+    Obj& obj = getInstance();
     switch (message) {
-        case WM_INITDIALOG: {
+    case WM_INITDIALOG: {
+        updateObjDialogControls(hDlg);
+        return TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_RADIO_MESH_TYPE_ALOC:
+        case IDC_RADIO_MESH_TYPE_PRIM: {
+            obj.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Mesh type for build set to %s.",
+                        obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
-        case WM_COMMAND:
-            switch (LOWORD(wParam)) {
-                case IDC_RADIO_MESH_TYPE_ALOC:
-                case IDC_RADIO_MESH_TYPE_PRIM: {
-                    obj.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
-                    obj.saveObjSettings();
-                    Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                                obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
-                    updateObjDialogControls(hDlg);
-                    return TRUE;
-                }
-                case IDC_RADIO_BUILD_TYPE_COPY:
-                case IDC_RADIO_BUILD_TYPE_INSTANCE: {
-                        obj.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                                    obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
-                        updateObjDialogControls(hDlg);
-                        return TRUE;
-                }
+        case IDC_RADIO_BUILD_TYPE_COPY:
+        case IDC_RADIO_BUILD_TYPE_INSTANCE: {
+            obj.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
+                        obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
 
-                case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
-                        obj.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Filter to include box set to %s.", obj.filterToIncludeBox ? "true" : "false");
-                        updateObjDialogControls(hDlg);
-                        return TRUE;
-                    }
+        case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
+            obj.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Filter to include box set to %s.", obj.filterToIncludeBox ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
 
-                case IDC_CHECK_SKIP_RPKG_EXTRACT: {
-                        obj.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.", obj.skipExtractingAlocsOrPrims ? "true" : "false");
-                        updateObjDialogControls(hDlg);
-                        return TRUE;
-                    }
-                case IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS: {
-                        obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS) ? COPY : INSTANCE;
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.", obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
-                        updateObjDialogControls(hDlg);
-                        return (INT_PTR) TRUE;
-                    }
-                case IDC_CHECK_EXTRACT_TEXTURE_FILES: {
-                        obj.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Extract textures set to %s.", obj.extractTextures ? "true" : "false");
-                        updateObjDialogControls(hDlg);
-                        return (INT_PTR) TRUE;
-                    }
-                case IDC_CHECK_APPLY_TEXTURES: {
-                        obj.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Apply textures set to %s.", obj.applyTextures ? "true" : "false");
-                        updateObjDialogControls(hDlg);
-                        return (INT_PTR) TRUE;
-                    }
+        case IDC_CHECK_SKIP_RPKG_EXTRACT: {
+            obj.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.",
+                        obj.skipExtractingAlocsOrPrims ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
+        case IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS: {
+            obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS)
+                                                  ? COPY
+                                                  : INSTANCE;
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.",
+                        obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
+        case IDC_CHECK_EXTRACT_TEXTURE_FILES: {
+            obj.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Extract textures set to %s.", obj.extractTextures ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
+        case IDC_CHECK_APPLY_TEXTURES: {
+            obj.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
+            obj.saveObjSettings();
+            Logger::log(NK_INFO, "Apply textures set to %s.", obj.applyTextures ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
 
-                case IDC_BUTTON_RESET_DEFAULTS: {
-                    obj.resetDefaults();
-                    updateObjDialogControls(hDlg);
-                    Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
-                    Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                    obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
-                    Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                                obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
-                    obj.saveObjSettings();
-                    break;
-                    }
-                case WM_CLOSE:
-                    DestroyWindow(hDlg);
-                    return TRUE;
-
-                default:
-                    if (LOWORD(wParam) >= IDC_CHECK_PRIM_LOD_1 && LOWORD(wParam) <= IDC_CHECK_PRIM_LOD_8) {
-                        int index = LOWORD(wParam) - IDC_CHECK_PRIM_LOD_1;
-                        bool isChecked = IsDlgButtonChecked(hDlg, LOWORD(wParam)) == BST_CHECKED;
-                        obj.primLods[index] = isChecked;
-                        obj.saveObjSettings();
-                        Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
-                    }
-                    break;
-            }
+        case IDC_BUTTON_RESET_DEFAULTS: {
+            obj.resetDefaults();
+            updateObjDialogControls(hDlg);
+            Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+            Logger::log(NK_INFO, "Mesh type for build set to %s.",
+                        obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+            Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
+                        obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+            obj.saveObjSettings();
             break;
-        case WM_CLOSE: {
+        }
+        case WM_CLOSE:
             DestroyWindow(hDlg);
             return TRUE;
-        }
 
-        case WM_DESTROY: {
-            hObjDialog = nullptr;
-            return TRUE;
+        default:
+            if (LOWORD(wParam) >= IDC_CHECK_PRIM_LOD_1 && LOWORD(wParam) <= IDC_CHECK_PRIM_LOD_8) {
+                const int index = LOWORD(wParam) - IDC_CHECK_PRIM_LOD_1;
+                const bool isChecked = IsDlgButtonChecked(hDlg, LOWORD(wParam)) == BST_CHECKED;
+                obj.primLods[index] = isChecked;
+                obj.saveObjSettings();
+                Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+            }
+            break;
         }
         break;
-        default: ;
+    case WM_CLOSE: {
+        DestroyWindow(hDlg);
+        return TRUE;
     }
-    return (INT_PTR) FALSE;
+
+    case WM_DESTROY: {
+        hObjDialog = nullptr;
+        return TRUE;
+    }
+    break;
+    default: ;
+    }
+    return FALSE;
 }
 
-void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    std::string fileName = navKitSettings.outputFolder + "\\outputNavp.obj";
-    Gui &gui = Gui::getInstance();
+void Obj::buildObjFromNavp(const bool alsoLoadIntoUi) {
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const std::string fileName = navKitSettings.outputFolder + "\\outputNavp.obj";
+    Gui& gui = Gui::getInstance();
     gui.showLog = true;
 
     Logger::log(NK_INFO, ("Building obj from loaded navp. Saving to: " + fileName).c_str());
-    Navp &navp = Navp::getInstance();
+    const Navp& navp = Navp::getInstance();
     std::vector<Vec3> vertices;
-    std::vector<std::vector<int> > faces;
+    std::vector<std::vector<int>> faces;
     std::map<Vec3, int> pointsToIndexMap;
     int pointCount = 1;
-    for (const auto &[m_area, m_edges]: navp.navMesh->m_areas) {
+    for (const auto& [m_area, m_edges] : navp.navMesh->m_areas) {
         std::vector<int> face;
-        for (auto edge: m_edges) {
+        for (const auto edge : m_edges) {
             auto point = edge->m_pos;
             if (!pointsToIndexMap.contains(point)) {
                 vertices.push_back(point);
@@ -240,12 +247,12 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
     }
     std::ofstream f(fileName);
     f.clear();
-    for (auto v: vertices) {
+    for (const auto v : vertices) {
         f << "v " << v.X << " " << v.Z << " " << -v.Y << "\n";
     }
-    for (auto face: faces) {
+    for (auto face : faces) {
         f << "f ";
-        for (auto vi: face) {
+        for (const auto vi : face) {
             f << vi;
             if (vi != face.back()) {
                 f << " ";
@@ -266,16 +273,16 @@ void Obj::buildObjFromNavp(bool alsoLoadIntoUi) {
 
 void Obj::buildObjFromScene() {
     const auto start = std::chrono::high_resolution_clock::now();
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    const Scene &scene = Scene::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const Scene& scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
     startedObjGeneration = true;
     std::string buildOutputFileType = blendFileAndObjBuild
                                           ? "both"
                                           : blendFileOnlyBuild
-                                                ? "blend"
-                                                : "obj";
+                                          ? "blend"
+                                          : "obj";
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
     command += navKitSettings.blenderPath;
@@ -298,15 +305,13 @@ void Obj::buildObjFromScene() {
 
     if (filterToIncludeBox) {
         command += " true";
-    } else
-    {
+    } else {
         command += " false";
     }
 
     if (applyTextures && meshTypeForBuild == PRIM) {
         command += " true";
-    } else
-    {
+    } else {
         command += " false";
     }
 
@@ -314,17 +319,17 @@ void Obj::buildObjFromScene() {
         command += " true";
     }
     blenderObjStarted = true;
-    Gui &gui = Gui::getInstance();
+    Gui& gui = Gui::getInstance();
     gui.showLog = true;
     generatedObjName = "output.obj";
 
     backgroundWorker.emplace(
         &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2Obj.log", [this,
             buildOutputFileType, start] {
-
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(), duration.count());
+            Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(),
+                        duration.count());
             blenderObjGenerationDone = true;
             if (blendFileAndObjBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
@@ -339,7 +344,7 @@ void Obj::extractResourcesAndStartObjBuild() {
     Menu::updateMenuState();
     const std::string meshFileType = meshTypeForBuild == ALOC ? "ALOC" : "PRIM";
     const std::string meshFileTypeLower = meshTypeForBuild == ALOC ? "aloc" : "prim";
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string alocOrPrimFolder = navKitSettings.outputFolder + "\\" + meshFileTypeLower;
 
     struct stat folderExists{};
@@ -352,8 +357,8 @@ void Obj::extractResourcesAndStartObjBuild() {
             }
         }
     }
-    Scene &scene = Scene::getInstance();
-    const std::string &fileNameString = scene.lastLoadSceneFile;
+    Scene& scene = Scene::getInstance();
+    const std::string& fileNameString = scene.lastLoadSceneFile;
     const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
     const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
     const std::string navJsonFilePath = fileNameString;
@@ -362,12 +367,12 @@ void Obj::extractResourcesAndStartObjBuild() {
     } else {
         Menu::updateMenuState();
         int result = extract_scene_mesh_resources(
-                               navJsonFilePath.c_str(),
-                               runtimeFolder.c_str(),
-                               Rpkg::partitionManager,
-                               alocOrPrimFolder.c_str(),
-                               meshFileType.c_str(),
-                               Logger::rustLogCallback);
+            navJsonFilePath.c_str(),
+            runtimeFolder.c_str(),
+            Rpkg::partitionManager,
+            alocOrPrimFolder.c_str(),
+            meshFileType.c_str(),
+            Logger::rustLogCallback);
         if (result) {
             Logger::log(NK_ERROR, "Error extracting %ss from Rpkg files.", meshFileType.c_str());
             errorExtracting = true;
@@ -397,8 +402,10 @@ void Obj::extractResourcesAndStartObjBuild() {
             }
             for (int i = 0; i < primMatis->length; i++) {
                 std::string matiHash = get_string_from_list(primMatis, i);
-                if (std::ranges::find(scene.primMatis[mesh.primHash].matiHashes, matiHash) != scene.primMatis[mesh.primHash].matiHashes.end()) {
-                    Logger::log(NK_DEBUG, "Duplicate mati hash %s found in references for %s.", matiHash.c_str(), mesh.primHash.c_str());
+                if (std::ranges::find(scene.primMatis[mesh.primHash].matiHashes, matiHash) != scene.primMatis[mesh.
+                    primHash].matiHashes.end()) {
+                    Logger::log(NK_DEBUG, "Duplicate mati hash %s found in references for %s.", matiHash.c_str(),
+                                mesh.primHash.c_str());
                     continue;
                 }
                 scene.primMatis[mesh.primHash].matiHashes.push_back(matiHash);
@@ -439,7 +446,7 @@ void Obj::extractResourcesAndStartObjBuild() {
         }
         Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
         if (!neededTextHashes.empty()) {
-            std::vector neededTextHashesVec (neededTextHashes.begin(), neededTextHashes.end());
+            std::vector neededTextHashesVec(neededTextHashes.begin(), neededTextHashes.end());
             int result = Rpkg::extractResourcesFromRpkgs(
                 neededTextHashesVec,
                 TEXT);
@@ -460,7 +467,7 @@ void Obj::extractResourcesAndStartObjBuild() {
     Menu::updateMenuState();
 }
 
-char *Obj::openSetBlenderFileDialog() {
+char* Obj::openSetBlenderFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
@@ -473,14 +480,14 @@ void Obj::finalizeExtractResources() {
         blenderObjGenerationDone = false;
         errorExtracting = false;
         extractingResources = false;
-        SceneExtract &sceneExtract = SceneExtract::getInstance();
+        SceneExtract& sceneExtract = SceneExtract::getInstance();
         sceneExtract.alsoBuildAll = false;
         sceneExtract.alsoBuildObj = false;
     }
     if (doneExtractingAlocsOrPrims) {
         doneExtractingAlocsOrPrims = false;
-        const Scene &scene = Scene::getInstance();
-        const std::string &fileNameString = scene.lastLoadSceneFile;
+        const Scene& scene = Scene::getInstance();
+        const std::string& fileNameString = scene.lastLoadSceneFile;
         extractingResources = false;
         buildObjFromScene();
         Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
@@ -494,8 +501,8 @@ bool Obj::shouldExtractTextures() const {
 }
 
 void Obj::finalizeObjBuild() {
-    SceneExtract &sceneExtract = SceneExtract::getInstance();
-    NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    SceneExtract& sceneExtract = SceneExtract::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     if (blenderObjGenerationDone) {
         startedObjGeneration = false;
         objToLoad = navKitSettings.outputFolder;
@@ -521,7 +528,7 @@ void Obj::finalizeObjBuild() {
     Menu::updateMenuState();
 }
 
-void Obj::copyFile(const std::string &from, const std::string &to, const std::string& filetype) {
+void Obj::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
     if (from == to) {
         Logger::log(NK_ERROR, "Cannot overwrite current %s file: %s", filetype.c_str(), from.c_str());
         return;
@@ -536,12 +543,12 @@ void Obj::copyFile(const std::string &from, const std::string &to, const std::st
         const auto end = std::chrono::high_resolution_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving %s in %lld ms.", filetype.c_str(), duration.count());
-    } catch (const std::filesystem::filesystem_error &e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
     }
 }
 
-void Obj::saveObjMesh(char *objToCopy, char *newFileName) {
+void Obj::saveObjMesh(char* objToCopy, char* newFileName) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Obj to file at ";
     msg += std::ctime(&start_time);
@@ -566,13 +573,13 @@ void Obj::loadObjMesh() {
 
     auto recastFuture = std::async(std::launch::async, [this]() {
         Logger::log(NK_INFO, "Loading Obj model data to Recast...");
-        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        int result = recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0;
+        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+        const int result = recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0;
         Logger::log(NK_INFO, "Done loading Obj model data to Recast.");
         return result;
     });
 
-    auto modelFuture = std::async(std::launch::async, [this]() {
+    const auto modelFuture = std::async(std::launch::async, [this]() {
         Logger::log(NK_INFO, "Loading Obj model data to rendering system...");
         model.loadModelData(objToLoad);
         Logger::log(NK_INFO, "Done loading Obj model data to rendering system.");
@@ -586,21 +593,21 @@ void Obj::loadObjMesh() {
             // But it's pretty rare for there to not be an include box in the scene, so don't want to override
             // a bbox that has been manually set.
             // if (scene.includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
-                // Scene &scene = Scene::getInstance();
-                // const float pos[3] = {
-                //     scene.bBoxPos[0],
-                //     scene.bBoxPos[1],
-                //     scene.bBoxPos[2]
-                // };
-                // const float size[3] = {
-                //     scene.bBoxScale[0],
-                //     scene.bBoxScale[1],
-                //     scene.bBoxScale[2]
-                // };
+            // Scene &scene = Scene::getInstance();
+            // const float pos[3] = {
+            //     scene.bBoxPos[0],
+            //     scene.bBoxPos[1],
+            //     scene.bBoxPos[2]
+            // };
+            // const float size[3] = {
+            //     scene.bBoxScale[0],
+            //     scene.bBoxScale[1],
+            //     scene.bBoxScale[2]
+            // };
             //     scene.setBBox(pos, size);
             // }
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+            const auto end = std::chrono::high_resolution_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
             msg = "Finished loading Obj in ";
             msg += std::to_string(duration.count());
             msg += " seconds";
@@ -609,7 +616,7 @@ void Obj::loadObjMesh() {
     } else {
         modelFuture.wait();
         Logger::log(NK_ERROR, "Error loading obj.");
-        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         if (recastAdapter.getVertCount() == 0) {
             Logger::log(NK_ERROR, "Cannot load Obj, Obj has 0 vertices.");
         }
@@ -620,7 +627,7 @@ void Obj::loadObjMesh() {
 }
 
 void Obj::renderObj() const {
-    Renderer &renderer = Renderer::getInstance();
+    const Renderer& renderer = Renderer::getInstance();
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -649,22 +656,22 @@ void Obj::renderObjUsingRecast() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
-char *Obj::openLoadObjFileDialog() {
+char* Obj::openLoadObjFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-char *Obj::openSaveObjFileDialog() {
+char* Obj::openSaveObjFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
-char *Obj::openSaveBlendFileDialog() {
+char* Obj::openSaveBlendFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Blend files", "blend"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
-void Obj::setLastLoadFileName(const char *fileName) {
+void Obj::setLastLoadFileName(const char* fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadObjName = fileName;
         lastObjFileName = loadObjName;
@@ -672,13 +679,13 @@ void Obj::setLastLoadFileName(const char *fileName) {
     }
 }
 
-void Obj::setLastSaveFileName(const char *fileName) {
+void Obj::setLastSaveFileName(const char* fileName) {
     lastSaveObjFileName = fileName;
     loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
 }
 
 void Obj::handleOpenObjClicked() {
-    if (const char *fileName = openLoadObjFileDialog()) {
+    if (const char* fileName = openLoadObjFileDialog()) {
         setLastLoadFileName(fileName);
         objLoaded = false;
         objToLoad = fileName;
@@ -688,7 +695,7 @@ void Obj::handleOpenObjClicked() {
 }
 
 void Obj::handleSaveObjClicked() {
-    if (const char *fileName = openSaveObjFileDialog()) {
+    if (const char* fileName = openSaveObjFileDialog()) {
         loadObjName = fileName;
         setLastSaveFileName(fileName);
         saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
@@ -697,7 +704,7 @@ void Obj::handleSaveObjClicked() {
 }
 
 void Obj::handleSaveBlendClicked() {
-    if (const char *fileName = openSaveBlendFileDialog()) {
+    if (const char* fileName = openSaveBlendFileDialog()) {
         const std::string fileNameStr = fileName;
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         const std::string blendOutputFileName = navKitSettings.outputFolder + "\\output.blend";
@@ -710,14 +717,14 @@ bool Obj::canLoad() const {
 }
 
 bool Obj::canBuildObjFromNavp() {
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    const Navp &navp = Navp::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const Navp& navp = Navp::getInstance();
     return navKitSettings.outputSet && navKitSettings.blenderSet && navp.navpLoaded;
 }
 
 bool Obj::canBuildObjFromScene() const {
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-    const Scene &scene = Scene::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const Scene& scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingResources && navKitSettings.blenderSet
         && scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone && Rpkg::extractionDataInitComplete;
 }
@@ -757,7 +764,7 @@ void Obj::handleBuildObjFromNavpClicked() {
 void Obj::finalizeLoad() {
     if (loadObj) {
         lastObjFileName = objToLoad;
-        RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+        RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         recastAdapter.selectedObject = "";
         recastAdapter.markerPositionSet = false;
         std::string msg = "Loading Obj file: '";
@@ -769,10 +776,10 @@ void Obj::finalizeLoad() {
     }
 
     if (!objLoadDone.empty()) {
-        if (RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
+        if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             Logger::log(NK_INFO, "Creating OpenGL buffers for model...");
             loadTileTexture();
-            model.initGL();
+            model.initGl();
             Logger::log(NK_INFO, "Finished creating OpenGL buffers.");
 
             recastAdapter.handleMeshChanged();
@@ -782,7 +789,7 @@ void Obj::finalizeLoad() {
         objLoadDone.clear();
         objToLoad.clear();
         Menu::updateMenuState();
-        if (Navp &navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
+        if (Navp& navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
             Logger::log(NK_INFO, "Obj load complete, building Navp...");
             navp.handleBuildNavpClicked();
         }
@@ -791,14 +798,14 @@ void Obj::finalizeLoad() {
 
 std::string Obj::buildPrimLodsString() const {
     std::string primLodsStr;
-    for (const bool primLod: primLods) {
+    for (const bool primLod : primLods) {
         primLodsStr += primLod ? '1' : '0';
     }
     return primLodsStr;
 }
 
 void Obj::loadSettings() {
-    const PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
     const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
     for (int i = 0; i < 8; ++i) {
@@ -808,39 +815,43 @@ void Obj::loadSettings() {
             primLods[i] = true;
         }
     }
-    sceneMeshBuildType = strcmp(persistedSettings.getValue("Obj", "sceneMeshBuildType", "COPY"), "COPY") == 0 ? COPY : INSTANCE;
-    skipExtractingAlocsOrPrims = strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"), "true") == 0;
+    sceneMeshBuildType = strcmp(persistedSettings.getValue("Obj", "sceneMeshBuildType", "COPY"), "COPY") == 0
+                             ? COPY
+                             : INSTANCE;
+    skipExtractingAlocsOrPrims = strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"),
+                                        "true") == 0;
     filterToIncludeBox = strcmp(persistedSettings.getValue("Obj", "filterToIncludeBox", "true"), "true") == 0;
-    glacier2ObjDebugLogsEnabled = strcmp(persistedSettings.getValue("Obj", "glacier2ObjDebugLogsEnabled", "false"), "true") == 0;
+    glacier2ObjDebugLogsEnabled = strcmp(persistedSettings.getValue("Obj", "glacier2ObjDebugLogsEnabled", "false"),
+                                         "true") == 0;
     extractTextures = strcmp(persistedSettings.getValue("Obj", "extractTextures", "false"), "true") == 0;
     applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
 }
 
 void Obj::saveObjSettings() const {
-    PersistedSettings &persistedSettings = PersistedSettings::getInstance();
+    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
 
-    const char *meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
+    const char* meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
     persistedSettings.setValue("Obj", "meshTypeForBuild", meshTypeStr);
 
     const std::string primLodsStr = buildPrimLodsString();
     persistedSettings.setValue("Obj", "primLods", primLodsStr);
 
-    const char *buildTypeStr = (sceneMeshBuildType == COPY) ? "COPY" : "INSTANCE";
+    const char* buildTypeStr = (sceneMeshBuildType == COPY) ? "COPY" : "INSTANCE";
     persistedSettings.setValue("Obj", "sceneMeshBuildType", buildTypeStr);
 
-    const char *skipRpkgExtract = skipExtractingAlocsOrPrims ? "true" : "false";
+    const char* skipRpkgExtract = skipExtractingAlocsOrPrims ? "true" : "false";
     persistedSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
 
-    const char *filterEnabled = filterToIncludeBox ? "true" : "false";
+    const char* filterEnabled = filterToIncludeBox ? "true" : "false";
     persistedSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
 
-    const char *debugEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    const char* debugEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
     persistedSettings.setValue("Obj", "glacier2ObjDebugLogsEnabled", debugEnabled);
 
-    const char *extractTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    const char* extractTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
     persistedSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
 
-    const char *applyTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    const char* applyTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
     persistedSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
 
     persistedSettings.save();
@@ -848,7 +859,7 @@ void Obj::saveObjSettings() const {
 
 void Obj::resetDefaults() {
     meshTypeForBuild = ALOC;
-    for (bool & primLod : primLods) {
+    for (bool& primLod : primLods) {
         primLod = true;
     }
     sceneMeshBuildType = COPY;
@@ -862,8 +873,8 @@ void Obj::showObjDialog() {
         SetForegroundWindow(hObjDialog);
         return;
     }
-    HINSTANCE hInstance = GetModuleHandle(nullptr);
-    HWND hParentWnd = Renderer::hwnd;
+    const HINSTANCE hInstance = GetModuleHandle(nullptr);
+    const HWND hParentWnd = Renderer::hwnd;
     hObjDialog = CreateDialogParam(
         hInstance,
         MAKEINTRESOURCE(IDD_SCENE_MESH_SETTINGS),

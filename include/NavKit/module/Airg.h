@@ -25,19 +25,20 @@ struct AirgVertex {
     glm::vec3 normal;
     glm::vec4 color;
 };
+
 class Airg {
 public:
     explicit Airg();
 
     ~Airg();
 
-    static GLuint airgLineVAO;
+    static GLuint airgLineVao;
 
-    static GLuint airgTriVBO;
+    static GLuint airgTriVbo;
 
-    static GLuint airgTriVAO;
+    static GLuint airgTriVao;
 
-    static Airg &getInstance() {
+    static Airg& getInstance() {
         static Airg instance;
         return instance;
     }
@@ -55,9 +56,9 @@ public:
     bool showAirgIndices;
     bool showRecastDebugInfo;
     CellColorDataSource cellColorSource;
-    ResourceConverter *airgResourceConverter;
-    ResourceGenerator *airgResourceGenerator;
-    ReasoningGrid *reasoningGrid;
+    ResourceConverter* airgResourceConverter;
+    ResourceGenerator* airgResourceGenerator;
+    ReasoningGrid* reasoningGrid;
     int selectedWaypointIndex;
     bool doAirgHitTest;
     bool buildingVisionAndDeadEndData;
@@ -66,10 +67,14 @@ public:
 
     void finalizeSave();
 
-    int visibilityDataSize(ReasoningGrid* reasoningGrid, int waypointIndex);
+    static int visibilityDataSize(const ReasoningGrid* reasoningGrid, int waypointIndex);
 
     void build();
-    static void addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts, const Waypoint& waypoint, bool selected, const glm::vec4& color, bool forceFan = false);
+
+    static void addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
+                                    const Waypoint& waypoint, bool selected, const glm::vec4& color,
+                                    bool forceFan = false);
+
     void renderLayerIndices(int waypointIndex) const;
 
     void renderCellBitmaps(int waypointIndex, bool selected);
@@ -84,9 +89,9 @@ public:
 
     void connectWaypoints(int startWaypointIndex, int endWaypointIndex);
 
-    void setLastLoadFileName(const char *fileName);
+    void setLastLoadFileName(const char* fileName);
 
-    void setLastSaveFileName(const char *fileName);
+    void setLastSaveFileName(const char* fileName);
 
     void handleOpenAirgClicked();
 
@@ -129,7 +134,7 @@ public:
     static std::map<std::string, std::string> airgHashIoiStringMap;
 
 private:
-    static GLuint airgLineVBO;
+    static GLuint airgLineVbo;
 
     static int airgTriCount;
 
@@ -137,21 +142,21 @@ private:
 
     static bool airgDirty;
 
-    static GLuint airgHitTestVAO;
+    static GLuint airgHitTestVao;
 
-    static GLuint airgHitTestVBO;
+    static GLuint airgHitTestVbo;
 
     static int airgHitTestCount;
 
     static bool airgHitTestDirty;
 
-    static INT_PTR CALLBACK AirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    static INT_PTR CALLBACK airgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
-    static char *openSaveAirgFileDialog(char *lastAirgFolder);
+    static char* openSaveAirgFileDialog(char* lastAirgFolder);
 
-    static char *openAirgFileDialog(const char *lastAirgFolder);
+    static char* openAirgFileDialog(const char* lastAirgFolder);
 
-    static void saveAirg(Airg *airg, std::string fileName, bool isJson);
+    static void saveAirg(Airg* airg, const std::string& fileName, bool isJson);
 
-    static void loadAirg(Airg *airg, const std::string& fileName, bool isFromJson);
+    static void loadAirg(Airg* airg, const std::string& fileName, bool isFromJson);
 };

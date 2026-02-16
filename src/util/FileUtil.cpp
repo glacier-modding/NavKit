@@ -1,8 +1,8 @@
 #include "../../include/NavKit/util/FileUtil.h"
 
 namespace FileUtil {
-    char *openNfdLoadDialog(nfdu8filteritem_t *filters, const nfdfiltersize_t filterCount) {
-        nfdu8char_t *outPath;
+    char* openNfdLoadDialog(nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
+        nfdu8char_t* outPath;
 
         const nfdopendialogu8args_t args = {
             .filterList = filters,
@@ -19,8 +19,8 @@ namespace FileUtil {
         return nullptr;
     }
 
-    char *openNfdSaveDialog(nfdu8filteritem_t *filters, nfdfiltersize_t filterCount, const nfdu8char_t *defaultName) {
-        nfdu8char_t *outPath;
+    char* openNfdSaveDialog(nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName) {
+        nfdu8char_t* outPath;
 
         const nfdsavedialogu8args_t args = {
             .filterList = filters,
@@ -37,8 +37,8 @@ namespace FileUtil {
         return nullptr;
     }
 
-    char *openNfdFolderDialog(char *defaultPath) {
-        nfdu8char_t *outPath;
+    char* openNfdFolderDialog(char* defaultPath) {
+        nfdu8char_t* outPath;
         const nfdpickfolderu8args_t args = {
             .defaultPath = defaultPath,
         };

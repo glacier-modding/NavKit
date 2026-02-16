@@ -57,14 +57,15 @@ public:
     static void updateHitTestBuffers(const NavPower::NavMesh* navMesh);
 
     void renderPfSeedPoints() const;
+
     void renderPfSeedPointsForHitTest() const;
 
-    static Navp &getInstance() {
+    static Navp& getInstance() {
         static Navp instance;
         return instance;
     }
 
-    static Navp &getAirgInstance() {
+    static Navp& getAirgInstance() {
         static Navp instance;
         return instance;
     }
@@ -95,10 +96,10 @@ public:
 
     void setSelectedExclusionBoxIndex(int index);
 
-    NavPower::NavMesh *navMesh{};
+    NavPower::NavMesh* navMesh{};
     std::vector<char> navMeshFileData{};
-    std::map<NavPower::Binary::Area *, NavPower::Area *> binaryAreaToAreaMap;
-    std::map<Vec3, NavPower::Area *> posToAreaMap;
+    std::map<NavPower::Binary::Area*, NavPower::Area*> binaryAreaToAreaMap;
+    std::map<Vec3, NavPower::Area*> posToAreaMap;
     int selectedNavpAreaIndex;
     int selectedPfSeedPointIndex;
     int selectedExclusionBoxIndex;
@@ -115,21 +116,21 @@ public:
 
     bool stairsCheckboxValue;
 
-    std::map<NavPower::Binary::Area *, int> binaryAreaToAreaIndexMap;
+    std::map<NavPower::Binary::Area*, int> binaryAreaToAreaIndexMap;
 
     std::string loadedNavpText;
 
     static std::string selectedRpkgNavp;
 
-    void setLastLoadFileName(const char *fileName);
+    void setLastLoadFileName(const char* fileName);
 
-    void setLastSaveFileName(const char *fileName);
+    void setLastSaveFileName(const char* fileName);
 
     void loadNavpFromFile(const std::string& fileName);
 
     void handleOpenNavpClicked();
 
-    void saveNavMesh(const std::string &fileName, const std::string &extension);
+    void saveNavMesh(const std::string& fileName, const std::string& extension);
 
     void handleSaveNavpClicked();
 
@@ -145,9 +146,9 @@ public:
 
     static void updateExclusionBoxConvexVolumes();
 
-    void loadNavMeshFileData(const std::string &fileName);
+    void loadNavMeshFileData(const std::string& fileName);
 
-    void loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
+    void loadNavMesh(const std::string& fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
     std::atomic<bool> navpBuildDone{false};
 
@@ -158,17 +159,17 @@ public:
     void buildNavp();
 
     static std::map<std::string, std::string> navpHashIoiStringMap;
+
 private:
+    static void renderArea(const NavPower::Area& area, bool selected);
 
-    static void renderArea(const NavPower::Area &area, bool selected);
-
-    static bool areaIsStairs(const NavPower::Area &area);
+    static bool areaIsStairs(const NavPower::Area& area);
 
     void setStairsFlags() const;
 
-    static char *openLoadNavpFileDialog();
+    static char* openLoadNavpFileDialog();
 
-    static char *openSaveNavpFileDialog();
+    static char* openSaveNavpFileDialog();
 
     std::string loadNavpName;
     std::string lastLoadNavpFile;

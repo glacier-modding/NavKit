@@ -23,7 +23,7 @@ SceneExtract::SceneExtract() {
 SceneExtract::~SceneExtract() = default;
 
 void SceneExtract::handleExtractFromGameClicked() {
-    Gui &gui = Gui::getInstance();
+    Gui& gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildObj = false;
     alsoBuildAll = false;
@@ -35,21 +35,21 @@ bool SceneExtract::canExtractFromGame() const {
 }
 
 bool SceneExtract::canExtractFromGameAndBuildObj() const {
-    const Obj &obj = Obj::getInstance();
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const Obj& obj = Obj::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame()
-           && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+        && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
 }
 
 bool SceneExtract::canExtractFromGameAndBuildAll() const {
-    const Obj &obj = Obj::getInstance();
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+    const Obj& obj = Obj::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame()
-           && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+        && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
 }
 
 void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
-    Gui &gui = Gui::getInstance();
+    Gui& gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildObj = true;
     Obj::getInstance().objLoaded = false;
@@ -57,16 +57,16 @@ void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
 }
 
 void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
-    Gui &gui = Gui::getInstance();
+    Gui& gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildAll = true;
     Obj::getInstance().objLoaded = false;
     extractScene();
 }
 
-void SceneExtract::extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback) {
-    GameConnection &gameConnection = GameConnection::getInstance();
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+void SceneExtract::extractFromGame(const std::function<void()>& callback, const std::function<void()>& errorCallback) {
+    GameConnection& gameConnection = GameConnection::getInstance();
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     std::ofstream f(navKitSettings.outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME);
     f.clear();
     f.close();
@@ -88,7 +88,7 @@ void SceneExtract::extractFromGame(const std::function<void()> &callback, const 
 
 void SceneExtract::extractScene() {
     Logger::log(NK_INFO, "Extracting scene from game...");
-    GameConnection &gameConnection = GameConnection::getInstance();
+    GameConnection& gameConnection = GameConnection::getInstance();
     extractingFromGame = true;
 
     backgroundWorker.emplace(extractFromGame, [this] {
@@ -109,8 +109,8 @@ void SceneExtract::extractScene() {
 void SceneExtract::finalizeExtractScene() {
     if (doneExtractingFromGame) {
         doneExtractingFromGame = false;
-    const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
-        Scene &scene = Scene::getInstance();
+        const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+        Scene& scene = Scene::getInstance();
         std::string sceneFile = navKitSettings.outputFolder;
         sceneFile += "\\" + Scene::OUTPUT_SCENE_FILE_NAME;
         Logger::log(NK_INFO, "Loading nav.json file: '%s'.", sceneFile.c_str());
@@ -120,10 +120,10 @@ void SceneExtract::finalizeExtractScene() {
             &scene,
             sceneFile,
             [sceneFile, this] {
-                Scene &sceneScoped = Scene::getInstance();
-                Obj &obj = Obj::getInstance();
+                Scene& sceneScoped = Scene::getInstance();
+                Obj& obj = Obj::getInstance();
                 sceneScoped.sceneLoaded = true;
-                const std::string &fileNameString = sceneFile;
+                const std::string& fileNameString = sceneFile;
                 sceneScoped.lastLoadSceneFile = sceneFile;
                 if ((alsoBuildObj || alsoBuildAll) && !obj.startedObjGeneration) {
                     obj.extractResourcesAndStartObjBuild();
@@ -131,7 +131,7 @@ void SceneExtract::finalizeExtractScene() {
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();
             }, [this] {
-                Obj &objScoped = Obj::getInstance();
+                Obj& objScoped = Obj::getInstance();
                 Logger::log(NK_ERROR, "Error loading scene file.");
                 objScoped.startedObjGeneration = false;
                 extractingFromGame = false;
@@ -142,10 +142,10 @@ void SceneExtract::finalizeExtractScene() {
     }
 }
 
-char *SceneExtract::openHitmanFolderDialog(char *lastHitmanFolder) {
+char* SceneExtract::openHitmanFolderDialog(char* lastHitmanFolder) {
     return FileUtil::openNfdFolderDialog(lastHitmanFolder);
 }
 
-char *SceneExtract::openOutputFolderDialog(char *lastOutputFolder) {
+char* SceneExtract::openOutputFolderDialog(char* lastOutputFolder) {
     return FileUtil::openNfdFolderDialog(lastOutputFolder);
 }

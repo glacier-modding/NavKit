@@ -22,28 +22,27 @@ Scene::Scene()
     resetBBoxDefaults();
 }
 
-Scene::~Scene() {
-}
+Scene::~Scene() {}
 
 HWND Scene::hSceneDialog = nullptr;
 
-static std::string format_float_scene(float val) {
+static std::string format_float_scene(const float val) {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) << val;
     return ss.str();
 }
 
-char *Scene::openLoadSceneFileDialog() {
+char* Scene::openLoadSceneFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Nav.json files", "nav.json"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-char *Scene::openSaveSceneFileDialog() {
+char* Scene::openSaveSceneFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Nav.json files", "nav.json"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
-void Scene::setLastLoadFileName(char *fileName) {
+void Scene::setLastLoadFileName(char* fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadSceneName = fileName;
         lastLoadSceneFile = loadSceneName.data();
@@ -51,17 +50,17 @@ void Scene::setLastLoadFileName(char *fileName) {
     }
 }
 
-void Scene::setLastSaveFileName(char *fileName) {
+void Scene::setLastSaveFileName(char* fileName) {
     saveSceneName = fileName;
     saveSceneName = saveSceneName.substr(saveSceneName.find_last_of("/\\") + 1);
 }
 
-void Scene::loadMeshes(const std::function<void()> &errorCallback,
-                      simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+void Scene::loadMeshes(const std::function<void()>& errorCallback,
+                       simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::Meshes newMeshes;
     try {
         newMeshes = Json::Meshes(jsonDocument["meshes"]);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
@@ -69,12 +68,12 @@ void Scene::loadMeshes(const std::function<void()> &errorCallback,
     meshes = newMeshes.readMeshes();
 }
 
-void Scene::loadPfBoxes(const std::function<void()> &errorCallback,
-                        simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
+                        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::PfBoxes pfBoxes;
     try {
         pfBoxes = Json::PfBoxes(jsonDocument["pfBoxes"]);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
@@ -93,7 +92,7 @@ void Scene::loadPfBoxes(const std::function<void()> &errorCallback,
     }
 }
 
-void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
         version = static_cast<int>(static_cast<uint64_t>(jsonDocument["version"]));
     } catch (...) {
@@ -102,12 +101,12 @@ void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document> 
     }
 }
 
-void Scene::loadPfSeedPoints(const std::function<void()> &errorCallback,
-                             simdjson::simdjson_result<simdjson::ondemand::document> &jsonDocument) {
+void Scene::loadPfSeedPoints(const std::function<void()>& errorCallback,
+                             simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::PfSeedPoints newPfSeedPoints;
     try {
         newPfSeedPoints = Json::PfSeedPoints(jsonDocument["pfSeedPoints"]);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
         errorCallback();
@@ -116,7 +115,7 @@ void Scene::loadPfSeedPoints(const std::function<void()> &errorCallback,
 }
 
 void Scene::loadRoomsAndVolumes(const std::function<void()>& errorCallback,
-simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+                                simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
         Logger::log(NK_INFO, "Loading Gates.");
         gates = Json::Gates(jsonDocument["gates"]).gates;
@@ -130,7 +129,7 @@ simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
         volumeBoxes = Json::VolumeBoxes(jsonDocument["volumeBoxes"]).volumeBoxes;
         Logger::log(NK_INFO, "Loading Volume Spheres.");
         volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"]).volumeSpheres;
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
     } catch (...) {
         errorCallback();
@@ -138,13 +137,13 @@ simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
 }
 
 void Scene::loadMatis(const std::function<void()>& errorCallback,
-                     simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+                      simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
         for (const auto matiVec = Json::Matis(jsonDocument["matis"]).matis;
-            auto mati : matiVec) {
+             auto mati : matiVec) {
             matis[mati.hash] = mati;
         }
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_INFO, "No Matis found in scene file.");
     } catch (...) {
         errorCallback();
@@ -152,20 +151,20 @@ void Scene::loadMatis(const std::function<void()>& errorCallback,
 }
 
 void Scene::loadPrimMatis(const std::function<void()>& errorCallback,
-                     simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+                          simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
         for (const auto primMati : Json::PrimMatis(jsonDocument["primMatis"]).primMatis) {
             primMatis[primMati.primHash] = primMati;
         }
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_INFO, "No Prim Matis found in scene file.");
     } catch (...) {
         errorCallback();
     }
 }
 
-void Scene::loadScene(const std::string &fileName, const std::function<void()> &callback,
-                      const std::function<void()> &errorCallback) {
+void Scene::loadScene(const std::string& fileName, const std::function<void()>& callback,
+                      const std::function<void()>& errorCallback) {
     sceneLoaded = false;
     Menu::updateMenuState();
 
@@ -190,7 +189,7 @@ void Scene::saveScene(const std::string& fileName) const {
     ss << R"({"version":)" << version << ",";
     ss << R"("meshes":[)";
     auto separator = "";
-    for (const auto &mesh: meshes) {
+    for (const auto& mesh : meshes) {
         ss << separator;
         mesh.writeJson(ss);
         separator = ",";
@@ -203,7 +202,7 @@ void Scene::saveScene(const std::string& fileName) const {
         includeBox.writeJson(ss);
         separator = ",";
     }
-    for (const auto &pfBox: exclusionBoxes) {
+    for (const auto& pfBox : exclusionBoxes) {
         ss << separator;
         separator = ",";
         pfBox.writeJson(ss);
@@ -211,7 +210,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"pfSeedPoints":[)";
     separator = "";
-    for (auto &pfSeedPoint: pfSeedPoints) {
+    for (auto& pfSeedPoint : pfSeedPoints) {
         ss << separator;
         pfSeedPoint.writeJson(ss);
         separator = ",";
@@ -233,7 +232,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"gates":[)";
     separator = "";
-    for (auto &gate: gates) {
+    for (auto& gate : gates) {
         ss << separator;
         gate.writeJson(ss);
         separator = ",";
@@ -241,7 +240,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"rooms":[)";
     separator = "";
-    for (auto &room: rooms) {
+    for (auto& room : rooms) {
         ss << separator;
         room.writeJson(ss);
         separator = ",";
@@ -249,7 +248,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"aiAreaWorld":[)";
     separator = "";
-    for (auto &aiAreaWorld: aiAreaWorlds) {
+    for (auto& aiAreaWorld : aiAreaWorlds) {
         ss << separator;
         aiAreaWorld.writeJson(ss);
         separator = ",";
@@ -257,7 +256,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"aiArea":[)";
     separator = "";
-    for (auto &aiArea: aiAreas) {
+    for (auto& aiArea : aiAreas) {
         ss << separator;
         aiArea.writeJson(ss);
         separator = ",";
@@ -265,7 +264,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"volumeBoxes":[)";
     separator = "";
-    for (auto &volumeBox: volumeBoxes) {
+    for (auto& volumeBox : volumeBoxes) {
         ss << separator;
         volumeBox.writeJson(ss);
         separator = ",";
@@ -273,7 +272,7 @@ void Scene::saveScene(const std::string& fileName) const {
 
     ss << R"(],"volumeSpheres":[)";
     separator = "";
-    for (auto &volumeSphere: volumeSpheres) {
+    for (auto& volumeSphere : volumeSpheres) {
         ss << separator;
         volumeSphere.writeJson(ss);
         separator = ",";
@@ -291,7 +290,7 @@ void Scene::saveScene(const std::string& fileName) const {
 }
 
 void Scene::handleOpenSceneClicked() {
-    if (char *fileName = openLoadSceneFileDialog()) {
+    if (char* fileName = openLoadSceneFileDialog()) {
         setLastLoadFileName(fileName);
         std::string msg = "Loading nav.json file: '";
         msg += fileName;
@@ -316,7 +315,7 @@ void Scene::handleOpenSceneClicked() {
 }
 
 void Scene::handleSaveSceneClicked() {
-    if (char *fileName = openSaveSceneFileDialog()) {
+    if (char* fileName = openSaveSceneFileDialog()) {
         std::string fileNameStr = fileName;
         setLastSaveFileName(fileName);
         std::string msg = "Saving NavKit Scene file: '";
@@ -327,7 +326,7 @@ void Scene::handleSaveSceneClicked() {
     }
 }
 
-void Scene::setBBox(const float *pos, const float *scale) {
+void Scene::setBBox(const float* pos, const float* scale) {
     bBoxPos[0] = pos[0];
     bBoxPos[1] = pos[1];
     bBoxPos[2] = pos[2];
@@ -335,7 +334,7 @@ void Scene::setBBox(const float *pos, const float *scale) {
     bBoxScale[1] = scale[1];
     bBoxScale[2] = scale[2];
 
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
+    const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     const float bBoxMin[3] = {
         bBoxPos[0] - bBoxScale[0] / 2,
         bBoxPos[1] - bBoxScale[1] / 2,
@@ -352,41 +351,42 @@ void Scene::setBBox(const float *pos, const float *scale) {
 }
 
 void Scene::resetBBoxDefaults() {
-    float pos[3] = {0.0f, 0.0f, 0.0f};
-    float scale[3] = {1000.0f, 300.0f, 1000.0f};
+    const float pos[3] = {0.0f, 0.0f, 0.0f};
+    const float scale[3] = {1000.0f, 300.0f, 1000.0f};
     setBBox(pos, scale);
 }
 
-void Scene::updateSceneDialogControls(HWND hDlg) const {
+void Scene::updateSceneDialogControls(const HWND hDlg) const {
     // Position Sliders (-500 to 500)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, (int) (bBoxPos[0] + 500.0f));
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[0] + 500.0f));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(bBoxPos[0]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, (int) (bBoxPos[1] + 500.0f));
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[1] + 500.0f));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(bBoxPos[1]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, (int) (bBoxPos[2] + 500.0f));
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[2] + 500.0f));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(bBoxPos[2]).c_str());
 
     // Scale Sliders (1 to 800)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, (int) bBoxScale[0]);
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[0]));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(bBoxScale[0]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, (int) bBoxScale[1]);
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[1]));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(bBoxScale[1]).c_str());
 
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, (int) bBoxScale[2]);
+    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[2]));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
 }
 
-const Json::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &hash, const std::string &id, const float *pos) const {
-    std::vector<const Json::Mesh *> closestMeshes;
+const Json::Mesh* Scene::findMeshByHashAndIdAndPos(const std::string& hash, const std::string& id,
+                                                   const float* pos) const {
+    std::vector<const Json::Mesh*> closestMeshes;
     for (const Json::Mesh& mesh : meshes) {
         if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.id == id) {
             closestMeshes.push_back(&mesh);
@@ -396,7 +396,7 @@ const Json::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &hash, cons
         return nullptr;
     }
     Vec3 posVec = {pos[0], pos[1], pos[2]};
-    std::ranges::sort(closestMeshes, [posVec](const Json::Mesh *a, const Json::Mesh *b) {
+    std::ranges::sort(closestMeshes, [posVec](const Json::Mesh* a, const Json::Mesh* b) {
         const Vec3 aPos = {a->pos.x, a->pos.y, a->pos.z};
         const Vec3 bPos = {b->pos.x, b->pos.y, b->pos.z};
         return posVec.DistanceSquaredTo(aPos) < posVec.DistanceSquaredTo(bPos);
@@ -404,67 +404,67 @@ const Json::Mesh *Scene::findMeshByHashAndIdAndPos(const std::string &hash, cons
     return closestMeshes[0];
 }
 
-INT_PTR CALLBACK Scene::sceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    Scene &scene = getInstance();
+INT_PTR CALLBACK Scene::sceneDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+    Scene& scene = getInstance();
 
     switch (message) {
-        case WM_INITDIALOG:
-            scene.updateSceneDialogControls(hDlg);
-            return (INT_PTR) TRUE;
+    case WM_INITDIALOG:
+        scene.updateSceneDialogControls(hDlg);
+        return TRUE;
 
-        case WM_HSCROLL: {
-            bool changed = false;
-            int pos = SendMessage((HWND) lParam, TBM_GETPOS, 0, 0);
+    case WM_HSCROLL: {
+        bool changed = false;
+        const int pos = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
 
-            if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X)) {
-                scene.bBoxPos[0] = (float) pos - 500.0f;
-                SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
-                changed = true;
-            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y)) {
-                scene.bBoxPos[1] = (float) pos - 500.0f;
-                SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
-                changed = true;
-            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z)) {
-                scene.bBoxPos[2] = (float) pos - 500.0f;
-                SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
-                changed = true;
-            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X)) {
-                scene.bBoxScale[0] = (float) pos;
-                SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
-                changed = true;
-            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y)) {
-                scene.bBoxScale[1] = (float) pos;
-                SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
-                changed = true;
-            } else if ((HWND) lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z)) {
-                scene.bBoxScale[2] = (float) pos;
-                SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
-                changed = true;
-            }
-
-            if (changed) {
-                scene.setBBox(scene.bBoxPos, scene.bBoxScale);
-            }
-            return (INT_PTR) TRUE;
+        if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X)) {
+            scene.bBoxPos[0] = static_cast<float>(pos) - 500.0f;
+            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
+            changed = true;
+        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y)) {
+            scene.bBoxPos[1] = static_cast<float>(pos) - 500.0f;
+            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
+            changed = true;
+        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z)) {
+            scene.bBoxPos[2] = static_cast<float>(pos) - 500.0f;
+            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
+            changed = true;
+        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X)) {
+            scene.bBoxScale[0] = static_cast<float>(pos);
+            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
+            changed = true;
+        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y)) {
+            scene.bBoxScale[1] = static_cast<float>(pos);
+            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
+            changed = true;
+        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z)) {
+            scene.bBoxScale[2] = static_cast<float>(pos);
+            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
+            changed = true;
         }
 
-        case WM_COMMAND:
-            if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
-                scene.resetBBoxDefaults();
-                scene.updateSceneDialogControls(hDlg);
-            }
-            return (INT_PTR) TRUE;
-
-        case WM_CLOSE:
-            DestroyWindow(hDlg);
-            return (INT_PTR) TRUE;
-
-        case WM_DESTROY:
-            hSceneDialog = nullptr;
-            return (INT_PTR) TRUE;
-        default: ;
+        if (changed) {
+            scene.setBBox(scene.bBoxPos, scene.bBoxScale);
+        }
+        return TRUE;
     }
-    return (INT_PTR) FALSE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
+            scene.resetBBoxDefaults();
+            scene.updateSceneDialogControls(hDlg);
+        }
+        return TRUE;
+
+    case WM_CLOSE:
+        DestroyWindow(hDlg);
+        return TRUE;
+
+    case WM_DESTROY:
+        hSceneDialog = nullptr;
+        return TRUE;
+    default: ;
+    }
+    return FALSE;
 }
 
 void Scene::showSceneDialog() {
@@ -473,8 +473,8 @@ void Scene::showSceneDialog() {
         return;
     }
 
-    HINSTANCE hInstance = GetModuleHandle(nullptr);
-    HWND hParentWnd = Renderer::hwnd;
+    const HINSTANCE hInstance = GetModuleHandle(nullptr);
+    const HWND hParentWnd = Renderer::hwnd;
 
     hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, sceneDialogProc,
                                      reinterpret_cast<LPARAM>(this));
@@ -487,13 +487,13 @@ void Scene::showSceneDialog() {
         RECT parentRect, dialogRect;
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hSceneDialog, &dialogRect);
-        int parentWidth = parentRect.right - parentRect.left;
-        int parentHeight = parentRect.bottom - parentRect.top;
-        int dialogWidth = dialogRect.right - dialogRect.left;
-        int dialogHeight = dialogRect.bottom - dialogRect.top;
-        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-        SetWindowPos(hSceneDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        const int parentWidth = parentRect.right - parentRect.left;
+        const int parentHeight = parentRect.bottom - parentRect.top;
+        const int dialogWidth = dialogRect.right - dialogRect.left;
+        const int dialogHeight = dialogRect.bottom - dialogRect.top;
+        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        SetWindowPos(hSceneDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         ShowWindow(hSceneDialog, SW_SHOW);
     }
 }

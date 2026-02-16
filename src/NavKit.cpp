@@ -36,30 +36,30 @@
 #include "../include/NavKit/util/UpdateChecker.h"
 #undef main
 
-int SDL_main(const int argc, char **argv) {
+int SDL_main(const int argc, char** argv) {
     CPPTRACE_TRY
         {
             std::thread logThread(Logger::logRunner);
             logThread.detach();
 
             PersistedSettings::getInstance().load();
-            Renderer &renderer = Renderer::getInstance();
+            Renderer& renderer = Renderer::getInstance();
             if (!renderer.initWindowAndRenderer()) {
                 return -1;
             }
             renderer.initShaders();
             SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 
-            UpdateChecker &updateChecker = UpdateChecker::getInstance();
+            UpdateChecker& updateChecker = UpdateChecker::getInstance();
             updateChecker.startUpdateCheck();
 
-            SceneExtract &sceneExtract = SceneExtract::getInstance();
-            Navp &navp = Navp::getInstance();
-            Obj &obj = Obj::getInstance();
-            Airg &airg = Airg::getInstance();
-            InputHandler &inputHandler = InputHandler::getInstance();
+            SceneExtract& sceneExtract = SceneExtract::getInstance();
+            Navp& navp = Navp::getInstance();
+            Obj& obj = Obj::getInstance();
+            Airg& airg = Airg::getInstance();
+            InputHandler& inputHandler = InputHandler::getInstance();
             Menu::updateMenuState();
-            Gui &gui = Gui::getInstance();
+            Gui& gui = Gui::getInstance();
             bool isRunning = true;
             Logger::log(NK_INFO, "NavKit initialized.");
             while (isRunning) {
@@ -85,10 +85,10 @@ int SDL_main(const int argc, char **argv) {
         }
     CPPTRACE_CATCH(const std::exception& e) {
         ErrorHandler::openErrorDialog("An unexpected error occurred: " + std::string(e.what()) + "\n\nStack Trace:\n" +
-                                      cpptrace::from_current_exception().to_string());
+            cpptrace::from_current_exception().to_string());
     } catch (...) {
         ErrorHandler::openErrorDialog("An unexpected error occurred:\n\nStack Trace: \n" +
-                                      cpptrace::from_current_exception().to_string());
+            cpptrace::from_current_exception().to_string());
     }
     return 0;
 }

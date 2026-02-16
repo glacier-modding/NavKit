@@ -48,10 +48,10 @@ Navp::Navp()
       loadNavpName("Load Navp"),
       lastLoadNavpFile(loadNavpName),
       saveNavpName("Save Navp"),
-      lastSaveNavpFile(saveNavpName) {
-}
+      lastSaveNavpFile(saveNavpName) {}
 
 Navp::~Navp() = default;
+
 HWND Navp::hNavpDialog = nullptr;
 std::string Navp::selectedRpkgNavp{};
 std::map<std::string, std::string> Navp::navpHashIoiStringMap;
@@ -76,7 +76,9 @@ struct NavVertex {
 };
 
 void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIndex) {
-    if (!navMesh) return;
+    if (!navMesh) {
+        return;
+    }
 
     std::vector<NavVertex> triVertices;
     std::vector<NavVertex> lineVertices;
@@ -101,14 +103,14 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
 
             for (size_t j = 1; j < area.m_edges.size() - 1; ++j) {
                 const auto& v1 = area.m_edges[j];
-                const auto& v2 = area.m_edges[j+1];
+                const auto& v2 = area.m_edges[j + 1];
 
                 glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
                 glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
 
-                triVertices.push_back({p0, glm::vec3(0,1,0), areaColor});
-                triVertices.push_back({p1, glm::vec3(0,1,0), areaColor});
-                triVertices.push_back({p2, glm::vec3(0,1,0), areaColor});
+                triVertices.push_back({p0, glm::vec3(0, 1, 0), areaColor});
+                triVertices.push_back({p1, glm::vec3(0, 1, 0), areaColor});
+                triVertices.push_back({p2, glm::vec3(0, 1, 0), areaColor});
             }
         }
 
@@ -121,12 +123,14 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
             glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + 0.01f, -vEnd->m_pos.Y);
 
             auto getEdgeColor = [&](const NavPower::Binary::Edge* v) {
-                if (v->GetType() == NavPower::EdgeType::EDGE_PORTAL) return glm::vec4(1.0, 1.0, 1.0, 1.0);
+                if (v->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
+                    return glm::vec4(1.0, 1.0, 1.0, 1.0);
+                }
                 return selected ? glm::vec4(0.0, 1.0, 1.0, 1.0) : glm::vec4(0.0, 1.0, 0.0, 1.0);
             };
 
-            lineVertices.push_back({pStart, glm::vec3(0,1,0), getEdgeColor(vStart)});
-            lineVertices.push_back({pEnd, glm::vec3(0,1,0), getEdgeColor(vEnd)});
+            lineVertices.push_back({pStart, glm::vec3(0, 1, 0), getEdgeColor(vStart)});
+            lineVertices.push_back({pEnd, glm::vec3(0, 1, 0), getEdgeColor(vEnd)});
         }
 
         // Portal Loops (Circles)
@@ -136,22 +140,26 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
                 glm::vec4 circleColor(1.0, 1.0, 1.0, 1.0);
 
                 for (int k = 0; k < 8; ++k) {
-                    float a1 = (float)k / 8.0f * std::numbers::pi * 2;
-                    float a2 = (float)(k+1) / 8.0f * std::numbers::pi * 2;
+                    float a1 = static_cast<float>(k) / 8.0f * std::numbers::pi * 2;
+                    float a2 = static_cast<float>(k + 1) / 8.0f * std::numbers::pi * 2;
 
-                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1)*r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a1)*r));
-                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2)*r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a2)*r));
+                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1) * r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a1) * r));
+                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2) * r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a2) * r));
 
-                    lineVertices.push_back({glP1, glm::vec3(0,1,0), circleColor});
-                    lineVertices.push_back({glP2, glm::vec3(0,1,0), circleColor});
+                    lineVertices.push_back({glP1, glm::vec3(0, 1, 0), circleColor});
+                    lineVertices.push_back({glP2, glm::vec3(0, 1, 0), circleColor});
                 }
             }
         }
     }
 
     // Upload Triangles
-    if (navMeshTriVAO == 0) glGenVertexArrays(1, &navMeshTriVAO);
-    if (navMeshTriVBO == 0) glGenBuffers(1, &navMeshTriVBO);
+    if (navMeshTriVAO == 0) {
+        glGenVertexArrays(1, &navMeshTriVAO);
+    }
+    if (navMeshTriVBO == 0) {
+        glGenBuffers(1, &navMeshTriVBO);
+    }
 
     glBindVertexArray(navMeshTriVAO);
     glBindBuffer(GL_ARRAY_BUFFER, navMeshTriVBO);
@@ -167,8 +175,12 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
     navMeshTriCount = triVertices.size();
 
     // Upload Lines
-    if (navMeshLineVAO == 0) glGenVertexArrays(1, &navMeshLineVAO);
-    if (navMeshLineVBO == 0) glGenBuffers(1, &navMeshLineVBO);
+    if (navMeshLineVAO == 0) {
+        glGenVertexArrays(1, &navMeshLineVAO);
+    }
+    if (navMeshLineVBO == 0) {
+        glGenBuffers(1, &navMeshLineVBO);
+    }
 
     glBindVertexArray(navMeshLineVAO);
     glBindBuffer(GL_ARRAY_BUFFER, navMeshLineVBO);
@@ -187,26 +199,28 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
 }
 
 void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
-    if (!navMesh) return;
+    if (!navMesh) {
+        return;
+    }
     std::vector<NavVertex> vertices;
 
     for (int i = 0; i < navMesh->m_areas.size(); ++i) {
         const auto& area = navMesh->m_areas[i];
 
-        float r = (float)NAVMESH_AREA / 255.0f;
-        float g = (float)(i / 255) / 255.0f;
-        float b = (float)(i % 255) / 255.0f;
-        glm::vec4 color(r, g, b, 1.0f);
+        const float r = static_cast<float>(NAVMESH_AREA) / 255.0f;
+        const float g = static_cast<float>(i / 255) / 255.0f;
+        const float b = static_cast<float>(i % 255) / 255.0f;
+        const glm::vec4 color(r, g, b, 1.0f);
 
         if (area.m_edges.size() >= 3) {
             const auto& v0 = area.m_edges[0];
-            glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
+            const glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
 
             for (size_t j = 1; j < area.m_edges.size() - 1; ++j) {
                 const auto& v1 = area.m_edges[j];
-                const auto& v2 = area.m_edges[j+1];
-                glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
-                glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
+                const auto& v2 = area.m_edges[j + 1];
+                const glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
+                const glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
 
                 vertices.push_back({p0, glm::vec3(0), color});
                 vertices.push_back({p1, glm::vec3(0), color});
@@ -215,8 +229,12 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
         }
     }
 
-    if (hitTestVAO == 0) glGenVertexArrays(1, &hitTestVAO);
-    if (hitTestVBO == 0) glGenBuffers(1, &hitTestVBO);
+    if (hitTestVAO == 0) {
+        glGenVertexArrays(1, &hitTestVAO);
+    }
+    if (hitTestVBO == 0) {
+        glGenBuffers(1, &hitTestVBO);
+    }
 
     glBindVertexArray(hitTestVAO);
     glBindBuffer(GL_ARRAY_BUFFER, hitTestVBO);
@@ -235,9 +253,9 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
 
 void Navp::renderPfSeedPoints() const {
     if (showPfSeedPoints) {
-        Renderer &renderer = Renderer::getInstance();
+        Renderer& renderer = Renderer::getInstance();
         int i = 0;
-        for (const Json::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
+        for (const Json::PfSeedPoint& seedPoint : Scene::getInstance().pfSeedPoints) {
             Vec3 fill = {0, 0, 0.6};
             Vec3 outline = {0, 0, 0.8};
             if (selectedPfSeedPointIndex == i) {
@@ -259,10 +277,14 @@ void Navp::renderPfSeedPoints() const {
 }
 
 void Navp::renderPfSeedPointsForHitTest() const {
-    if (showPfSeedPoints && Scene::getInstance().sceneLoaded) {
-        Renderer &renderer = Renderer::getInstance();
+    if (showPfSeedPoints&& Scene::getInstance()
+    .
+    sceneLoaded
+    )
+    {
+        Renderer& renderer = Renderer::getInstance();
         int i = 0;
-        for (const Json::PfSeedPoint &seedPoint: Scene::getInstance().pfSeedPoints) {
+        for (const Json::PfSeedPoint& seedPoint : Scene::getInstance().pfSeedPoints) {
             const int highByte = (i >> 8) & 0xFF;
             const int lowByte = i & 0xFF;
             renderer.drawBox(
@@ -270,9 +292,15 @@ void Navp::renderPfSeedPointsForHitTest() const {
                 {0.25, 0.5, 0.25},
                 {0, 0, 0, 1},
                 true,
-                {static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {
+                    static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.05f
+                },
                 true,
-                {static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {
+                    static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.05f
+                },
                 1.0);
             i++;
         }
@@ -281,9 +309,9 @@ void Navp::renderPfSeedPointsForHitTest() const {
 
 void Navp::renderExclusionBoxes() const {
     if (showPfExclusionBoxes) {
-        Renderer &renderer = Renderer::getInstance();
+        Renderer& renderer = Renderer::getInstance();
         int i = 0;
-        for (const Json::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
+        for (const Json::PfBox& exclusionBox : Scene::getInstance().exclusionBoxes) {
             Vec3 fill = {0.6, 0, 0};
             Vec3 outline = {0.8, 0, 0};
             if (selectedExclusionBoxIndex == i) {
@@ -305,10 +333,14 @@ void Navp::renderExclusionBoxes() const {
 }
 
 void Navp::renderExclusionBoxesForHitTest() const {
-    if (showPfExclusionBoxes && Scene::getInstance().sceneLoaded) {
-        Renderer &renderer = Renderer::getInstance();
+    if (showPfExclusionBoxes&& Scene::getInstance()
+    .
+    sceneLoaded
+    )
+    {
+        Renderer& renderer = Renderer::getInstance();
         int i = 0;
-        for (const Json::PfBox &exclusionBox: Scene::getInstance().exclusionBoxes) {
+        for (const Json::PfBox& exclusionBox : Scene::getInstance().exclusionBoxes) {
             const int highByte = (i >> 8) & 0xFF;
             const int lowByte = i & 0xFF;
             renderer.drawBox(
@@ -316,42 +348,48 @@ void Navp::renderExclusionBoxesForHitTest() const {
                 {exclusionBox.scale.x, exclusionBox.scale.z, -exclusionBox.scale.y},
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
                 true,
-                {static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {
+                    static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.05f
+                },
                 true,
-                {static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f, static_cast<float>(lowByte) / 255.05f},
+                {
+                    static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.05f
+                },
                 1.0);
             i++;
         }
     }
 }
 
-char *Navp::openLoadNavpFileDialog() {
+char* Navp::openLoadNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdLoadDialog(filters, 2);
 }
 
-char *Navp::openSaveNavpFileDialog() {
+char* Navp::openSaveNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdSaveDialog(filters, 2, "output");
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {
     if (Obj::getInstance().objLoaded) {
-        if (const RecastAdapter &recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
+        if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             recastAdapter.clearConvexVolumes();
-            for (Json::PfBox exclusionBox: Scene::getInstance().exclusionBoxes) {
+            for (Json::PfBox exclusionBox : Scene::getInstance().exclusionBoxes) {
                 recastAdapter.addConvexVolume(exclusionBox);
             }
         }
     }
 }
 
-bool Navp::areaIsStairs(const NavPower::Area &area) {
+bool Navp::areaIsStairs(const NavPower::Area& area) {
     return area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
 }
 
 void Navp::setStairsFlags() const {
-    for (auto &area: navMesh->m_areas) {
+    for (auto& area : navMesh->m_areas) {
         const Vec3 normal = area.CalculateNormal();
         const Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
         const float horizontalMagnitude = std::sqrt(
@@ -376,9 +414,9 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
     }
     selectedNavpAreaIndex = index;
     if (index != -1 && index < navMesh->m_areas.size()) {
-        auto &selectedArea = navMesh->m_areas[index];
+        auto& selectedArea = navMesh->m_areas[index];
         Logger::log(NK_INFO, ("Selected area: " + std::to_string(index + 1)).c_str());
-        Vec3 pos = selectedArea.m_area->m_pos;
+        const Vec3 pos = selectedArea.m_area->m_pos;
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
         std::string msg = "Area " + std::to_string(index + 1) + ": pos: (";
@@ -388,7 +426,7 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
         snprintf(v, sizeof(v), "%.2f", pos.Z);
         msg += ", " + std::string{v} + ") Edges: [";
         int edgeIndex = 0;
-        for (const auto vertex: selectedArea.m_edges) {
+        for (const auto vertex : selectedArea.m_edges) {
             msg += std::to_string(edgeIndex + 1) + ": (";
             snprintf(v, sizeof(v), "%.2f", vertex->m_pos.X);
             msg += std::string{v};
@@ -421,10 +459,10 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
 }
 
 void Navp::setSelectedPfSeedPointIndex(const int index) {
-    const Scene &scene = Scene::getInstance();
+    const Scene& scene = Scene::getInstance();
 
     if (index == -1 && selectedPfSeedPointIndex != -1) {
-        auto &selectedPFSeedPoint = scene.pfSeedPoints[selectedPfSeedPointIndex];
+        auto& selectedPFSeedPoint = scene.pfSeedPoints[selectedPfSeedPointIndex];
         Logger::log(
             NK_INFO,
             ("Deselected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").
@@ -432,16 +470,16 @@ void Navp::setSelectedPfSeedPointIndex(const int index) {
     }
     selectedPfSeedPointIndex = index;
     if (index != -1 && index < scene.pfSeedPoints.size()) {
-        auto &selectedPFSeedPoint = scene.pfSeedPoints[index];
+        auto& selectedPFSeedPoint = scene.pfSeedPoints[index];
         Logger::log(
             NK_INFO,
             ("Selected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").
             c_str());
-        Vec3 pos = {selectedPFSeedPoint.pos.x, selectedPFSeedPoint.pos.y, selectedPFSeedPoint.pos.z};
+        const Vec3 pos = {selectedPFSeedPoint.pos.x, selectedPFSeedPoint.pos.y, selectedPFSeedPoint.pos.z};
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
         std::string msg = "PF Seed point name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id +
-                          "' pos: (";
+            "' pos: (";
         msg += std::string{v};
         snprintf(v, sizeof(v), "%.2f", pos.Y);
         msg += ", " + std::string{v};
@@ -451,11 +489,11 @@ void Navp::setSelectedPfSeedPointIndex(const int index) {
     }
 }
 
-void Navp::setSelectedExclusionBoxIndex(int index) {
-    Scene &scene = Scene::getInstance();
+void Navp::setSelectedExclusionBoxIndex(const int index) {
+    const Scene& scene = Scene::getInstance();
 
     if (index == -1 && selectedExclusionBoxIndex != -1) {
-        auto &selectedExclusionBox = scene.exclusionBoxes[selectedExclusionBoxIndex];
+        const auto& selectedExclusionBox = scene.exclusionBoxes[selectedExclusionBoxIndex];
         Logger::log(
             NK_INFO,
             ("Deselected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'")
@@ -463,17 +501,17 @@ void Navp::setSelectedExclusionBoxIndex(int index) {
     }
     selectedExclusionBoxIndex = index;
     if (index != -1 && index < scene.exclusionBoxes.size()) {
-        auto &selectedExclusionBox = scene.exclusionBoxes[index];
+        const auto& selectedExclusionBox = scene.exclusionBoxes[index];
 
         Logger::log(
             NK_INFO,
             ("Selected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'").
             c_str());
-        Vec3 pos = {selectedExclusionBox.pos.x, selectedExclusionBox.pos.y, selectedExclusionBox.pos.z};
+        const Vec3 pos = {selectedExclusionBox.pos.x, selectedExclusionBox.pos.y, selectedExclusionBox.pos.z};
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
         std::string msg =
-                "Exclusion Box name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "' pos: (";
+            "Exclusion Box name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "' pos: (";
         msg += std::string{v};
         snprintf(v, sizeof(v), "%.2f", pos.Y);
         msg += ", " + std::string{v};
@@ -485,7 +523,7 @@ void Navp::setSelectedExclusionBoxIndex(int index) {
 
 void Navp::renderNavMesh() {
     if (!loading) {
-        Renderer &renderer = Renderer::getInstance();
+        Renderer& renderer = Renderer::getInstance();
 
         if (navMeshDirty || selectedNavpAreaIndex != lastSelectedArea) {
             updateNavMeshBuffers(navMesh, selectedNavpAreaIndex);
@@ -511,25 +549,25 @@ void Navp::renderNavMesh() {
         glBindVertexArray(0);
         renderer.shader.setBool("useVertexColor", false);
 
-        Vec3 colorRed = {1.0f, 0.4f, 0.4f};
-        Vec3 colorGreen = {.7f, 1.0f, .7f};
-        Vec3 colorBlue = {.7f, .7f, 1.0f};
-        Vec3 colorPink = {1.0f, .7f, 1.0f};
+        const Vec3 colorRed = {1.0f, 0.4f, 0.4f};
+        const Vec3 colorGreen = {.7f, 1.0f, .7f};
+        const Vec3 colorBlue = {.7f, .7f, 1.0f};
+        const Vec3 colorPink = {1.0f, .7f, 1.0f};
         if (showNavpIndices) {
             int areaIndex = 0;
-            for (const NavPower::Area &area: navMesh->m_areas) {
+            for (const NavPower::Area& area : navMesh->m_areas) {
                 renderer.drawText(std::to_string(areaIndex + 1), {
                                       area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y
                                   }, colorBlue);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
-                    for (const auto vertex: area.m_edges) {
+                    for (const auto vertex : area.m_edges) {
                         renderer.drawText(std::to_string(edgeIndex + 1),
                                           {vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y},
                                           vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
                                               ? colorRed
                                               : colorGreen);
-                        if (vertex->m_pAdjArea != 0) {
+                        if (vertex->m_pAdjArea != nullptr) {
                             const auto nextVertex = area.m_edges[(edgeIndex + 1) % area.m_edges.size()];
                             Vec3 midpoint = (vertex->m_pos + nextVertex->m_pos) / 2.0f;
                             const int neighborAreaIndex = binaryAreaToAreaIndexMap[vertex->m_pAdjArea];
@@ -553,7 +591,7 @@ void Navp::renderNavMeshForHitTest() const {
             hitTestDirty = false;
         }
 
-        Renderer &renderer = Renderer::getInstance();
+        const Renderer& renderer = Renderer::getInstance();
         renderer.shader.use();
         renderer.shader.setMat4("view", renderer.view);
         renderer.shader.setMat4("projection", renderer.projection);
@@ -568,26 +606,29 @@ void Navp::renderNavMeshForHitTest() const {
     }
 }
 
-void Navp::loadNavMeshFileData(const std::string &fileName) {
-    if (!std::filesystem::is_regular_file(fileName))
+void Navp::loadNavMeshFileData(const std::string& fileName) {
+    if (!std::filesystem::is_regular_file(fileName)) {
         throw std::runtime_error("Input path is not a regular file.");
+    }
 
     const long s_FileSize = std::filesystem::file_size(fileName);
 
-    if (s_FileSize < sizeof(NavPower::NavMesh))
+    if (s_FileSize < sizeof(NavPower::NavMesh)) {
         throw std::runtime_error("Invalid NavMesh File.");
+    }
 
     std::ifstream s_FileStream(fileName, std::ios::in | std::ios::binary);
 
-    if (!s_FileStream)
+    if (!s_FileStream) {
         throw std::runtime_error("Error creating input file stream.");
+    }
 
     navMeshFileData.resize(s_FileSize);
 
     s_FileStream.read(navMeshFileData.data(), s_FileSize);
 }
 
-void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg) {
+void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const bool isFromBuildingNavp, const bool isFromBuildingAirg) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
@@ -595,29 +636,33 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     const auto start = std::chrono::high_resolution_clock::now();
     loading = true;
     CPPTRACE_TRY
-        {
+    {
             NavPower::NavMesh newNavMesh = isFromJson
                                                ? LoadNavMeshFromJson(fileName.c_str())
                                                : LoadNavMeshFromBinary(fileName.c_str());
-            std::swap(*navMesh, newNavMesh);
-            const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+        std::swap(*navMesh, newNavMesh);
+            const NavKitSettings & navKitSettings = NavKitSettings::getInstance();
             if (isFromBuildingNavp || isFromBuildingAirg) {
-                setStairsFlags();
-                outputNavpFilename = navKitSettings.outputFolder + (isFromBuildingNavp
-                                                                  ? "\\output.navp"
-                                                                  : "\\outputForAirg.navp");
-                OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
+            setStairsFlags();
+            outputNavpFilename = navKitSettings.outputFolder + (isFromBuildingNavp
+                                                                    ? "\\output.navp"
+                                                                    : "\\outputForAirg.navp");
+            OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
                 NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
-                std::swap(*navMesh, reloadedNavMesh);
-            }
-            if (isFromJson) {
-                OutputNavMesh_NAVP_Write(navMesh, outputNavpFilename.c_str());
-                loadNavMeshFileData(outputNavpFilename);
-            } else {
-                loadNavMeshFileData(fileName);
-            }
+            std::swap(*navMesh, reloadedNavMesh);
+            
         }
-    CPPTRACE_CATCH(const std::exception& e) {
+            if (isFromJson) {
+            OutputNavMesh_NAVP_Write(navMesh, outputNavpFilename.c_str());
+            loadNavMeshFileData(outputNavpFilename);
+            
+        }else {
+            loadNavMeshFileData(fileName);
+            
+        }
+    }
+    CPPTRACE_CATCH(const std::exception & e)
+    {
         msg = "Error loading Navp file '";
         msg += fileName;
         msg += "': ";
@@ -626,7 +671,10 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
         return;
-    } catch (...) {
+    }
+    catch
+    (...)
+    {
         msg = "Invalid Navp file: '";
         msg += fileName;
         msg += "'...";
@@ -634,8 +682,8 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
         return;
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    const auto end = std::chrono::high_resolution_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
     msg = "Finished loading Navp in ";
     msg += std::to_string(duration.count());
     msg += " seconds";
@@ -647,57 +695,63 @@ void Navp::loadNavMesh(const std::string &fileName, bool isFromJson, bool isFrom
     hitTestDirty = true;
     Menu::updateMenuState();
     buildAreaMaps();
-    if (Airg &airg = Airg::getInstance(); SceneExtract::getInstance().alsoBuildAll && airg.canBuildAirg()) {
+    if (Airg& airg = Airg::getInstance(); SceneExtract::getInstance().alsoBuildAll && airg.canBuildAirg()) {
         airg.handleBuildAirgClicked();
     }
 }
 
 void Navp::buildNavp() {
     CPPTRACE_TRY
-        {
-            std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    {
+            const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::string msg = "Building Navp at ";
-            msg += std::ctime(&start_time);
-            Logger::log(NK_INFO, msg.data());
-            auto start = std::chrono::high_resolution_clock::now();
-            RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-            updateExclusionBoxConvexVolumes();
-            building = true;
-            Menu::updateMenuState();
-            Logger::log(NK_INFO, "Beginning Recast build...");
+        msg += std::ctime(&start_time);
+        Logger::log(NK_INFO, msg.data());
+            const auto start = std::chrono::high_resolution_clock::now();
+        RecastAdapter & recastAdapter = RecastAdapter::getInstance();
+        updateExclusionBoxConvexVolumes();
+        building = true;
+        Menu::updateMenuState();
+        Logger::log(NK_INFO, "Beginning Recast build...");
             if (recastAdapter.handleBuild()) {
-                Logger::log(NK_INFO, "Done with Recast build.");
-                Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
-                recastAdapter.findPfSeedPointAreas();
-                recastAdapter.excludeNonReachableAreas();
-                auto end = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-                navpBuildDone.store(true);
-                msg = "Finished building Navp in ";
-                msg += std::to_string(duration.count());
-                msg += " seconds";
-                Logger::log(NK_INFO, msg.data());
-                setSelectedNavpAreaIndex(-1);
-                Menu::updateMenuState();
-            } else {
-                Logger::log(NK_ERROR, "Error building Navp");
-                building = false;
-                navpBuildDone.store(false);
-                Menu::updateMenuState();
-            }
+            Logger::log(NK_INFO, "Done with Recast build.");
+            Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
+            recastAdapter.findPfSeedPointAreas();
+            recastAdapter.excludeNonReachableAreas();
+                const auto end = std::chrono::high_resolution_clock::now();
+                const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+            navpBuildDone.store(true);
+            msg = "Finished building Navp in ";
+            msg += std::to_string(duration.count());
+            msg += " seconds";
+            Logger::log(NK_INFO, msg.data());
+            setSelectedNavpAreaIndex(-1);
+            Menu::updateMenuState();
+            
+        }else {
+            Logger::log(NK_ERROR, "Error building Navp");
+            building = false;
+            navpBuildDone.store(false);
+            Menu::updateMenuState();
+            
         }
-    CPPTRACE_CATCH(const std::exception& e) {
+    }
+    CPPTRACE_CATCH(const std::exception & e)
+    {
         std::string msg = "Error building Navp: ";
         msg += e.what();
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
-    } catch (...) {
+    }
+    catch
+    (...)
+    {
         Logger::log(NK_ERROR, "Error building Navp.");
     }
 }
 
-void Navp::setLastLoadFileName(const char *fileName) {
+void Navp::setLastLoadFileName(const char* fileName) {
     Logger::log(NK_INFO, ("Setting last navp loaded file name: " + std::string(fileName)).c_str());
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadNavpName = fileName;
@@ -706,7 +760,7 @@ void Navp::setLastLoadFileName(const char *fileName) {
     }
 }
 
-void Navp::setLastSaveFileName(const char *fileName) {
+void Navp::setLastSaveFileName(const char* fileName) {
     saveNavpName = fileName;
     lastSaveNavpFile = saveNavpName.data();
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
@@ -716,7 +770,7 @@ void Navp::loadNavpFromFile(const std::string& fileName) {
     Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
     setLastLoadFileName(fileName.c_str());
     std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
-    std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
+    std::ranges::transform(extension, extension.begin(), ::toupper);
 
     if (extension == "JSON") {
         std::string msg = "Loading Navp.json file: '";
@@ -734,13 +788,13 @@ void Navp::loadNavpFromFile(const std::string& fileName) {
 }
 
 void Navp::handleOpenNavpClicked() {
-    if (const char *fileName = openLoadNavpFileDialog()) {
+    if (const char* fileName = openLoadNavpFileDialog()) {
         loadedNavpText = fileName;
         loadNavpFromFile(fileName);
     }
 }
 
-void Navp::saveNavMesh(const std::string &fileName, const std::string &extension) {
+void Navp::saveNavMesh(const std::string& fileName, const std::string& extension) {
     loading = true;
 
     const auto start = std::chrono::high_resolution_clock::now();
@@ -753,7 +807,7 @@ void Navp::saveNavMesh(const std::string &fileName, const std::string &extension
         if (upper_extension == "JSON") {
             OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
         } else if (upper_extension == "NAVP") {
-            const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+            const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
             const std::string tempOutputJSONFilename = navKitSettings.outputFolder + "\\temp_save.navp.json";
 
             OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
@@ -768,7 +822,7 @@ void Navp::saveNavMesh(const std::string &fileName, const std::string &extension
         const auto end = std::chrono::high_resolution_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving Navp in %lld ms.", duration.count());
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_ERROR, "Error saving Navp file '%s': %s", fileName.c_str(), e.what());
     } catch (...) {
         Logger::log(NK_ERROR, "An unknown error occurred while saving Navp file '%s'", fileName.c_str());
@@ -778,7 +832,7 @@ void Navp::saveNavMesh(const std::string &fileName, const std::string &extension
 }
 
 void Navp::handleSaveNavpClicked() {
-    if (char *fileName = openSaveNavpFileDialog()) {
+    if (const char* fileName = openSaveNavpFileDialog()) {
         setLastSaveFileName(fileName);
         std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
 
@@ -790,16 +844,16 @@ bool Navp::stairsAreaSelected() const {
     return selectedNavpAreaIndex == -1
                ? false
                : selectedNavpAreaIndex < navMesh->m_areas.size()
-                     ? areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex])
-                     : false;
+               ? areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex])
+               : false;
 }
 
 bool Navp::canBuildNavp() const {
-    const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-    const Obj &obj = Obj::getInstance();
-    const Scene &scene = Scene::getInstance();
+    const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+    const Obj& obj = Obj::getInstance();
+    const Scene& scene = Scene::getInstance();
     return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
-           Airg::getInstance().airgBuilding && scene.sceneLoaded;
+        Airg::getInstance().airgBuilding && scene.sceneLoaded;
 }
 
 bool Navp::canSave() const {
@@ -808,12 +862,12 @@ bool Navp::canSave() const {
 
 void Navp::handleEditStairsClicked() const {
     if (selectedNavpAreaIndex != -1) {
-        NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
-                                            NavPower::AreaUsageFlags::AREA_STEPS)
+        const NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+                                               NavPower::AreaUsageFlags::AREA_STEPS)
                                                ? NavPower::AreaUsageFlags::AREA_FLAT
                                                : NavPower::AreaUsageFlags::AREA_STEPS;
-        std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
-                                     NavPower::AreaUsageFlags::AREA_STEPS)
+        const std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+                                        NavPower::AreaUsageFlags::AREA_STEPS)
                                         ? "AREA_FLAT"
                                         : "AREA_STEPS";
         Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
@@ -831,7 +885,7 @@ void Navp::buildAreaMaps() {
     binaryAreaToAreaMap.clear();
     posToAreaMap.clear();
     int areaIndex = 1;
-    for (NavPower::Area &area: navMesh->m_areas) {
+    for (NavPower::Area& area : navMesh->m_areas) {
         binaryAreaToAreaIndexMap.emplace(area.m_area, areaIndex);
         binaryAreaToAreaMap.emplace(area.m_area, &area);
         posToAreaMap.emplace(area.m_area->m_pos, &area);
@@ -842,8 +896,8 @@ void Navp::buildAreaMaps() {
 void Navp::finalizeBuild() {
     if (navpBuildDone) {
         navpLoaded = true;
-        const RecastAdapter &recastAdapter = RecastAdapter::getInstance();
-        const NavKitSettings &navKitSettings = NavKitSettings::getInstance();
+        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
+        const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         outputNavpFilename = navKitSettings.outputFolder + "\\output.navp.json";
         recastAdapter.save(outputNavpFilename);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
@@ -853,12 +907,13 @@ void Navp::finalizeBuild() {
     }
 }
 
-void Navp::updateNavpDialogControls(HWND hwnd) {
-    auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
+void Navp::updateNavpDialogControls(const HWND hwnd) {
+    const auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
     SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
 
     if (!navpHashIoiStringMap.empty()) {
-        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
+        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(
+            navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
         auto comparator = [](const std::pair<std::string, std::string>& a,
                              const std::pair<std::string, std::string>& b) {
             if (a.second != b.second) {
@@ -867,19 +922,19 @@ void Navp::updateNavpDialogControls(HWND hwnd) {
             return a.first < b.first;
         };
         std::ranges::sort(sorted_hash_ioi_string_pairs, comparator);
-        for (auto & [hash, ioiString] : sorted_hash_ioi_string_pairs) {
+        for (auto& [hash, ioiString] : sorted_hash_ioi_string_pairs) {
             std::string listItemString;
             if (!ioiString.empty()) {
                 listItemString = ioiString;
             } else {
                 listItemString = hash;
             }
-            SendMessage(hWndComboBox, (UINT) CB_ADDSTRING, (WPARAM) 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
+            SendMessage(hWndComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
             if (selectedRpkgNavp.empty()) {
                 selectedRpkgNavp = ioiString;
             }
         }
-        SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM) 0, (LPARAM) 0);
+        SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);
     }
 }
 
@@ -891,8 +946,8 @@ void Navp::extractNavpFromRpkgs(const std::string& hash) {
     }
 }
 
-INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    Navp* pNavp = nullptr;
+INT_PTR CALLBACK Navp::extractNavpDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+    Navp * pNavp = nullptr;
     if (message == WM_INITDIALOG) {
         pNavp = reinterpret_cast<Navp*>(lParam);
         SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pNavp));
@@ -901,54 +956,54 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wPa
     }
 
     if (!pNavp) {
-        return (INT_PTR)FALSE;
+        return FALSE;
     }
 
     switch (message) {
-        case WM_INITDIALOG:
-            updateNavpDialogControls(hDlg);
-            return (INT_PTR) TRUE;
+    case WM_INITDIALOG:
+        updateNavpDialogControls(hDlg);
+        return TRUE;
 
-        case WM_COMMAND:
+    case WM_COMMAND:
 
-            if(HIWORD(wParam) == CBN_SELCHANGE) {
-                const int ItemIndex = SendMessage((HWND) lParam, (UINT) CB_GETCURSEL,
-                    (WPARAM) 0, (LPARAM) 0);
-                char ListItem[256];
-                SendMessage((HWND) lParam, (UINT) CB_GETLBTEXT, (WPARAM) ItemIndex, (LPARAM) ListItem);
-                selectedRpkgNavp = ListItem;
+        if (HIWORD(wParam) == CBN_SELCHANGE) {
+            const int ItemIndex = SendMessage((HWND)lParam, CB_GETCURSEL,
+                                              0, 0);
+            char ListItem[256];
+            SendMessage((HWND)lParam, CB_GETLBTEXT, static_cast<WPARAM>(ItemIndex), (LPARAM)ListItem);
+            selectedRpkgNavp = ListItem;
 
-                return TRUE;
-            }
-            if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
-                for (auto & [hash, ioiString]: navpHashIoiStringMap) {
-                    if (hash == selectedRpkgNavp) {
-                        getInstance().loadedNavpText = hash;
-                    } else if (ioiString == selectedRpkgNavp) {
-                        getInstance().loadedNavpText = ioiString;
-                    } else {
-                        continue;
-                    }
-                    extractNavpFromRpkgs(hash);
+            return TRUE;
+        }
+        if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
+            for (auto& [hash, ioiString] : navpHashIoiStringMap) {
+                if (hash == selectedRpkgNavp) {
+                    getInstance().loadedNavpText = hash;
+                } else if (ioiString == selectedRpkgNavp) {
+                    getInstance().loadedNavpText = ioiString;
+                } else {
+                    continue;
                 }
-                DestroyWindow(hDlg);
-                return TRUE;
-            } else if (commandId == IDCANCEL) {
-                DestroyWindow(hDlg);
-                return TRUE;
+                extractNavpFromRpkgs(hash);
             }
-            return (INT_PTR) TRUE;
-
-        case WM_CLOSE:
             DestroyWindow(hDlg);
-            return (INT_PTR) TRUE;
+            return TRUE;
+        } else if (commandId == IDCANCEL) {
+            DestroyWindow(hDlg);
+            return TRUE;
+        }
+        return TRUE;
 
-        case WM_DESTROY:
-            hNavpDialog = nullptr;
-            return (INT_PTR) TRUE;
-        default: ;
+    case WM_CLOSE:
+        DestroyWindow(hDlg);
+        return TRUE;
+
+    case WM_DESTROY:
+        hNavpDialog = nullptr;
+        return TRUE;
+    default: ;
     }
-    return (INT_PTR) FALSE;
+    return FALSE;
 }
 
 void Navp::showExtractNavpDialog() {
@@ -959,15 +1014,16 @@ void Navp::showExtractNavpDialog() {
 
     HINSTANCE hInstance = nullptr;
     if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                           (LPCSTR)&Navp::extractNavpDialogProc, &hInstance)) {
+                           (LPCSTR) & Navp::extractNavpDialogProc, &hInstance)) {
         Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
         return;
     }
 
-    HWND hParentWnd = Renderer::hwnd;
+    const HWND hParentWnd = Renderer::hwnd;
 
-    hNavpDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_NAVP_DIALOG), hParentWnd, extractNavpDialogProc,
-                                     reinterpret_cast<LPARAM>(this));
+    hNavpDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_NAVP_DIALOG), hParentWnd,
+                                    extractNavpDialogProc,
+                                    reinterpret_cast<LPARAM>(this));
 
     if (hNavpDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
@@ -977,16 +1033,19 @@ void Navp::showExtractNavpDialog() {
         RECT parentRect, dialogRect;
         GetWindowRect(hParentWnd, &parentRect);
         GetWindowRect(hNavpDialog, &dialogRect);
-        int parentWidth = parentRect.right - parentRect.left;
-        int parentHeight = parentRect.bottom - parentRect.top;
-        int dialogWidth = dialogRect.right - dialogRect.left;
-        int dialogHeight = dialogRect.bottom - dialogRect.top;
-        int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-        SetWindowPos(hNavpDialog, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        const int parentWidth = parentRect.right - parentRect.left;
+        const int parentHeight = parentRect.bottom - parentRect.top;
+        const int dialogWidth = dialogRect.right - dialogRect.left;
+        const int dialogHeight = dialogRect.bottom - dialogRect.top;
+        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
+        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
+        SetWindowPos(hNavpDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         ShowWindow(hNavpDialog, SW_SHOW);
     } else {
         const DWORD error = GetLastError();
-        Logger::log(NK_ERROR, "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.", error);
+        Logger::log(
+            NK_ERROR,
+            "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.",
+            error);
     }
 }

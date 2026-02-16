@@ -15,8 +15,7 @@
 
 UpdateChecker::UpdateChecker()
     : updateCheckCompleted(false)
-      , isUpdateAvailable(false) {
-}
+      , isUpdateAvailable(false) {}
 
 UpdateChecker::~UpdateChecker() {
     if (updateThread.joinable()) {
@@ -32,7 +31,7 @@ void UpdateChecker::startUpdateCheck() {
 }
 
 void UpdateChecker::performUpdateCheck() {
-    UpdateChecker &updateChecker = getInstance();
+    UpdateChecker & updateChecker = getInstance();
     Logger::log(NK_INFO, "Checking for updates.");
 
     httplib::Client cli("https://api.github.com");
@@ -48,24 +47,24 @@ void UpdateChecker::performUpdateCheck() {
         }
         updateChecker.responseBody = res->body;
         simdjson::ondemand::parser parser;
-        simdjson::padded_string json(updateChecker.responseBody);
+        const simdjson::padded_string json(updateChecker.responseBody);
         simdjson::ondemand::document doc = parser.iterate(json);
 
-        std::string_view latestVersionSV = doc["tag_name"];
+        const std::string_view latestVersionSV = doc["tag_name"];
         if (latestVersionSV.empty()) {
             Logger::log(NK_ERROR, "Error checking for updates.");
         }
-        std::string latestVersionStr(latestVersionSV.substr(1));
+        const std::string latestVersionStr(latestVersionSV.substr(1));
 
         const std::string currentVersionStr =
-                std::string(NavKit_VERSION_MAJOR) + "." + std::string(NavKit_VERSION_MINOR) + "." +
-                std::string(NavKit_VERSION_PATCH);
+            std::string(NavKit_VERSION_MAJOR) + "." + std::string(NavKit_VERSION_MINOR) + "." +
+            std::string(NavKit_VERSION_PATCH);
         Logger::log(NK_INFO, ("Current version: " + currentVersionStr).c_str());
         Logger::log(NK_INFO, ("Latest version: " + latestVersionStr).c_str());
-        bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
+        const bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
         Logger::log(NK_INFO, (std::string(updateAvailable ? "Update available." : "No update available.")).c_str());
         if (updateAvailable) {
-            for (simdjson::ondemand::object asset: doc["assets"]) {
+            for (simdjson::ondemand::object asset : doc["assets"]) {
                 if (std::string_view url_sv = asset["browser_download_url"]; url_sv.ends_with(".msi")) {
                     {
                         std::lock_guard lock(updateChecker.mutex);
@@ -81,9 +80,10 @@ void UpdateChecker::performUpdateCheck() {
             }
             Logger::log(NK_ERROR, "No MSI asset found in the latest GitHub release.");
         }
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
-    } {
+    }
+    {
         std::lock_guard lock(updateChecker.mutex);
         updateChecker.updateCheckCompleted = true;
     }
@@ -95,7 +95,7 @@ void UpdateChecker::renderUpdatePopup() {
     }
 }
 
-void splitUrl(const std::string &url, std::string &domain, std::string &path) {
+void splitUrl(const std::string& url, std::string& domain, std::string& path) {
     const size_t protocol_end = url.find("://");
     size_t start_pos = 0;
 
@@ -134,7 +134,7 @@ void UpdateChecker::performUpdate() const {
     char temp_path_buf[MAX_PATH];
     GetTempPathA(MAX_PATH, temp_path_buf);
     const std::filesystem::path temp_updater_dir =
-            std::filesystem::path(temp_path_buf) / ("NavKitUpdate_" + std::to_string(GetCurrentProcessId()));
+        std::filesystem::path(temp_path_buf) / ("NavKitUpdate_" + std::to_string(GetCurrentProcessId()));
     std::filesystem::create_directories(temp_updater_dir);
     const std::filesystem::path temp_updater_path = temp_updater_dir / "updater.exe";
 
@@ -142,7 +142,7 @@ void UpdateChecker::performUpdate() const {
         std::filesystem::copy_file(original_updater_path, temp_updater_path,
                                    std::filesystem::copy_options::overwrite_existing);
         Logger::log(NK_INFO, ("Copied updater to " + temp_updater_path.string()).c_str());
-    } catch (const std::filesystem::filesystem_error &e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, ("NavKit: Failed to copy updater to temp directory: " + std::string(e.what())).c_str());
         return;
     }
@@ -154,11 +154,11 @@ void UpdateChecker::performUpdate() const {
                                        std::filesystem::copy_options::overwrite_existing);
             Logger::log(
                 NK_INFO, ("Copied NavKit.ini to " + temp_settings_path.string() + " to preserve settings.").c_str());
-        } catch (const std::filesystem::filesystem_error &e) {
+        } catch (const std::filesystem::filesystem_error& e) {
             Logger::log(
                 NK_ERROR,
                 ("NavKit: Failed to copy NavKit.ini to temp directory, settings will not be preserved: " +
-                 std::string(e.what())).c_str());
+                    std::string(e.what())).c_str());
         }
     }
 
@@ -189,14 +189,14 @@ void UpdateChecker::performUpdate() const {
     }
 
     const std::string command = "\"" + local_msi_path.string() + "\" "
-                                + std::to_string(GetCurrentProcessId()) + " "
-                                + latestVersion + " "
-                                + "\"" + install_dir.string() + "\"";
+        + std::to_string(GetCurrentProcessId()) + " "
+        + latestVersion + " "
+        + "\"" + install_dir.string() + "\"";
 
     Logger::log(NK_INFO, ("Launching updater with command: " + command).c_str());
     if (reinterpret_cast<INT_PTR>(
-            ShellExecuteA(nullptr, "open", temp_updater_path.string().c_str(), command.c_str(),
-                          temp_updater_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
+        ShellExecuteA(nullptr, "open", temp_updater_path.string().c_str(), command.c_str(),
+                      temp_updater_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
         Logger::log(NK_ERROR, "NavKit: Failed to launch updater.exe from temp directory.");
         return;
     }
@@ -208,32 +208,33 @@ void UpdateChecker::performUpdate() const {
 
 INT_PTR CALLBACK UpdateChecker::updateDialogHandler(const HWND hwndDlg, const UINT uMsg, const WPARAM wParam,
                                                     LPARAM lParam) {
-    const UpdateChecker &updateChecker = getInstance();
+    const UpdateChecker& updateChecker = getInstance();
     switch (uMsg) {
-        case WM_INITDIALOG: {
-            const HWND hStatic = GetDlgItem(hwndDlg, IDC_UPDATE_TEXT);
-            SetWindowTextA(hStatic, updateChecker.updateMessage.c_str());
+    case WM_INITDIALOG: {
+        const HWND hStatic = GetDlgItem(hwndDlg, IDC_UPDATE_TEXT);
+        SetWindowTextA(hStatic, updateChecker.updateMessage.c_str());
+        return TRUE;
+    }
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDNO) {
+            EndDialog(hwndDlg, IDNO);
             return TRUE;
         }
-        case WM_COMMAND:
-            if (LOWORD(wParam) == IDNO) {
-                EndDialog(hwndDlg, IDNO);
-                return TRUE;
-            }
-            if (LOWORD(wParam) == IDYES) {
-                getInstance().performUpdate();
-                EndDialog(hwndDlg, IDYES);
-                return TRUE;
-            }
-            return FALSE;
-        case WM_CLOSE:
-            EndDialog(hwndDlg, IDOK);
+        if (LOWORD(wParam) == IDYES) {
+            getInstance().performUpdate();
+            EndDialog(hwndDlg, IDYES);
             return TRUE;
-        default: return FALSE;
+        }
+        return FALSE;
+    case WM_CLOSE:
+        EndDialog(hwndDlg, IDOK);
+        return TRUE;
+    default:
+        return FALSE;
     }
 }
 
-void UpdateChecker::openUpdateDialog(const std::string &message) {
+void UpdateChecker::openUpdateDialog(const std::string& message) {
     std::string formattedMessage = message;
 
     size_t pos = 0;
@@ -246,7 +247,7 @@ void UpdateChecker::openUpdateDialog(const std::string &message) {
                     0);
 }
 
-bool UpdateChecker::isVersionGreaterThan(const std::string &v1, const std::string &v2) {
+bool UpdateChecker::isVersionGreaterThan(const std::string& v1, const std::string& v2) {
     std::vector<int> ver1, ver2;
     std::stringstream ss1(v1), ss2(v2);
     std::string segment;
@@ -261,8 +262,12 @@ bool UpdateChecker::isVersionGreaterThan(const std::string &v1, const std::strin
     for (size_t i = 0; i < std::max(ver1.size(), ver2.size()); ++i) {
         const int n1 = i < ver1.size() ? ver1[i] : 0;
         const int n2 = i < ver2.size() ? ver2[i] : 0;
-        if (n1 > n2) return true;
-        if (n1 < n2) return false;
+        if (n1 > n2) {
+            return true;
+        }
+        if (n1 < n2) {
+            return false;
+        }
     }
     return false;
 }

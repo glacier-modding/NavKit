@@ -8,8 +8,7 @@
 #include "../../include/NavKit/module/Obj.h"
 #include "../../include/NavKit/module/Renderer.h"
 
-PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {
-}
+PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {}
 
 void PersistedSettings::load() {
     ini.SetUnicode();
@@ -29,7 +28,8 @@ void PersistedSettings::load() {
             CSimpleIniA::TNamesDepend sections;
             oldIni.GetAllSections(sections);
             // Merge from old settings using the previous settings schema
-            if (const auto backgroundColor = oldIni.GetValue("Colors", "backgroundColor", ""); backgroundColor[0] != '\0') {
+            if (const auto backgroundColor = oldIni.GetValue("Colors", "backgroundColor", ""); backgroundColor[0] !=
+                '\0') {
                 ini.SetValue("NavKit", "backgroundColor", backgroundColor);
             }
             if (const auto hitman = oldIni.GetValue("Paths", "hitman", ""); hitman[0] != '\0') {
@@ -42,8 +42,8 @@ void PersistedSettings::load() {
                 ini.SetValue("NavKit", "blender", blender);
             }
             // Merge from old settings that match the new settings schema
-            for (const auto &section: sections) {
-                if (const CSimpleIniA::TKeyVal *keys = oldIni.GetSection(section.pItem)) {
+            for (const auto& section : sections) {
+                if (const CSimpleIniA::TKeyVal* keys = oldIni.GetSection(section.pItem)) {
                     for (auto keyval = keys->begin(); keyval != keys->end(); ++keyval) {
                         const auto key = keyval->first.pItem;
                         if (const auto oldValue = oldIni.GetValue(section.pItem, key, "")) {
@@ -66,7 +66,7 @@ void PersistedSettings::load() {
         try {
             std::filesystem::remove(oldIniFileName);
             Logger::log(NK_INFO, "Removed temporary old settings file.");
-        } catch (const std::filesystem::filesystem_error &e) {
+        } catch (const std::filesystem::filesystem_error& e) {
             Logger::log(NK_ERROR, "Failed to delete NavKit.ini.old: %s", e.what());
         }
     } else {
@@ -92,12 +92,12 @@ void PersistedSettings::save() const {
     }
 }
 
-const char *PersistedSettings::getValue(const std::string &folder, const std::string &key,
-                                        const std::string &defaultValue) const {
+const char* PersistedSettings::getValue(const std::string& folder, const std::string& key,
+                                        const std::string& defaultValue) const {
     return ini.GetValue(folder.c_str(), key.c_str(), defaultValue.c_str());
 }
 
-void PersistedSettings::setValue(const std::string &folder, const std::string &key, const std::string &value) {
+void PersistedSettings::setValue(const std::string& folder, const std::string& key, const std::string& value) {
     if (ini.SetValue(folder.c_str(), key.c_str(), value.c_str()) == SI_FAIL) {
         Logger::log(NK_ERROR, "Error updating setting");
     }

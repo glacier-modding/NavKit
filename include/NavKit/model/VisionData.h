@@ -20,11 +20,15 @@ class VisionData {
 public:
     VisionData() = default;
 
-    explicit constexpr VisionData(const VisionDataType type) : visionDataType(type) {
+    explicit constexpr VisionData(const VisionDataType type) : visionDataType(type) {}
+
+    constexpr bool operator==(const VisionData a) const {
+        return visionDataType == a.visionDataType;
     }
 
-    constexpr bool operator==(const VisionData a) const { return visionDataType == a.visionDataType; }
-    constexpr bool operator!=(const VisionData a) const { return visionDataType != a.visionDataType; }
+    constexpr bool operator!=(const VisionData a) const {
+        return visionDataType != a.visionDataType;
+    }
 
     std::string getName() const;
 

@@ -1,6 +1,6 @@
 #include "../../include/NavKit/model/ReasoningGrid.h"
 
-const void Vec4::writeJson(std::ostream &f) {
+const void Vec4::writeJson(std::ostream& f) {
     f << "{";
 
     f << "\"x\"" << ":";
@@ -28,7 +28,7 @@ void Vec4::readJson(simdjson::ondemand::object p_Json) {
     w = double(p_Json["w"]);
 }
 
-const void Properties::writeJson(std::ostream &f) {
+const void Properties::writeJson(std::ostream& f) {
     f << "{";
 
     f << "\"vMin\"" << ":";
@@ -53,10 +53,10 @@ const void Properties::writeJson(std::ostream &f) {
 }
 
 void Properties::readJson(simdjson::ondemand::object p_Json) {
-    simdjson::ondemand::object vMinJson = p_Json["vMin"];
+    const simdjson::ondemand::object vMinJson = p_Json["vMin"];
     vMin.readJson(vMinJson);
 
-    simdjson::ondemand::object vMaxJson = p_Json["vMax"];
+    const simdjson::ondemand::object vMaxJson = p_Json["vMax"];
     vMax.readJson(vMaxJson);
 
     nGridWidth = uint64_t(p_Json["nGridWidth"]);
@@ -66,12 +66,12 @@ void Properties::readJson(simdjson::ondemand::object p_Json) {
     nVisibilityRange = uint64_t(p_Json["nVisibilityRange"]);
 }
 
-const void SizedArray::writeJson(std::ostream &f) {
+const void SizedArray::writeJson(std::ostream& f) {
     f << "{";
     f << "\"m_aBytes\"" << ":";
     f << "[";
     for (size_t i = 0; i < m_aBytes.size(); i++) {
-        f << (uint64_t) m_aBytes[i];
+        f << (uint64_t)m_aBytes[i];
         if (i < m_aBytes.size() - 1) {
             f << ",";
         }
@@ -87,13 +87,13 @@ const void SizedArray::writeJson(std::ostream &f) {
 
 void SizedArray::readJson(simdjson::ondemand::object p_Json) {
     simdjson::ondemand::array m_aBytesJson = p_Json["m_aBytes"];
-    for (uint64_t byteJson: m_aBytesJson) {
+    for (const uint64_t byteJson : m_aBytesJson) {
         m_aBytes.push_back(byteJson);
     }
     m_nSize = uint64_t(p_Json["m_nSize"]);
 }
 
-const void Waypoint::writeJson(std::ostream &f) {
+const void Waypoint::writeJson(std::ostream& f) {
     f << "{";
     f << "\"nNeighbor0\"" << ":";
     f << nNeighbors[0];
@@ -132,23 +132,23 @@ const void Waypoint::writeJson(std::ostream &f) {
 
 void Waypoint::readJson(simdjson::ondemand::object p_Json) {
     nNeighbors.clear();
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor0"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor1"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor2"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor3"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor4"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor5"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor6"]));
-    nNeighbors.push_back((uint16_t) uint64_t(p_Json["nNeighbor7"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor0"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor1"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor2"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor3"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor4"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor5"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor6"]));
+    nNeighbors.push_back((uint16_t)uint64_t(p_Json["nNeighbor7"]));
 
-    simdjson::ondemand::object vPosJson = p_Json["vPos"];
+    const simdjson::ondemand::object vPosJson = p_Json["vPos"];
     vPos.readJson(vPosJson);
 
     nVisionDataOffset = uint64_t(p_Json["nVisionDataOffset"]);
     nLayerIndex = uint64_t(p_Json["nLayerIndex"]);
 }
 
-const void ReasoningGrid::writeJson(std::ostream &f) {
+const void ReasoningGrid::writeJson(std::ostream& f) {
     f << "{";
 
     f << "\"m_WaypointList\"" << ":";
@@ -182,7 +182,7 @@ const void ReasoningGrid::writeJson(std::ostream &f) {
     f << "\"m_pVisibilityData\"" << ":";
     f << "[";
     for (size_t i = 0; i < m_pVisibilityData.size(); i++) {
-        f << (uint64_t) m_pVisibilityData[i];
+        f << (uint64_t)m_pVisibilityData[i];
         if (i < m_pVisibilityData.size() - 1) {
             f << ",";
         }
@@ -197,43 +197,43 @@ const void ReasoningGrid::writeJson(std::ostream &f) {
     f << "}";
 }
 
-void ReasoningGrid::readJson(const char *p_AirgPath) {
+void ReasoningGrid::readJson(const char* p_AirgPath) {
     simdjson::ondemand::parser p_Parser;
-    simdjson::padded_string p_Json = simdjson::padded_string::load(p_AirgPath);
+    const simdjson::padded_string p_Json = simdjson::padded_string::load(p_AirgPath);
     simdjson::ondemand::document p_AirgDocument = p_Parser.iterate(p_Json);
 
-    simdjson::ondemand::object m_PropertiesJson = p_AirgDocument["m_Properties"];
+    const simdjson::ondemand::object m_PropertiesJson = p_AirgDocument["m_Properties"];
     m_Properties.readJson(m_PropertiesJson);
-    simdjson::ondemand::object m_HighVisibilityBitsJson = p_AirgDocument["m_HighVisibilityBits"];
+    const simdjson::ondemand::object m_HighVisibilityBitsJson = p_AirgDocument["m_HighVisibilityBits"];
     m_HighVisibilityBits.readJson(m_HighVisibilityBitsJson);
-    simdjson::ondemand::object m_LowVisibilityBitsJson = p_AirgDocument["m_LowVisibilityBits"];
+    const simdjson::ondemand::object m_LowVisibilityBitsJson = p_AirgDocument["m_LowVisibilityBits"];
     m_LowVisibilityBits.readJson(m_LowVisibilityBitsJson);
-    simdjson::ondemand::object m_deadEndDataJson = p_AirgDocument["m_deadEndData"];
+    const simdjson::ondemand::object m_deadEndDataJson = p_AirgDocument["m_deadEndData"];
     m_deadEndData.readJson(m_deadEndDataJson);
     m_nNodeCount = int64_t(p_AirgDocument["m_nNodeCount"]);
     simdjson::ondemand::array m_WaypointListJson = p_AirgDocument["m_WaypointList"];
-    for (simdjson::ondemand::value waypointJson: m_WaypointListJson) {
+    for (simdjson::ondemand::value waypointJson : m_WaypointListJson) {
         Waypoint waypoint;
         waypoint.readJson(waypointJson);
         m_WaypointList.push_back(waypoint);
     }
     simdjson::ondemand::array m_pVisibilityDataJson = p_AirgDocument["m_pVisibilityData"];
-    for (uint64_t visibilityDatum: m_pVisibilityDataJson) {
+    for (const uint64_t visibilityDatum : m_pVisibilityDataJson) {
         m_pVisibilityData.push_back(visibilityDatum);
     }
 }
 
 std::vector<uint8_t> ReasoningGrid::getWaypointVisionData(int waypointIndex) {
-    Waypoint &waypoint = m_WaypointList[waypointIndex];
-    int nextWaypointOffset = (waypointIndex + 1) < m_WaypointList.size()
+    const Waypoint& waypoint = m_WaypointList[waypointIndex];
+    const int nextWaypointOffset = (waypointIndex + 1) < m_WaypointList.size()
                                  ? m_WaypointList[waypointIndex + 1].nVisionDataOffset
                                  : m_pVisibilityData.size();
     int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
 
-    std::vector<uint8_t>::const_iterator first = m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
-    std::vector<uint8_t>::const_iterator last = (waypointIndex + 1) < m_WaypointList.size()
+    const std::vector<uint8_t>::const_iterator first = m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
+    const std::vector<uint8_t>::const_iterator last = (waypointIndex + 1) < m_WaypointList.size()
                                                     ? m_pVisibilityData.begin() + m_WaypointList[waypointIndex + 1].
-                                                      nVisionDataOffset
+                                                    nVisionDataOffset
                                                     : m_pVisibilityData.end();
     std::vector<uint8_t> waypointVisibilityData(first, last);
     return waypointVisibilityData;

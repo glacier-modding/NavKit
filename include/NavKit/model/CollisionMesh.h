@@ -24,7 +24,7 @@ public:
     SMatrix m_mTransform;
     float4 m_vMin;
     float4 m_vMax;
-    ZResourceID *m_ResourceID;
+    ZResourceID* m_ResourceID;
     bool m_bMeshLoaded;
     ECollisionSource m_Source;
 };

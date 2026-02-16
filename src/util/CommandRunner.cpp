@@ -14,18 +14,19 @@ CommandRunner::CommandRunner() {
 CommandRunner::~CommandRunner() {
     closing = true;
     for (int commandIndex = 0; commandIndex < commandsRun; commandIndex++) {
-        for (const HANDLE &handle: handles[commandIndex]) {
+        for (const HANDLE& handle : handles[commandIndex]) {
             TerminateProcess(handle, 0);
             CloseHandle(handle);
         }
     }
 }
 
-void CommandRunner::runCommand(const std::string& command, const std::string& logFileName, const std::function<void()>& callback,
+void CommandRunner::runCommand(const std::string& command, const std::string& logFileName,
+                               const std::function<void()>& callback,
                                const std::function<void()>& errorCallback) {
     int commandIndex = commandsRun;
     commandsRun++;
-    handles.emplace(std::pair<int, std::vector<HANDLE> >(commandIndex, {}));
+    handles.emplace(std::pair<int, std::vector<HANDLE>>(commandIndex, {}));
     SECURITY_ATTRIBUTES saAttr = {sizeof(saAttr), nullptr, TRUE};
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
@@ -47,13 +48,13 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
 
     ZeroMemory(&pi, sizeof(pi));
 
-    FILE *logFile = fopen(logFileName.c_str(), "w");
-    char *commandLineChar = _strdup(command.c_str());
+    FILE* logFile = fopen(logFileName.c_str(), "w");
+    char* commandLineChar = _strdup(command.c_str());
 
-    if (!CreateProcess(NULL, commandLineChar, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+    if (!CreateProcess(nullptr, commandLineChar, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
         Logger::log(NK_ERROR,
                     ("Error creating process for command: " + command +
-                     ".").c_str());
+                        ".").c_str());
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
         fclose(logFile);
@@ -75,7 +76,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
             fclose(logFile);
             return;
         }
-        if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0)) {
+        if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0)) {
             break;
         }
         output.insert(output.end(), buffer, buffer + bytesRead);
@@ -126,7 +127,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
             }
             errorMessage += outputString;
             errorMessage +=
-                    "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
+                "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
             ErrorHandler::openErrorDialog(errorMessage);
             fclose(logFile);
             return;

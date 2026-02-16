@@ -9,7 +9,7 @@ public:
 
     ~SceneExtract();
 
-    static SceneExtract &getInstance() {
+    static SceneExtract& getInstance() {
         static SceneExtract instance;
         return instance;
     }
@@ -32,9 +32,9 @@ public:
     bool alsoBuildObj;
     bool alsoBuildAll;
 
-    static char *openHitmanFolderDialog(char *lastHitmanFolder);
+    static char* openHitmanFolderDialog(char* lastHitmanFolder);
 
-    static char *openOutputFolderDialog(char *lastOutputFolder);
+    static char* openOutputFolderDialog(char* lastOutputFolder);
 
     std::optional<std::jthread> backgroundWorker;
 
@@ -43,5 +43,5 @@ public:
     void finalizeExtractScene();
 
 private:
-    static void extractFromGame(const std::function<void()> &callback, const std::function<void()> &errorCallback);
+    static void extractFromGame(const std::function<void()>& callback, const std::function<void()>& errorCallback);
 };
