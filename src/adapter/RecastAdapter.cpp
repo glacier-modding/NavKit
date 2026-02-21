@@ -8,7 +8,7 @@
 #include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/util/Math.h"
@@ -973,7 +973,7 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
         markerPosition[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
         markerPosition[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
         markerPosition[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
-        for (auto [object, vertexRange] : Obj::getInstance().objectTriangleRanges) {
+        for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
             if (hit >= vertexRange.first && hit < vertexRange.second) {
                 selectedObject = object;
                 break;

@@ -5,108 +5,36 @@
 #include <cstdarg>
 #include <vector>
 
-void Logger::doResetLog() {
-    m_messageCount = 0;
-    m_textPoolSize = 0;
-    m_logBuffer.clear();
+#include "../../include/NavKit/module/NavKitSettings.h"
+
+Logger::Logger()
+    : messageCount(0),
+      textPoolSize(0),
+      logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()) {
+    memset(messages, 0, sizeof(char*) * MAX_MESSAGES);
+    logFile.open("NavKit.log", std::ios::out | std::ios::trunc);
 }
 
-void Logger::doLog(const rcLogCategory category, const char* msg, const int len) {
-    if (!len)
+void Logger::doLog(const char* msg, const int len) {
+    if (!len) {
         return;
+    }
 
-    std::lock_guard lock(m_log_mutex);
-    if (m_logBuffer.size() >= MAX_MESSAGES - 1) {
-        m_logBuffer.pop_front();
+    std::lock_guard lock(logMutex);
+    if (logBuffer.size() >= MAX_MESSAGES - 1) {
+        logBuffer.pop_front();
     } else {
-        m_messageCount++;
+        messageCount++;
     }
-    m_logBuffer.push_back(msg);
-    //if (m_messageCount >= MAX_MESSAGES) {
-    //	//dumpLog("%s");
-    //	resetLog();
-    //	return;
-    //}
-    //char* dst = &m_textPool[m_textPoolSize];
-    //int n = TEXT_POOL_SIZE - m_textPoolSize;
-    //if (n < 2) {
-    //	//dumpLog("%s");
-    //	resetLog();
-    //	dst = &m_textPool[m_textPoolSize];
-    //	n = TEXT_POOL_SIZE - m_textPoolSize;
-    //}
-
-    //char* cat = dst;
-    //char* text = dst+1;
-    //const int maxtext = n-1;
-    //// Store category
-    //*cat = (char)category;
-    //// Store message
-    //const int count = rcMin(len+1, maxtext);
-    //memcpy(text, msg, count);
-    //text[count-1] = '\0';
-    //m_textPoolSize += 1 + count;
-    //m_messages[m_messageCount++] = dst;
-}
-
-void Logger::dumpLog(const char* format, ...) {
-    // Print header.
-    va_list ap;
-    va_start(ap, format);
-    vprintf(format, ap);
-    va_end(ap);
-    printf("\n");
-
-    // Print messages
-    const int TAB_STOPS[4] = {28, 36, 44, 52};
-    for (int i = 0; i < m_messageCount; ++i) {
-        const char* msg = m_messages[i] + 1;
-        int n = 0;
-        while (*msg) {
-            if (*msg == '\t') {
-                int count = 1;
-                for (int j = 0; j < 4; ++j) {
-                    if (n < TAB_STOPS[j]) {
-                        count = TAB_STOPS[j] - n;
-                        break;
-                    }
-                }
-                while (--count) {
-                    putchar(' ');
-                    n++;
-                }
-            } else {
-                putchar(*msg);
-                n++;
-            }
-            msg++;
-        }
-        putchar('\n');
-    }
+    logBuffer.push_back(msg);
 }
 
 int Logger::getLogCount() const {
-    return m_messageCount;
+    return messageCount;
 }
 
 std::deque<std::string>& Logger::getLogBuffer() {
-    return m_logBuffer;
-}
-
-const char* Logger::getLogText(const int i) const {
-    if (i < m_logBuffer.size()) {
-        return m_logBuffer[i].c_str();
-    } else {
-        return "";
-    }
-}
-
-Logger::Logger()
-    : m_messageCount(0),
-      m_textPoolSize(0),
-      logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()),
-      debugLogsEnabled(false) {
-    memset(m_messages, 0, sizeof(char*) * MAX_MESSAGES);
+    return logBuffer;
 }
 
 [[noreturn]] void Logger::logRunner() {
@@ -123,7 +51,7 @@ Logger::Logger()
                 msg = "[WARN] ";
                 break;
             case NK_DEBUG:
-                if (!logger.debugLogsEnabled) {
+                if (!NavKitSettings::getInstance().showDebugLogs) {
                     continue;
                 };
                 msg = "[DEBUG] ";
@@ -132,7 +60,8 @@ Logger::Logger()
                 break;
             }
             msg += message.value().second;
-            logger.doLog(static_cast<rcLogCategory>(message.value().first), msg.c_str(), msg.length());
+            logger.logFile << msg << std::endl;
+            logger.doLog(msg.c_str(), msg.length());
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -148,7 +77,7 @@ void Logger::rustLogCallback(const char* message) {
 }
 
 std::mutex& Logger::getLogMutex() {
-    return m_log_mutex;
+    return logMutex;
 }
 
 void Logger::log(LogCategory category, const char* format, ...) {

@@ -1,4 +1,4 @@
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 
 #include <direct.h>
 #include <SDL.h>
@@ -29,20 +29,19 @@
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavWeakness/NavPower.h"
 
-Obj::Obj() : loadObjName("Load Obj"),
+SceneMesh::SceneMesh() : loadObjName("Load Obj"),
              saveObjName("Save Obj"),
              lastObjFileName("Load Obj"),
              lastSaveObjFileName("Save Obj"),
              objLoaded(false),
              showObj(true),
              loadObj(false),
-             startedObjGeneration(false),
-             blenderObjStarted(false),
-             blenderObjGenerationDone(false),
+             startedSceneMeshGeneration(false),
+             blenderSceneMeshBuildStarted(false),
+             blenderSceneMeshGenerationDone(false),
              blendFileOnlyBuild(false),
              blendFileAndObjBuild(false),
              filterToIncludeBox(true),
-             glacier2ObjDebugLogsEnabled(false),
              errorBuilding(false),
              skipExtractingAlocsOrPrims(false),
              errorExtracting(false),
@@ -56,11 +55,11 @@ Obj::Obj() : loadObjName("Load Obj"),
              extractTextures(false),
              applyTextures(false) {}
 
-HWND Obj::hObjDialog = nullptr;
+HWND SceneMesh::hSceneMeshDialog = nullptr;
 
-GLuint Obj::tileTextureId = 0;
+GLuint SceneMesh::tileTextureId = 0;
 
-void Obj::loadTileTexture() {
+void SceneMesh::loadTileTexture() {
     if (tileTextureId != 0) {
         return;
     }
@@ -88,8 +87,8 @@ void Obj::loadTileTexture() {
     }
 }
 
-void Obj::updateObjDialogControls(const HWND hDlg) {
-    const Obj& obj = getInstance();
+void SceneMesh::updateObjDialogControls(const HWND hDlg) {
+    const SceneMesh& obj = getInstance();
     CheckRadioButton(hDlg, IDC_RADIO_MESH_TYPE_ALOC, IDC_RADIO_MESH_TYPE_PRIM,
                      obj.meshTypeForBuild == ALOC ? IDC_RADIO_MESH_TYPE_ALOC : IDC_RADIO_MESH_TYPE_PRIM);
 
@@ -105,14 +104,12 @@ void Obj::updateObjDialogControls(const HWND hDlg) {
 
     CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX, obj.filterToIncludeBox ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS,
-                   obj.glacier2ObjDebugLogsEnabled ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES, obj.extractTextures ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
 }
 
-INT_PTR CALLBACK Obj::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
-    Obj& obj = getInstance();
+INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
+    SceneMesh& obj = getInstance();
     switch (message) {
     case WM_INITDIALOG: {
         updateObjDialogControls(hDlg);
@@ -152,16 +149,6 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(const HWND hDlg, const UINT message,
             obj.saveObjSettings();
             Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.",
                         obj.skipExtractingAlocsOrPrims ? "true" : "false");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-        case IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS: {
-            obj.glacier2ObjDebugLogsEnabled = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS)
-                                                  ? COPY
-                                                  : INSTANCE;
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Show Blender Debug Logs set to %s.",
-                        obj.glacier2ObjDebugLogsEnabled ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
@@ -212,7 +199,7 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(const HWND hDlg, const UINT message,
     }
 
     case WM_DESTROY: {
-        hObjDialog = nullptr;
+        hSceneMeshDialog = nullptr;
         return TRUE;
     }
     break;
@@ -221,7 +208,7 @@ INT_PTR CALLBACK Obj::ObjSettingsDialogProc(const HWND hDlg, const UINT message,
     return FALSE;
 }
 
-void Obj::buildObjFromNavp(const bool alsoLoadIntoUi) {
+void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string fileName = navKitSettings.outputFolder + "\\outputNavp.obj";
     Gui& gui = Gui::getInstance();
@@ -265,19 +252,19 @@ void Obj::buildObjFromNavp(const bool alsoLoadIntoUi) {
     if (alsoLoadIntoUi) {
         generatedObjName = "outputNavp.obj";
         objLoaded = false;
-        blenderObjGenerationDone = true;
+        blenderSceneMeshGenerationDone = true;
         loadObj = true;
         Menu::updateMenuState();
     }
 }
 
-void Obj::buildObjFromScene() {
+void SceneMesh::buildSceneMeshFromScene() {
     const auto start = std::chrono::high_resolution_clock::now();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Scene& scene = Scene::getInstance();
     objLoaded = false;
     Menu::updateMenuState();
-    startedObjGeneration = true;
+    startedSceneMeshGeneration = true;
     std::string buildOutputFileType = blendFileAndObjBuild
                                           ? "both"
                                           : blendFileOnlyBuild
@@ -315,10 +302,10 @@ void Obj::buildObjFromScene() {
         command += " false";
     }
 
-    if (glacier2ObjDebugLogsEnabled) {
+    if (NavKitSettings::getInstance().showDebugLogs) {
         command += " true";
     }
-    blenderObjStarted = true;
+    blenderSceneMeshBuildStarted = true;
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
     generatedObjName = "output.obj";
@@ -330,7 +317,7 @@ void Obj::buildObjFromScene() {
             const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(),
                         duration.count());
-            blenderObjGenerationDone = true;
+            blenderSceneMeshGenerationDone = true;
             if (blendFileAndObjBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
             }
@@ -339,7 +326,7 @@ void Obj::buildObjFromScene() {
         });
 }
 
-void Obj::extractResourcesAndStartObjBuild() {
+void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
     extractingResources = true;
     Menu::updateMenuState();
     const std::string meshFileType = meshTypeForBuild == ALOC ? "ALOC" : "PRIM";
@@ -467,17 +454,17 @@ void Obj::extractResourcesAndStartObjBuild() {
     Menu::updateMenuState();
 }
 
-char* Obj::openSetBlenderFileDialog() {
+char* SceneMesh::openSetBlenderFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-void Obj::finalizeExtractResources() {
+void SceneMesh::finalizeExtractResources() {
     if (errorExtracting) {
         errorBuilding = false;
-        startedObjGeneration = false;
-        blenderObjStarted = false;
-        blenderObjGenerationDone = false;
+        startedSceneMeshGeneration = false;
+        blenderSceneMeshBuildStarted = false;
+        blenderSceneMeshGenerationDone = false;
         errorExtracting = false;
         extractingResources = false;
         SceneExtract& sceneExtract = SceneExtract::getInstance();
@@ -489,37 +476,37 @@ void Obj::finalizeExtractResources() {
         const Scene& scene = Scene::getInstance();
         const std::string& fileNameString = scene.lastLoadSceneFile;
         extractingResources = false;
-        buildObjFromScene();
+        buildSceneMeshFromScene();
         Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
         errorExtracting = false;
     }
     Menu::updateMenuState();
 }
 
-bool Obj::shouldExtractTextures() const {
+bool SceneMesh::shouldExtractTextures() const {
     return meshTypeForBuild == PRIM && applyTextures && extractTextures;
 }
 
-void Obj::finalizeObjBuild() {
+void SceneMesh::finalizeSceneMeshBuild() {
     SceneExtract& sceneExtract = SceneExtract::getInstance();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    if (blenderObjGenerationDone) {
-        startedObjGeneration = false;
+    if (blenderSceneMeshGenerationDone) {
+        startedSceneMeshGeneration = false;
         objToLoad = navKitSettings.outputFolder;
         objToLoad += "\\" + generatedObjName;
         loadObj = !blendFileOnlyBuild;
         lastObjFileName = navKitSettings.outputFolder;
         lastObjFileName += generatedObjName;
-        blenderObjStarted = false;
-        blenderObjGenerationDone = false;
+        blenderSceneMeshBuildStarted = false;
+        blenderSceneMeshGenerationDone = false;
         sceneExtract.alsoBuildObj = false;
         blendFileOnlyBuild = false;
     }
     if (errorBuilding) {
         errorBuilding = false;
-        startedObjGeneration = false;
-        blenderObjStarted = false;
-        blenderObjGenerationDone = false;
+        startedSceneMeshGeneration = false;
+        blenderSceneMeshBuildStarted = false;
+        blenderSceneMeshGenerationDone = false;
         objLoaded = false;
         sceneExtract.alsoBuildAll = false;
         sceneExtract.alsoBuildObj = false;
@@ -528,7 +515,7 @@ void Obj::finalizeObjBuild() {
     Menu::updateMenuState();
 }
 
-void Obj::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
+void SceneMesh::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
     if (from == to) {
         Logger::log(NK_ERROR, "Cannot overwrite current %s file: %s", filetype.c_str(), from.c_str());
         return;
@@ -548,23 +535,23 @@ void Obj::copyFile(const std::string& from, const std::string& to, const std::st
     }
 }
 
-void Obj::saveObjMesh(char* objToCopy, char* newFileName) {
+void SceneMesh::saveObjMesh(char* objToCopy, char* newFileName) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Obj to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    backgroundWorker.emplace(&Obj::copyFile, objToCopy, newFileName, "Obj");
+    backgroundWorker.emplace(&SceneMesh::copyFile, objToCopy, newFileName, "Obj");
 }
 
-void Obj::saveBlendMesh(std::string objToCopy, std::string newFileName) {
+void SceneMesh::saveBlendMesh(std::string objToCopy, std::string newFileName) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Blend to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    backgroundWorker.emplace(&Obj::copyFile, objToCopy, newFileName, "Blend");
+    backgroundWorker.emplace(&SceneMesh::copyFile, objToCopy, newFileName, "Blend");
 }
 
-void Obj::loadObjMesh() {
+void SceneMesh::loadObjMesh() {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Obj from file at ";
     msg += std::ctime(&start_time);
@@ -626,7 +613,7 @@ void Obj::loadObjMesh() {
     }
 }
 
-void Obj::renderObj() const {
+void SceneMesh::renderObj() const {
     const Renderer& renderer = Renderer::getInstance();
 
     glEnable(GL_DEPTH_TEST);
@@ -652,26 +639,26 @@ void Obj::renderObj() const {
     model.draw(renderer.shader, renderer.projection * renderer.view);
 }
 
-void Obj::renderObjUsingRecast() {
+void SceneMesh::renderObjUsingRecast() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
-char* Obj::openLoadObjFileDialog() {
+char* SceneMesh::openLoadObjFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-char* Obj::openSaveObjFileDialog() {
+char* SceneMesh::openSaveObjFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
-char* Obj::openSaveBlendFileDialog() {
+char* SceneMesh::openSaveBlendFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Blend files", "blend"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output");
 }
 
-void Obj::setLastLoadFileName(const char* fileName) {
+void SceneMesh::setLastLoadFileName(const char* fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadObjName = fileName;
         lastObjFileName = loadObjName;
@@ -679,12 +666,12 @@ void Obj::setLastLoadFileName(const char* fileName) {
     }
 }
 
-void Obj::setLastSaveFileName(const char* fileName) {
+void SceneMesh::setLastSaveFileName(const char* fileName) {
     lastSaveObjFileName = fileName;
     loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
 }
 
-void Obj::handleOpenObjClicked() {
+void SceneMesh::handleOpenObjClicked() {
     if (const char* fileName = openLoadObjFileDialog()) {
         setLastLoadFileName(fileName);
         objLoaded = false;
@@ -694,7 +681,7 @@ void Obj::handleOpenObjClicked() {
     }
 }
 
-void Obj::handleSaveObjClicked() {
+void SceneMesh::handleSaveObjClicked() {
     if (const char* fileName = openSaveObjFileDialog()) {
         loadObjName = fileName;
         setLastSaveFileName(fileName);
@@ -703,7 +690,7 @@ void Obj::handleSaveObjClicked() {
     }
 }
 
-void Obj::handleSaveBlendClicked() {
+void SceneMesh::handleSaveBlendClicked() {
     if (const char* fileName = openSaveBlendFileDialog()) {
         const std::string fileNameStr = fileName;
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
@@ -712,56 +699,56 @@ void Obj::handleSaveBlendClicked() {
     }
 }
 
-bool Obj::canLoad() const {
+bool SceneMesh::canLoad() const {
     return objToLoad.empty();
 }
 
-bool Obj::canBuildObjFromNavp() {
+bool SceneMesh::canBuildObjFromNavp() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Navp& navp = Navp::getInstance();
     return navKitSettings.outputSet && navKitSettings.blenderSet && navp.navpLoaded;
 }
 
-bool Obj::canBuildObjFromScene() const {
+bool SceneMesh::canBuildObjFromScene() const {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Scene& scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingResources && navKitSettings.blenderSet
-        && scene.sceneLoaded && !blenderObjStarted && !blenderObjGenerationDone && Rpkg::extractionDataInitComplete;
+        && scene.sceneLoaded && !blenderSceneMeshBuildStarted && !blenderSceneMeshGenerationDone && Rpkg::extractionDataInitComplete;
 }
 
-bool Obj::canSaveBlend() const {
+bool SceneMesh::canSaveBlend() const {
     return blendFileBuilt;
 }
 
-bool Obj::canBuildBlendFromScene() const {
+bool SceneMesh::canBuildBlendFromScene() const {
     // Currently this is the same as Obj::canBuildObjFromScene.
     // Its expected this may change if the blend export includes features OBJ can't handle - like lights.
     return canBuildObjFromScene();
 }
 
-bool Obj::canBuildBlendAndObjFromScene() const {
+bool SceneMesh::canBuildBlendAndObjFromScene() const {
     return canBuildObjFromScene();
 }
 
-void Obj::handleBuildObjFromSceneClicked() {
-    backgroundWorker.emplace(&Obj::extractResourcesAndStartObjBuild, this);
+void SceneMesh::handleBuildObjFromSceneClicked() {
+    backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
-void Obj::handleBuildBlendFromSceneClicked() {
+void SceneMesh::handleBuildBlendFromSceneClicked() {
     blendFileOnlyBuild = true;
-    backgroundWorker.emplace(&Obj::extractResourcesAndStartObjBuild, this);
+    backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
-void Obj::handleBuildBlendAndObjFromSceneClicked() {
+void SceneMesh::handleBuildBlendAndObjFromSceneClicked() {
     blendFileAndObjBuild = true;
-    backgroundWorker.emplace(&Obj::extractResourcesAndStartObjBuild, this);
+    backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
-void Obj::handleBuildObjFromNavpClicked() {
+void SceneMesh::handleBuildObjFromNavpClicked() {
     return buildObjFromNavp(true);
 }
 
-void Obj::finalizeLoad() {
+void SceneMesh::finalizeLoad() {
     if (loadObj) {
         lastObjFileName = objToLoad;
         RecastAdapter& recastAdapter = RecastAdapter::getInstance();
@@ -771,7 +758,7 @@ void Obj::finalizeLoad() {
         msg += objToLoad;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&Obj::loadObjMesh, this);
+        backgroundWorker.emplace(&SceneMesh::loadObjMesh, this);
         loadObj = false;
     }
 
@@ -789,14 +776,15 @@ void Obj::finalizeLoad() {
         objLoadDone.clear();
         objToLoad.clear();
         Menu::updateMenuState();
+        Logger::log(NK_INFO, "Obj load complete.");
         if (Navp& navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
-            Logger::log(NK_INFO, "Obj load complete, building Navp...");
+            Logger::log(NK_INFO, "Building Navp...");
             navp.handleBuildNavpClicked();
         }
     }
 }
 
-std::string Obj::buildPrimLodsString() const {
+std::string SceneMesh::buildPrimLodsString() const {
     std::string primLodsStr;
     for (const bool primLod : primLods) {
         primLodsStr += primLod ? '1' : '0';
@@ -804,7 +792,7 @@ std::string Obj::buildPrimLodsString() const {
     return primLodsStr;
 }
 
-void Obj::loadSettings() {
+void SceneMesh::loadSettings() {
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
     const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
@@ -821,13 +809,11 @@ void Obj::loadSettings() {
     skipExtractingAlocsOrPrims = strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"),
                                         "true") == 0;
     filterToIncludeBox = strcmp(persistedSettings.getValue("Obj", "filterToIncludeBox", "true"), "true") == 0;
-    glacier2ObjDebugLogsEnabled = strcmp(persistedSettings.getValue("Obj", "glacier2ObjDebugLogsEnabled", "false"),
-                                         "true") == 0;
     extractTextures = strcmp(persistedSettings.getValue("Obj", "extractTextures", "false"), "true") == 0;
     applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
 }
 
-void Obj::saveObjSettings() const {
+void SceneMesh::saveObjSettings() const {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
 
     const char* meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
@@ -845,19 +831,16 @@ void Obj::saveObjSettings() const {
     const char* filterEnabled = filterToIncludeBox ? "true" : "false";
     persistedSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
 
-    const char* debugEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
-    persistedSettings.setValue("Obj", "glacier2ObjDebugLogsEnabled", debugEnabled);
-
-    const char* extractTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    const char* extractTexturesEnabled = extractTextures ? "true" : "false";
     persistedSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
 
-    const char* applyTexturesEnabled = glacier2ObjDebugLogsEnabled ? "true" : "false";
+    const char* applyTexturesEnabled = applyTextures ? "true" : "false";
     persistedSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
 
     persistedSettings.save();
 }
 
-void Obj::resetDefaults() {
+void SceneMesh::resetDefaults() {
     meshTypeForBuild = ALOC;
     for (bool& primLod : primLods) {
         primLod = true;
@@ -865,17 +848,16 @@ void Obj::resetDefaults() {
     sceneMeshBuildType = COPY;
     skipExtractingAlocsOrPrims = false;
     filterToIncludeBox = true;
-    glacier2ObjDebugLogsEnabled = false;
 }
 
-void Obj::showObjDialog() {
-    if (hObjDialog) {
-        SetForegroundWindow(hObjDialog);
+void SceneMesh::showSceneMeshDialog() {
+    if (hSceneMeshDialog) {
+        SetForegroundWindow(hSceneMeshDialog);
         return;
     }
     const HINSTANCE hInstance = GetModuleHandle(nullptr);
     const HWND hParentWnd = Renderer::hwnd;
-    hObjDialog = CreateDialogParam(
+    hSceneMeshDialog = CreateDialogParam(
         hInstance,
         MAKEINTRESOURCE(IDD_SCENE_MESH_SETTINGS),
         hParentWnd,
@@ -883,14 +865,14 @@ void Obj::showObjDialog() {
         reinterpret_cast<LPARAM>(this)
     );
 
-    if (hObjDialog) {
+    if (hSceneMeshDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hObjDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hObjDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hSceneMeshDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+            SendMessage(hSceneMeshDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
         }
         RECT parentRect, dialogRect;
         GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hObjDialog, &dialogRect);
+        GetWindowRect(hSceneMeshDialog, &dialogRect);
 
         const int parentWidth = parentRect.right - parentRect.left;
         const int parentHeight = parentRect.bottom - parentRect.top;
@@ -900,8 +882,8 @@ void Obj::showObjDialog() {
         const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
         const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
 
-        SetWindowPos(hObjDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hSceneMeshDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
-        ShowWindow(hObjDialog, SW_SHOW);
+        ShowWindow(hSceneMeshDialog, SW_SHOW);
     }
 }

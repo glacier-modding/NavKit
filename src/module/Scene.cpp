@@ -9,7 +9,7 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
@@ -81,7 +81,7 @@ void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
     }
     pfBoxes.readPathfindingBBoxes();
     if (includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
-        if (Obj::getInstance().objLoaded) {
+        if (SceneMesh::getInstance().objLoaded) {
             RecastAdapter::getInstance().setSceneBBoxToMesh();
         }
     } else {

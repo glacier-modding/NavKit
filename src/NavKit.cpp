@@ -27,7 +27,7 @@
 #include "../include/NavKit/module/Logger.h"
 #include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/Navp.h"
-#include "../include/NavKit/module/Obj.h"
+#include "../include/NavKit/module/SceneMesh.h"
 #include "../include/NavKit/module/PersistedSettings.h"
 #include "../include/NavKit/module/Renderer.h"
 #include "../include/NavKit/module/SceneExtract.h"
@@ -55,7 +55,7 @@ int SDL_main(const int argc, char** argv) {
 
             SceneExtract& sceneExtract = SceneExtract::getInstance();
             Navp& navp = Navp::getInstance();
-            Obj& obj = Obj::getInstance();
+            SceneMesh& obj = SceneMesh::getInstance();
             Airg& airg = Airg::getInstance();
             InputHandler& inputHandler = InputHandler::getInstance();
             Menu::updateMenuState();
@@ -71,7 +71,7 @@ int SDL_main(const int argc, char** argv) {
                 gui.drawGui();
 
                 sceneExtract.finalizeExtractScene();
-                obj.finalizeObjBuild();
+                obj.finalizeSceneMeshBuild();
                 navp.finalizeBuild();
                 obj.finalizeLoad();
                 airg.finalizeSave();

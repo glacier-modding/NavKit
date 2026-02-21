@@ -6,6 +6,7 @@ struct DialogSettings {
     std::string hitmanFolder;
     std::string outputFolder;
     std::string blenderPath;
+    bool showDebugLogs;
 };
 
 class NavKitSettings {
@@ -30,6 +31,7 @@ public:
     std::string hitmanFolder;
     std::string outputFolder;
     std::string blenderPath;
+    bool showDebugLogs;
     static HWND hSettingsDialog;
 
     void setHitmanFolder(const std::string& folderName);

@@ -17,7 +17,7 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
@@ -374,7 +374,7 @@ char* Navp::openSaveNavpFileDialog() {
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {
-    if (Obj::getInstance().objLoaded) {
+    if (SceneMesh::getInstance().objLoaded) {
         if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             recastAdapter.clearConvexVolumes();
             for (Json::PfBox exclusionBox : Scene::getInstance().exclusionBoxes) {
@@ -850,7 +850,7 @@ bool Navp::stairsAreaSelected() const {
 
 bool Navp::canBuildNavp() const {
     const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-    const Obj& obj = Obj::getInstance();
+    const SceneMesh& obj = SceneMesh::getInstance();
     const Scene& scene = Scene::getInstance();
     return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
         Airg::getInstance().airgBuilding && scene.sceneLoaded;

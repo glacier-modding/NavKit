@@ -17,7 +17,7 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"

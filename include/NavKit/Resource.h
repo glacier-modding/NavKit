@@ -20,7 +20,7 @@
 #define IDM_SETTINGS_NAVKIT                     1200
 #define IDM_SETTINGS_SCENE                      1201
 #define IDM_SETTINGS_RECAST                     1202
-#define IDM_SETTINGS_OBJ                        1203
+#define IDM_SETTINGS_SCENE_MESH                 1203
 #define IDM_SETTINGS_AIRG                       1204
 #define IDM_VIEW_NAVP_SHOW_NAVP                 1300
 #define IDM_VIEW_NAVP_SHOW_INDICES              1301
@@ -44,8 +44,8 @@
 #define IDM_EXTRACT_SCENE_AND_BUILD_ALL         1402
 #define IDM_BUILD_OBJ_FROM_SCENE                1500
 #define IDM_BUILD_OBJ_FROM_NAVP                 1501
-#define IDM_BUILD_BLEND_FROM_SCENE				1502
-#define IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE  	1503
+#define IDM_BUILD_BLEND_FROM_SCENE              1502
+#define IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE      1503
 #define IDM_BUILD_NAVP                          1510
 #define IDM_BUILD_AIRG                          1520
 #define IDM_HELP_ABOUT                          1600
@@ -67,6 +67,7 @@
 #define IDC_EDIT_HITMAN_PATH                    30006
 #define IDC_EDIT_OUTPUT_PATH                    30007
 #define IDC_EDIT_BLENDER_PATH                   30008
+#define IDC_CHECK_SHOW_DEBUG_LOGS               30009
 #define IDC_BG_COLOR_TEXT                       30010
 #define IDC_HITMAN_DIR_TEXT                     30011
 #define IDC_OUTPUT_DIR_TEXT                     30012
@@ -149,9 +150,8 @@
 #define IDC_RADIO_BUILD_TYPE_INSTANCE           30412
 #define IDC_CHECK_FILTER_TO_INCLUDE_BOX         30413
 #define IDC_CHECK_SKIP_RPKG_EXTRACT             30414
-#define IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS       30415
-#define IDC_CHECK_EXTRACT_TEXTURE_FILES         30416
-#define IDC_CHECK_APPLY_TEXTURES                30417
+#define IDC_CHECK_EXTRACT_TEXTURE_FILES         30415
+#define IDC_CHECK_APPLY_TEXTURES                30416
 
 #define IDD_EXTRACT_NAVP_DIALOG                 30500
 #define IDC_COMBOBOX_NAVP                       30501

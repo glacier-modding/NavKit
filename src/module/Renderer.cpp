@@ -6,7 +6,7 @@
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 
 #include <numbers>
@@ -291,7 +291,7 @@ void Renderer::renderFrame() {
     shader.setBool("useVertexColor", false);
     glUseProgram(0);
 
-    if (const Obj& obj = Obj::getInstance(); obj.objLoaded && obj.showObj) {
+    if (const SceneMesh& obj = SceneMesh::getInstance(); obj.objLoaded && obj.showObj) {
         obj.renderObj();
         glUseProgram(0);
         glDisable(GL_CULL_FACE);
@@ -595,7 +595,7 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     Navp::getInstance().renderPfSeedPointsForHitTest();
     Navp::getInstance().renderExclusionBoxesForHitTest();
     Airg::getInstance().renderAirgForHitTest();
-    const Obj& obj = Obj::getInstance();
+    const SceneMesh& obj = SceneMesh::getInstance();
     if (obj.showObj && obj.objLoaded) {
         obj.renderObj();
     }
