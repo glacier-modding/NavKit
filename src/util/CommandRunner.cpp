@@ -48,7 +48,6 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
 
     ZeroMemory(&pi, sizeof(pi));
 
-    FILE* logFile = fopen(logFileName.c_str(), "w");
     char* commandLineChar = _strdup(command.c_str());
 
     if (!CreateProcess(nullptr, commandLineChar, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
@@ -57,7 +56,6 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
                         ".").c_str());
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
-        fclose(logFile);
         errorCallback();
         return;
     }
@@ -73,7 +71,6 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
 
     while (true) {
         if (closing) {
-            fclose(logFile);
             return;
         }
         if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0)) {
@@ -90,8 +87,6 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
         while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
             std::string line = outputString.substr(start, pos - start);
             Logger::log(NK_INFO, line.c_str());
-            fputs(line.c_str(), logFile);
-            fputc('\n', logFile);
             pos++;
             start = pos;
         }
@@ -105,7 +100,6 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
             handles[commandIndex].pop_back();
             handles[commandIndex].pop_back();
             handles[commandIndex].pop_back();
-            fclose(logFile);
             errorCallback();
             return;
         }
@@ -129,7 +123,6 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
             errorMessage +=
                 "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
             ErrorHandler::openErrorDialog(errorMessage);
-            fclose(logFile);
             return;
         }
         if (start > 0) {
@@ -148,21 +141,16 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
         while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
             std::string line = outputString.substr(start, pos - start);
             Logger::log(NK_INFO, line.c_str());
-            fputs(line.c_str(), logFile);
-            fputc('\n', logFile);
             pos++;
             start = pos;
         }
         if (start < outputString.size()) {
             std::string line = outputString.substr(start);
             Logger::log(NK_INFO, line.c_str());
-            fputs(line.c_str(), logFile);
-            fputc('\n', logFile);
         }
     }
 
     if (closing) {
-        fclose(logFile);
         return;
     }
 
@@ -175,6 +163,5 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
     handles[commandIndex].pop_back();
     handles[commandIndex].pop_back();
 
-    fclose(logFile);
     callback();
 }

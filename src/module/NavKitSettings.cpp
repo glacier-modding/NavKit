@@ -7,8 +7,7 @@
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Logger.h"
-#include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
@@ -22,18 +21,21 @@ void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.hitmanFolder = R"(C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)";
     settings.outputFolder = R"(D:\workspace\output)";
     settings.blenderPath = R"(C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)";
+    settings.showDebugLogs = false;
 }
 
 void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings& tempSettings) {
     const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
-    SendMessage(hSlider, TBM_SETRANGE, TRUE, MAKELONG(0, 100)); // Range 0-100
+    SendMessage(hSlider, TBM_SETRANGE, TRUE, MAKELONG(0, 100));
     SendMessage(hSlider, TBM_SETPOS, TRUE, tempSettings.backgroundColor * 100.0f);
     SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings.hitmanFolder.c_str());
     SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings.outputFolder.c_str());
     SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings.blenderPath.c_str());
+    CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS, tempSettings.showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
 }
 
-INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
+                                                    const LPARAM lParam) {
     auto navKitSettings = reinterpret_cast<NavKitSettings*>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
 
     switch (message) {
@@ -46,6 +48,7 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT 
         tempSettings->hitmanFolder = navKitSettings->hitmanFolder;
         tempSettings->outputFolder = navKitSettings->outputFolder;
         tempSettings->blenderPath = navKitSettings->blenderPath;
+        tempSettings->showDebugLogs = navKitSettings->showDebugLogs;
         SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(tempSettings));
 
         setDialogInputs(hDlg, *tempSettings);
@@ -77,26 +80,34 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT 
                 SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
             }
         } else if (commandId == IDC_BUTTON_BROWSE_BLENDER) {
-            if (const char* blenderFileName = Obj::openSetBlenderFileDialog()) {
+            if (const char* blenderFileName = SceneMesh::openSetBlenderFileDialog()) {
                 tempSettings->blenderPath = blenderFileName;
                 SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings->blenderPath.c_str());
             }
+        } else if (commandId == IDC_CHECK_SHOW_DEBUG_LOGS) {
+            tempSettings->showDebugLogs = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS);
+            Logger::log(NK_INFO, "Show Debug logs set to %s.", tempSettings->showDebugLogs ? "true" : "false");
+            CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS,
+                           tempSettings->showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
+            return TRUE;
         } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
             navKitSettings->resetDefaults(*tempSettings);
             setDialogInputs(hDlg, *tempSettings);
         } else if (commandId == IDOK || commandId == IDC_APPLY) {
             if (tempSettings) {
+                navKitSettings->backgroundColor = tempSettings->backgroundColor;
                 navKitSettings->setHitmanFolder(tempSettings->hitmanFolder);
                 navKitSettings->setOutputFolder(tempSettings->outputFolder);
                 navKitSettings->setBlenderFile(tempSettings->blenderPath);
-                navKitSettings->backgroundColor = tempSettings->backgroundColor;
+                navKitSettings->showDebugLogs = tempSettings->showDebugLogs;
 
                 PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+                persistedSettings.setValue("NavKit", "backgroundColor",
+                                           std::to_string(navKitSettings->backgroundColor));
                 persistedSettings.setValue("NavKit", "hitman", tempSettings->hitmanFolder);
                 persistedSettings.setValue("NavKit", "output", tempSettings->outputFolder);
                 persistedSettings.setValue("NavKit", "blender", tempSettings->blenderPath);
-                persistedSettings.setValue("NavKit", "backgroundColor",
-                                           std::to_string(navKitSettings->backgroundColor));
+                persistedSettings.setValue("NavKit", "showDebugLogs", tempSettings->showDebugLogs ? "true" : "false");
                 persistedSettings.save();
             }
             if (commandId == IDOK) {
@@ -130,7 +141,8 @@ NavKitSettings::NavKitSettings() : backgroundColor(0.30f),
                                    hitmanSet(false),
                                    outputSet(false),
                                    blenderSet(false),
-                                   blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")") {}
+                                   blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")"),
+                                   showDebugLogs(false) {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
     if (hSettingsDialog) {
@@ -172,10 +184,11 @@ void NavKitSettings::showNavKitSettingsDialog() {
 
 void NavKitSettings::loadSettings() {
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    backgroundColor = static_cast<float>(atof(persistedSettings.getValue("NavKit", "backgroundColor", "0.16f")));
     setHitmanFolder(persistedSettings.getValue("NavKit", "hitman", "default"));
     setOutputFolder(persistedSettings.getValue("NavKit", "output", "default"));
     setBlenderFile(persistedSettings.getValue("NavKit", "blender", "default"));
-    backgroundColor = static_cast<float>(atof(persistedSettings.getValue("NavKit", "backgroundColor", "0.16f")));
+    showDebugLogs = strcmp(persistedSettings.getValue("NavKit", "showDebugLogs", "false"), "true") == 0;
 }
 
 void NavKitSettings::setHitmanFolder(const std::string& folderName) {

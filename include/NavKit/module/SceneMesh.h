@@ -23,8 +23,8 @@ enum SceneMeshBuildType {
     COPY
 };
 
-class Obj {
-    explicit Obj();
+class SceneMesh {
+    explicit SceneMesh();
 
     static GLuint tileTextureId;
 
@@ -33,8 +33,8 @@ class Obj {
     static void updateObjDialogControls(HWND hDlg);
 
 public:
-    static Obj& getInstance() {
-        static Obj instance;
+    static SceneMesh& getInstance() {
+        static SceneMesh instance;
         return instance;
     }
 
@@ -49,13 +49,12 @@ public:
     std::vector<std::string> files;
     std::string objToLoad;
     std::vector<bool> objLoadDone;
-    bool startedObjGeneration;
-    bool blenderObjStarted;
-    bool blenderObjGenerationDone;
+    bool startedSceneMeshGeneration;
+    bool blenderSceneMeshBuildStarted;
+    bool blenderSceneMeshGenerationDone;
     bool blendFileOnlyBuild;
     bool blendFileAndObjBuild;
     bool filterToIncludeBox;
-    bool glacier2ObjDebugLogsEnabled;
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
     bool errorExtracting;
@@ -69,7 +68,7 @@ public:
     bool blendFileBuilt;
     bool extractTextures;
     bool applyTextures;
-    static HWND hObjDialog;
+    static HWND hSceneMeshDialog;
     Model model;
 
     static char* openSetBlenderFileDialog();
@@ -88,9 +87,9 @@ public:
 
     void buildObjFromNavp(bool alsoLoadIntoUi);
 
-    void buildObjFromScene();
+    void buildSceneMeshFromScene();
 
-    void finalizeObjBuild();
+    void finalizeSceneMeshBuild();
 
     void renderObj() const;
 
@@ -140,7 +139,7 @@ public:
 
     static INT_PTR ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
-    void showObjDialog();
+    void showSceneMeshDialog();
 
     std::optional<std::jthread> backgroundWorker;
 
@@ -148,5 +147,5 @@ public:
 
     bool shouldExtractTextures() const;
 
-    void extractResourcesAndStartObjBuild();
+    void extractResourcesAndStartSceneMeshBuild();
 };

@@ -17,7 +17,7 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
@@ -374,7 +374,7 @@ char* Navp::openSaveNavpFileDialog() {
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {
-    if (Obj::getInstance().objLoaded) {
+    if (SceneMesh::getInstance().objLoaded) {
         if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             recastAdapter.clearConvexVolumes();
             for (Json::PfBox exclusionBox : Scene::getInstance().exclusionBoxes) {
@@ -558,7 +558,7 @@ void Navp::renderNavMesh() {
             for (const NavPower::Area& area : navMesh->m_areas) {
                 renderer.drawText(std::to_string(areaIndex + 1), {
                                       area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y
-                                  }, colorBlue);
+                                  }, colorBlue, 20);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
                     for (const auto vertex : area.m_edges) {
@@ -566,14 +566,14 @@ void Navp::renderNavMesh() {
                                           {vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y},
                                           vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
                                               ? colorRed
-                                              : colorGreen);
+                                              : colorGreen, 20);
                         if (vertex->m_pAdjArea != nullptr) {
                             const auto nextVertex = area.m_edges[(edgeIndex + 1) % area.m_edges.size()];
                             Vec3 midpoint = (vertex->m_pos + nextVertex->m_pos) / 2.0f;
                             const int neighborAreaIndex = binaryAreaToAreaIndexMap[vertex->m_pAdjArea];
                             renderer.drawText(std::to_string(neighborAreaIndex),
                                               {midpoint.X, midpoint.Z + 0.1f, -midpoint.Y},
-                                              colorPink);
+                                              colorPink, 20);
                         }
                         edgeIndex++;
                     }
@@ -850,7 +850,7 @@ bool Navp::stairsAreaSelected() const {
 
 bool Navp::canBuildNavp() const {
     const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-    const Obj& obj = Obj::getInstance();
+    const SceneMesh& obj = SceneMesh::getInstance();
     const Scene& scene = Scene::getInstance();
     return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
         Airg::getInstance().airgBuilding && scene.sceneLoaded;

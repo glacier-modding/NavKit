@@ -83,15 +83,9 @@ public:
 
     void save(const std::string& data) const;
 
-    [[nodiscard]] std::mutex& getLogMutex() const;
-
     [[nodiscard]] int getVertCount() const;
 
     [[nodiscard]] int getTriCount() const;
-
-    [[nodiscard]] int getLogCount() const;
-
-    std::deque<std::string>& getLogBuffer() const;
 
     void addConvexVolume(Json::PfBox& pfBox) const;
 
@@ -139,7 +133,6 @@ public:
     dtQueryFilter* filter;
     dtQueryFilter* filterWithExcluded;
     bool markerPositionSet;
-    bool processHitTestShift;
     float markerPosition[3]{};
     std::string selectedObject;
 

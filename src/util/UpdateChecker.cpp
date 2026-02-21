@@ -62,7 +62,7 @@ void UpdateChecker::performUpdateCheck() {
         Logger::log(NK_INFO, ("Current version: " + currentVersionStr).c_str());
         Logger::log(NK_INFO, ("Latest version: " + latestVersionStr).c_str());
         const bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
-        Logger::log(NK_INFO, (std::string(updateAvailable ? "Update available." : "No update available.")).c_str());
+        Logger::log(NK_INFO, std::string(updateAvailable ? "Update available." : "No update available.").c_str());
         if (updateAvailable) {
             for (simdjson::ondemand::object asset : doc["assets"]) {
                 if (std::string_view url_sv = asset["browser_download_url"]; url_sv.ends_with(".msi")) {

@@ -4,7 +4,7 @@
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/RecastDemo/imgui.h"
@@ -33,7 +33,7 @@ int InputHandler::handleInput() {
     Renderer& renderer = Renderer::getInstance();
     Airg& airg = Airg::getInstance();
     Navp& navp = Navp::getInstance();
-    Obj& obj = Obj::getInstance();
+    SceneMesh& obj = SceneMesh::getInstance();
     bool done = false;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -126,7 +126,7 @@ int InputHandler::handleInput() {
                                                       reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                 (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog,
                                                         reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Obj::hObjDialog && IsDialogMessage(Obj::hObjDialog,
+                (SceneMesh::hSceneMeshDialog && IsDialogMessage(SceneMesh::hSceneMeshDialog,
                                                     reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
                 (Navp::hNavpDialog && IsDialogMessage(Navp::hNavpDialog,
                                                       reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
@@ -202,7 +202,7 @@ void InputHandler::hitTest() const {
     const Gui& gui = Gui::getInstance();
     Navp& navp = Navp::getInstance();
     Airg& airg = Airg::getInstance();
-    Obj& obj = Obj::getInstance();
+    SceneMesh& obj = SceneMesh::getInstance();
     RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     const Renderer& renderer = Renderer::getInstance();
     if (!gui.mouseOverMenu) {

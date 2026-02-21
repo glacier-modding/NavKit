@@ -86,7 +86,7 @@ void Rpkg::initExtractionData() {
     Logger::log(NK_INFO, "Loading hash list into memory.");
 
     RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
-    Logger::log(NK_INFO, "Total hash list entries: %d, adding each entry...", hashListRustStringList->length);
+    Logger::log(NK_INFO, "Total hash list entries: %d, adding entries...", hashListRustStringList->length);
     for (int i = 0; i < hashListRustStringList->length; i++) {
         std::string hash = hashListRustStringList->entries[i];
         const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());

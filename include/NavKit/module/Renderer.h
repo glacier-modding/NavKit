@@ -46,8 +46,8 @@ public:
 
     void drawText(const std::string& text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0) const;
 
-    static void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
-                        Vec3 outlineColor, float alpha);
+    void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
+                        Vec3 outlineColor, float alpha) const;
 
     bool initWindowAndRenderer();
 
@@ -65,7 +65,7 @@ public:
 
     void finalizeFrame() const;
 
-    static void drawBounds();
+    void drawBounds();
 
     void drawAxes();
 

@@ -3,10 +3,41 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Scene.h"
 
+std::string Json::toString(double val) {
+    return std::to_string(val);
+}
+
+std::string Json::toString(int64_t val) {
+    return std::to_string(val);
+}
+
+std::string Json::toString(bool val) {
+    return val ? "true" : "false";
+}
+
+std::string Json::toString(std::string_view val) {
+    return std::string(val);
+}
+
+template <typename t, typename> Json::JsonValueProxy::operator t() {
+    using simdT = typename SimdJsonTypeMap<t>::type;
+    simdT val;
+    if (json[field].get(val) == simdjson::SUCCESS) {
+        Logger::log(NK_DEBUG, "Field: %s value: %s", field.c_str(), toString(val).c_str());
+        return static_cast<t>(val);
+    }
+    Logger::log(NK_ERROR, "Error getting value for field: %s", field.c_str());
+    return {};
+}
+
+Json::JsonValueProxy Json::getValue(simdjson::ondemand::object json, const std::string& field) {
+    return {json, field};
+}
+
 void Json::Vec3::readJson(simdjson::ondemand::object json) {
-    x = static_cast<float>(static_cast<double>(json["x"]));
-    y = static_cast<float>(static_cast<double>(json["y"]));
-    z = static_cast<float>(static_cast<double>(json["z"]));
+    x = getValue(json, "x");
+    y = getValue(json, "y");
+    z = getValue(json, "z");
 }
 
 void Json::Vec3::writeJson(std::ostream& f, const std::string& propertyName) const {
@@ -14,10 +45,10 @@ void Json::Vec3::writeJson(std::ostream& f, const std::string& propertyName) con
 }
 
 void Json::Rotation::readJson(simdjson::ondemand::object json) {
-    x = static_cast<float>(static_cast<double>(json["x"]));
-    y = static_cast<float>(static_cast<double>(json["y"]));
-    z = static_cast<float>(static_cast<double>(json["z"]));
-    w = static_cast<float>(static_cast<double>(json["w"]));
+    x = getValue(json, "x");
+    y = getValue(json, "y");
+    z = getValue(json, "z");
+    w = getValue(json, "w");
 }
 
 void Json::Rotation::writeJson(std::ostream& f) const {
@@ -25,8 +56,8 @@ void Json::Rotation::writeJson(std::ostream& f) const {
 }
 
 void Json::PfBoxType::readJson(simdjson::ondemand::object json) {
-    type = std::string{std::string_view(json["type"])};
-    data = std::string{std::string_view(json["data"])};
+    type = getValue(json, "type");
+    data = getValue(json, "data");
 }
 
 void Json::PfBoxType::writeJson(std::ostream& f) const {
@@ -34,7 +65,7 @@ void Json::PfBoxType::writeJson(std::ostream& f) const {
 }
 
 void Json::Vec3Wrapped::readJson(simdjson::ondemand::object json) {
-    type = std::string{std::string_view(json["type"])};
+    type = getValue(json, "type");
     const simdjson::ondemand::object dataJson = json["data"];
     data.readJson(dataJson);
 }
@@ -46,29 +77,18 @@ void Json::Vec3Wrapped::writeJson(std::ostream& f, std::string propertyName) con
 }
 
 void Json::Entity::readJson(simdjson::ondemand::object json) {
-    auto result = json["id"];
-    if (result.error() == simdjson::SUCCESS) {
-        id = std::string{std::string_view(json["id"])};
-    }
-    result = json["name"];
-    if (result.error() == simdjson::SUCCESS) {
-        name = std::string{std::string_view(json["name"])};
-    }
-    result = json["tblu"];
-    if (result.error() == simdjson::SUCCESS) {
-        tblu = std::string{std::string_view(json["tblu"])};
-    }
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object positionJson = json["position"];
     position.readJson(positionJson);
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
-    result = json["type"];
-    if (result.error() == simdjson::SUCCESS) {
+    if (json["type"].error() == simdjson::SUCCESS) {
         const simdjson::ondemand::object pfBoxTypeJson = json["type"];
         type.readJson(pfBoxTypeJson);
     }
-    result = json["scale"];
-    if (result.error() == simdjson::SUCCESS) {
+    if (json["scale"].error() == simdjson::SUCCESS) {
         const simdjson::ondemand::object scaleJson = json["scale"];
         scale.readJson(scaleJson);
     }
@@ -92,10 +112,10 @@ void Json::Entity::writeJson(std::ostream& f) const {
 }
 
 void Json::HashesAndEntity::readJson(simdjson::ondemand::object json) {
-    alocHash = std::string{std::string_view(json["alocHash"])};
-    primHash = std::string{std::string_view(json["primHash"])};
-    roomName = std::string{std::string_view(json["roomName"])};
-    roomFolderName = std::string{std::string_view(json["roomFolderName"])};
+    alocHash = getValue(json, "alocHash");
+    primHash = getValue(json, "primHash");
+    roomName = getValue(json, "roomName");
+    roomFolderName = getValue(json, "roomFolderName");
     const simdjson::ondemand::object entityJson = json["entity"];
     entity.readJson(entityJson);
 }
@@ -235,26 +255,19 @@ void Json::Room::writeJson(std::ostream& f) const {
 }
 
 void Json::Room::readJson(simdjson::ondemand::object json) {
-    auto result = json["id"];
-    if (result.error() == simdjson::SUCCESS) {
-        id = std::string{std::string_view(json["id"])};
-    }
-    result = json["name"];
-    if (result.error() == simdjson::SUCCESS) {
-        name = std::string{std::string_view(json["name"])};
-    }
-    result = json["tblu"];
-    if (result.error() == simdjson::SUCCESS) {
-        tblu = std::string{std::string_view(json["tblu"])};
-    }
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object positionJson = json["position"];
     position.readJson(positionJson);
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
-    const simdjson::ondemand::object roomExtentMinJson = json["roomExtentMin"];
-    roomExtentMin.readJson(roomExtentMinJson);
-    const simdjson::ondemand::object roomExtentMaxJson = json["roomExtentMax"];
-    roomExtentMax.readJson(roomExtentMaxJson);
+    if (json["roomExtentMin"].error() == simdjson::SUCCESS) {
+        roomExtentMin.readJson(json["roomExtentMin"]);
+    }
+    if (json["roomExtentMax"].error() == simdjson::SUCCESS) {
+        roomExtentMax.readJson(json["roomExtentMax"]);
+    }
 }
 
 Json::Rooms::Rooms(simdjson::ondemand::array roomsJson) {
@@ -280,26 +293,19 @@ void Json::Gate::writeJson(std::ostream& f) const {
 }
 
 void Json::Gate::readJson(simdjson::ondemand::object json) {
-    auto result = json["id"];
-    if (result.error() == simdjson::SUCCESS) {
-        id = std::string{std::string_view(json["id"])};
-    }
-    result = json["name"];
-    if (result.error() == simdjson::SUCCESS) {
-        name = std::string{std::string_view(json["name"])};
-    }
-    result = json["tblu"];
-    if (result.error() == simdjson::SUCCESS) {
-        tblu = std::string{std::string_view(json["tblu"])};
-    }
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object positionJson = json["position"];
     position.readJson(positionJson);
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
-    const simdjson::ondemand::object bboxCenterJson = json["bboxCenter"];
-    bboxCenter.readJson(bboxCenterJson);
-    const simdjson::ondemand::object bboxHalfSizeJson = json["bboxHalfSize"];
-    bboxHalfSize.readJson(bboxHalfSizeJson);
+    if (json["bboxCenter"].error() == simdjson::SUCCESS) {
+        bboxCenter.readJson(json["bboxCenter"]);
+    }
+    if (json["bboxHalfSize"].error() == simdjson::SUCCESS) {
+        bboxHalfSize.readJson(json["bboxHalfSize"]);
+    }
 }
 
 void Json::AiAreaWorld::writeJson(std::ostream& f) const {
@@ -314,18 +320,9 @@ void Json::AiAreaWorld::writeJson(std::ostream& f) const {
 }
 
 void Json::AiAreaWorld::readJson(simdjson::ondemand::object json) {
-    auto result = json["id"];
-    if (result.error() == simdjson::SUCCESS) {
-        id = std::string{std::string_view(json["id"])};
-    }
-    result = json["name"];
-    if (result.error() == simdjson::SUCCESS) {
-        name = std::string{std::string_view(json["name"])};
-    }
-    result = json["tblu"];
-    if (result.error() == simdjson::SUCCESS) {
-        tblu = std::string{std::string_view(json["tblu"])};
-    }
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
 }
@@ -347,11 +344,11 @@ void Json::ParentData::writeJson(std::ostream& f) const {
 }
 
 void Json::ParentData::readJson(simdjson::ondemand::object json) {
-    id = std::string{std::string_view(json["id"])};
-    name = std::string{std::string_view(json["name"])};
-    source = std::string{std::string_view(json["source"])};
-    tblu = std::string{std::string_view(json["tblu"])};
-    type = std::string{std::string_view(json["type"])};
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    source = getValue(json, "source");
+    // tblu = getValue(json, "tblu");
+    type = getValue(json, "type");
 }
 
 void Json::Parent::writeJson(std::ostream& f) const {
@@ -362,7 +359,7 @@ void Json::Parent::writeJson(std::ostream& f) const {
 }
 
 void Json::Parent::readJson(simdjson::ondemand::object json) {
-    type = std::string{std::string_view(json["type"])};
+    type = getValue(json, "type");
     const simdjson::ondemand::object dataJson = json["data"];
     data.readJson(dataJson);
 }
@@ -392,18 +389,9 @@ void Json::AiArea::writeJson(std::ostream& f) const {
 }
 
 void Json::AiArea::readJson(simdjson::ondemand::object json) {
-    auto result = json["id"];
-    if (result.error() == simdjson::SUCCESS) {
-        id = std::string{std::string_view(json["id"])};
-    }
-    result = json["name"];
-    if (result.error() == simdjson::SUCCESS) {
-        name = std::string{std::string_view(json["name"])};
-    }
-    result = json["tblu"];
-    if (result.error() == simdjson::SUCCESS) {
-        tblu = std::string{std::string_view(json["tblu"])};
-    }
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
     logicalParents.clear();
@@ -442,15 +430,8 @@ void Json::Radius::writeJson(std::ostream& f) const {
 }
 
 void Json::Radius::readJson(simdjson::ondemand::object json) {
-    auto result = json["type"];
-    if (result.error() == simdjson::SUCCESS) {
-        type = std::string{std::string_view(json["type"])};
-    }
-    result = json["data"];
-    if (result.error() == simdjson::SUCCESS) {
-        const auto dataString = std::string{std::string_view(json["data"])};
-        data = std::stod(dataString);
-    }
+    type = getValue(json, "type");
+    data = getValue(json, "data");
 }
 
 void Json::VolumeSphere::writeJson(std::ostream& f) const {
@@ -465,18 +446,12 @@ void Json::VolumeSphere::writeJson(std::ostream& f) const {
 }
 
 void Json::VolumeSphere::readJson(simdjson::ondemand::object json) {
-    auto result = json["id"];
-    if (result.error() == simdjson::SUCCESS) {
-        id = std::string{std::string_view(json["id"])};
-    }
-    result = json["name"];
-    if (result.error() == simdjson::SUCCESS) {
-        name = std::string{std::string_view(json["name"])};
-    }
-    result = json["radius"];
-    if (result.error() == simdjson::SUCCESS) {
-        const simdjson::ondemand::object radiusJson = json["radius"];
-        radius.readJson(radiusJson);
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    position.readJson(json["position"]);
+    rotation.readJson(json["rotation"]);
+    if (json["radius"].error() == simdjson::SUCCESS) {
+        radius.readJson(json["radius"]);
     }
 }
 
@@ -520,34 +495,34 @@ std::vector<Json::PfSeedPoint> Json::PfSeedPoints::readPfSeedPoints() const {
 }
 
 void Json::Mati::readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
-    hash = std::string{std::string_view(jsonDocument["id"])};
-    className = std::string{std::string_view(jsonDocument["class"])};
+    hash = getValue(jsonDocument.get_object(), "id");
+    className = getValue(jsonDocument.get_object(), "class");
     simdjson::ondemand::object propertiesJson = jsonDocument["properties"];
     auto result = propertiesJson["mapTexture2D_01"];
     if (result.error() == simdjson::SUCCESS) {
-        simdjson::ondemand::object diffuseJson = propertiesJson["mapTexture2D_01"];
-        diffuse = std::string{std::string_view(diffuseJson["value"])};
+        const simdjson::ondemand::object diffuseJson = propertiesJson["mapTexture2D_01"];
+        diffuse = getValue(diffuseJson, "value");
     } else {
         Logger::log(NK_ERROR, "No diffuse texture found for %s", hash.c_str());
     }
     result = propertiesJson["mapTexture2DNormal_01"];
     if (result.error() == simdjson::SUCCESS) {
         simdjson::ondemand::object normalJson = propertiesJson["mapTexture2DNormal_01"];
-        normal = std::string{std::string_view(normalJson["value"])};
+        normal = getValue(normalJson, "value");
     }
     result = propertiesJson["mapTexture2D_03"];
     if (result.error() == simdjson::SUCCESS) {
         simdjson::ondemand::object specularJson = propertiesJson["mapTexture2D_03"];
-        specular = std::string{std::string_view(specularJson["value"])};
+        specular = getValue(specularJson, "value");
     }
 }
 
-void Json::Mati::readJsonFromScene(simdjson::ondemand::object jsonDocument) {
-    hash = std::string{std::string_view(jsonDocument["hash"])};
-    className = std::string{std::string_view(jsonDocument["class"])};
-    diffuse = std::string{std::string_view(jsonDocument["diffuse"])};
-    normal = std::string{std::string_view(jsonDocument["normal"])};
-    specular = std::string{std::string_view(jsonDocument["specular"])};
+void Json::Mati::readJsonFromScene(simdjson::ondemand::object json) {
+    hash = getValue(json, "hash");
+    className = getValue(json, "class");
+    diffuse = getValue(json, "diffuse");
+    normal = getValue(json, "normal");
+    specular = getValue(json, "specular");
 }
 
 void Json::Mati::writeJson(std::ostream& f) const {
@@ -567,12 +542,12 @@ Json::Matis::Matis(simdjson::ondemand::array matisJson) {
     }
 }
 
-void Json::PrimMati::readJson(simdjson::ondemand::object jsonDocument) {
-    primHash = std::string{std::string_view(jsonDocument["primHash"])};
-    simdjson::ondemand::array matiHashesJson = jsonDocument["matiHashes"];
+void Json::PrimMati::readJson(simdjson::ondemand::object json) {
+    primHash = getValue(json, "primHash");
+    simdjson::ondemand::array matiHashesJson = json["matiHashes"];
     matiHashes.clear();
     for (simdjson::ondemand::value matiHashJson : matiHashesJson) {
-        matiHashes.push_back(std::string{std::string_view(matiHashJson)});
+        matiHashes.push_back(std::string(std::string_view(matiHashJson)));
     }
 }
 

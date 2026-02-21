@@ -156,7 +156,7 @@ void Grid::renderGrid() const {
     renderer.shader.setMat4("view", renderer.view);
     renderer.shader.setMat4("projection", renderer.projection);
     renderer.shader.setMat3("normalMatrix", glm::mat3(1.0f)); // Identity
-    renderer.shader.setVec4("objectColor", glm::vec4(0.6f, 0.6f, 0.6f, 0.6f));
+    renderer.shader.setVec4("flatColor", glm::vec4(0.6f, 0.6f, 0.6f, 0.6f));
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, whiteTextureID);

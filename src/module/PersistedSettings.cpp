@@ -5,7 +5,7 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 
 PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {}
@@ -82,7 +82,7 @@ void PersistedSettings::load() {
 
     NavKitSettings::getInstance().loadSettings();
     Renderer::getInstance().loadSettings();
-    Obj::getInstance().loadSettings();
+    SceneMesh::getInstance().loadSettings();
     RecastAdapter::getInstance().loadSettings();
 }
 

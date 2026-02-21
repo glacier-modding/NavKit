@@ -8,7 +8,7 @@
 #include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/util/Math.h"
@@ -49,7 +49,6 @@ RecastAdapter::RecastAdapter() {
     filterWithExcluded->setAreaCost(SAMPLE_POLYAREA_GRASS, 2.0f);
     filterWithExcluded->setAreaCost(SAMPLE_POLYAREA_JUMP, 1.5f);
     markerPositionSet = false;
-    processHitTestShift = false;
     markerPosition[0] = 0;
     markerPosition[1] = 0;
     markerPosition[2] = 0;
@@ -93,13 +92,14 @@ inline unsigned int nextPow2(unsigned int v) {
 }
 
 static void updateRecastDialogControls(const HWND hDlg) {
-    const RecastAdapter & adapter = RecastAdapter::getInstance();
+    const RecastAdapter& adapter = RecastAdapter::getInstance();
     Sample_TileMesh* sample = adapter.sample;
     if (!sample) {
         return;
     }
 
-    auto set_slider = [&](const int sliderId, const int textId, const float value, const float min_val, const float step, const int num_steps,
+    auto set_slider = [&](const int sliderId, const int textId, const float value, const float min_val,
+                          const float step, const int num_steps,
                           const int precision) {
         const int pos = static_cast<int>((value - min_val) / step);
         SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETRANGE, TRUE, MAKELONG(0, num_steps));
@@ -186,7 +186,8 @@ static void updateRecastDialogControls(const HWND hDlg) {
     }
 }
 
-INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
+                                                 const LPARAM lParam) {
     Sample_TileMesh* sample = getInstance().sample;
     if (!sample) {
         return FALSE;
@@ -202,7 +203,8 @@ INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT mes
         const int pos = SendMessage(hSlider, TBM_GETPOS, 0, 0);
         bool needs_tiling_update = false;
 
-        auto update_float_slider = [&](float& value, const float min_val, const float step, const int textId, const int precision) {
+        auto update_float_slider = [&](float& value, const float min_val, const float step, const int textId,
+                                       const int precision) {
             value = min_val + (pos * step);
             SetDlgItemTextA(hDlg, textId, formatRecastFloat(value, precision).c_str());
         };
@@ -258,20 +260,18 @@ INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT mes
                 sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
             } else if (commandId == IDC_RADIO_PARTITION_MONOTONE) {
                 sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
-            } else
-                if (commandId == IDC_RADIO_PARTITION_LAYERS) {
-                    sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
-                }
+            } else if (commandId == IDC_RADIO_PARTITION_LAYERS) {
+                sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
+            }
         } else if (commandId >= IDC_CHECK_FILTER_LOW_HANGING && commandId <= IDC_CHECK_FILTER_WALKABLE_LOW) {
             const bool checked = IsDlgButtonChecked(hDlg, commandId) == BST_CHECKED;
             if (commandId == IDC_CHECK_FILTER_LOW_HANGING) {
                 sample->m_filterLowHangingObstacles = checked;
             } else if (commandId == IDC_CHECK_FILTER_LEDGE_SPANS) {
                 sample->m_filterLedgeSpans = checked;
-            } else
-                if (commandId == IDC_CHECK_FILTER_WALKABLE_LOW) {
-                    sample->m_filterWalkableLowHeightSpans = checked;
-                }
+            } else if (commandId == IDC_CHECK_FILTER_WALKABLE_LOW) {
+                sample->m_filterWalkableLowHeightSpans = checked;
+            }
         } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
             getInstance().resetCommonSettings();
             updateRecastDialogControls(hDlg);
@@ -321,10 +321,6 @@ void RecastAdapter::showRecastDialog() {
 
         ShowWindow(hRecastDialog, SW_SHOW);
     }
-}
-
-void RecastAdapter::log(const int category, const std::string& message) const {
-    buildContext->log(static_cast<rcLogCategory>(category), message.c_str());
 }
 
 void RecastAdapter::drawInputGeom() const {
@@ -546,7 +542,8 @@ void RecastAdapter::findPfSeedPointAreas() {
     pfSeedPointAreas.clear();
     for (const auto& pfSeedPoint : Scene::getInstance().pfSeedPoints) {
         dtPolyRef pfSeedPointRef;
-        const Vec3 recastPosVec3 = convertFromNavPowerToRecast({pfSeedPoint.pos.x, pfSeedPoint.pos.y, pfSeedPoint.pos.z});
+        const Vec3 recastPosVec3 = convertFromNavPowerToRecast(
+            {pfSeedPoint.pos.x, pfSeedPoint.pos.y, pfSeedPoint.pos.z});
         const float recastPos[3] = {recastPosVec3.X, recastPosVec3.Y, recastPosVec3.Z};
         const dtStatus result = findNearestPoly(recastPos, &pfSeedPointRef, nullptr, true);
         if (result == DT_SUCCESS) {
@@ -694,24 +691,12 @@ void RecastAdapter::save(const std::string& data) const {
     sample->saveAll(data.c_str());
 }
 
-std::mutex& RecastAdapter::getLogMutex() const {
-    return buildContext->m_log_mutex;
-}
-
 int RecastAdapter::getVertCount() const {
     return inputGeom->getMesh()->getVertCount();
 }
 
 int RecastAdapter::getTriCount() const {
     return inputGeom->getMesh()->getTriCount();
-}
-
-int RecastAdapter::getLogCount() const {
-    return buildContext->getLogCount();
-}
-
-std::deque<std::string>& RecastAdapter::getLogBuffer() const {
-    return buildContext->m_logBuffer;
 }
 
 void RecastAdapter::addConvexVolume(Json::PfBox& pfBox) const {
@@ -983,40 +968,32 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
     rayEnd[2] = (float)z;
     const int hit = inputGeom->raycastMesh(rayStart, rayEnd, hitTime);
     if (hit != -1) {
-        if (SDL_GetModState() & KMOD_CTRL) {
-            float pos[3];
-            pos[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
-            pos[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
-            pos[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
-            sample->handleClick(rayStart, pos, processHitTestShift);
-        } else {
-            // Marker
-            markerPositionSet = true;
-            markerPosition[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
-            markerPosition[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
-            markerPosition[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
-            for (auto [object, vertexRange] : Obj::getInstance().objectTriangleRanges) {
-                if (hit >= vertexRange.first && hit < vertexRange.second) {
-                    selectedObject = object;
-                    break;
-                }
+        // Marker
+        markerPositionSet = true;
+        markerPosition[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
+        markerPosition[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
+        markerPosition[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
+        for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
+            if (hit >= vertexRange.first && hit < vertexRange.second) {
+                selectedObject = object;
+                break;
             }
-            std::string meshNameString;
-            std::string roomString;
-            if (Scene::getInstance().sceneLoaded) {
-                if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
-                    selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
-                    meshNameString = mesh->name;
-                    roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
-                }
-            }
-            Logger::log(
-                NK_INFO,
-                ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
-                    std::to_string(hit) + roomString +
-                    ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
-                    std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
         }
+        std::string meshNameString;
+        std::string roomString;
+        if (Scene::getInstance().sceneLoaded) {
+            if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
+                selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
+                meshNameString = mesh->name;
+                roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
+            }
+        }
+        Logger::log(
+            NK_INFO,
+            ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
+                std::to_string(hit) + roomString +
+                ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
+                std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
     } else {
         if (SDL_GetModState()) {
             // Marker
