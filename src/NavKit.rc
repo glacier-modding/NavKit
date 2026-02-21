@@ -40,7 +40,8 @@ BEGIN
     END
     POPUP "&View"
     BEGIN
-        MENUITEM "Show &BBox",                               IDM_VIEW_SCENE_SHOW_BBOX, CHECKED
+        MENUITEM "Show &Bounding Box",                       IDM_VIEW_SCENE_SHOW_BBOX, CHECKED
+        MENUITEM "Show &Axes",                               IDM_VIEW_SCENE_SHOW_AXES, CHECKED
         MENUITEM SEPARATOR
         MENUITEM "Show &Navp",                               IDM_VIEW_NAVP_SHOW_NAVP, CHECKED
         MENUITEM "Show Navp &Indices",                       IDM_VIEW_NAVP_SHOW_INDICES
@@ -309,7 +310,7 @@ BEGIN
     GROUPBOX        "Show Blender Debug logs",IDC_STATIC,7,270,246,35
     AUTOCHECKBOX    "Show Debug Logs",IDC_CHECK_SHOW_BLENDER_DEBUG_LOGS,14,285,80,10
 
-    GROUPBOX        "Extract texture TEXT files from RPKG files",IDC_STATIC,7,315,246,35
+    GROUPBOX        "Extract texture TEXT files from RPKG files and update the scene file",IDC_STATIC,7,315,246,35
     AUTOCHECKBOX    "Extract textures",IDC_CHECK_EXTRACT_TEXTURE_FILES,14,330,80,10
 
     GROUPBOX        "Apply textures to scene mesh",IDC_STATIC,7,360,246,35

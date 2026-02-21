@@ -15,10 +15,11 @@
 
 Scene::Scene()
     : sceneLoaded(false),
+      showBBox(true),
+      showAxes(true),
       version(1),
       loadSceneName("Load NavKit Scene"),
-      saveSceneName("Save NavKit Scene"),
-      showBBox(true) {
+      saveSceneName("Save NavKit Scene") {
     resetBBoxDefaults();
 }
 

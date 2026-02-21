@@ -11,6 +11,7 @@
 
 #include <numbers>
 #include <array>
+#include <vector>
 
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
@@ -41,7 +42,7 @@ Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
 
     cameraEulers[0] = 45.0, cameraEulers[1] = 135.0;
     cameraPos[0] = 10, cameraPos[1] = 15, cameraPos[2] = 10;
-    camr = 1000;
+    camr = 10000;
     origCameraEulers[0] = 0,
         origCameraEulers[1] = 0;
     prevFrameTime = 0;
@@ -344,7 +345,9 @@ void Renderer::renderFrame() {
     if (scene.showBBox) {
         drawBounds();
     }
-    drawAxes();
+    if (scene.showAxes) {
+        drawAxes();
+    }
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -353,16 +356,41 @@ void Renderer::finalizeFrame() const {
     SDL_GL_SwapWindow(window);
 }
 
-void drawLine(const Vec3 s, const Vec3 e, const Vec3 color = {-1, -1, -1}) {
-    if (color.X != -1) {
-        glColor3f(color.X, color.Y, color.Z);
+void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view, const glm::mat4& projection, const Vec3 color = {-1, -1, -1}) {
+    static GLuint vao = 0, vbo = 0;
+    if (vao == 0) {
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glBindVertexArray(0);
     }
+
+    float vertices[] = {
+        s.X, s.Y, s.Z,
+        e.X, e.Y, e.Z
+    };
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+    shader.use();
+    shader.setBool("useFlatColor", true);
+    shader.setBool("useVertexColor", false);
+    glm::vec4 c = (color.X == -1) ? glm::vec4(1.0f) : glm::vec4(color.X, color.Y, color.Z, 1.0f);
+    shader.setVec4("flatColor", c);
+    shader.setMat4("projection", projection);
+    shader.setMat4("view", view);
+    shader.setMat4("model", glm::mat4(1.0f));
+
     glDepthMask(GL_FALSE);
-    glBegin(GL_LINES);
-    glVertex3f(s.X, s.Y, s.Z);
-    glVertex3f(e.X, e.Y, e.Z);
-    glEnd();
+    glBindVertexArray(vao);
+    glDrawArrays(GL_LINES, 0, 2);
+    glBindVertexArray(0);
     glDepthMask(GL_TRUE);
+    glUseProgram(0);
 }
 
 void Renderer::drawBounds() {
@@ -384,19 +412,19 @@ void Renderer::drawBounds() {
     const Vec3 rfd = {r, f, d};
     const Vec3 lbd = {l, b, d};
     const Vec3 rbd = {r, b, d};
-    glColor3f(0.0, 1.0, 1.0);
-    drawLine(lfu, rfu);
-    drawLine(lfu, lbu);
-    drawLine(lfu, lfd);
-    drawLine(rfu, rbu);
-    drawLine(rfu, rfd);
-    drawLine(lbu, rbu);
-    drawLine(lbu, lbd);
-    drawLine(rbu, rbd);
-    drawLine(lfd, rfd);
-    drawLine(lfd, lbd);
-    drawLine(rfd, rbd);
-    drawLine(lbd, rbd);
+    const Vec3 cyan = {0.0f, 1.0f, 1.0f};
+    drawLine(lfu, rfu, shader, view, projection, cyan);
+    drawLine(lfu, lbu, shader, view, projection, cyan);
+    drawLine(lfu, lfd, shader, view, projection, cyan);
+    drawLine(rfu, rbu, shader, view, projection, cyan);
+    drawLine(rfu, rfd, shader, view, projection, cyan);
+    drawLine(lbu, rbu, shader, view, projection, cyan);
+    drawLine(lbu, lbd, shader, view, projection, cyan);
+    drawLine(rbu, rbd, shader, view, projection, cyan);
+    drawLine(lfd, rfd, shader, view, projection, cyan);
+    drawLine(lfd, lbd, shader, view, projection, cyan);
+    drawLine(rfd, rbd, shader, view, projection, cyan);
+    drawLine(lbd, rbd, shader, view, projection, cyan);
     glDepthMask(GL_TRUE);
 }
 
@@ -406,13 +434,13 @@ void Renderer::drawAxes() {
     const Vec3 y = {0, 1, 0};
     const Vec3 z = {0, 0, 1};
 
-    drawLine(o, x, x);
+    drawLine(o, x, shader, view, projection, x);
     drawText("X", x, x);
 
-    drawLine(o, y, y);
+    drawLine(o, y, shader, view, projection, y);
     drawText("Y", y, y);
 
-    drawLine(o, z * -1, z);
+    drawLine(o, z * -1, shader, view, projection, z);
     drawText("Z", z * -1, z);
 }
 
@@ -443,145 +471,113 @@ void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 colo
 }
 
 void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled, const Vec3 fillColor, const bool outlined,
-                       const Vec3 outlineColor, const float alpha) {
-    // Bottom face
-    Vec3 rotated1 = rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
-    Vec3 rotated2 = rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
-    Vec3 rotated3 = rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
-    Vec3 rotated4 = rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
-    if (filled) {
-        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
-        glBegin(GL_POLYGON);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
+                       const Vec3 outlineColor, const float alpha) const {
+    static GLuint vao = 0, vbo = 0;
+    if (vao == 0) {
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glBindVertexArray(0);
     }
-    if (outlined) {
-        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
+
+    std::vector<float> filledVertices;
+    std::vector<float> outlinedVertices;
+
+    auto addQuad = [&](Vec3 v1, Vec3 v2, Vec3 v3, Vec3 v4) {
+        if (filled) {
+            filledVertices.push_back(pos.X + v1.X); filledVertices.push_back(pos.Y + v1.Y); filledVertices.push_back(pos.Z + v1.Z);
+            filledVertices.push_back(pos.X + v2.X); filledVertices.push_back(pos.Y + v2.Y); filledVertices.push_back(pos.Z + v2.Z);
+            filledVertices.push_back(pos.X + v3.X); filledVertices.push_back(pos.Y + v3.Y); filledVertices.push_back(pos.Z + v3.Z);
+
+            filledVertices.push_back(pos.X + v1.X); filledVertices.push_back(pos.Y + v1.Y); filledVertices.push_back(pos.Z + v1.Z);
+            filledVertices.push_back(pos.X + v3.X); filledVertices.push_back(pos.Y + v3.Y); filledVertices.push_back(pos.Z + v3.Z);
+            filledVertices.push_back(pos.X + v4.X); filledVertices.push_back(pos.Y + v4.Y); filledVertices.push_back(pos.Z + v4.Z);
+        }
+        if (outlined) {
+            outlinedVertices.push_back(pos.X + v1.X); outlinedVertices.push_back(pos.Y + v1.Y); outlinedVertices.push_back(pos.Z + v1.Z);
+            outlinedVertices.push_back(pos.X + v2.X); outlinedVertices.push_back(pos.Y + v2.Y); outlinedVertices.push_back(pos.Z + v2.Z);
+
+            outlinedVertices.push_back(pos.X + v2.X); outlinedVertices.push_back(pos.Y + v2.Y); outlinedVertices.push_back(pos.Z + v2.Z);
+            outlinedVertices.push_back(pos.X + v3.X); outlinedVertices.push_back(pos.Y + v3.Y); outlinedVertices.push_back(pos.Z + v3.Z);
+
+            outlinedVertices.push_back(pos.X + v3.X); outlinedVertices.push_back(pos.Y + v3.Y); outlinedVertices.push_back(pos.Z + v3.Z);
+            outlinedVertices.push_back(pos.X + v4.X); outlinedVertices.push_back(pos.Y + v4.Y); outlinedVertices.push_back(pos.Z + v4.Z);
+
+            outlinedVertices.push_back(pos.X + v4.X); outlinedVertices.push_back(pos.Y + v4.Y); outlinedVertices.push_back(pos.Z + v4.Z);
+            outlinedVertices.push_back(pos.X + v1.X); outlinedVertices.push_back(pos.Y + v1.Y); outlinedVertices.push_back(pos.Z + v1.Z);
+        }
+    };
+
+    // Bottom
+    addQuad(
+        rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation)
+    );
+    // Top
+    addQuad(
+        rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation)
+    );
+    // Left
+    addQuad(
+        rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation)
+    );
+    // Right
+    addQuad(
+        rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation)
+    );
+    // Front
+    addQuad(
+        rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation)
+    );
+    // Back
+    addQuad(
+        rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation),
+        rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
+        rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation)
+    );
+
+    shader.use();
+    shader.setBool("useFlatColor", true);
+    shader.setBool("useVertexColor", false);
+    shader.setMat4("projection", projection);
+    shader.setMat4("view", view);
+    shader.setMat4("model", glm::mat4(1.0f));
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    if (filled && !filledVertices.empty()) {
+        glBufferData(GL_ARRAY_BUFFER, filledVertices.size() * sizeof(float), filledVertices.data(), GL_DYNAMIC_DRAW);
+        shader.setVec4("flatColor", glm::vec4(fillColor.X, fillColor.Y, fillColor.Z, 1.0f));
+        glDrawArrays(GL_TRIANGLES, 0, filledVertices.size() / 3);
     }
-    // Top face
-    rotated1 = rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation);
-    rotated2 = rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation);
-    rotated3 = rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation);
-    rotated4 = rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation);
-    if (filled) {
-        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
-        glBegin(GL_POLYGON);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
+
+    if (outlined && !outlinedVertices.empty()) {
+        glBufferData(GL_ARRAY_BUFFER, outlinedVertices.size() * sizeof(float), outlinedVertices.data(), GL_DYNAMIC_DRAW);
+        shader.setVec4("flatColor", glm::vec4(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha));
+        glDrawArrays(GL_LINES, 0, outlinedVertices.size() / 3);
     }
-    if (outlined) {
-        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    // Left face
-    rotated1 = rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
-    rotated2 = rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation);
-    rotated3 = rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation);
-    rotated4 = rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
-    if (filled) {
-        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
-        glBegin(GL_POLYGON);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    if (outlined) {
-        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    // Right face
-    rotated1 = rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
-    rotated2 = rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation);
-    rotated3 = rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation);
-    rotated4 = rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
-    if (filled) {
-        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
-        glBegin(GL_POLYGON);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    if (outlined) {
-        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    // Front face
-    rotated1 = rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
-    rotated2 = rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation);
-    rotated3 = rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation);
-    rotated4 = rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation);
-    if (filled) {
-        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
-        glBegin(GL_POLYGON);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    if (outlined) {
-        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    // Back face
-    rotated1 = rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
-    rotated2 = rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation);
-    rotated3 = rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation);
-    rotated4 = rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation);
-    if (filled) {
-        glColor4f(fillColor.X, fillColor.Y, fillColor.Z, alpha);
-        glBegin(GL_POLYGON);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
-    if (outlined) {
-        glColor4f(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha);
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(pos.X + rotated1.X, pos.Y + rotated1.Y, pos.Z + rotated1.Z);
-        glVertex3f(pos.X + rotated2.X, pos.Y + rotated2.Y, pos.Z + rotated2.Z);
-        glVertex3f(pos.X + rotated3.X, pos.Y + rotated3.Y, pos.Z + rotated3.Z);
-        glVertex3f(pos.X + rotated4.X, pos.Y + rotated4.Y, pos.Z + rotated4.Z);
-        glEnd();
-    }
+
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
 HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
@@ -607,6 +603,7 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     glReadBuffer(GL_COLOR_ATTACHMENT0);
     glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glUseProgram(0);
     const int selectedIndex = static_cast<int>(pixel[1]) * 255 + static_cast<int>(pixel[2]);
 
     if (selectedIndex == 65280) {

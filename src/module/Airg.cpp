@@ -375,7 +375,8 @@ char* Airg::openSaveAirgFileDialog(char* lastAirgFolder) {
 }
 
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
-                               const Waypoint& waypoint, const bool selected, const glm::vec4& color, const bool forceFan) {
+                               const Waypoint& waypoint, const bool selected, const glm::vec4& color,
+                               const bool forceFan) {
     const float r = 0.1f;
     const float z = waypoint.vPos.z + 0.03f;
     const glm::vec3 center(waypoint.vPos.x, z, -waypoint.vPos.y);
@@ -517,8 +518,8 @@ void Airg::renderAirg() {
                         for (int bxi = 0; bxi < numBoxesPerSide; bxi++) {
                             float bx = x - reasoningGrid->m_Properties.fGridSpacing / 2 + bxi * bw;
                             float byRaw = (cellColorSource == AIRG_BITMAP)
-                                               ? -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw)
-                                               : -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
+                                              ? -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw)
+                                              : -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
 
                             uint8_t val = data[numBoxesPerSide * byi + bxi];
                             float c = val / 255.0f;
@@ -624,7 +625,7 @@ void Airg::renderAirg() {
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
             renderer.drawText(std::to_string(i), {waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y},
-                              {1, .7f, .7f});
+                              {1, .7f, .7f}, 20);
         }
     }
 }
@@ -708,8 +709,8 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
         msg = "  Vision Data Offset: " + std::to_string(waypoint.nVisionDataOffset);
         msg += "  Layer Index: " + std::to_string(waypoint.nLayerIndex);
         const int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size()
-                                     ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset
-                                     : reasoningGrid->m_pVisibilityData.size();
+                                           ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset
+                                           : reasoningGrid->m_pVisibilityData.size();
         const int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
         msg += "  Visibility Data size: " + std::to_string(visibilityDataSize);
 
@@ -910,8 +911,9 @@ void Airg::extractAirgFromRpkgs(const std::string& hash) {
     }
 }
 
-INT_PTR CALLBACK Airg::extractAirgDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-    Airg * pAirg = nullptr;
+INT_PTR CALLBACK Airg::extractAirgDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
+                                             const LPARAM lParam) {
+    Airg* pAirg = nullptr;
     if (message == WM_INITDIALOG) {
         pAirg = reinterpret_cast<Airg*>(lParam);
         SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pAirg));
@@ -978,7 +980,7 @@ void Airg::showExtractAirgDialog() {
 
     HINSTANCE hInstance = nullptr;
     if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                           (LPCSTR) & Airg::extractAirgDialogProc, &hInstance)) {
+                           (LPCSTR)&Airg::extractAirgDialogProc, &hInstance)) {
         Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
         return;
     }

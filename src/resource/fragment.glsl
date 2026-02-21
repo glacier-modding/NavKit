@@ -5,7 +5,7 @@ in vec3 Normal;
 in vec3 FragPos;
 in vec4 VertexColor;
 
-uniform vec4 objectColor;
+uniform vec4 flatColor;
 uniform sampler2D tileTexture;
 uniform bool useFlatColor;
 uniform bool useVertexColor;
@@ -16,7 +16,7 @@ void main()
         if (useVertexColor) {
             FragColor = VertexColor;
         } else {
-            FragColor = objectColor;
+            FragColor = flatColor;
         }
         return;
     }
@@ -39,6 +39,6 @@ void main()
     vec4 zaxis = texture(tileTexture, FragPos.xy);
     vec4 texColor = xaxis * blending.x + yaxis * blending.y + zaxis * blending.z;
 
-    vec3 result = (ambient + diffuse) * objectColor.rgb * texColor.rgb;
-    FragColor = vec4(result, objectColor.a);
+    vec3 result = (ambient + diffuse) * flatColor.rgb * texColor.rgb;
+    FragColor = vec4(result, flatColor.a);
 }

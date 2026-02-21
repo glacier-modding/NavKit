@@ -1902,10 +1902,10 @@ class Physics:
     def read(self, filepath):
         aloc_name = bpy.path.display_name_from_filepath(filepath)
 
-        log("INFO", "Loading aloc file " + aloc_name, aloc_name)
+        log("DEBUG", "Loading aloc file " + aloc_name, aloc_name)
         file_size = os.path.getsize(filepath)
         if file_size == 19:
-            log("INFO", "[INFO] Skipping header only ALOC: " + aloc_name, aloc_name)
+            log("DEBUG", "Skipping header only ALOC: " + aloc_name, aloc_name)
             return -1
 
         fp = os.fsencode(filepath)
@@ -2271,35 +2271,48 @@ def load_aloc(filepath):
     return aloc, [aloc_obj]
 
 
-def add_texture(obj, tga_file_path):
+texture_to_material_map = {}
+
+
+def add_texture(obj, tga_file_path, texture_hash):
     if not os.path.exists(tga_file_path):
         log("ERROR", "Cannot add texture, file not found at: " + tga_file_path, "add_textures")
         return
+    tga_file_path = os.path.abspath(tga_file_path)
+    log("DEBUG", "TGA filepath: " + tga_file_path, "add_textures")
 
-    material_name = "TGA_Material"
-    mat = bpy.data.materials.new(name=material_name)
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    links = mat.node_tree.links
-    nodes.clear()
-    node_output = nodes.new(type='ShaderNodeOutputMaterial')
-    node_output.location = (400, 0)
-    node_texture = nodes.new(type='ShaderNodeTexImage')
-    node_texture.location = (-400, 0)
-    img = bpy.data.images.load(tga_file_path)
-    node_texture.image = img
-
-    if "HitmanTextureNode" in bpy.data.node_groups:
-        node_group = nodes.new(type='ShaderNodeGroup')
-        node_group.node_tree = bpy.data.node_groups["HitmanTextureNode"]
-        node_group.location = (0, 0)
-        links.new(node_texture.outputs['Color'], node_group.inputs[0])
-        links.new(node_group.outputs[0], node_output.inputs['Surface'])
+    if tga_file_path in texture_to_material_map:
+        mat = texture_to_material_map[tga_file_path]
     else:
-        node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-        node_bsdf.location = (0, 0)
-        links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
-        links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+        material_name = texture_hash + "_Material"
+        mat = bpy.data.materials.new(name=material_name)
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+        node_output = nodes.new(type='ShaderNodeOutputMaterial')
+        node_output.location = (400, 0)
+        node_texture = nodes.new(type='ShaderNodeTexImage')
+        node_texture.location = (-400, 0)
+        img = bpy.data.images.new(name=texture_hash, width=1, height=1)
+        img.source = 'FILE'
+        img.filepath = tga_file_path
+        log("INFO", "Blender internal image path: " + str(img.filepath), "add_texture")
+        log("INFO", "Image has data (after setting path): " + str(img.has_data), "add_texture")
+        node_texture.image = img
+
+        if "HitmanTextureNode" in bpy.data.node_groups:
+            node_group = nodes.new(type='ShaderNodeGroup')
+            node_group.node_tree = bpy.data.node_groups["HitmanTextureNode"]
+            node_group.location = (0, 0)
+            links.new(node_texture.outputs['Color'], node_group.inputs[0])
+            links.new(node_group.outputs[0], node_output.inputs['Surface'])
+        else:
+            node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+            node_bsdf.location = (0, 0)
+            links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
+            links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+        texture_to_material_map[tga_file_path] = mat
 
     if obj.data.materials:
         obj.data.materials[0] = mat
@@ -2398,7 +2411,11 @@ def load_volume_boxes(json_data, volume_types):
                         mathutils.Quaternion([trig_vol["rotation"][coord] for coord in coords]) 
                     ]
                     if "radius" in trig_vol: #sphere volume
-                        scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
+                        try:
+                            scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
+                        except TypeError:
+                            log("INFO", "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"], "load_scenario")
+                            scale = mathutils.Vector([1, 1, 1])
                         create_volume(vol_name, area_coll.name, pos, rot, scale, 'SPHERE')
                     else: #box volume
                         scale = mathutils.Vector([trig_vol["scale"]["data"][coord] for coord in coords[1:]])
@@ -2468,7 +2485,6 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             prim_matis[prim_mati["primHash"]] = prim_mati
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
-        print(filepath)
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
             log("INFO", "Loading texture node from the resource blend file:" + filepath, "load_scenario")
             if texture_node_name in data_from.materials:
@@ -2519,8 +2535,8 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             room_names[mesh_hash] = []
         transforms[mesh_hash].append(transform)
         room_names[mesh_hash].append(room_name)
-    output_dir = os.path.dirname(path_to_output_obj_file)
-    path_to_aloc_or_prim_dir = "%s\\%s" % (output_dir, mesh_type.lower())
+    output_dir = os.path.abspath(os.path.dirname(path_to_output_obj_file))
+    path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
     log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "load_scenario")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
     aloc_or_prim_list = [item for item in file_list if item.lower().endswith('.' + mesh_type.lower())]
@@ -2640,7 +2656,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 modifier["Socket_2"] = obj
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
-                if mesh_type == "PRIM" and apply_textures:
+                if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
                     log("DEBUG", "Adding texture", "load_scenario")
                     try:
                         add_textures(obj, matis, mesh_hash, output_dir, prim_matis, obj_i, material_indices[obj_i])
@@ -2658,7 +2674,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             for o_i in range(o_size):
                 obj = objects[o_i]
                 culled_indices = set()
-                #basic culling prepass using bounding spheres
+                # basic culling prepass using bounding spheres
                 if filter_to_include_box and pf_box_bounding_sphere_center is not None:
                     lsbbox_center = get_local_space_bbox_center(obj)
                     for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
@@ -2679,32 +2695,26 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 mesh_i += 1
                 log("DEBUG", "Total submeshes: " + str(o_size), "load_scenario")
                 for o_i in range(o_size):
-                    log("DEBUG", "Processing submesh: " + str(o_i), "load_scenario")
 
                     obj = objects[o_i]
                     if not unlinked[o_i]:
-                        log("DEBUG", "Unlinking submesh: " + str(o_i), "load_scenario")
                         bpy.context.scene.collection.objects.unlink(obj)
                         unlinked[o_i] = True
                     if i >= len(positions[o_i]):
                         continue
-                    log("DEBUG", "Setting cur", "load_scenario")
                     if cur is None:
                         cur = obj
                     else:
                         cur = obj.copy()
-                    log("DEBUG", "Linking cur", "load_scenario")
                     bpy.data.collections.get(room_name).objects.link(cur)
                     cur.name = mesh_hash + "_" + mesh_id
                     cur.select_set(True)
-                    log("DEBUG", "Transforming cur", "load_scenario")
                     cur.scale = mathutils.Vector((scales[o_i][i][0], scales[o_i][i][1], scales[o_i][i][2]))
                     cur.rotation_mode = 'QUATERNION'
                     cur.rotation_quaternion = (rotations[o_i][i][0], rotations[o_i][i][1], rotations[o_i][i][2], rotations[o_i][i][3])
                     cur.location = mathutils.Vector((positions[o_i][i][0], positions[o_i][i][1], positions[o_i][i][2]))
 
                     if mesh_type == "PRIM" and apply_textures:
-                        log("DEBUG", "Adding texture", "load_scenario")
                         try:
                             add_textures(cur, matis, mesh_hash, output_dir, prim_matis, o_i, material_indices[o_i])
                         except struct.error as err:
@@ -2744,9 +2754,9 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
     mati = matis[mati_hash]
     log("DEBUG", "Diffuse hash: " + mati["diffuse"], "add_textures")
     diffuse_hash = mati["diffuse"]
-    path_to_tga_dir = "%s\\tga" % output_dir
-    diffuse_tga_path = "%s\\%s.tga" % (path_to_tga_dir, diffuse_hash)
-    add_texture(obj, diffuse_tga_path)
+    path_to_tga_dir = os.path.join(output_dir, "tga")
+    diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
+    add_texture(obj, diffuse_tga_path, diffuse_hash)
 
 
 def main():
@@ -2799,7 +2809,7 @@ def save_obj_file(output_path):
 
 def save_blend_file(output_path):
     log("INFO", "Attempting to save blender file to :" + output_path, "main")
-    bpy.ops.wm.save_as_mainfile(filepath=output_path)
+    bpy.ops.wm.save_as_mainfile(filepath=output_path, relative_remap=False)
 
 
 if __name__ == "__main__":

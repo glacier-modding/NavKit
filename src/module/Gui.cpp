@@ -3,18 +3,16 @@
 
 #include <deque>
 
-#include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
-#include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include <SDL.h>
 #include <GL/glew.h>
 #include <GL/glu.h>
 
+#include "../../include/NavKit/module/Logger.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
 
@@ -75,7 +73,6 @@ void Gui::drawGui() {
                  airg.selectedWaypointIndex);
         imguiDrawText(10, renderer.height - 140, IMGUI_ALIGN_LEFT, selectedAirgText,
                       imguiRGBA(255, 255, 255, 128));
-        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
 
         if (showLog) {
             if (imguiBeginScrollArea("Log", 20, 20,
@@ -86,14 +83,15 @@ void Gui::drawGui() {
                                      &logScroll)) {
                 mouseOverMenu = true;
             }
-            std::lock_guard lock(recastAdapter.getLogMutex());
+            Logger &logger = Logger::getInstance();
+            std::lock_guard lock(logger.getLogMutex());
 
-            const std::deque<std::string>& logBuffer = recastAdapter.getLogBuffer();
+            const std::deque<std::string>& logBuffer = logger.getLogBuffer();
             for (auto it = logBuffer.cbegin();
                  it != logBuffer.cend(); ++it) {
                 imguiLabel(it->c_str());
             }
-            if (const int logCount = recastAdapter.getLogCount(); lastLogCount != logCount) {
+            if (const int logCount = logger.getLogCount(); lastLogCount != logCount) {
                 logScroll = std::max(0, logCount * 20 - 160);
                 lastLogCount = logCount;
             }

@@ -205,7 +205,11 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 break;
 
             case IDM_VIEW_SCENE_SHOW_BBOX:
-                handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_BBOX, Scene::getInstance().showBBox, "Show BBox");
+                handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_BBOX, Scene::getInstance().showBBox, "Show Bounding Box");
+                break;
+
+            case IDM_VIEW_SCENE_SHOW_AXES:
+                handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_AXES, Scene::getInstance().showAxes, "Show Axes");
                 break;
 
             case IDM_VIEW_NAVP_SHOW_NAVP:

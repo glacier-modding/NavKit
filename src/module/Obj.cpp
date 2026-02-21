@@ -647,7 +647,7 @@ void Obj::renderObj() const {
     renderer.shader.setMat4("view", renderer.view);
     renderer.shader.setMat4("model", modelTransform);
     renderer.shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelTransform))));
-    renderer.shader.setVec4("objectColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
+    renderer.shader.setVec4("flatColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
 
     model.draw(renderer.shader, renderer.projection * renderer.view);
 }
