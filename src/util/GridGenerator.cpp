@@ -13,7 +13,7 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Scene.h"
 
 #include "../../include/NavKit/module/PersistedSettings.h"
@@ -29,7 +29,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     airg.airgLoading = true;
     airg.airgLoaded = false;
     Menu::updateMenuState();
-    Obj& obj = Obj::getInstance();
+    SceneMesh& obj = SceneMesh::getInstance();
     obj.buildObjFromNavp(false);
     const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();

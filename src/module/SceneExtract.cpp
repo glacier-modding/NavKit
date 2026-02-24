@@ -8,7 +8,7 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/util/FileUtil.h"
@@ -35,24 +35,24 @@ bool SceneExtract::canExtractFromGame() const {
 }
 
 bool SceneExtract::canExtractFromGameAndBuildObj() const {
-    const Obj& obj = Obj::getInstance();
+    const SceneMesh& obj = SceneMesh::getInstance();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame()
-        && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+        && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted && !obj.blenderSceneMeshGenerationDone;
 }
 
 bool SceneExtract::canExtractFromGameAndBuildAll() const {
-    const Obj& obj = Obj::getInstance();
+    const SceneMesh& obj = SceneMesh::getInstance();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame()
-        && navKitSettings.blenderSet && !obj.blenderObjStarted && !obj.blenderObjGenerationDone;
+        && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted && !obj.blenderSceneMeshGenerationDone;
 }
 
 void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildObj = true;
-    Obj::getInstance().objLoaded = false;
+    SceneMesh::getInstance().objLoaded = false;
     extractScene();
 }
 
@@ -60,7 +60,7 @@ void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildAll = true;
-    Obj::getInstance().objLoaded = false;
+    SceneMesh::getInstance().objLoaded = false;
     extractScene();
 }
 
@@ -121,19 +121,19 @@ void SceneExtract::finalizeExtractScene() {
             sceneFile,
             [sceneFile, this] {
                 Scene& sceneScoped = Scene::getInstance();
-                Obj& obj = Obj::getInstance();
+                SceneMesh& obj = SceneMesh::getInstance();
                 sceneScoped.sceneLoaded = true;
                 const std::string& fileNameString = sceneFile;
                 sceneScoped.lastLoadSceneFile = sceneFile;
-                if ((alsoBuildObj || alsoBuildAll) && !obj.startedObjGeneration) {
-                    obj.extractResourcesAndStartObjBuild();
+                if ((alsoBuildObj || alsoBuildAll) && !obj.startedSceneMeshGeneration) {
+                    obj.extractResourcesAndStartSceneMeshBuild();
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();
             }, [this] {
-                Obj& objScoped = Obj::getInstance();
+                SceneMesh& objScoped = SceneMesh::getInstance();
                 Logger::log(NK_ERROR, "Error loading scene file.");
-                objScoped.startedObjGeneration = false;
+                objScoped.startedSceneMeshGeneration = false;
                 extractingFromGame = false;
                 alsoBuildAll = false;
                 alsoBuildObj = false;

@@ -25,7 +25,7 @@
 #include <map>
 #include <math.h>
 
-#include "../../../include/NavKit/module/Obj.h"
+#include "../../../include/NavKit/module/SceneMesh.h"
 
 rcMeshLoaderObj::rcMeshLoaderObj() :
 	m_scale(1.0f),
@@ -186,7 +186,7 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 	int vcap = 0;
 	int tcap = 0;
 	std::string objectName;
-	Obj& obj = Obj::getInstance();
+	SceneMesh& obj = SceneMesh::getInstance();
 	while (src < srcEnd)
 	{
 		// Parse one row

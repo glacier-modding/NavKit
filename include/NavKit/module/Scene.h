@@ -82,6 +82,7 @@ public:
     float bBoxPos[3]{};
     float bBoxScale[3]{};
     bool showBBox;
+    bool showAxes;
     int version;
     static HWND hSceneDialog;
 

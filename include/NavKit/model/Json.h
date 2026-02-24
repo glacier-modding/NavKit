@@ -1,12 +1,31 @@
 #pragma once
 
 #include <filesystem>
-#include <map>
 #include <string>
 #include <vector>
+#include <string_view>
 #include "../../../extern/simdjson/simdjson.h"
 
 namespace Json {
+    template <typename t> struct SimdJsonTypeMap;
+
+    template <> struct SimdJsonTypeMap<float> { using type = double; };
+    template <> struct SimdJsonTypeMap<double> { using type = double; };
+    template <> struct SimdJsonTypeMap<int> { using type = int64_t; };
+    template <> struct SimdJsonTypeMap<bool> { using type = bool; };
+    template <> struct SimdJsonTypeMap<std::string> { using type = std::string_view; };
+    std::string toString(double val);
+    std::string toString(int64_t val);
+    std::string toString(bool val);
+    std::string toString(std::string_view val);
+    struct JsonValueProxy {
+        simdjson::ondemand::object json;
+        std::string field;
+        template <typename t, typename = typename SimdJsonTypeMap<t>::type>
+        operator t();
+    };
+    JsonValueProxy getValue(simdjson::ondemand::object json, const std::string& field);
+
     class Vec3 {
     public:
         Vec3(): x(0), y(0), z(0) {

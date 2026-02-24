@@ -10,7 +10,7 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/Obj.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
@@ -87,7 +87,7 @@ void Menu::updateMenuState() {
     const SceneExtract& sceneExtract = SceneExtract::getInstance();
     const Airg& airg = Airg::getInstance();
     const Navp& navp = Navp::getInstance();
-    const Obj& obj = Obj::getInstance();
+    const SceneMesh& obj = SceneMesh::getInstance();
     const bool isSceneLoaded = scene.sceneLoaded;
     const bool isNavpLoaded = navp.navpLoaded;
     const bool isObjLoaded = obj.objLoaded;
@@ -137,12 +137,11 @@ void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const cha
     }
     const UINT checkState = isChecked ? MF_CHECKED : MF_UNCHECKED;
     CheckMenuItem(hMenu, menuId, MF_BYCOMMAND | checkState);
-    Logger::log(NK_DEBUG, ("Set " + std::string(itemName) + " to " + (isChecked ? "ON" : "OFF")).data());
 }
 
 int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
     Navp& navp = Navp::getInstance();
-    Obj& obj = Obj::getInstance();
+    SceneMesh& obj = SceneMesh::getInstance();
     Airg& airg = Airg::getInstance();
     SceneExtract& sceneExtract = SceneExtract::getInstance();
     if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
@@ -153,7 +152,7 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 Logger::log(NK_DEBUG, "File -> Open Scene clicked");
                 break;
             case IDM_FILE_OPEN_OBJ:
-                Obj::getInstance().handleOpenObjClicked();
+                SceneMesh::getInstance().handleOpenObjClicked();
                 Logger::log(NK_DEBUG, "File -> Open Obj clicked");
                 break;
             case IDM_FILE_OPEN_NAVP:
@@ -177,11 +176,11 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 Logger::log(NK_DEBUG, "File -> Save Scene clicked");
                 break;
             case IDM_FILE_SAVE_OBJ:
-                Obj::getInstance().handleSaveObjClicked();
+                SceneMesh::getInstance().handleSaveObjClicked();
                 Logger::log(NK_DEBUG, "File -> Save Obj clicked");
                 break;
             case IDM_FILE_SAVE_BLEND:
-                Obj::getInstance().handleSaveBlendClicked();
+                SceneMesh::getInstance().handleSaveBlendClicked();
                 Logger::log(NK_DEBUG, "File -> Save Blend clicked");
                 break;
             case IDM_FILE_SAVE_NAVP:
@@ -194,18 +193,25 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 break;
 
             case IDM_FILE_EXIT:
+                Logger::log(NK_DEBUG, "File -> Exit clicked");
                 return InputHandler::QUIT;
 
             case IDM_EDIT_NAVP_STAIRS:
+                Logger::log(NK_DEBUG, "Edit -> Navp Stairs clicked");
                 navp.handleEditStairsClicked();
                 break;
 
             case IDM_EDIT_AIRG_CONNECT_WAYPOINT:
+                Logger::log(NK_DEBUG, "Edit -> Airg Connect Waypoint clicked");
                 airg.handleConnectWaypointClicked();
                 break;
 
             case IDM_VIEW_SCENE_SHOW_BBOX:
-                handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_BBOX, Scene::getInstance().showBBox, "Show BBox");
+                handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_BBOX, Scene::getInstance().showBBox, "Show Bounding Box");
+                break;
+
+            case IDM_VIEW_SCENE_SHOW_AXES:
+                handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_AXES, Scene::getInstance().showAxes, "Show Axes");
                 break;
 
             case IDM_VIEW_NAVP_SHOW_NAVP:
@@ -232,7 +238,7 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 break;
             case IDM_VIEW_OBJ_SHOW_OBJ:
                 handleCheckboxMenuItem(
-                    IDM_VIEW_OBJ_SHOW_OBJ, Obj::getInstance().showObj,
+                    IDM_VIEW_OBJ_SHOW_OBJ, SceneMesh::getInstance().showObj,
                     "Show Obj");
                 break;
             case IDM_VIEW_AIRG_SHOW_AIRG:
@@ -322,9 +328,9 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 RecastAdapter::getInstance().showRecastDialog();
                 Logger::log(NK_DEBUG, "Settings -> Recast Settings clicked");
                 break;
-            case IDM_SETTINGS_OBJ:
-                Obj::getInstance().showObjDialog();
-                Logger::log(NK_DEBUG, "Settings -> Obj Settings clicked");
+            case IDM_SETTINGS_SCENE_MESH:
+                SceneMesh::getInstance().showSceneMeshDialog();
+                Logger::log(NK_DEBUG, "Settings -> Scene Mesh Settings clicked");
                 break;
 
             default:
