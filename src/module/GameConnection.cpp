@@ -149,6 +149,11 @@ int GameConnection::listNavKitSceneEntities() const {
     bool done = false;
     int messagesReceived = 0;
     while (!done) {
+        if (!ws || ws->getReadyState() == WebSocket::CLOSED) {
+            Logger::log(NK_ERROR, "GameConnection: Editor connection closed unexpectedly.");
+            return 1;
+        }
+
         ws->poll(10);
         ws->dispatch([&](const std::string& message) {
             messagesReceived++;

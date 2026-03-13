@@ -2473,16 +2473,11 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             else:
                 log("ERROR", "=========================== Error Loading the resource blend file ================", "load_scenario")
                 assert 0
-    matis = {}
-    prim_matis = {}
+    prim_textures = {}
     texture_node_name = "HitmanTextureNode"
     if apply_textures:
-        matis_list = data['matis']
-        for mati in matis_list:
-            matis[mati["hash"]] = mati
-        prim_matis_list = data['primMatis']
-        for prim_mati in prim_matis_list:
-            prim_matis[prim_mati["primHash"]] = prim_mati
+        for mesh in data['meshes']:
+            prim_textures[mesh["primHash"]] = mesh["textures"]
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
@@ -2656,10 +2651,10 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 modifier["Socket_2"] = obj
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
-                if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
+                if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_textures:
                     log("DEBUG", "Adding texture", "load_scenario")
                     try:
-                        add_textures(obj, matis, mesh_hash, output_dir, prim_matis, obj_i, material_indices[obj_i])
+                        add_textures(obj, prim_textures, mesh_hash, output_dir, obj_i, material_indices[obj_i])
                     except struct.error as err:
                         log("ERROR", "Error adding texture " + str(err), "load_scenario")
         else:
@@ -2716,7 +2711,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
 
                     if mesh_type == "PRIM" and apply_textures:
                         try:
-                            add_textures(cur, matis, mesh_hash, output_dir, prim_matis, o_i, material_indices[o_i])
+                            add_textures(cur, prim_textures, mesh_hash, output_dir, o_i, material_indices[o_i])
                         except struct.error as err:
                             log("ERROR", "Error adding texture " + str(err), "load_scenario")
                     if cur:
@@ -2737,23 +2732,17 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
     return 0
 
 
-def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_i):
+def add_textures(obj, prim_textures, mesh_hash, output_dir, submesh_i, material_i):
     log("DEBUG", "Adding texture to prim hash: " + mesh_hash, "add_textures")
-    log("DEBUG", "Prim Mati: " + str(prim_matis[mesh_hash]), "add_textures")
-    log("DEBUG", "Mati hashes: " + str(prim_matis[mesh_hash]["matiHashes"]), "add_textures")
+    log("DEBUG", "Texture hashes: " + str(prim_textures[mesh_hash]), "add_textures")
     log("DEBUG", "Prim Submesh index: " + str(submesh_i), "add_texturess")
     log("DEBUG", "Material index: " + str(material_i), "add_texturess")
-    if material_i >= len(prim_matis[mesh_hash]["matiHashes"]):
+    if material_i >= len(prim_textures[mesh_hash]):
         log("ERROR", "Prim index out of range: " + str(material_i), "add_textures")
         return
-    log("DEBUG", "Mati hash: " + str(prim_matis[mesh_hash]["matiHashes"][material_i]), "add_texturess")
-    mati_hash = prim_matis[mesh_hash]["matiHashes"][material_i]
-    if mati_hash not in matis:
-        log("ERROR", "Mati hash not found in matis: " + mati_hash, "add_textures")
-        return
-    mati = matis[mati_hash]
-    log("DEBUG", "Diffuse hash: " + mati["diffuse"], "add_textures")
-    diffuse_hash = mati["diffuse"]
+    submesh_textures = prim_textures[mesh_hash][submesh_i]
+    log("DEBUG", "Diffuse hash: " + submesh_textures["diffuse"], "add_textures")
+    diffuse_hash = submesh_textures["diffuse"]
     path_to_tga_dir = os.path.join(output_dir, "tga")
     diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
     add_texture(obj, diffuse_tga_path, diffuse_hash)

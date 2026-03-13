@@ -66,7 +66,7 @@ void Scene::loadMeshes(const std::function<void()>& errorCallback,
     } catch (...) {
         errorCallback();
     }
-    meshes = newMeshes.readMeshes();
+    meshes = newMeshes.meshes;
 }
 
 void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
@@ -389,7 +389,7 @@ const Json::Mesh* Scene::findMeshByHashAndIdAndPos(const std::string& hash, cons
                                                    const float* pos) const {
     std::vector<const Json::Mesh*> closestMeshes;
     for (const Json::Mesh& mesh : meshes) {
-        if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.id == id) {
+        if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.entity.id == id) {
             closestMeshes.push_back(&mesh);
         }
     }
