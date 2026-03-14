@@ -30,30 +30,30 @@
 #include "../../include/NavWeakness/NavPower.h"
 
 SceneMesh::SceneMesh() : loadObjName("Load Obj"),
-             saveObjName("Save Obj"),
-             lastObjFileName("Load Obj"),
-             lastSaveObjFileName("Save Obj"),
-             objLoaded(false),
-             showObj(true),
-             loadObj(false),
-             startedSceneMeshGeneration(false),
-             blenderSceneMeshBuildStarted(false),
-             blenderSceneMeshGenerationDone(false),
-             blendFileOnlyBuild(false),
-             blendFileAndObjBuild(false),
-             filterToIncludeBox(true),
-             errorBuilding(false),
-             skipExtractingAlocsOrPrims(false),
-             errorExtracting(false),
-             extractingResources(false),
-             doneExtractingAlocsOrPrims(false),
-             doObjHitTest(false),
-             meshTypeForBuild(ALOC),
-             sceneMeshBuildType(COPY),
-             primLods{true, true, true, true, true, true, true, true},
-             blendFileBuilt(false),
-             extractTextures(false),
-             applyTextures(false) {}
+                         saveObjName("Save Obj"),
+                         lastObjFileName("Load Obj"),
+                         lastSaveObjFileName("Save Obj"),
+                         objLoaded(false),
+                         showObj(true),
+                         loadObj(false),
+                         startedSceneMeshGeneration(false),
+                         blenderSceneMeshBuildStarted(false),
+                         blenderSceneMeshGenerationDone(false),
+                         blendFileOnlyBuild(false),
+                         blendFileAndObjBuild(false),
+                         filterToIncludeBox(true),
+                         errorBuilding(false),
+                         skipExtractingAlocsOrPrims(false),
+                         errorExtracting(false),
+                         extractingResources(false),
+                         doneExtractingAlocsOrPrims(false),
+                         doObjHitTest(false),
+                         meshTypeForBuild(ALOC),
+                         sceneMeshBuildType(COPY),
+                         primLods{true, true, true, true, true, true, true, true},
+                         blendFileBuilt(false),
+                         extractTextures(false),
+                         applyTextures(false) {}
 
 HWND SceneMesh::hSceneMeshDialog = nullptr;
 
@@ -108,7 +108,8 @@ void SceneMesh::updateObjDialogControls(const HWND hDlg) {
     CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
 }
 
-INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
+                                                  LPARAM lParam) {
     SceneMesh& obj = getInstance();
     switch (message) {
     case WM_INITDIALOG: {
@@ -562,8 +563,14 @@ void SceneMesh::loadObjMesh() {
 void SceneMesh::renderObj() const {
     const Renderer& renderer = Renderer::getInstance();
 
+    static int logCounterObj = 0;
+    if (logCounterObj < 10) {
+        Logger::log(NK_DEBUG, "SceneMesh::renderObj: meshes count: %zu, objLoaded: %d", model.meshes.size(), objLoaded);
+        logCounterObj++;
+    }
+
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
 
     renderer.shader.use();
 
@@ -580,7 +587,7 @@ void SceneMesh::renderObj() const {
     renderer.shader.setMat4("view", renderer.view);
     renderer.shader.setMat4("model", modelTransform);
     renderer.shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelTransform))));
-    renderer.shader.setVec4("flatColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
+    renderer.shader.setVec4("flatColor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
     model.draw(renderer.shader, renderer.projection * renderer.view);
 }
@@ -659,7 +666,8 @@ bool SceneMesh::canBuildObjFromScene() const {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Scene& scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingResources && navKitSettings.blenderSet
-        && scene.sceneLoaded && !blenderSceneMeshBuildStarted && !blenderSceneMeshGenerationDone && Rpkg::extractionDataInitComplete;
+        && scene.sceneLoaded && !blenderSceneMeshBuildStarted && !blenderSceneMeshGenerationDone &&
+        Rpkg::extractionDataInitComplete;
 }
 
 bool SceneMesh::canSaveBlend() const {

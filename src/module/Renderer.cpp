@@ -147,10 +147,10 @@ bool Renderer::initWindowAndRenderer() {
         SDL_SetWindowPosition(window, x, y);
     }
     const std::string navKitVersion = NavKit_VERSION_MAJOR
-    "."
-    NavKit_VERSION_MINOR
-    "."
-    NavKit_VERSION_PATCH;
+        "."
+        NavKit_VERSION_MINOR
+        "."
+        NavKit_VERSION_PATCH;
     std::string title = "NavKit ";
     title += navKitVersion;
     SDL_SetWindowTitle(window, title.data());
@@ -289,10 +289,20 @@ void Renderer::renderFrame() {
     shader.use();
     shader.setBool("useFlatColor", false);
     shader.setBool("useVertexColor", false);
+    shader.setBool("useTexture", false);
     glUseProgram(0);
 
     if (const SceneMesh& obj = SceneMesh::getInstance(); obj.objLoaded && obj.showObj) {
+        GLboolean blendEnabled;
+        glGetBooleanv(GL_BLEND, &blendEnabled);
+        static bool blendLogged = false;
+        if (!blendLogged) {
+            Logger::log(NK_DEBUG, "Renderer::renderFrame: GL_BLEND is %s", blendEnabled ? "ENABLED" : "DISABLED");
+            blendLogged = true;
+        }
+        glEnable(GL_TEXTURE_2D);
         obj.renderObj();
+        glDisable(GL_TEXTURE_2D);
         glUseProgram(0);
         glDisable(GL_CULL_FACE);
     }
@@ -356,7 +366,8 @@ void Renderer::finalizeFrame() const {
     SDL_GL_SwapWindow(window);
 }
 
-void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view, const glm::mat4& projection, const Vec3 color = {-1, -1, -1}) {
+void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view, const glm::mat4& projection,
+              const Vec3 color = {-1, -1, -1}) {
     static GLuint vao = 0, vbo = 0;
     if (vao == 0) {
         glGenVertexArrays(1, &vao);
@@ -470,7 +481,8 @@ void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 colo
     glPopMatrix();
 }
 
-void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled, const Vec3 fillColor, const bool outlined,
+void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled,
+                       const Vec3 fillColor, const bool outlined,
                        const Vec3 outlineColor, const float alpha) const {
     static GLuint vao = 0, vbo = 0;
     if (vao == 0) {
@@ -488,26 +500,54 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
 
     auto addQuad = [&](Vec3 v1, Vec3 v2, Vec3 v3, Vec3 v4) {
         if (filled) {
-            filledVertices.push_back(pos.X + v1.X); filledVertices.push_back(pos.Y + v1.Y); filledVertices.push_back(pos.Z + v1.Z);
-            filledVertices.push_back(pos.X + v2.X); filledVertices.push_back(pos.Y + v2.Y); filledVertices.push_back(pos.Z + v2.Z);
-            filledVertices.push_back(pos.X + v3.X); filledVertices.push_back(pos.Y + v3.Y); filledVertices.push_back(pos.Z + v3.Z);
+            filledVertices.push_back(pos.X + v1.X);
+            filledVertices.push_back(pos.Y + v1.Y);
+            filledVertices.push_back(pos.Z + v1.Z);
+            filledVertices.push_back(pos.X + v2.X);
+            filledVertices.push_back(pos.Y + v2.Y);
+            filledVertices.push_back(pos.Z + v2.Z);
+            filledVertices.push_back(pos.X + v3.X);
+            filledVertices.push_back(pos.Y + v3.Y);
+            filledVertices.push_back(pos.Z + v3.Z);
 
-            filledVertices.push_back(pos.X + v1.X); filledVertices.push_back(pos.Y + v1.Y); filledVertices.push_back(pos.Z + v1.Z);
-            filledVertices.push_back(pos.X + v3.X); filledVertices.push_back(pos.Y + v3.Y); filledVertices.push_back(pos.Z + v3.Z);
-            filledVertices.push_back(pos.X + v4.X); filledVertices.push_back(pos.Y + v4.Y); filledVertices.push_back(pos.Z + v4.Z);
+            filledVertices.push_back(pos.X + v1.X);
+            filledVertices.push_back(pos.Y + v1.Y);
+            filledVertices.push_back(pos.Z + v1.Z);
+            filledVertices.push_back(pos.X + v3.X);
+            filledVertices.push_back(pos.Y + v3.Y);
+            filledVertices.push_back(pos.Z + v3.Z);
+            filledVertices.push_back(pos.X + v4.X);
+            filledVertices.push_back(pos.Y + v4.Y);
+            filledVertices.push_back(pos.Z + v4.Z);
         }
         if (outlined) {
-            outlinedVertices.push_back(pos.X + v1.X); outlinedVertices.push_back(pos.Y + v1.Y); outlinedVertices.push_back(pos.Z + v1.Z);
-            outlinedVertices.push_back(pos.X + v2.X); outlinedVertices.push_back(pos.Y + v2.Y); outlinedVertices.push_back(pos.Z + v2.Z);
+            outlinedVertices.push_back(pos.X + v1.X);
+            outlinedVertices.push_back(pos.Y + v1.Y);
+            outlinedVertices.push_back(pos.Z + v1.Z);
+            outlinedVertices.push_back(pos.X + v2.X);
+            outlinedVertices.push_back(pos.Y + v2.Y);
+            outlinedVertices.push_back(pos.Z + v2.Z);
 
-            outlinedVertices.push_back(pos.X + v2.X); outlinedVertices.push_back(pos.Y + v2.Y); outlinedVertices.push_back(pos.Z + v2.Z);
-            outlinedVertices.push_back(pos.X + v3.X); outlinedVertices.push_back(pos.Y + v3.Y); outlinedVertices.push_back(pos.Z + v3.Z);
+            outlinedVertices.push_back(pos.X + v2.X);
+            outlinedVertices.push_back(pos.Y + v2.Y);
+            outlinedVertices.push_back(pos.Z + v2.Z);
+            outlinedVertices.push_back(pos.X + v3.X);
+            outlinedVertices.push_back(pos.Y + v3.Y);
+            outlinedVertices.push_back(pos.Z + v3.Z);
 
-            outlinedVertices.push_back(pos.X + v3.X); outlinedVertices.push_back(pos.Y + v3.Y); outlinedVertices.push_back(pos.Z + v3.Z);
-            outlinedVertices.push_back(pos.X + v4.X); outlinedVertices.push_back(pos.Y + v4.Y); outlinedVertices.push_back(pos.Z + v4.Z);
+            outlinedVertices.push_back(pos.X + v3.X);
+            outlinedVertices.push_back(pos.Y + v3.Y);
+            outlinedVertices.push_back(pos.Z + v3.Z);
+            outlinedVertices.push_back(pos.X + v4.X);
+            outlinedVertices.push_back(pos.Y + v4.Y);
+            outlinedVertices.push_back(pos.Z + v4.Z);
 
-            outlinedVertices.push_back(pos.X + v4.X); outlinedVertices.push_back(pos.Y + v4.Y); outlinedVertices.push_back(pos.Z + v4.Z);
-            outlinedVertices.push_back(pos.X + v1.X); outlinedVertices.push_back(pos.Y + v1.Y); outlinedVertices.push_back(pos.Z + v1.Z);
+            outlinedVertices.push_back(pos.X + v4.X);
+            outlinedVertices.push_back(pos.Y + v4.Y);
+            outlinedVertices.push_back(pos.Z + v4.Z);
+            outlinedVertices.push_back(pos.X + v1.X);
+            outlinedVertices.push_back(pos.Y + v1.Y);
+            outlinedVertices.push_back(pos.Z + v1.Z);
         }
     };
 
@@ -571,7 +611,8 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
     }
 
     if (outlined && !outlinedVertices.empty()) {
-        glBufferData(GL_ARRAY_BUFFER, outlinedVertices.size() * sizeof(float), outlinedVertices.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, outlinedVertices.size() * sizeof(float), outlinedVertices.data(),
+                     GL_DYNAMIC_DRAW);
         shader.setVec4("flatColor", glm::vec4(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha));
         glDrawArrays(GL_LINES, 0, outlinedVertices.size() / 3);
     }
