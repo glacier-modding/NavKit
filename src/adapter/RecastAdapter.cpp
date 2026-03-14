@@ -984,7 +984,7 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
         if (Scene::getInstance().sceneLoaded) {
             if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
                 selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
-                meshNameString = mesh->name;
+                meshNameString = mesh->entity.name;
                 roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
             }
         }

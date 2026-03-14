@@ -194,13 +194,13 @@ void NavKitSettings::loadSettings() {
 void NavKitSettings::setHitmanFolder(const std::string& folderName) {
     if (std::filesystem::exists(folderName) && std::filesystem::is_directory(folderName)) {
         hitmanSet = true;
-        bool shouldReInitExtractionData = false;
+        bool shouldReinitExtractionData = false;
         if (folderName != hitmanFolder) {
-            shouldReInitExtractionData = true;
+            shouldReinitExtractionData = true;
         }
         hitmanFolder = folderName;
         Logger::log(NK_INFO, ("Setting Hitman folder to: " + hitmanFolder).c_str());
-        if (shouldReInitExtractionData) {
+        if (shouldReinitExtractionData) {
             Rpkg::backgroundWorker.emplace(&Rpkg::initExtractionData);
         }
     } else {

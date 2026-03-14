@@ -76,6 +76,7 @@ public:
     Json::PfBox includeBox;
     std::vector<Json::PfBox> exclusionBoxes;
     std::vector<Json::PfSeedPoint> pfSeedPoints;
+    std::vector<Json::Textures> textures;
     std::map<std::string, Json::Mati> matis;
     std::map<std::string, Json::PrimMati> primMatis;
     std::optional<std::jthread> backgroundWorker;
