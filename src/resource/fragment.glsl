@@ -21,6 +21,8 @@ void main()
         } else {
             FragColor = flatColor;
         }
+        FragColor.rgb *= 1.2;
+        FragColor.a *= flatColor.a;
         return;
     }
 
@@ -50,5 +52,5 @@ void main()
         result *= flatColor.rgb;
     }
     
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(result, texColor.a * flatColor.a);
 }

@@ -51,7 +51,7 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
                 int height = header[14] | (header[15] << 8);
                 int bpp = header[16];
                 if ((header[2] == 2 || header[2] == 10) && (bpp == 24 || bpp == 32)) {
-                    Logger::log(NK_INFO, "TGA header: type=%d, bpp=%d, width=%d, height=%d, descriptor=0x%02x",
+                    Logger::log(NK_DEBUG, "TGA header: type=%d, bpp=%d, width=%d, height=%d, descriptor=0x%02x",
                                 (int)header[2], bpp, width, height, (int)header[17]);
                     int size = width * height * (bpp / 8);
                     std::vector<unsigned char> data(size);
