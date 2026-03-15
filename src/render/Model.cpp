@@ -307,14 +307,38 @@ void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
             }
 
             std::ranges::sort(indices, [&](unsigned int a, unsigned int b) {
-                return distances[a] < distances[b];
+                return distances[a] > distances[b];
             });
             return indices;
         });
     }
 
+    // Pass 1: Opaque meshes
     for (const unsigned int i : drawOrder) {
         const Mesh& mesh = meshes[i];
+        if (mesh.isTransparent) continue;
+
+        const glm::vec3 center = (mesh.aabbMin + mesh.aabbMax) * 0.5f;
+        const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;
+        bool inside = true;
+        for (const auto& plane : planes) {
+            const float r = extents.x * std::abs(plane.x) + extents.y * std::abs(plane.y) + extents.z *
+                std::abs(plane.z);
+            if (const float d = glm::dot(glm::vec3(plane), center) + plane.w; d < -r) {
+                inside = false;
+                break;
+            }
+        }
+        if (inside) {
+            mesh.draw(shader);
+        }
+    }
+
+    // Pass 2: Transparent meshes (sorted back-to-front by distances[a] > distances[b])
+    for (const unsigned int i : drawOrder) {
+        const Mesh& mesh = meshes[i];
+        if (!mesh.isTransparent) continue;
+
         const glm::vec3 center = (mesh.aabbMin + mesh.aabbMax) * 0.5f;
         const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;
         bool inside = true;
