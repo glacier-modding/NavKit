@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -132,6 +133,7 @@ public:
     static std::string selectedRpkgAirg;
 
     static std::map<std::string, std::string> airgHashIoiStringMap;
+    static std::mutex airgHashIoiStringMapMutex;
 
 private:
     static GLuint airgLineVbo;
