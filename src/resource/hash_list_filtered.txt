@@ -3,6 +3,7 @@
 0072B1CA3E7D3037.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_ancestral_harebell.navp].pc_navp
 0081F0CDA499B5D0.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_ancestral_vesper.navp].pc_navp
 002E699011FE27A9.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_bulldog.navp].pc_navp
+00C301D11D906009.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_filur.navp].pc_navp
 00F3BCCA229D92FE.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_hollyhock.navp].pc_navp
 007E5EF2677D6424.NAVP,[assembly:/_pro/scenes/missions/ancestral/scene_smoothsnake.navp].pc_navp
 00F529F026987939.NAVP,[assembly:/_pro/scenes/missions/bangkok/_scene_mission_tiger.navp].pc_navp
@@ -87,6 +88,7 @@
 000226E68F5B89CA.AIRG,[assembly:/_pro/scenes/demo/intel2020/intelcpudemo_scene.airg].pc_airg
 00212E7A77EEB968.AIRG,[assembly:/_pro/scenes/frontend/mainmenu_scene.airg].pc_airg
 00087426DD646847.AIRG,[assembly:/_pro/scenes/missions/ancestral/scene_bulldog_scene.airg].pc_airg
+00BDEBFD3D83D437.AIRG,[assembly:/_pro/scenes/missions/ancestral/scene_filur_scene.airg].pc_airg
 00268B5E2DD9A2D7.AIRG,[assembly:/_pro/scenes/missions/ancestral/scene_hollyhock_scene.airg].pc_airg
 003BFDA176F1BBA3.AIRG,[assembly:/_pro/scenes/missions/bangkok/_scene_mission_tiger_scene.airg].pc_airg
 003AC103C4BA275E.AIRG,[assembly:/_pro/scenes/missions/bangkok/scene_baiju_scene.airg].pc_airg

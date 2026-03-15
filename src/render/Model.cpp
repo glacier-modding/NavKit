@@ -13,6 +13,7 @@
 #include <GL/glew.h>
 #include <SDL.h>
 
+#include <stb_image.h>
 #include "../../include/NavKit/render/Model.h"
 #include "../../include/NavKit/module/Logger.h"
 
@@ -38,121 +39,31 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
         filename = dir + filename;
     }
 
-    SDL_Surface* surface = SDL_LoadBMP(filename.c_str());
-    if (!surface) {
-        if (filename.size() > 4 && (filename.substr(filename.size() - 4) == ".TGA" || filename.substr(
-            filename.size() - 4) == ".tga")) {
-            Logger::log(NK_DEBUG, "Attempting manual TGA load: %s", filename.c_str());
-            std::ifstream file(filename, std::ios::binary);
-            if (file.is_open()) {
-                unsigned char header[18];
-                file.read((char*)header, 18);
-                int width = header[12] | (header[13] << 8);
-                int height = header[14] | (header[15] << 8);
-                int bpp = header[16];
-                if ((header[2] == 2 || header[2] == 10) && (bpp == 24 || bpp == 32)) {
-                    Logger::log(NK_DEBUG, "TGA header: type=%d, bpp=%d, width=%d, height=%d, descriptor=0x%02x",
-                                (int)header[2], bpp, width, height, (int)header[17]);
-                    int size = width * height * (bpp / 8);
-                    std::vector<unsigned char> data(size);
-                    if (header[2] == 2) {
-                        file.read((char*)data.data(), size);
-                    } else {
-                        int i = 0;
-                        while (i < size) {
-                            unsigned char p;
-                            file.read((char*)&p, 1);
-                            if (p & 0x80) {
-                                int count = (p & 0x7F) + 1;
-                                unsigned char pixel[4];
-                                file.read((char*)pixel, bpp / 8);
-                                for (int j = 0; j < count; ++j) {
-                                    for (int k = 0; k < bpp / 8; ++k) {
-                                        if (i < size)
-                                            data[i++] = pixel[k];
-                                    }
-                                }
-                            } else {
-                                int count = p + 1;
-                                int bytesToRead = count * (bpp / 8);
-                                if (i + bytesToRead <= size) {
-                                    file.read((char*)&data[i], bytesToRead);
-                                    i += bytesToRead;
-                                } else {
-                                    file.read((char*)&data[i], size - i);
-                                    i = size;
-                                }
-                            }
-                        }
-                    }
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 0);
 
-                    if (!(header[17] & 0x20)) {
-                        int rowSize = width * (bpp / 8);
-                        std::vector<unsigned char> row(rowSize);
-                        for (int y = 0; y < height / 2; ++y) {
-                            int topIdx = y * rowSize;
-                            int bottomIdx = (height - 1 - y) * rowSize;
-                            std::copy(data.begin() + topIdx, data.begin() + topIdx + rowSize, row.begin());
-                            std::copy(data.begin() + bottomIdx, data.begin() + bottomIdx + rowSize,
-                                      data.begin() + topIdx);
-                            std::copy(row.begin(), row.end(), data.begin() + bottomIdx);
-                        }
-                    }
+    if (data) {
+        texture.width = width;
+        texture.height = height;
+        texture.bpp = nrChannels * 8;
+        int size = width * height * nrChannels;
+        texture.data.assign(data, data + size);
 
-                    if (bpp == 32) {
-                        for (size_t i = 3; i < data.size(); i += 4) {
-                            data[i] = 255;
-                        }
-                    }
-
-                    texture.width = width;
-                    texture.height = height;
-                    texture.bpp = bpp;
-                    texture.data = std::move(data);
-                    texture.internalFormat = (bpp == 32) ? GL_RGBA8 : GL_RGB8;
-                    texture.uploadFormat = (bpp == 32) ? GL_BGRA : GL_BGR;
-                    texture.loaded = true;
-
-                    unsigned long long sum = 0;
-                    for (size_t j = 0; j < texture.data.size(); ++j) {
-                        sum += texture.data[j];
-                    }
-                    Logger::log(NK_DEBUG, "TGA data sum: %llu, average: %f, samples: %02x %02x %02x %02x, format: 0x%x",
-                                sum, (double)sum / texture.data.size(), texture.data[0], texture.data[1],
-                                texture.data[2], (bpp == 32 ? texture.data[3] : 0), texture.uploadFormat);
-
-                    Logger::log(NK_DEBUG, "Manual TGA load successful (deferred): %s", filename.c_str());
-                    return texture;
-                } else {
-                    Logger::log(NK_ERROR, "Unsupported TGA format: type=%d, bpp=%d", (int)header[2], bpp);
-                }
-            } else {
-                Logger::log(NK_ERROR, "Failed to open TGA file: %s", filename.c_str());
-            }
-        }
-    }
-
-    if (surface) {
-        Logger::log(NK_DEBUG, "Texture loaded successfully using SDL_LoadBMP: %s", filename.c_str());
-        SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-        SDL_FreeSurface(surface);
-
-        if (formattedSurface) {
-            texture.width = formattedSurface->w;
-            texture.height = formattedSurface->h;
-            texture.bpp = 32;
-            int size = texture.width * texture.height * 4;
-            texture.data.assign((unsigned char*)formattedSurface->pixels,
-                                (unsigned char*)formattedSurface->pixels + size);
+        if (nrChannels == 3) {
+            texture.internalFormat = GL_RGB8;
+            texture.uploadFormat = GL_RGB;
+        } else if (nrChannels == 4) {
             texture.internalFormat = GL_RGBA8;
             texture.uploadFormat = GL_RGBA;
-            texture.loaded = true;
-            SDL_FreeSurface(formattedSurface);
-        } else {
-            Logger::log(NK_ERROR, "Texture failed to convert at path: %s", filename.c_str());
         }
+
+        texture.loaded = true;
+        stbi_image_free(data);
+        Logger::log(NK_DEBUG, "Texture loaded successfully using stb_image: %s (%dx%d, %d channels)", 
+                    filename.c_str(), width, height, nrChannels);
     } else {
-        Logger::log(NK_ERROR, "Texture failed to load at path: %s", filename.c_str());
+        Logger::log(NK_ERROR, "Texture failed to load at path: %s. Reason: %s", 
+                    filename.c_str(), stbi_failure_reason());
     }
 
     return texture;
