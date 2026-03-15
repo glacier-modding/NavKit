@@ -4,11 +4,14 @@ out vec4 FragColor;
 in vec3 Normal;
 in vec3 FragPos;
 in vec4 VertexColor;
+in vec2 TexCoords;
 
 uniform vec4 flatColor;
 uniform sampler2D tileTexture;
+uniform sampler2D texture_diffuse1;
 uniform bool useFlatColor;
 uniform bool useVertexColor;
+uniform bool useTexture;
 
 void main()
 {
@@ -18,27 +21,36 @@ void main()
         } else {
             FragColor = flatColor;
         }
+        FragColor.rgb *= 1.2;
+        FragColor.a *= flatColor.a;
         return;
     }
 
-    float ambientStrength = 0.3;
-    vec3 ambient = ambientStrength * vec3(1.0, 1.0, 1.0);
-
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(vec3(0.0, 0.866, 0.5)); // Y=sin(60), Z=cos(60)
+    vec3 lightDir = normalize(vec3(0.5, 0.866, 0.5));
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
+    float ambientStrength = 0.3; 
+    vec3 lightIntensity = vec3(ambientStrength + diff);
 
-    vec3 blending = abs(normalize(Normal));
-    blending = normalize(max(blending, 0.00001));
-    float b = (blending.x + blending.y + blending.z);
-    blending /= b;
+    vec4 texColor;
+    if (useTexture) {
+        texColor = texture(texture_diffuse1, TexCoords);
+    } else {
+        vec3 blending = abs(normalize(Normal));
+        blending = normalize(max(blending, 0.00001));
+        float b = (blending.x + blending.y + blending.z);
+        blending /= b;
 
-    vec4 xaxis = texture(tileTexture, FragPos.yz);
-    vec4 yaxis = texture(tileTexture, FragPos.xz);
-    vec4 zaxis = texture(tileTexture, FragPos.xy);
-    vec4 texColor = xaxis * blending.x + yaxis * blending.y + zaxis * blending.z;
+        vec4 xaxis = texture(tileTexture, FragPos.yz);
+        vec4 yaxis = texture(tileTexture, FragPos.xz);
+        vec4 zaxis = texture(tileTexture, FragPos.xy);
+        texColor = xaxis * blending.x + yaxis * blending.y + zaxis * blending.z;
+    }
 
-    vec3 result = (ambient + diffuse) * flatColor.rgb * texColor.rgb;
-    FragColor = vec4(result, flatColor.a);
+    vec3 result = lightIntensity * texColor.rgb;
+    if (flatColor.rgb != vec3(1.0, 1.0, 1.0) || flatColor.a != 1.0) {
+        result *= flatColor.rgb;
+    }
+    
+    FragColor = vec4(result, texColor.a * flatColor.a);
 }

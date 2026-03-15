@@ -66,7 +66,7 @@ void Scene::loadMeshes(const std::function<void()>& errorCallback,
     } catch (...) {
         errorCallback();
     }
-    meshes = newMeshes.readMeshes();
+    meshes = newMeshes.meshes;
 }
 
 void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
@@ -139,9 +139,10 @@ void Scene::loadRoomsAndVolumes(const std::function<void()>& errorCallback,
 
 void Scene::loadMatis(const std::function<void()>& errorCallback,
                       simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    Logger::log(NK_INFO, "Loading Matis.");
     try {
         for (const auto matiVec = Json::Matis(jsonDocument["matis"]).matis;
-             auto mati : matiVec) {
+             const auto& mati : matiVec) {
             matis[mati.hash] = mati;
         }
     } catch (const std::exception& e) {
@@ -153,8 +154,9 @@ void Scene::loadMatis(const std::function<void()>& errorCallback,
 
 void Scene::loadPrimMatis(const std::function<void()>& errorCallback,
                           simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    Logger::log(NK_INFO, "Loading Prim Matis.");
     try {
-        for (const auto primMati : Json::PrimMatis(jsonDocument["primMatis"]).primMatis) {
+        for (const auto& primMati : Json::PrimMatis(jsonDocument["primMatis"]).primMatis) {
             primMatis[primMati.primHash] = primMati;
         }
     } catch (const std::exception& e) {
@@ -389,7 +391,7 @@ const Json::Mesh* Scene::findMeshByHashAndIdAndPos(const std::string& hash, cons
                                                    const float* pos) const {
     std::vector<const Json::Mesh*> closestMeshes;
     for (const Json::Mesh& mesh : meshes) {
-        if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.id == id) {
+        if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.entity.id == id) {
             closestMeshes.push_back(&mesh);
         }
     }
