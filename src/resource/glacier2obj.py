@@ -2325,17 +2325,28 @@ def load_aloc(filepath):
 texture_to_material_map = {}
 
 
-def add_texture(obj, tga_file_path, texture_hash):
-    if not os.path.exists(tga_file_path):
-        log("ERROR", "Cannot add texture, file not found at: " + tga_file_path, "add_textures")
+def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, specular_hash):
+    diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
+    normal_tga_path = os.path.join(path_to_tga_dir, normal_hash + ".TGA")
+    specular_tga_path = os.path.join(path_to_tga_dir, specular_hash + ".TGA")
+    if not os.path.exists(diffuse_tga_path):
+        log("ERROR", "Cannot add texture, Diffuse texture file not found at: " + str(diffuse_tga_path), "add_textures")
         return
-    tga_file_path = os.path.abspath(tga_file_path)
-    log("DEBUG", "TGA filepath: " + tga_file_path, "add_textures")
-
-    if tga_file_path in texture_to_material_map:
-        mat = texture_to_material_map[tga_file_path]
+    if not os.path.exists(normal_tga_path):
+        log("DEBUG", "Normal texture file not found at: " + str(normal_tga_path), "add_textures")
     else:
-        material_name = texture_hash + "_Material"
+        normal_tga_path = os.path.abspath(normal_tga_path)
+    if not os.path.exists(specular_tga_path):
+        log("DEBUG", "Specular texture file not found at: " + str(specular_tga_path), "add_textures")
+    else:
+        specular_tga_path = os.path.abspath(specular_tga_path)
+    diffuse_tga_path = os.path.abspath(diffuse_tga_path)
+    log("DEBUG", "Diffuse TGA filepath: " + diffuse_tga_path, "add_textures")
+
+    if mati_hash in texture_to_material_map:
+        mat = texture_to_material_map[mati_hash]
+    else:
+        material_name = mati_hash + "_Material"
         mat = bpy.data.materials.new(name=material_name)
         mat.use_nodes = True
         nodes = mat.node_tree.nodes
@@ -2345,32 +2356,62 @@ def add_texture(obj, tga_file_path, texture_hash):
         node_output.location = (400, 0)
         node_texture = nodes.new(type='ShaderNodeTexImage')
         node_texture.location = (-400, 0)
-        img = bpy.data.images.new(name=texture_hash, width=1, height=1)
+        img = bpy.data.images.new(name=diffuse_hash, width=1, height=1)
         img.source = 'FILE'
-        img.filepath = tga_file_path
+        img.filepath = diffuse_tga_path
         log("INFO", "Blender internal image path: " + str(img.filepath), "add_texture")
         log("INFO", "Image has data (after setting path): " + str(img.has_data), "add_texture")
         node_texture.image = img
+        normal_set = False
+        if os.path.exists(normal_tga_path):
+            node_texture_normal = nodes.new(type='ShaderNodeTexImage')
+            node_texture_normal.location = (-400, -300)
+            img_normal = bpy.data.images.new(name=normal_hash, width=1, height=1)
+            img_normal.source = 'FILE'
+            img_normal.filepath = normal_tga_path
+            node_texture_normal.image = img_normal
+            normal_set = True
+            try:
+                node_texture_normal.image.colorspace_settings.name = 'Non-Color'
+            except:
+                pass
+        specular_set = False
+        if os.path.exists(specular_tga_path):
+            node_texture_specular = nodes.new(type='ShaderNodeTexImage')
+            node_texture_specular.location = (-400, -600)
+            img_specular = bpy.data.images.new(name=specular_hash, width=1, height=1)
+            img_specular.source = 'FILE'
+            img_specular.filepath = specular_tga_path
+            node_texture_specular.image = img_specular
+            specular_set = True
+            try:
+                node_texture_specular.image.colorspace_settings.name = 'Non-Color'
+            except:
+                pass
 
         if "HitmanTextureNode" in bpy.data.node_groups:
             node_group = nodes.new(type='ShaderNodeGroup')
             node_group.node_tree = bpy.data.node_groups["HitmanTextureNode"]
             node_group.location = (0, 0)
             links.new(node_texture.outputs['Color'], node_group.inputs[0])
+            if normal_set:
+                links.new(node_texture_normal.outputs['Color'], node_group.inputs[1])
+            if specular_set:
+                links.new(node_texture_specular.outputs['Color'], node_group.inputs[2])
             links.new(node_group.outputs[0], node_output.inputs['Surface'])
         else:
             node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
             node_bsdf.location = (0, 0)
             links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
             links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
-        texture_to_material_map[tga_file_path] = mat
+        texture_to_material_map[mati_hash] = mat
 
     if obj.data.materials:
         obj.data.materials[0] = mat
     else:
         obj.data.materials.append(mat)
 
-    log("DEBUG", "Texture " + tga_file_path + " applied to " + obj.name, "add_textures")
+    log("DEBUG", "Texture " + mati_hash + " applied to " + obj.name, "add_textures")
 
 
 def get_local_space_bbox_center(obj):
@@ -2852,9 +2893,10 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
     mati = matis[mati_hash]
     log("DEBUG", "Diffuse hash: " + mati["diffuse"], "add_textures")
     diffuse_hash = mati["diffuse"]
+    normal_hash = mati["normal"]
+    specular_hash = mati["specular"]
     path_to_tga_dir = os.path.join(output_dir, "tga")
-    diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
-    add_texture(obj, diffuse_tga_path, diffuse_hash)
+    add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, specular_hash)
 
 
 def main():
