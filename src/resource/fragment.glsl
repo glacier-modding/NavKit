@@ -51,6 +51,11 @@ void main()
     if (flatColor.rgb != vec3(1.0, 1.0, 1.0) || flatColor.a != 1.0) {
         result *= flatColor.rgb;
     }
+
+    float alpha = texColor.a * flatColor.a;
+    if (alpha < 0.1) {
+        discard;
+    }
     
-    FragColor = vec4(result, texColor.a * flatColor.a);
+    FragColor = vec4(result, alpha);
 }

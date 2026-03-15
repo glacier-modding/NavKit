@@ -37,6 +37,8 @@ public:
     glm::vec3 aabbMin;
     glm::vec3 aabbMax;
 
+    bool isTransparent = false;
+
     Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices,
          const std::vector<Texture>& textures);
 

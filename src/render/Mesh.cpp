@@ -24,6 +24,16 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>&
         for (const auto& v : vertices) {
             aabbMin = glm::min(aabbMin, v.position);
             aabbMax = glm::max(aabbMax, v.position);
+            if (v.color.a < 0.99f) {
+                isTransparent = true;
+            }
+        }
+    }
+
+    for (const auto& t : textures) {
+        if (t.uploadFormat == GL_RGBA) {
+            isTransparent = true;
+            break;
         }
     }
 }
