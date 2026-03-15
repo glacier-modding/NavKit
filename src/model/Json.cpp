@@ -79,7 +79,6 @@ void Json::Vec3Wrapped::writeJson(std::ostream& f, std::string propertyName) con
 void Json::Entity::readJson(simdjson::ondemand::object json) {
     id = getValue(json, "id");
     name = getValue(json, "name");
-    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object positionJson = json["position"];
     position.readJson(positionJson);
     const simdjson::ondemand::object rotationJson = json["rotation"];
@@ -96,8 +95,7 @@ void Json::Entity::readJson(simdjson::ondemand::object json) {
 
 void Json::Entity::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
+        R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -111,7 +109,7 @@ void Json::Entity::writeJson(std::ostream& f) const {
     f << "}";
 }
 
-void Json::HashesAndEntity::readJson(simdjson::ondemand::object json) {
+void Json::Mesh::readJson(simdjson::ondemand::object json) {
     alocHash = getValue(json, "alocHash");
     primHash = getValue(json, "primHash");
     roomName = getValue(json, "roomName");
@@ -125,48 +123,27 @@ void Json::Mesh::writeJson(std::ostream& f) const {
         R"(","primHash":")" << primHash <<
         R"(","roomName":")" << roomName <<
         R"(","roomFolderName":")" << roomFolderName <<
-        R"(","entity":{"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
-    pos.writeJson(f);
-    f << ",";
-    rotation.writeJson(f);
-    f << ",";
-    scale.writeJson(f);
-    f << "}}";
+        R"(","entity":{"id":")" << entity.id <<
+        R"(","name":")" << entity.name;
+        entity.position.writeJson(f);
+        f << ",";
+        entity.rotation.writeJson(f);
+        f << ",";
+        entity.scale.writeJson(f);
+        f << "}}";
 }
 
-Json::Meshes::Meshes(simdjson::ondemand::array alocs) {
-    for (simdjson::ondemand::value hashAndEntityJson : alocs) {
-        HashesAndEntity hashAndEntity;
-        hashAndEntity.readJson(hashAndEntityJson);
-        hashesAndEntities.push_back(hashAndEntity);
-    }
-}
-
-std::vector<Json::Mesh> Json::Meshes::readMeshes() const {
-    std::vector<Mesh> meshes;
-    for (const HashesAndEntity& hashAndEntity : hashesAndEntities) {
+Json::Meshes::Meshes(simdjson::ondemand::array meshesJson) {
+    for (simdjson::ondemand::value meshJson : meshesJson) {
         Mesh mesh;
-        mesh.alocHash = hashAndEntity.alocHash;
-        mesh.primHash = hashAndEntity.primHash;
-        mesh.roomName = hashAndEntity.roomName;
-        mesh.roomFolderName = hashAndEntity.roomFolderName;
-        mesh.id = hashAndEntity.entity.id;
-        mesh.name = hashAndEntity.entity.name;
-        mesh.tblu = hashAndEntity.entity.tblu;
-        mesh.pos = hashAndEntity.entity.position;
-        mesh.rotation = hashAndEntity.entity.rotation;
-        mesh.scale = hashAndEntity.entity.scale;
-        meshes.emplace_back(mesh);
+        mesh.readJson(meshJson);
+        meshes.push_back(mesh);
     }
-    return meshes;
 }
 
 void Json::PfBox::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
+        R"(","name":")" << name << R"(",)";
     pos.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -199,23 +176,21 @@ void Json::PfBoxes::readPathfindingBBoxes() {
         if (entity.type.data == INCLUDE_TYPE) {
             std::string id = entity.id;
             std::string name = entity.name;
-            std::string tblu = entity.tblu;
             Vec3 p = entity.position;
             Vec3 s = entity.scale.data;
             Rotation r = entity.rotation;
             PfBoxType type = entity.type;
-            scene.includeBox = {id, name, tblu, p, s, r, type};
+            scene.includeBox = {id, name, p, s, r, type};
             includeBoxFound = true;
         }
         if (entity.type.data == EXCLUDE_TYPE) {
             std::string id = entity.id;
             std::string name = entity.name;
-            std::string tblu = entity.tblu;
             Vec3 p = entity.position;
             Vec3 s = entity.scale.data;
             Rotation r = entity.rotation;
             PfBoxType type = entity.type;
-            scene.exclusionBoxes.emplace_back(id, name, tblu, p, s, r, type);
+            scene.exclusionBoxes.emplace_back(id, name, p, s, r, type);
         }
     }
     if (!includeBoxFound) {
@@ -224,11 +199,10 @@ void Json::PfBoxes::readPathfindingBBoxes() {
         Rotation r;
         std::string id = NO_INCLUDE_BOX_FOUND;
         std::string name;
-        std::string tblu;
         PfBoxType type;
         type.type = "EPathFinderBoxType";
         type.data = INCLUDE_TYPE;
-        scene.includeBox = {id, name, tblu, pos, scale, r, type};
+        scene.includeBox = {id, name, pos, scale, r, type};
     }
 }
 
@@ -242,8 +216,7 @@ Json::Gates::Gates(simdjson::ondemand::array gatesJson) {
 
 void Json::Room::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
+        R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -257,7 +230,6 @@ void Json::Room::writeJson(std::ostream& f) const {
 void Json::Room::readJson(simdjson::ondemand::object json) {
     id = getValue(json, "id");
     name = getValue(json, "name");
-    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object positionJson = json["position"];
     position.readJson(positionJson);
     const simdjson::ondemand::object rotationJson = json["rotation"];
@@ -280,8 +252,7 @@ Json::Rooms::Rooms(simdjson::ondemand::array roomsJson) {
 
 void Json::Gate::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
+        R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -295,7 +266,6 @@ void Json::Gate::writeJson(std::ostream& f) const {
 void Json::Gate::readJson(simdjson::ondemand::object json) {
     id = getValue(json, "id");
     name = getValue(json, "name");
-    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object positionJson = json["position"];
     position.readJson(positionJson);
     const simdjson::ondemand::object rotationJson = json["rotation"];
@@ -311,9 +281,6 @@ void Json::Gate::readJson(simdjson::ondemand::object json) {
 void Json::AiAreaWorld::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
         R"(","name":")" << name;
-    if (!tblu.empty()) {
-        f << R"(","tblu":")" << tblu;
-    }
     f << R"(",)";
     rotation.writeJson(f);
     f << "}";
@@ -322,7 +289,6 @@ void Json::AiAreaWorld::writeJson(std::ostream& f) const {
 void Json::AiAreaWorld::readJson(simdjson::ondemand::object json) {
     id = getValue(json, "id");
     name = getValue(json, "name");
-    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
 }
@@ -339,7 +305,6 @@ void Json::ParentData::writeJson(std::ostream& f) const {
     f << R"("data":{"id":")" << id <<
         R"(","name":")" << name <<
         R"(","source":")" << source <<
-        R"(","tblu":")" << tblu <<
         R"(","type":")" << type << R"("})";
 }
 
@@ -347,7 +312,6 @@ void Json::ParentData::readJson(simdjson::ondemand::object json) {
     id = getValue(json, "id");
     name = getValue(json, "name");
     source = getValue(json, "source");
-    // tblu = getValue(json, "tblu");
     type = getValue(json, "type");
 }
 
@@ -366,8 +330,7 @@ void Json::Parent::readJson(simdjson::ondemand::object json) {
 
 void Json::AiArea::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
+        R"(","name":")" << name << R"(",)";
     rotation.writeJson(f);
     f << R"(,"logicalParent":[)";
     auto separator = "";
@@ -391,7 +354,6 @@ void Json::AiArea::writeJson(std::ostream& f) const {
 void Json::AiArea::readJson(simdjson::ondemand::object json) {
     id = getValue(json, "id");
     name = getValue(json, "name");
-    // tblu = getValue(json, "tblu");
     const simdjson::ondemand::object rotationJson = json["rotation"];
     rotation.readJson(rotationJson);
     logicalParents.clear();
@@ -465,8 +427,7 @@ Json::VolumeSpheres::VolumeSpheres(simdjson::ondemand::array volumeSpheresJson) 
 
 void Json::PfSeedPoint::writeJson(std::ostream& f) const {
     f << R"({"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","tblu":")" << tblu << R"(",)";
+        R"(","name":")" << name << R"(",)";
     pos.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -486,17 +447,15 @@ std::vector<Json::PfSeedPoint> Json::PfSeedPoints::readPfSeedPoints() const {
     for (const Entity& entity : entities) {
         std::string id = entity.id;
         std::string name = entity.name;
-        std::string tblu = entity.tblu;
         Vec3 p = entity.position;
         Rotation r = entity.rotation;
-        pfSeedPoints.emplace_back(id, name, tblu, p, r);
+        pfSeedPoints.emplace_back(id, name, p, r);
     }
     return pfSeedPoints;
 }
 
 void Json::Mati::readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     hash = getValue(jsonDocument.get_object(), "id");
-    className = getValue(jsonDocument.get_object(), "class");
     simdjson::ondemand::object propertiesJson = jsonDocument["properties"];
     auto result = propertiesJson["mapTexture2D_01"];
     if (result.error() == simdjson::SUCCESS) {
@@ -519,7 +478,6 @@ void Json::Mati::readJsonFromMatiFile(simdjson::simdjson_result<simdjson::ondema
 
 void Json::Mati::readJsonFromScene(simdjson::ondemand::object json) {
     hash = getValue(json, "hash");
-    className = getValue(json, "class");
     diffuse = getValue(json, "diffuse");
     normal = getValue(json, "normal");
     specular = getValue(json, "specular");
@@ -527,7 +485,6 @@ void Json::Mati::readJsonFromScene(simdjson::ondemand::object json) {
 
 void Json::Mati::writeJson(std::ostream& f) const {
     f << R"({"hash":")" << hash <<
-        R"(","class":")" << className <<
         R"(","diffuse":")" << diffuse <<
         R"(","normal":")" << normal <<
         R"(","specular":")" << specular;
