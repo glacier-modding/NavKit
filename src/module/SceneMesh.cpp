@@ -388,6 +388,16 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
                             diffuseHash.c_str(),
                             mesh.primHash.c_str());
                 neededTextHashes.insert(diffuseHash);
+                auto normalHash = scene.matis[matiHash].normal;
+                Logger::log(NK_INFO, "Found normal texture %s for mesh %s.",
+                            normalHash.c_str(),
+                            mesh.primHash.c_str());
+                neededTextHashes.insert(normalHash);
+                auto specularHash = scene.matis[matiHash].specular;
+                Logger::log(NK_INFO, "Found specular texture %s for mesh %s.",
+                            specularHash.c_str(),
+                            mesh.primHash.c_str());
+                neededTextHashes.insert(specularHash);
             }
         }
         Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
