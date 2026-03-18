@@ -275,48 +275,44 @@ void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
             viewProj[2][3] + (i % 2 == 0 ? 1 : -1) * viewProj[2][i / 2],
             viewProj[3][3] + (i % 2 == 0 ? 1 : -1) * viewProj[3][i / 2]
         );
-    }
-
-    auto& [drawOrder, sortFuture] = sortContexts[this];
-
-    if (drawOrder.size() != meshes.size()) {
-        drawOrder.resize(meshes.size());
-        std::iota(drawOrder.begin(), drawOrder.end(), 0);
-    }
-
-    if (sortFuture.valid() && sortFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        if (std::vector<unsigned int> newOrder = sortFuture.get(); newOrder.size() == meshes.size()) {
-            drawOrder = std::move(newOrder);
+        const float length = glm::length(glm::vec3(planes[i]));
+        if (length > 0.0f) {
+            planes[i] /= length;
         }
     }
 
-    if (!sortFuture.valid()) {
-        std::vector<glm::vec3> centers;
-        centers.reserve(meshes.size());
-        for (const auto& mesh : meshes) {
-            centers.push_back((mesh.aabbMin + mesh.aabbMax) * 0.5f);
+    std::vector<unsigned int> opaqueIndices;
+    std::vector<unsigned int> transparentIndices;
+    opaqueIndices.reserve(meshes.size());
+    transparentIndices.reserve(meshes.size());
+
+    for (unsigned int i = 0; i < meshes.size(); ++i) {
+        if (meshes[i].isBlended) {
+            transparentIndices.push_back(i);
+        } else {
+            opaqueIndices.push_back(i);
         }
-
-        sortFuture = std::async(std::launch::async, [centers = std::move(centers), viewProj]() {
-            std::vector<unsigned int> indices(centers.size());
-            std::iota(indices.begin(), indices.end(), 0);
-
-            std::vector<float> distances(centers.size());
-            for (size_t i = 0; i < centers.size(); ++i) {
-                distances[i] = (viewProj * glm::vec4(centers[i], 1.0f)).w;
-            }
-
-            std::ranges::sort(indices, [&](unsigned int a, unsigned int b) {
-                return distances[a] > distances[b];
-            });
-            return indices;
-        });
     }
 
-    // Pass 1: Opaque meshes
-    for (const unsigned int i : drawOrder) {
+    std::vector<float> distances(meshes.size());
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const glm::vec3 center = (meshes[i].aabbMin + meshes[i].aabbMax) * 0.5f;
+        distances[i] = (viewProj * glm::vec4(center, 1.0f)).w;
+    }
+
+    // Sort Opaque Front-to-Back (Optimizes overdraw)
+    std::sort(opaqueIndices.begin(), opaqueIndices.end(), [&](unsigned int a, unsigned int b) {
+        return distances[a] < distances[b];
+    });
+
+    // Sort Transparent Back-to-Front (Required for correct blending)
+    std::sort(transparentIndices.begin(), transparentIndices.end(), [&](unsigned int a, unsigned int b) {
+        return distances[a] > distances[b];
+    });
+
+    // Pass 1: Opaque meshes (including cutout transparency)
+    for (const unsigned int i : opaqueIndices) {
         const Mesh& mesh = meshes[i];
-        if (mesh.isTransparent) continue;
 
         const glm::vec3 center = (mesh.aabbMin + mesh.aabbMax) * 0.5f;
         const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;
@@ -334,10 +330,9 @@ void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
         }
     }
 
-    // Pass 2: Transparent meshes (sorted back-to-front by distances[a] > distances[b])
-    for (const unsigned int i : drawOrder) {
+    // Pass 2: Blended transparent meshes (sorted back-to-front by distances[a] > distances[b])
+    for (const unsigned int i : transparentIndices) {
         const Mesh& mesh = meshes[i];
-        if (!mesh.isTransparent) continue;
 
         const glm::vec3 center = (mesh.aabbMin + mesh.aabbMax) * 0.5f;
         const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;

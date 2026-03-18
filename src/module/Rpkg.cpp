@@ -49,9 +49,7 @@ void Rpkg::initExtractionData() {
                         const std::string navpHash =
                             dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
                         std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
-                        if (Navp::navpHashIoiStringMap.contains(navpHash)) {
-                            Navp::navpHashIoiStringMap[navpHash] = ioiString;
-                        }
+                        Navp::navpHashIoiStringMap[navpHash] = ioiString;
                     }
                 }
                 if (line.find(".AIRG") != std::string::npos) {
@@ -65,9 +63,7 @@ void Rpkg::initExtractionData() {
                         const std::string airgHash =
                             dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
                         std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
-                        if (Airg::airgHashIoiStringMap.contains(airgHash)) {
-                            Airg::airgHashIoiStringMap[airgHash] = ioiString;
-                        }
+                        Airg::airgHashIoiStringMap[airgHash] = ioiString;
                     }
                 }
             }

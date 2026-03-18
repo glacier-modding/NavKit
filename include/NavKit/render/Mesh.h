@@ -38,6 +38,7 @@ public:
     glm::vec3 aabbMax;
 
     bool isTransparent = false;
+    bool isBlended = false;
 
     Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices,
          const std::vector<Texture>& textures);
