@@ -26,6 +26,9 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>&
             aabbMax = glm::max(aabbMax, v.position);
             if (v.color.a < 0.99f) {
                 isTransparent = true;
+                if (v.color.a > 0.1f) {
+                    isBlended = true;
+                }
             }
         }
     }
@@ -33,6 +36,10 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>&
     for (const auto& t : textures) {
         if (t.uploadFormat == GL_RGBA) {
             isTransparent = true;
+            // We assume RGBA textures might need blending, 
+            // but the shader handles cutout with discard.
+            // If it's a known format or we could check the data, we'd be more sure.
+            // For now, let's treat RGBA as "could be transparent".
             break;
         }
     }
