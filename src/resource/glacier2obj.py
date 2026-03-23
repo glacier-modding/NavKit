@@ -1337,6 +1337,8 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
         layer = mesh.vertex_colors.new(name="Col")
         mesh.color_attributes[layer.name].data.foreach_set("color", loop_cols)
 
+    mesh.polygons.foreach_set("use_smooth", [False] * len(mesh.polygons))
+
     mesh.validate()
     mesh.update()
 
@@ -2086,6 +2088,7 @@ def convex_hull(bm):
 
 def finalize_mesh(bm, obj):
     bm.to_mesh(obj.data)
+    obj.data.polygons.foreach_set("use_smooth", [False] * len(obj.data.polygons))
     bm.free()
 
 
