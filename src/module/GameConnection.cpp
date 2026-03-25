@@ -165,7 +165,7 @@ int GameConnection::listNavKitSceneEntities() const {
 
         ws->dispatch([&](const std::string& message) {
             messagesReceived++;
-            if (message == "Done sending scene.") {
+            if (message == "Done sending entities.") {
                 done = true;
                 return;
             }
