@@ -85,17 +85,17 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 # How NavKit generates Navp and Airg files 
 NavKit performs the following series of steps to be able to generate Navp files.
 1. Connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's ZGeomEntities, PFBox entities, and PFSeedPoint entities and send their data back to NavKit, where they are saved to `output.nav.json` in the specified output folder.
-1. Extract all the necessary Aloc or Prim files from the rpkg files to the `aloc` or `prim` folder of the specified output folder using glacier2obj (A rust library included in the installer).
-1. Open the blender cli and run the `glacier2obj.py` script to generate an obj by importing all the Aloc or Prim files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` in the specified output folder.
+1. Extract all the necessary Aloc or Prim files from the rpkg files to the `aloc` or `prim` folder of the specified output folder using navkit-rpkg-lib (A rust library included in the installer).
+1. Open the blender cli and run the `glacier2obj.py` script to generate an obj by importing all the Aloc or Prim files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` and / or `output.blend` in the specified output folder.
 1. Load `output.obj` from the specified output folder or another specified Obj file.
-1. At this point, the build Navp section of the menu will be available, and you can customize the parameters with "Settings > Recast Settings" on the menu bar, then press "Build > Build Navp" on the menu bar to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
+1. At this point, the build Navp section of the menu will be available. You can customize the parameters with "Settings > Recast Settings" on the menu bar, then press "Build > Build Navp" on the menu bar to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
 1. At this point, the build Airg section of the menu will be available, and you can customize the parameters, then press build to generate the Airg.
 # Disclaimer
-*NavKit is still a work in progress, and there may be glitches or issues with Obj, Navp, or Airg generation in the current version. If you encounter any problems while running NavKit please create an issue on this GitHub repo.*
+*NavKit is still a work in progress, and there may be glitches or issues with Obj, Blend, Navp, or Airg generation in the current version. If you encounter any problems while running NavKit, please create an issue on this GitHub repo.*
 # Future enhancements
 * Faster Scene generation
 * Linux and macOS support
-* More issues on the Issues tab
+* More planned features are on the Issues tab
 # Building instructions (CLion or Visual Studio)
 1. Clone this repository with the '--recurse-submodules' option
 1. Open in Visual Studio or CLion
@@ -127,8 +127,10 @@ Jojje
 Kercyx  
 Kevin Rudd  
 LaNombre  
+xiuliu⅃  
 Luka  
 Lyssa  
+Mark2580  
 NoFate  
 Notex  
 Pavle  
