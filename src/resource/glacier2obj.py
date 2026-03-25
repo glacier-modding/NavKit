@@ -1289,17 +1289,25 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
     mesh = bpy.data.meshes.new(name=(str(prim_name) + "_" + str(mesh_index)))
 
     vert_locs = []
-    loop_vidxs = []
+    loop_normals = []
     loop_cols = []
 
     material_index = prim.header.object_table[mesh_index].prim_object.material_id
     sub_mesh = prim.header.object_table[mesh_index].sub_mesh
 
     loop_uvs = [[] for _ in range(sub_mesh.num_uvchannels)]
-    loop_vidxs.extend(sub_mesh.indices)
 
-    for i, vert in enumerate(sub_mesh.vertexBuffer.vertices):
-        vert_locs.extend([vert.position[0], vert.position[1], vert.position[2]])
+    unique_verts = {}
+    remap = []
+
+    for vert in sub_mesh.vertexBuffer.vertices:
+        pos = (vert.position[0], vert.position[1], vert.position[2])
+        if pos not in unique_verts:
+            unique_verts[pos] = len(vert_locs) // 3
+            vert_locs.extend(pos)
+        remap.append(unique_verts[pos])
+
+    loop_vidxs = [remap[i] for i in sub_mesh.indices]
 
     mesh.vertices.add(len(vert_locs) // 3)
     mesh.vertices.foreach_set("co", vert_locs)
@@ -1315,9 +1323,10 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
     mesh.polygons.foreach_set("loop_start", loop_starts)
     mesh.polygons.foreach_set("loop_total", loop_totals)
 
-    if load_textures:
-        for index in sub_mesh.indices:
-            vert = sub_mesh.vertexBuffer.vertices[index]
+    for index in sub_mesh.indices:
+        vert = sub_mesh.vertexBuffer.vertices[index]
+        loop_normals.append((vert.normal[0], vert.normal[1], vert.normal[2]))
+        if load_textures:
             loop_cols.extend(
                 [
                     vert.color[0] / 255,
@@ -1329,6 +1338,7 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
             for uv_i in range(sub_mesh.num_uvchannels):
                 loop_uvs[uv_i].extend([vert.uv[uv_i][0], 1 - vert.uv[uv_i][1]])
 
+    if load_textures:
         for uv_i in range(sub_mesh.num_uvchannels):
             name = "UVMap" if uv_i == 0 else "UVMap.%03d" % uv_i
             layer = mesh.uv_layers.new(name=name)
@@ -1337,7 +1347,13 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
         layer = mesh.vertex_colors.new(name="Col")
         mesh.color_attributes[layer.name].data.foreach_set("color", loop_cols)
 
-    mesh.polygons.foreach_set("use_smooth", [False] * len(mesh.polygons))
+    mesh.update()
+
+    mesh.normals_split_custom_set(loop_normals)
+    if bpy.app.version < (4, 1, 0):
+        mesh.use_auto_smooth = True
+
+    mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
 
     mesh.validate()
     mesh.update()
@@ -2086,7 +2102,7 @@ def convex_hull(bm):
     bmesh.ops.convex_hull(bm, input=bm.verts)
 
 
-def finalize_mesh(bm, obj):
+def finalize_aloc_mesh(bm, obj):
     bm.to_mesh(obj.data)
     obj.data.polygons.foreach_set("use_smooth", [False] * len(obj.data.polygons))
     bm.free()
@@ -2269,7 +2285,7 @@ def load_aloc(filepath):
         log("ERROR", "Unknown data type: " + str(aloc.data_type) + " for Mesh ALOC " + aloc_name, "load_aloc")
         return -1, []
 
-    finalize_mesh(bm, aloc_obj)
+    finalize_aloc_mesh(bm, aloc_obj)
     log("DEBUG", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
     return aloc, [aloc_obj]
 
