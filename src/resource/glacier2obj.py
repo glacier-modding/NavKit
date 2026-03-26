@@ -2349,61 +2349,94 @@ def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, spec
         material_name = mati_hash + "_Material"
         mat = bpy.data.materials.new(name=material_name)
         mat.use_nodes = True
+
+        # Enable transparency in the viewport/EEVEE (Updated for 4.2/4.3+)
+        # Use hasattr to handle cases where engine-specific attributes aren't initialized
+        if hasattr(mat, "eevee"):
+            mat.eevee.transparent_render_method = 'DITHERED'
+        elif hasattr(mat, "blend_method"):
+            mat.blend_method = 'HASHED'
+            if hasattr(mat, "shadow_method"):
+                mat.shadow_method = 'HASHED'
+
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
         nodes.clear()
         node_output = nodes.new(type='ShaderNodeOutputMaterial')
-        node_output.location = (400, 0)
-        node_texture = nodes.new(type='ShaderNodeTexImage')
-        node_texture.location = (-400, 0)
-        img = bpy.data.images.new(name=diffuse_hash, width=1, height=1)
-        img.source = 'FILE'
-        img.filepath = diffuse_tga_path
-        log("INFO", "Blender internal image path: " + str(img.filepath), "add_texture")
-        log("INFO", "Image has data (after setting path): " + str(img.has_data), "add_texture")
-        node_texture.image = img
-        normal_set = False
-        if os.path.exists(normal_tga_path):
-            node_texture_normal = nodes.new(type='ShaderNodeTexImage')
-            node_texture_normal.location = (-400, -300)
-            img_normal = bpy.data.images.new(name=normal_hash, width=1, height=1)
-            img_normal.source = 'FILE'
-            img_normal.filepath = normal_tga_path
-            node_texture_normal.image = img_normal
-            normal_set = True
-            try:
-                node_texture_normal.image.colorspace_settings.name = 'Non-Color'
-            except:
-                pass
-        specular_set = False
+        node_output.location = (700, 0)
+
+        # Select Node Type based on Blender Version (Specular BSDF removed in 4.3)
+        is_v40_plus = bpy.app.version >= (4, 0, 0)
+        is_v43_plus = bpy.app.version >= (4, 3, 0)
+        bsdf_type = 'ShaderNodeBsdfPrincipled' if is_v43_plus else 'ShaderNodeBsdfSpecular'
+        invert_type = 'ShaderNodeInvert' if is_v43_plus else 'ShaderNodeInvertColor'
+
+        node_spec_bsdf = nodes.new(type=bsdf_type)
+        node_spec_bsdf.name = "Specular BSDF"
+        node_spec_bsdf.location = (400, 0)
+        links.new(node_spec_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+
+        # Diffuse Setup
+        node_diffuse = nodes.new(type='ShaderNodeTexImage')
+        node_diffuse.name = "Diffuse"
+        node_diffuse.location = (-400, 350)
+        img_diff = bpy.data.images.load(diffuse_tga_path)
+        img_diff.name = diffuse_hash
+        node_diffuse.image = img_diff
+
+        links.new(node_diffuse.outputs['Color'], node_spec_bsdf.inputs['Base Color'])
+
+        # Transparency/Alpha logic
+        if is_v43_plus:
+            # Principled BSDF uses 'Alpha' directly (equivalent to Invert -> Transparency)
+            links.new(node_diffuse.outputs['Alpha'], node_spec_bsdf.inputs['Alpha'])
+        else:
+            # Legacy Specular BSDF uses 'Transparency' (Inverted Alpha)
+            node_invert_transp = nodes.new(type=invert_type)
+            node_invert_transp.location = (50, 300)
+            links.new(node_diffuse.outputs['Alpha'], node_invert_transp.inputs['Color'])
+            links.new(node_invert_transp.outputs['Color'], node_spec_bsdf.inputs['Transparency'])
+
+        # Specular Setup
         if os.path.exists(specular_tga_path):
-            node_texture_specular = nodes.new(type='ShaderNodeTexImage')
-            node_texture_specular.location = (-400, -600)
-            img_specular = bpy.data.images.new(name=specular_hash, width=1, height=1)
-            img_specular.source = 'FILE'
-            img_specular.filepath = specular_tga_path
-            node_texture_specular.image = img_specular
-            specular_set = True
+            node_spec_tex = nodes.new(type='ShaderNodeTexImage')
+            node_spec_tex.name = "Specular"
+            node_spec_tex.location = (-400, 0)
+            img_spec = bpy.data.images.load(specular_tga_path)
+            img_spec.name = specular_hash
+            node_spec_tex.image = img_spec
             try:
-                node_texture_specular.image.colorspace_settings.name = 'Non-Color'
+                node_spec_tex.image.colorspace_settings.name = 'Non-Color'
             except:
                 pass
 
-        if "HitmanTextureNode" in bpy.data.node_groups:
-            node_group = nodes.new(type='ShaderNodeGroup')
-            node_group.node_tree = bpy.data.node_groups["HitmanTextureNode"]
-            node_group.location = (0, 0)
-            links.new(node_texture.outputs['Color'], node_group.inputs[0])
-            if normal_set:
-                links.new(node_texture_normal.outputs['Color'], node_group.inputs[1])
-            if specular_set:
-                links.new(node_texture_specular.outputs['Color'], node_group.inputs[2])
-            links.new(node_group.outputs[0], node_output.inputs['Surface'])
-        else:
-            node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-            node_bsdf.location = (0, 0)
-            links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
-            links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+            node_invert_rough = nodes.new(type=invert_type)
+            node_invert_rough.location = (50, -50)
+
+            spec_socket = 'Specular Tint' if is_v43_plus else 'Specular'
+            links.new(node_spec_tex.outputs['Color'], node_spec_bsdf.inputs[spec_socket])
+            links.new(node_spec_tex.outputs['Alpha'], node_invert_rough.inputs['Color'])
+            links.new(node_invert_rough.outputs['Color'], node_spec_bsdf.inputs['Roughness'])
+
+        # Normal Setup
+        if os.path.exists(normal_tga_path):
+            node_norm_tex = nodes.new(type='ShaderNodeTexImage')
+            node_norm_tex.name = "Normal"
+            node_norm_tex.location = (-400, -350)
+            img_norm = bpy.data.images.load(normal_tga_path)
+            img_norm.name = normal_hash
+            node_norm_tex.image = img_norm
+            try:
+                node_norm_tex.image.colorspace_settings.name = 'Non-Color'
+            except:
+                pass
+
+            node_norm_map = nodes.new(type='ShaderNodeNormalMap')
+            node_norm_map.location = (50, -350)
+
+            links.new(node_norm_tex.outputs['Color'], node_norm_map.inputs['Color'])
+            links.new(node_norm_map.outputs['Normal'], node_spec_bsdf.inputs['Normal'])
+
         texture_to_material_map[mati_hash] = mat
 
     if obj.data.materials:
@@ -2516,7 +2549,7 @@ def load_volume_boxes(json_data, volume_types):
                         except TypeError:
                             log("INFO",
                                 "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"],
-                                "load_scenario")
+                                "load_volume_boxes")
                             scale = mathutils.Vector([1, 1, 1])
                         create_volume(vol_name, area_coll.name, pos, rot, scale, 'SPHERE')
                     else:  # box volume
@@ -2580,7 +2613,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 assert 0
     matis = {}
     prim_matis = {}
-    texture_node_name = "HitmanTextureNode"
+    shading_mat_name = "HitmanTextureNode"
     if apply_textures:
         matis_list = data['matis']
         for mati in matis_list:
@@ -2591,13 +2624,11 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-            log("INFO", "Loading texture node from the resource blend file:" + filepath, "load_scenario")
-            if texture_node_name in data_from.materials:
-                data_to.node_groups.append(texture_node_name)
+            log("INFO", "Loading shading material from the resource blend file: " + filepath, "load_scenario")
+            if shading_mat_name in data_from.materials:
+                data_to.materials.append(shading_mat_name)
             else:
-                log("ERROR", "=========================== Error Loading the resource blend file ================",
-                    "load_scenario")
-                assert 0
+                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "load_scenario")
         log("INFO", "Adding light", "load_scenario")
 
         light_data = bpy.data.lights.new(name="Sun", type='SUN')
@@ -2919,6 +2950,10 @@ def main():
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
+
+    # Ensure the render engine is set to EEVEE so transparency properties are active
+    # In 4.2+, EEVEE Next is 'BLENDER_EEVEE_NEXT'
+    bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
 
     scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
                              apply_textures)
