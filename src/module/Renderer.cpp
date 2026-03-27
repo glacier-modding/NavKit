@@ -172,6 +172,8 @@ bool Renderer::initWindowAndRenderer() {
 
     glDepthFunc(GL_LEQUAL);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glEnable(GL_POLYGON_OFFSET_LINE);
     glEnable(GL_BLEND);
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
     prevFrameTime = SDL_GetTicks();
@@ -301,7 +303,14 @@ void Renderer::renderFrame() {
             blendLogged = true;
         }
         glEnable(GL_TEXTURE_2D);
+
+        // Note: If obj.renderObj() contains both the floor and the grease spot,
+        // applying the offset here moves both, which doesn't fix fighting between them.
+        // However, we'll keep a slight offset to prevent fighting with the grid.
+        glPolygonOffset(-1.0f, -1.0f);
         obj.renderObj();
+        glPolygonOffset(0.0f, 0.0f);
+
         glDisable(GL_TEXTURE_2D);
         glUseProgram(0);
         glDisable(GL_CULL_FACE);
@@ -424,6 +433,10 @@ void Renderer::drawBounds() {
     const Vec3 lbd = {l, b, d};
     const Vec3 rbd = {r, b, d};
     const Vec3 cyan = {0.0f, 1.0f, 1.0f};
+
+    // Offset the lines slightly so they don't Z-fight with the mesh they enclose
+    glPolygonOffset(-1.0f, -1.0f);
+
     drawLine(lfu, rfu, shader, view, projection, cyan);
     drawLine(lfu, lbu, shader, view, projection, cyan);
     drawLine(lfu, lfd, shader, view, projection, cyan);
@@ -436,6 +449,8 @@ void Renderer::drawBounds() {
     drawLine(lfd, lbd, shader, view, projection, cyan);
     drawLine(rfd, rbd, shader, view, projection, cyan);
     drawLine(lbd, rbd, shader, view, projection, cyan);
+
+    glPolygonOffset(0.0f, 0.0f);
     glDepthMask(GL_TRUE);
 }
 
@@ -604,9 +619,15 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
+    // 1. Disable depth writing so transparent boxes don't "cut holes" in the floor
+    // 2. Increase offset units to -2.0 to be more aggressive against Z-fighting
+    glDepthMask(GL_FALSE);
+    glPolygonOffset(-2.0f, -2.0f);
+
     if (filled && !filledVertices.empty()) {
         glBufferData(GL_ARRAY_BUFFER, filledVertices.size() * sizeof(float), filledVertices.data(), GL_DYNAMIC_DRAW);
-        shader.setVec4("flatColor", glm::vec4(fillColor.X, fillColor.Y, fillColor.Z, 1.0f));
+        // Use the alpha parameter provided to the function
+        shader.setVec4("flatColor", glm::vec4(fillColor.X, fillColor.Y, fillColor.Z, alpha));
         glDrawArrays(GL_TRIANGLES, 0, filledVertices.size() / 3);
     }
 
@@ -617,6 +638,8 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
         glDrawArrays(GL_LINES, 0, outlinedVertices.size() / 3);
     }
 
+    glDepthMask(GL_TRUE);
+    glPolygonOffset(0.0f, 0.0f);
     glBindVertexArray(0);
     glUseProgram(0);
 }

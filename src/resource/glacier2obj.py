@@ -2349,15 +2349,19 @@ def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, spec
         material_name = mati_hash + "_Material"
         mat = bpy.data.materials.new(name=material_name)
         mat.use_nodes = True
+        
+        # Enable transparency (Updated for Blender 4.3 EEVEE Next)
+        # Set the master blend_method first
+        if hasattr(mat, "blend_method"):
+            mat.blend_method = 'HASHED'
 
-        # Enable transparency in the viewport/EEVEE (Updated for 4.2/4.3+)
-        # Use hasattr to handle cases where engine-specific attributes aren't initialized
+        # Set EEVEE Next specific properties
         if hasattr(mat, "eevee"):
             mat.eevee.transparent_render_method = 'DITHERED'
-        elif hasattr(mat, "blend_method"):
-            mat.blend_method = 'HASHED'
-            if hasattr(mat, "shadow_method"):
-                mat.shadow_method = 'HASHED'
+            # Ensure shadows also respect the alpha mask
+            mat.eevee.shadow_method = 'HASHED'
+        elif hasattr(mat, "shadow_method"):
+            mat.shadow_method = 'HASHED'
 
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
@@ -2382,6 +2386,7 @@ def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, spec
         node_diffuse.location = (-400, 350)
         img_diff = bpy.data.images.load(diffuse_tga_path)
         img_diff.name = diffuse_hash
+        img_diff.alpha_mode = 'STRAIGHT'
         node_diffuse.image = img_diff
 
         links.new(node_diffuse.outputs['Color'], node_spec_bsdf.inputs['Base Color'])
