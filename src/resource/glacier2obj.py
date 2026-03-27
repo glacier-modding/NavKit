@@ -1,33 +1,35 @@
-from timeit import default_timer as timer
-from typing import Any
-
-import bmesh
-import bpy
 import ctypes
 import enum
 import json
 import math
-import mathutils
-import numpy as np
 import os
 import struct
 import sys
+from timeit import default_timer as timer
+
+import bmesh
+import bpy
+import mathutils
+import numpy as np
 from bpy.types import (
     Context,
 )
+
 glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
+
 
 # General
 
 
 def log(level, msg, filter_field):
-    if level in glacier2obj_enabled_log_levels: # and filter_field == "007573591BE1BE69":
+    if level in glacier2obj_enabled_log_levels:  # and filter_field == "007573591BE1BE69":
         print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
         try:
             sys.stdout.flush()
             os.fsync(sys.stdout.fileno())
         except OSError:
             pass
+
 
 class BinaryReader:
     def __init__(self, stream):
@@ -1333,7 +1335,7 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
                     vert.color[1] / 255,
                     vert.color[2] / 255,
                     vert.color[3] / 255,
-                    ]
+                ]
             )
             for uv_i in range(sub_mesh.num_uvchannels):
                 loop_uvs[uv_i].extend([vert.uv[uv_i][0], 1 - vert.uv[uv_i][1]])
@@ -1382,11 +1384,11 @@ def load_prim(filepath, lod_mask):
     prim.read(br)
     br.close()
 
-    objects = []
+    submeshes = []
     material_indices = []
-    for mesh_index in range(prim.num_objects()):
-        prim_mesh_obj = prim.header.object_table[mesh_index].prim_object
-        lod = prim_mesh_obj.lodmask
+    for submesh_index in range(prim.num_objects()):
+        prim_submesh_obj = prim.header.object_table[submesh_index].prim_object
+        lod = prim_submesh_obj.lodmask
 
         include_mesh = False
         for bit in range(8):
@@ -1396,13 +1398,14 @@ def load_prim(filepath, lod_mask):
                 break
         if not include_mesh:
             continue
-        mesh, material_index = load_prim_mesh(prim, prim_name, mesh_index)
+        mesh, material_index = load_prim_mesh(prim, prim_name, submesh_index)
         obj = bpy.data.objects.new(mesh.name, mesh)
         bpy.context.scene.collection.objects.link(obj)
-        objects.append(obj)
+        submeshes.append(obj)
         material_indices.append(material_index)
 
-    return objects, material_indices
+    return submeshes, material_indices
+
 
 # ALOC
 class PhysicsCollisionLayerType(enum.IntEnum):
@@ -1611,7 +1614,9 @@ def read_convex_mesh(br, aloc_name):
         _mEdges = br.readUByteVec(4 * 2 * convex_mesh.edge_count)  # mEdges
     else:
         log("DEBUG", "has_grb_data false. No edges to read. Current offset: " + str(br.tell()), aloc_name)
-    log("DEBUG",  "Finished reading main convex hull data. Reading remaining convex hull data. Current offset: " + str(br.tell()), aloc_name)
+    log("DEBUG",
+        "Finished reading main convex hull data. Reading remaining convex hull data. Current offset: " + str(br.tell()),
+        aloc_name)
     # ---- End of Variable data for each Convex Mesh Hull
 
     # Remaining convex hull data
@@ -1662,7 +1667,8 @@ def read_convex_mesh(br, aloc_name):
         br.readUByteVec(num_svm_adj_verts)
         log("DEBUG", "Finished Gauss Data. File offset: " + str(br.tell()), aloc_name)
     else:
-        log("DEBUG", "Gauss Flag is " + str(gauss_map_flag) + " No Gauss Data. File offset: " + str(br.tell()), aloc_name)
+        log("DEBUG", "Gauss Flag is " + str(gauss_map_flag) + " No Gauss Data. File offset: " + str(br.tell()),
+            aloc_name)
     _mRadius = br.readFloat()
     _mExtents_0 = br.readFloat()
     _mExtents_1 = br.readFloat()
@@ -1874,11 +1880,11 @@ class Physics:
                     + os.environ["PATH"]
             )
 
-
     def read_primitive_mesh(self, br, primitive_count, aloc_name):
         for primitive_index in range(primitive_count):  # size of box = 52
             primitive_type = br.readString(3).decode("utf-8")
-            log("DEBUG", "Loading primitive " + str(primitive_index + 1) + " / " + str(primitive_count) + " with type: " + primitive_type, aloc_name)
+            log("DEBUG", "Loading primitive " + str(primitive_index + 1) + " / " + str(
+                primitive_count) + " with type: " + primitive_type, aloc_name)
             br.readUByteVec(1)
             if primitive_type == "BOX":
                 log("DEBUG", "Loading Primitive Box", aloc_name)
@@ -1892,9 +1898,14 @@ class Physics:
                 # 63
                 primitive_box.rotation = br.readFloatVec(4)
                 # 79
-                log("DEBUG", "Primitive Box: Pos: " + str(primitive_box.position[0]) + str(primitive_box.position[1]) + str(primitive_box.position[2]), aloc_name)
-                log("DEBUG", "Primitive Box: half_extents: " + str(primitive_box.half_extents[0]) + str(primitive_box.half_extents[1]) + str(primitive_box.half_extents[2]), aloc_name)
-                log("DEBUG", "Primitive Box: rotation: " + str(primitive_box.rotation[0]) + str(primitive_box.rotation[1]) + str(primitive_box.rotation[2]) + str(primitive_box.rotation[3]), aloc_name)
+                log("DEBUG",
+                    "Primitive Box: Pos: " + str(primitive_box.position[0]) + str(primitive_box.position[1]) + str(
+                        primitive_box.position[2]), aloc_name)
+                log("DEBUG", "Primitive Box: half_extents: " + str(primitive_box.half_extents[0]) + str(
+                    primitive_box.half_extents[1]) + str(primitive_box.half_extents[2]), aloc_name)
+                log("DEBUG",
+                    "Primitive Box: rotation: " + str(primitive_box.rotation[0]) + str(primitive_box.rotation[1]) + str(
+                        primitive_box.rotation[2]) + str(primitive_box.rotation[3]), aloc_name)
                 log("DEBUG", "Primitive Box: collision_layer: " + str(primitive_box.collision_layer), aloc_name)
                 self.primitive_boxes_count += 1
                 self.primitive_boxes.append(primitive_box)
@@ -1948,19 +1959,23 @@ class Physics:
         if self.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
             self.convex_mesh_count = br.readUInt()
             for convex_mesh_index in range(self.convex_mesh_count):
-                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count), aloc_name)
+                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
+                    aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
             mesh_type = br.readString(3).decode("utf-8")  # Mesh Type ("TRI")
             br.readUByte()  # .
             log("DEBUG", "Current Mesh type: " + mesh_type, aloc_name)
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
-                log("DEBUG", "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count), aloc_name)
+                log("DEBUG",
+                    "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count),
+                    aloc_name)
                 mesh = read_triangle_mesh(aloc_name, br)
                 if mesh != -1:
                     self.triangle_meshes.append(mesh)
                 else:
-                    log("ERROR", "Can't continue loading current ALOC " + aloc_name + ". Returning loaded meshes.", aloc_name)
+                    log("ERROR", "Can't continue loading current ALOC " + aloc_name + ". Returning loaded meshes.",
+                        aloc_name)
                     self.triangle_mesh_count = triangle_mesh_index
                     br.close()
                     return 0
@@ -1970,11 +1985,13 @@ class Physics:
             log("DEBUG", "Loading Convex Mesh and Primitives for ALOC: " + aloc_name, aloc_name)
             self.convex_mesh_count = br.readUInt()
             for convex_mesh_index in range(self.convex_mesh_count):
-                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count), aloc_name)
+                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
+                    aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
             br.readString(3).decode("utf-8")  # Mesh Type ("ICP")
             br.readUByte()  # .
-            log("DEBUG", "Done loading convex meshes. Reading primitive meshes. File offset: " + str(br.tell()), aloc_name)
+            log("DEBUG", "Done loading convex meshes. Reading primitive meshes. File offset: " + str(br.tell()),
+                aloc_name)
             self.primitive_count = br.readUInt()
             log("DEBUG", "Loading Primitive mesh", aloc_name)
             self.read_primitive_mesh(br, self.primitive_count, aloc_name)
@@ -1983,7 +2000,9 @@ class Physics:
         elif self.data_type == PhysicsDataType.TRIANGLE_MESH_AND_PRIMITIVE:
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
-                log("DEBUG", "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count), aloc_name)
+                log("DEBUG",
+                    "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count),
+                    aloc_name)
                 self.triangle_meshes.append(read_triangle_mesh(aloc_name, br))
             br.readString(3).decode("utf-8")  # Mesh Type ("ICP")
             br.readUByte()  # .
@@ -1998,24 +2017,30 @@ class Physics:
             return 0
         elif mesh_type == "CVX":
             if self.data_type != PhysicsDataType.CONVEX_MESH:
-                log("WARNING", "data_type " + str(PhysicsDataType(self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
+                log("WARNING", "data_type " + str(PhysicsDataType(
+                    self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
             self.convex_mesh_count = br.readUInt()
             for convex_mesh_index in range(self.convex_mesh_count):
-                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count), aloc_name)
+                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
+                    aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
             br.close()
             return 0
         elif mesh_type == "TRI":
             if self.data_type != PhysicsDataType.TRIANGLE_MESH:
-                log("WARNING", "data_type " + str(PhysicsDataType(self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
+                log("WARNING", "data_type " + str(PhysicsDataType(
+                    self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
-                log("DEBUG", "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count), aloc_name)
+                log("DEBUG",
+                    "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count),
+                    aloc_name)
                 mesh = read_triangle_mesh(aloc_name, br)
                 if mesh != -1:
                     self.triangle_meshes.append(mesh)
                 else:
-                    log("ERROR", "Can't continue loading current ALOC: " + aloc_name + ". Returning loaded meshes.", aloc_name)
+                    log("ERROR", "Can't continue loading current ALOC: " + aloc_name + ". Returning loaded meshes.",
+                        aloc_name)
                     self.triangle_mesh_count = triangle_mesh_index
                     br.close()
                     return 0
@@ -2023,7 +2048,8 @@ class Physics:
             return 0
         elif mesh_type == "ICP":
             if self.data_type != PhysicsDataType.PRIMITIVE:
-                log("WARNING", "data_type " + str(PhysicsDataType(self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
+                log("WARNING", "data_type " + str(PhysicsDataType(
+                    self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
             log("DEBUG", "Found primitive", aloc_name)
             primitive_count = br.readUInt()
             # 27
@@ -2033,11 +2059,11 @@ class Physics:
             # raise(Exception("mesh_type == ICP")) # TODO: Verify that ICP meshes work properly
             br.close()
             return 0
-        log("ERROR", "Problem reading aloc: data_type: " + str(self.data_type) + " mesh_type: " + str(mesh_type), aloc_name)
+        log("ERROR", "Problem reading aloc: data_type: " + str(self.data_type) + " mesh_type: " + str(mesh_type),
+            aloc_name)
 
         br.close()
         return -1
-
 
     def set_collision_settings(self, settings):
         self.lib.SetCollisionSettings(ctypes.byref(settings))
@@ -2116,6 +2142,7 @@ def create_new_object(name, collision_type, data_type):
     bpy.context.scene.collection.objects.link(obj)
     log("DEBUG", "Finished Creating new object for ALOC: " + name, "create_new_object")
     return obj
+
 
 def load_triangle_mesh_objects(aloc, aloc_name, bm):
     for mesh_index in range(aloc.triangle_mesh_count):
@@ -2221,7 +2248,8 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
 
             loc = mathutils.Vector((capsule.position[0], capsule.position[1], capsule.position[2]))
             if len(capsule.rotation) == 4:
-                rot = mathutils.Quaternion((capsule.rotation[3], capsule.rotation[0], capsule.rotation[1], capsule.rotation[2]))
+                rot = mathutils.Quaternion(
+                    (capsule.rotation[3], capsule.rotation[0], capsule.rotation[1], capsule.rotation[2]))
             else:
                 x = capsule.rotation[0]
                 y = capsule.rotation[1]
@@ -2236,9 +2264,12 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
                 cylinder_height = 0
             z_offset = cylinder_height / 2
 
-            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius, matrix=mat @ mathutils.Matrix.Translation((0, 0, z_offset)))
-            bmesh.ops.create_cone(bm, cap_ends=False, cap_tris=False, segments=32, radius1=capsule.radius, radius2=capsule.radius, depth=cylinder_height, matrix=mat)
-            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius, matrix=mat @ mathutils.Matrix.Translation((0, 0, -z_offset)))
+            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius,
+                                      matrix=mat @ mathutils.Matrix.Translation((0, 0, z_offset)))
+            bmesh.ops.create_cone(bm, cap_ends=False, cap_tris=False, segments=32, radius1=capsule.radius,
+                                  radius2=capsule.radius, depth=cylinder_height, matrix=mat)
+            bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius,
+                                      matrix=mat @ mathutils.Matrix.Translation((0, 0, -z_offset)))
         else:
             log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(capsule.collision_layer), "load_aloc")
@@ -2257,7 +2288,8 @@ def load_aloc(filepath):
 
     log("DEBUG", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
-    aloc_obj = create_new_object(aloc_name + "_original_" + str(aloc.collision_type) + "_" + str(aloc.data_type), aloc.collision_type, aloc.data_type)
+    aloc_obj = create_new_object(aloc_name + "_original_" + str(aloc.collision_type) + "_" + str(aloc.data_type),
+                                 aloc.collision_type, aloc.data_type)
     bm = bmesh.new()
 
     if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
@@ -2293,74 +2325,157 @@ def load_aloc(filepath):
 texture_to_material_map = {}
 
 
-def add_texture(obj, tga_file_path, texture_hash):
-    if not os.path.exists(tga_file_path):
-        log("ERROR", "Cannot add texture, file not found at: " + tga_file_path, "add_textures")
+def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, specular_hash):
+    diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
+    normal_tga_path = os.path.join(path_to_tga_dir, normal_hash + ".TGA")
+    specular_tga_path = os.path.join(path_to_tga_dir, specular_hash + ".TGA")
+    if not os.path.exists(diffuse_tga_path):
+        log("ERROR", "Cannot add texture, Diffuse texture file not found at: " + str(diffuse_tga_path), "add_textures")
         return
-    tga_file_path = os.path.abspath(tga_file_path)
-    log("DEBUG", "TGA filepath: " + tga_file_path, "add_textures")
-
-    if tga_file_path in texture_to_material_map:
-        mat = texture_to_material_map[tga_file_path]
+    if not os.path.exists(normal_tga_path):
+        log("DEBUG", "Normal texture file not found at: " + str(normal_tga_path), "add_textures")
     else:
-        material_name = texture_hash + "_Material"
+        normal_tga_path = os.path.abspath(normal_tga_path)
+    if not os.path.exists(specular_tga_path):
+        log("DEBUG", "Specular texture file not found at: " + str(specular_tga_path), "add_textures")
+    else:
+        specular_tga_path = os.path.abspath(specular_tga_path)
+    diffuse_tga_path = os.path.abspath(diffuse_tga_path)
+    log("DEBUG", "Diffuse TGA filepath: " + diffuse_tga_path, "add_textures")
+
+    if mati_hash in texture_to_material_map:
+        mat = texture_to_material_map[mati_hash]
+    else:
+        material_name = mati_hash + "_Material"
         mat = bpy.data.materials.new(name=material_name)
         mat.use_nodes = True
+        
+        # Enable transparency (Updated for Blender 4.3 EEVEE Next)
+        # Set the master blend_method first
+        if hasattr(mat, "blend_method"):
+            mat.blend_method = 'HASHED'
+
+        # Set EEVEE Next specific properties
+        if hasattr(mat, "eevee"):
+            mat.eevee.transparent_render_method = 'DITHERED'
+            # Ensure shadows also respect the alpha mask
+            mat.eevee.shadow_method = 'HASHED'
+        elif hasattr(mat, "shadow_method"):
+            mat.shadow_method = 'HASHED'
+
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
         nodes.clear()
         node_output = nodes.new(type='ShaderNodeOutputMaterial')
-        node_output.location = (400, 0)
-        node_texture = nodes.new(type='ShaderNodeTexImage')
-        node_texture.location = (-400, 0)
-        img = bpy.data.images.new(name=texture_hash, width=1, height=1)
-        img.source = 'FILE'
-        img.filepath = tga_file_path
-        log("INFO", "Blender internal image path: " + str(img.filepath), "add_texture")
-        log("INFO", "Image has data (after setting path): " + str(img.has_data), "add_texture")
-        node_texture.image = img
+        node_output.location = (700, 0)
 
-        if "HitmanTextureNode" in bpy.data.node_groups:
-            node_group = nodes.new(type='ShaderNodeGroup')
-            node_group.node_tree = bpy.data.node_groups["HitmanTextureNode"]
-            node_group.location = (0, 0)
-            links.new(node_texture.outputs['Color'], node_group.inputs[0])
-            links.new(node_group.outputs[0], node_output.inputs['Surface'])
+        # Select Node Type based on Blender Version (Specular BSDF removed in 4.3)
+        is_v40_plus = bpy.app.version >= (4, 0, 0)
+        is_v43_plus = bpy.app.version >= (4, 3, 0)
+        bsdf_type = 'ShaderNodeBsdfPrincipled' if is_v43_plus else 'ShaderNodeBsdfSpecular'
+        invert_type = 'ShaderNodeInvert' if is_v43_plus else 'ShaderNodeInvertColor'
+
+        node_spec_bsdf = nodes.new(type=bsdf_type)
+        node_spec_bsdf.name = "Specular BSDF"
+        node_spec_bsdf.location = (400, 0)
+        links.new(node_spec_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
+
+        # Diffuse Setup
+        node_diffuse = nodes.new(type='ShaderNodeTexImage')
+        node_diffuse.name = "Diffuse"
+        node_diffuse.location = (-400, 350)
+        img_diff = bpy.data.images.load(diffuse_tga_path)
+        img_diff.name = diffuse_hash
+        img_diff.alpha_mode = 'STRAIGHT'
+        node_diffuse.image = img_diff
+
+        links.new(node_diffuse.outputs['Color'], node_spec_bsdf.inputs['Base Color'])
+
+        # Transparency/Alpha logic
+        if is_v43_plus:
+            # Principled BSDF uses 'Alpha' directly (equivalent to Invert -> Transparency)
+            links.new(node_diffuse.outputs['Alpha'], node_spec_bsdf.inputs['Alpha'])
         else:
-            node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-            node_bsdf.location = (0, 0)
-            links.new(node_texture.outputs['Color'], node_bsdf.inputs['Base Color'])
-            links.new(node_bsdf.outputs['BSDF'], node_output.inputs['Surface'])
-        texture_to_material_map[tga_file_path] = mat
+            # Legacy Specular BSDF uses 'Transparency' (Inverted Alpha)
+            node_invert_transp = nodes.new(type=invert_type)
+            node_invert_transp.location = (50, 300)
+            links.new(node_diffuse.outputs['Alpha'], node_invert_transp.inputs['Color'])
+            links.new(node_invert_transp.outputs['Color'], node_spec_bsdf.inputs['Transparency'])
+
+        # Specular Setup
+        if os.path.exists(specular_tga_path):
+            node_spec_tex = nodes.new(type='ShaderNodeTexImage')
+            node_spec_tex.name = "Specular"
+            node_spec_tex.location = (-400, 0)
+            img_spec = bpy.data.images.load(specular_tga_path)
+            img_spec.name = specular_hash
+            node_spec_tex.image = img_spec
+            try:
+                node_spec_tex.image.colorspace_settings.name = 'Non-Color'
+            except:
+                pass
+
+            node_invert_rough = nodes.new(type=invert_type)
+            node_invert_rough.location = (50, -50)
+
+            spec_socket = 'Specular Tint' if is_v43_plus else 'Specular'
+            links.new(node_spec_tex.outputs['Color'], node_spec_bsdf.inputs[spec_socket])
+            links.new(node_spec_tex.outputs['Alpha'], node_invert_rough.inputs['Color'])
+            links.new(node_invert_rough.outputs['Color'], node_spec_bsdf.inputs['Roughness'])
+
+        # Normal Setup
+        if os.path.exists(normal_tga_path):
+            node_norm_tex = nodes.new(type='ShaderNodeTexImage')
+            node_norm_tex.name = "Normal"
+            node_norm_tex.location = (-400, -350)
+            img_norm = bpy.data.images.load(normal_tga_path)
+            img_norm.name = normal_hash
+            node_norm_tex.image = img_norm
+            try:
+                node_norm_tex.image.colorspace_settings.name = 'Non-Color'
+            except:
+                pass
+
+            node_norm_map = nodes.new(type='ShaderNodeNormalMap')
+            node_norm_map.location = (50, -350)
+
+            links.new(node_norm_tex.outputs['Color'], node_norm_map.inputs['Color'])
+            links.new(node_norm_map.outputs['Normal'], node_spec_bsdf.inputs['Normal'])
+
+        texture_to_material_map[mati_hash] = mat
 
     if obj.data.materials:
         obj.data.materials[0] = mat
     else:
         obj.data.materials.append(mat)
 
-    log("DEBUG", "Texture " + tga_file_path + " applied to " + obj.name, "add_textures")
+    log("DEBUG", "Texture " + mati_hash + " applied to " + obj.name, "add_textures")
+
 
 def get_local_space_bbox_center(obj):
     return 0.125 * sum((mathutils.Vector(ls_corner) for ls_corner in obj.bound_box), mathutils.Vector())
 
 
-def get_bounding_sphere_data(obj, ws_mat, lsbbox_center = None):
+def get_bounding_sphere_data(obj, ws_mat, lsbbox_center=None):
     if lsbbox_center is None:
         lsbbox_center = get_local_space_bbox_center(obj)
     wsbbox_center = ws_mat @ lsbbox_center
-    radius = max((mathutils.Vector(ws_mat @ mathutils.Vector(ls_corner)) - wsbbox_center).xy for ls_corner in obj.bound_box)
+    radius = max(
+        (mathutils.Vector(ws_mat @ mathutils.Vector(ls_corner)) - wsbbox_center).xy for ls_corner in obj.bound_box)
     return wsbbox_center, radius.length
+
 
 def create_volume(name, col_name, pos, rot, scale, shape='CUBE'):
     o = bpy.data.objects.new(name, None)
-    bpy.data.collections.get(col_name).objects.link( o )
+    bpy.data.collections.get(col_name).objects.link(o)
     o.empty_display_type = shape
     o.empty_display_size = 0.5
     o.location = pos
     o.rotation_mode = "QUATERNION"
     o.rotation_quaternion = rot
     o.scale = scale
-    o.show_name = True #Good idea to show names? Or makes viewport too busy?
+    o.show_name = True  # Good idea to show names? Or makes viewport too busy?
+
 
 def load_volume_boxes(json_data, volume_types):
     volume_boxes_coll = bpy.data.collections.new("Volume boxes")
@@ -2375,7 +2490,7 @@ def load_volume_boxes(json_data, volume_types):
             else:
                 gates_coll = bpy.data.collections.get(volt)
             for vol in json_data[volt]:
-                coords = ["w","x","y","z"]
+                coords = ["w", "x", "y", "z"]
                 pos, rot, scale, center = [
                     mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
                     mathutils.Quaternion([vol["rotation"][coord] for coord in coords]),
@@ -2391,20 +2506,24 @@ def load_volume_boxes(json_data, volume_types):
             else:
                 rooms_coll = bpy.data.collections.get(volt)
             for vol in json_data[volt]:
-                coords = ["w","x","y","z"]
+                coords = ["w", "x", "y", "z"]
                 pos, rot = [
                     mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
                     mathutils.Quaternion([vol["rotation"][coord] for coord in coords]),
-                ]                
-                scale = mathutils.Vector([vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) - mathutils.Vector([vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])
-                center = (mathutils.Vector([vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) + mathutils.Vector([vol["roomExtentMin"]["data"][coord] for coord in coords[1:]]))/2
+                ]
+                scale = mathutils.Vector(
+                    [vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) - mathutils.Vector(
+                    [vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])
+                center = (mathutils.Vector(
+                    [vol["roomExtentMax"]["data"][coord] for coord in coords[1:]]) + mathutils.Vector(
+                    [vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])) / 2
                 pos += center
                 create_volume(vol["name"], rooms_coll.name, pos, rot, scale)
         elif volt == "aiArea":
             for ai_area_world in json_data["aiAreaWorld"]:
                 area_world_coll = bpy.data.collections.new(ai_area_world["name"])
                 volume_boxes_coll.children.link(area_world_coll)
-            #Go through the volumes and prepare the hashmap
+            # Go through the volumes and prepare the hashmap
             id_to_trigger_volume = {}
             for trig_vol in json_data["volumeBoxes"]:
                 id_to_trigger_volume[trig_vol["id"]] = trig_vol
@@ -2419,28 +2538,32 @@ def load_volume_boxes(json_data, volume_types):
                     if parent_coll is None:
                         parent_coll = bpy.data.collections.new(parent_coll_name)
                     if prev_coll.name not in parent_coll.children:
-                        parent_coll.children.link(prev_coll)   
-                    prev_coll = parent_coll                           
-                for vol_name in ai_area['areaVolumeNames']:                    
-                    id = vol_name.split("(")[1].split(")")[0] # name ex: VolumeBox_AIArea_02 (729b0d862bef84a2)
+                        parent_coll.children.link(prev_coll)
+                    prev_coll = parent_coll
+                for vol_name in ai_area['areaVolumeNames']:
+                    id = vol_name.split("(")[1].split(")")[0]  # name ex: VolumeBox_AIArea_02 (729b0d862bef84a2)
                     trig_vol = id_to_trigger_volume[id]
-                    coords = ["w","x","y","z"]
+                    coords = ["w", "x", "y", "z"]
                     pos, rot = [
                         mathutils.Vector([trig_vol["position"][coord] for coord in coords[1:]]),
-                        mathutils.Quaternion([trig_vol["rotation"][coord] for coord in coords]) 
+                        mathutils.Quaternion([trig_vol["rotation"][coord] for coord in coords])
                     ]
-                    if "radius" in trig_vol: #sphere volume
+                    if "radius" in trig_vol:  # sphere volume
                         try:
                             scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
                         except TypeError:
-                            log("INFO", "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"], "load_scenario")
+                            log("INFO",
+                                "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"],
+                                "load_volume_boxes")
                             scale = mathutils.Vector([1, 1, 1])
                         create_volume(vol_name, area_coll.name, pos, rot, scale, 'SPHERE')
-                    else: #box volume
+                    else:  # box volume
                         scale = mathutils.Vector([trig_vol["scale"]["data"][coord] for coord in coords[1:]])
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
-def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box, apply_textures):
+
+def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box,
+                  apply_textures):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -2454,14 +2577,14 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
 
     load_volume_boxes(data, ["gates", "rooms", "aiArea"])
 
-    #Get the "pathfinding include" box
+    # Get the "pathfinding include" box
     pf_include_box_info = None
     pf_box_bounding_sphere_center = None
     pf_box_bounding_sphere_radius = None
     sapienza_include_box_id = "48b22d0153942122"
     for pf_box in data['pfBoxes']:
         if pf_box["type"]["data"] == "PFBT_INCLUDE_MESH_COLLISION" or pf_box["id"] == sapienza_include_box_id:
-            coords = ["w","x","y","z"]
+            coords = ["w", "x", "y", "z"]
             pf_include_box_info = [
                 mathutils.Vector([pf_box["position"][coord] for coord in coords[1:]]),
                 mathutils.Quaternion([pf_box["rotation"][coord] for coord in coords]),
@@ -2490,11 +2613,12 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             if geo_node_name in data_from.node_groups:
                 data_to.node_groups.append(geo_node_name)
             else:
-                log("ERROR", "=========================== Error Loading the resource blend file ================", "load_scenario")
+                log("ERROR", "=========================== Error Loading the resource blend file ================",
+                    "load_scenario")
                 assert 0
     matis = {}
     prim_matis = {}
-    texture_node_name = "HitmanTextureNode"
+    shading_mat_name = "HitmanTextureNode"
     if apply_textures:
         matis_list = data['matis']
         for mati in matis_list:
@@ -2505,12 +2629,11 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-            log("INFO", "Loading texture node from the resource blend file:" + filepath, "load_scenario")
-            if texture_node_name in data_from.materials:
-                data_to.node_groups.append(texture_node_name)
+            log("INFO", "Loading shading material from the resource blend file: " + filepath, "load_scenario")
+            if shading_mat_name in data_from.materials:
+                data_to.materials.append(shading_mat_name)
             else:
-                log("ERROR", "=========================== Error Loading the resource blend file ================", "load_scenario")
-                assert 0
+                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "load_scenario")
         log("INFO", "Adding light", "load_scenario")
 
         light_data = bpy.data.lights.new(name="Sun", type='SUN')
@@ -2531,7 +2654,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         if room_folder_name not in bpy.data.collections:
             coll = bpy.data.collections.new(room_folder_name)
             bpy.context.scene.collection.children.link(coll)
-            coll.color_tag = "COLOR_0" + str(room_folder_color_index%8 + 1)
+            coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
             room_folder_color_index += 1
             log("INFO", "Adding new collection for room folder name: " + room_folder_name, "load_scenario")
 
@@ -2601,145 +2724,178 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         material_indices = []
         try:
             if mesh_type == "ALOC":
-                aloc, objects = load_aloc(aloc_or_prim_path)
+                aloc, submeshes = load_aloc(aloc_or_prim_path)
                 if aloc == -1:
-                    log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(mesh_hash) + " ================", "load_scenario")
+                    log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
+                        mesh_hash) + " ================", "load_scenario")
                     error_alocs.append(mesh_hash)
                     continue
                 collision_type = aloc.collision_type
             else:
-                objects, material_indices = load_prim(aloc_or_prim_path, lod_mask)
+                submeshes, material_indices = load_prim(aloc_or_prim_path, lod_mask)
         except struct.error as err:
             error_alocs.append("Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err))
-            log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err) + " ================", "load_scenario")
+            log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
+                mesh_hash) + " Exception: " + str(err) + " ================", "load_scenario")
             continue
-        t = transforms[mesh_hash]
-        t_size = len(t)
+        mesh_transforms = transforms[mesh_hash]
+        mesh_instance_count = len(mesh_transforms)
         if collision_type == PhysicsCollisionType.RIGIDBODY:
-            for i in range(0, t_size):
-                log("INFO", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
+            for mesh_index in range(0, mesh_instance_count):
+                log("INFO", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
+                    meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
+                    mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
                 mesh_i += 1
             continue
-        if len(objects) == 0:
-            log("DEBUG", "No collidable objects for " + str(mesh_hash), "load_scenario")
+        if len(submeshes) == 0:
+            log("DEBUG", "No submeshes for " + str(mesh_hash), "load_scenario")
             mesh_i += len(transforms[mesh_hash])
             continue
-        if not objects:
-            log("INFO", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------", "load_scenario")
+        if not submeshes:
+            log("INFO", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------",
+                "load_scenario")
             mesh_i += len(transforms[mesh_hash])
             continue
         if collision_type in excluded_collision_types:
-            log("DEBUG", "+++++++++++++++++++++ Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(collision_type) + " +++++++++++++", "load_scenario")
+            log("DEBUG",
+                "Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(
+                    collision_type), "load_scenario")
             mesh_i += len(transforms[mesh_hash])
             continue
         if build_type == "instance":
-            #different instances transforms
-            aloc_positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
-            aloc_rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])).to_euler() for i in range(t_size)]
-            aloc_scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
-            for obj_i, obj in enumerate(objects):
+            # different instances transforms
+            mesh_positions = [mathutils.Vector(
+                (transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"],
+                 transforms[mesh_hash][i]["position"]["z"])) for i in range(mesh_instance_count)]
+            mesh_rotations = [mathutils.Quaternion(
+                (transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"],
+                 transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])).to_euler() for i in
+                              range(mesh_instance_count)]
+            mesh_scales = [mathutils.Vector(
+                (transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"],
+                 transforms[mesh_hash][i]["scale"]["z"])) for i in range(mesh_instance_count)]
+            for submesh_i, submesh in enumerate(submeshes):
                 culled_indices = set()
-                #basic culling prepass using bounding spheres
+                # basic culling prepass using bounding spheres
                 if filter_to_include_box and pf_box_bounding_sphere_center is not None:
-                    lsbbox_center = get_local_space_bbox_center(obj)
-                    for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
+                    lsbbox_center = get_local_space_bbox_center(submesh)
+                    for u, (pos, rot, scale) in enumerate(zip(mesh_positions, mesh_rotations, mesh_scales)):
                         inst_mat = mathutils.Matrix.LocRotScale(pos, rot, scale)
-                        instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(obj, inst_mat, lsbbox_center)
+                        instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(submesh, inst_mat,
+                                                                                              lsbbox_center)
                         threshold = (instance_bbox_radius + pf_box_bounding_sphere_radius)
-                        if (instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
+                        if (
+                                instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
                             culled_indices.add(u)
 
-                positions = [aloc_positions[u] for u in range(t_size) if u not in culled_indices]
-                rotations = [aloc_rotations[u] for u in range(t_size) if u not in culled_indices]
-                scales = [aloc_scales[u] for u in range(t_size) if u not in culled_indices]
+                positions = [mesh_positions[u] for u in range(mesh_instance_count) if u not in culled_indices]
+                rotations = [mesh_rotations[u] for u in range(mesh_instance_count) if u not in culled_indices]
+                scales = [mesh_scales[u] for u in range(mesh_instance_count) if u not in culled_indices]
 
-                #create the "fake" placement mesh
+                # create the "fake" placement mesh
                 mesh = bpy.data.meshes.new(mesh_hash + "_placement")
                 mesh.from_pydata(positions, [], [])
-                #rotation attrib
-                attr = mesh.attributes.new(name="rotation",type='FLOAT_VECTOR',domain='POINT')
-                for i, r in enumerate(rotations):
-                    attr.data[i].vector = r
-                #scale attrib
-                attr = mesh.attributes.new(name="scale",type='FLOAT_VECTOR',domain='POINT')
-                for i, s in enumerate(scales):
-                    attr.data[i].vector = s
+                # rotation attrib
+                attr = mesh.attributes.new(name="rotation", type='FLOAT_VECTOR', domain='POINT')
+                for mesh_index, r in enumerate(rotations):
+                    attr.data[mesh_index].vector = r
+                # scale attrib
+                attr = mesh.attributes.new(name="scale", type='FLOAT_VECTOR', domain='POINT')
+                for mesh_index, s in enumerate(scales):
+                    attr.data[mesh_index].vector = s
 
                 mesh.update()
-                attr_obj = bpy.data.objects.new(mesh_hash +"_placement", mesh)
+                attr_obj = bpy.data.objects.new(mesh_hash + "_placement", mesh)
                 bpy.context.collection.objects.link(attr_obj)
-                obj.hide_viewport = True
+                submesh.hide_viewport = True
 
                 modifier = attr_obj.modifiers.new(name="GeometryNodes", type='NODES')
                 modifier.node_group = bpy.data.node_groups[geo_node_name]
-                modifier["Socket_2"] = obj
+                modifier["Socket_2"] = submesh
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
                 if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
                     log("DEBUG", "Adding texture", "load_scenario")
                     try:
-                        add_textures(obj, matis, mesh_hash, output_dir, prim_matis, obj_i, material_indices[obj_i])
+                        add_textures(submesh, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_indices[submesh_i])
                     except struct.error as err:
                         log("ERROR", "Error adding texture " + str(err), "load_scenario")
         else:
-            cur = None
-            aloc_positions = [mathutils.Vector((transforms[mesh_hash][i]["position"]["x"], transforms[mesh_hash][i]["position"]["y"], transforms[mesh_hash][i]["position"]["z"])) for i in range(t_size)]
-            aloc_rotations = [mathutils.Quaternion((transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"], transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])) for i in range(t_size)]
-            aloc_scales = [mathutils.Vector((transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"], transforms[mesh_hash][i]["scale"]["z"])) for i in range(t_size)]
-            o_size = len(objects)
+            current_submesh = None
+            mesh_positions = [mathutils.Vector(
+                (transforms[mesh_hash][mesh_index]["position"]["x"], transforms[mesh_hash][mesh_index]["position"]["y"],
+                 transforms[mesh_hash][mesh_index]["position"]["z"])) for mesh_index in range(mesh_instance_count)]
+            mesh_rotations = [mathutils.Quaternion(
+                (transforms[mesh_hash][i]["rotate"]["w"], transforms[mesh_hash][i]["rotate"]["x"],
+                 transforms[mesh_hash][i]["rotate"]["y"], transforms[mesh_hash][i]["rotate"]["z"])) for i in
+                              range(mesh_instance_count)]
+            mesh_scales = [mathutils.Vector(
+                (transforms[mesh_hash][i]["scale"]["x"], transforms[mesh_hash][i]["scale"]["y"],
+                 transforms[mesh_hash][i]["scale"]["z"])) for i in range(mesh_instance_count)]
+            submesh_count = len(submeshes)
             positions = []
             rotations = []
             scales = []
-            for o_i in range(o_size):
-                obj = objects[o_i]
+            for submesh_instance_index in range(submesh_count):
+                submesh = submeshes[submesh_instance_index]
                 culled_indices = set()
                 # basic culling prepass using bounding spheres
                 if filter_to_include_box and pf_box_bounding_sphere_center is not None:
-                    lsbbox_center = get_local_space_bbox_center(obj)
-                    for u, (pos, rot, scale) in enumerate(zip(aloc_positions, aloc_rotations, aloc_scales)):
+                    lsbbox_center = get_local_space_bbox_center(submesh)
+                    for u, (pos, rot, scale) in enumerate(zip(mesh_positions, mesh_rotations, mesh_scales)):
                         inst_mat = mathutils.Matrix.LocRotScale(pos, rot, scale)
-                        instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(obj, inst_mat, lsbbox_center)
+                        instance_bbox_center, instance_bbox_radius = get_bounding_sphere_data(submesh, inst_mat,
+                                                                                              lsbbox_center)
                         threshold = (instance_bbox_radius + pf_box_bounding_sphere_radius)
-                        if (instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
+                        if (
+                                instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
                             culled_indices.add(u)
 
-                positions.append([aloc_positions[u] for u in range(t_size) if u not in culled_indices])
-                rotations.append([aloc_rotations[u] for u in range(t_size) if u not in culled_indices])
-                scales.append([aloc_scales[u] for u in range(t_size) if u not in culled_indices])
-            unlinked = [False for _ in range(o_size)]
-            for i in range(t_size):
-                room_name = room_names[mesh_hash][i]
-                mesh_id = transforms[mesh_hash][i]["id"]
-                log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(i) + " Mesh: [" + str(mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
+                positions.append([mesh_positions[u] for u in range(mesh_instance_count) if u not in culled_indices])
+                rotations.append([mesh_rotations[u] for u in range(mesh_instance_count) if u not in culled_indices])
+                scales.append([mesh_scales[u] for u in range(mesh_instance_count) if u not in culled_indices])
+            unlinked = [False for _ in range(submesh_count)]
+            for mesh_index in range(mesh_instance_count):
+                room_name = room_names[mesh_hash][mesh_index]
+                mesh_instance_id = transforms[mesh_hash][mesh_index]["id"]
+                log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
+                    meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
+                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
                 mesh_i += 1
-                log("DEBUG", "Total submeshes: " + str(o_size), "load_scenario")
-                for o_i in range(o_size):
-
-                    obj = objects[o_i]
-                    if not unlinked[o_i]:
-                        bpy.context.scene.collection.objects.unlink(obj)
-                        unlinked[o_i] = True
-                    if i >= len(positions[o_i]):
+                log("DEBUG", "Total submeshes: " + str(submesh_count), "load_scenario")
+                for submesh_instance_index in range(submesh_count):
+                    submesh = submeshes[submesh_instance_index]
+                    if not unlinked[submesh_instance_index]:
+                        bpy.context.scene.collection.objects.unlink(submesh)
+                        unlinked[submesh_instance_index] = True
+                    if mesh_index >= len(positions[submesh_instance_index]):
                         continue
-                    if cur is None:
-                        cur = obj
+                    if current_submesh is None:
+                        current_submesh = submesh
                     else:
-                        cur = obj.copy()
-                    bpy.data.collections.get(room_name).objects.link(cur)
-                    cur.name = mesh_hash + "_" + mesh_id
-                    cur.select_set(True)
-                    cur.scale = mathutils.Vector((scales[o_i][i][0], scales[o_i][i][1], scales[o_i][i][2]))
-                    cur.rotation_mode = 'QUATERNION'
-                    cur.rotation_quaternion = (rotations[o_i][i][0], rotations[o_i][i][1], rotations[o_i][i][2], rotations[o_i][i][3])
-                    cur.location = mathutils.Vector((positions[o_i][i][0], positions[o_i][i][1], positions[o_i][i][2]))
+                        current_submesh = submesh.copy()
+                    bpy.data.collections.get(room_name).objects.link(current_submesh)
+                    current_submesh.name = mesh_hash + "_" + mesh_instance_id
+                    current_submesh.select_set(True)
+                    current_submesh.scale = mathutils.Vector(
+                        (scales[submesh_instance_index][mesh_index][0], scales[submesh_instance_index][mesh_index][1],
+                         scales[submesh_instance_index][mesh_index][2]))
+                    current_submesh.rotation_mode = 'QUATERNION'
+                    current_submesh.rotation_quaternion = (rotations[submesh_instance_index][mesh_index][0],
+                                                           rotations[submesh_instance_index][mesh_index][1],
+                                                           rotations[submesh_instance_index][mesh_index][2],
+                                                           rotations[submesh_instance_index][mesh_index][3])
+                    current_submesh.location = mathutils.Vector((positions[submesh_instance_index][mesh_index][0],
+                                                                 positions[submesh_instance_index][mesh_index][1],
+                                                                 positions[submesh_instance_index][mesh_index][2]))
 
                     if mesh_type == "PRIM" and apply_textures:
                         try:
-                            add_textures(cur, matis, mesh_hash, output_dir, prim_matis, o_i, material_indices[o_i])
+                            add_textures(current_submesh, matis, mesh_hash, output_dir, prim_matis, submesh_instance_index, material_indices[submesh_instance_index])
                         except struct.error as err:
                             log("ERROR", "Error adding texture " + str(err), "load_scenario")
-                    if cur:
-                        cur.select_set(False)
+                    if current_submesh:
+                        current_submesh.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
     if len(missing_mesh_hashes) > 0:
@@ -2773,13 +2929,16 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
     mati = matis[mati_hash]
     log("DEBUG", "Diffuse hash: " + mati["diffuse"], "add_textures")
     diffuse_hash = mati["diffuse"]
+    normal_hash = mati["normal"]
+    specular_hash = mati["specular"]
     path_to_tga_dir = os.path.join(output_dir, "tga")
-    diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
-    add_texture(obj, diffuse_tga_path, diffuse_hash)
+    add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, specular_hash)
 
 
 def main():
-    log("DEBUG", "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textyres (true | false)> <debug logs enabled (true | false)>", "main")
+    log("DEBUG",
+        "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textyres (true | false)> <debug logs enabled (true | false)>",
+        "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
     log("INFO", "blender.exe called with args: " + str(argv), "main")  # --> ['example', 'args', '123']
@@ -2797,14 +2956,19 @@ def main():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
-    scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box, apply_textures)
+    # Ensure the render engine is set to EEVEE so transparency properties are active
+    # In 4.2+, EEVEE Next is 'BLENDER_EEVEE_NEXT'
+    bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
+
+    scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
+                             apply_textures)
     if scenario == 1:
-        log("INFO", 'Failed to import scenario "%s"' % scene_path   , "main")
+        log("INFO", 'Failed to import scenario "%s"' % scene_path, "main")
         return 1
-    if output_path[-4:]== 'both':
+    if output_path[-4:] == 'both':
         save_blend_file(output_path[:-4] + "blend")
         save_obj_file(output_path[:-4] + "obj")
-    elif output_path[-5:]== 'blend':
+    elif output_path[-5:] == 'blend':
         save_blend_file(output_path)
     else:
         save_obj_file(output_path)
@@ -2820,10 +2984,24 @@ def main():
 
 def save_obj_file(output_path):
     log("INFO", "Attempting to save obj file to :" + output_path, "main")
-    if bpy.app.version_string[0] == "3":
-        bpy.ops.export_scene.obj(filepath=output_path, use_selection=False)
+    if bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2:
+        bpy.ops.wm.obj_export(
+            filepath=output_path,
+            export_materials=True,
+            path_mode='ABSOLUTE'
+        )
+    elif bpy.app.version[0] == 3:
+        bpy.ops.export_scene.obj(
+            filepath=output_path,
+            use_selection=False,
+            ext_materials=True,
+            path_mode='ABSOLUTE'
+        )
     else:
-        bpy.ops.wm.obj_export(filepath=output_path)  # Export the entire scene
+        bpy.ops.export_scene.obj(
+            filepath=output_path,
+            path_mode='ABSOLUTE'
+        )
 
 
 def save_blend_file(output_path):

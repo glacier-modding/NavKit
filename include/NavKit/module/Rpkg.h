@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <map>
 #include <optional>
 #include <set>
@@ -41,6 +42,7 @@ public:
     static HashList* hashList;
     static std::map<std::string, HashListEntry> hashToHashListEntryMap;
     static std::map<std::string, HashListEntry> ioiStringToHashListEntryMap;
+    static std::mutex hashMapsMutex;
 
     static std::optional<std::jthread> backgroundWorker;
 };

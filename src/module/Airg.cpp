@@ -54,6 +54,7 @@ Airg::~Airg() = default;
 HWND Airg::hAirgDialog = nullptr;
 std::string Airg::selectedRpkgAirg{};
 std::map<std::string, std::string> Airg::airgHashIoiStringMap;
+std::mutex Airg::airgHashIoiStringMapMutex;
 
 GLuint Airg::airgTriVao = 0;
 GLuint Airg::airgTriVbo = 0;

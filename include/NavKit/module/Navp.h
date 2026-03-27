@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <map>
 #include <string>
 #include <vector>
@@ -159,6 +160,7 @@ public:
     void buildNavp();
 
     static std::map<std::string, std::string> navpHashIoiStringMap;
+    static std::mutex navpHashIoiStringMapMutex;
 
 private:
     static void renderArea(const NavPower::Area& area, bool selected);
