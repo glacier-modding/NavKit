@@ -50,6 +50,7 @@ set(UTIL_SOURCES
 add_library(NavKitLib STATIC
         adapter/RecastAdapter.cpp
         extern/easywsclient/easywsclient.cpp
+        extern/QuickDigest/quickdigest5.cpp
         ${RECAST_DEMO_SOURCES}
         ${MODEL_SOURCES}
         ${MODULE_SOURCES}

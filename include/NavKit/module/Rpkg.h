@@ -29,6 +29,8 @@ class Rpkg {
 public:
     static void initExtractionData();
 
+    static void checkHitmanVersion();
+
     static bool canExtract();
 
     static int extractResourcesFromRpkgs(const std::vector<std::string>& hashes, ResourceType type);
@@ -43,4 +45,5 @@ public:
     static std::map<std::string, HashListEntry> ioiStringToHashListEntryMap;
 
     static std::optional<std::jthread> backgroundWorker;
+    static bool unknownGameVersion;
 };

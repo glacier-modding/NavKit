@@ -3,6 +3,7 @@
 
 #include <cpptrace/from_current.hpp>
 
+#include "../../include/QuickDigest/quickdigest5.hpp"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -13,6 +14,7 @@ class NavKitSettings;
 
 std::string Rpkg::gameVersion = "HM3";
 bool Rpkg::extractionDataInitComplete = false;
+bool Rpkg::unknownGameVersion = false;
 PartitionManager* Rpkg::partitionManager = nullptr;
 HashList* Rpkg::hashList = nullptr;
 std::map<std::string, HashListEntry> Rpkg::hashToHashListEntryMap{};
@@ -20,9 +22,14 @@ std::map<std::string, HashListEntry> Rpkg::ioiStringToHashListEntryMap{};
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
 void Rpkg::initExtractionData() {
-    Logger::log(NK_INFO, "Scanning resource packages.");
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
+    Logger::log(NK_INFO, "Checking Hitman Platform.");
+    checkHitmanVersion();
+    if (unknownGameVersion) {
+        return;
+    }
+    Logger::log(NK_INFO, "Scanning resource packages.");
     partitionManager = scan_packages(retailFolder.c_str(), gameVersion.c_str(), Logger::rustLogCallback);
     extractionDataInitComplete = true;
     Logger::log(NK_INFO, "Done scanning resource packages.");
@@ -105,49 +112,83 @@ void Rpkg::initExtractionData() {
     Menu::updateMenuState();
 }
 
+void Rpkg::checkHitmanVersion() {
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const std::string hitmanFolder = navKitSettings.hitmanFolder;
+    std::map<std::string, std::string> gameHashes({
+        std::pair("eba61aa0a92b76579e977fb9a057bb81", "epic"), // base game
+        std::pair("e64c439a45c8c868956345c99b2d036b", "epic"), // ansel unlock
+        std::pair("062d384cae3813e5e0fbc1e2861e4f88", "steam"), // base game
+        std::pair("18c2ff82f076f7904d4f0fcaa2e0d2f6", "steam"), // ansel unlock
+        std::pair("37df6b0755060b48e0959516b0deea62", "microsoft")
+    });
+
+    if (!(std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg") || std::filesystem::exists(
+        hitmanFolder + "\\Retail\\HITMAN3.exe"))) {
+        Logger::log(NK_ERROR, "HITMAN3.exe couldn't be located, please re-read the installation instructions!");
+    }
+
+    if (std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg") && !std::filesystem::exists(
+        hitmanFolder + "\\MicrosoftGame.Config")) {
+        Logger::log(NK_ERROR, "The game config couldn't be located, please re-read the installation instructions!");
+    }
+    std::string platform;
+    if (std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg")) {
+        const std::string hash = QuickDigest5::fileToHash(hitmanFolder + "\\MicrosoftGame.Config");
+        platform = gameHashes.contains(hash) ? gameHashes[hash] : "undefined";
+    } else {
+        const std::string hash = QuickDigest5::fileToHash(hitmanFolder + "\\Retail\\HITMAN3.exe");
+        platform = gameHashes.contains(hash) ? gameHashes[hash] : "undefined";
+    }
+    if (platform == "undefined") {
+        Logger::log(
+            NK_ERROR,
+            "Unknown game version. If the game has recently updated, wait for a NavKit update to be released; the developers are already aware. If you're using a cracked version of the game, that's the problem."
+        );
+        unknownGameVersion = true;
+    } else {
+        Logger::log(NK_INFO, "Detected game platform: %s", platform.c_str());
+    }
+}
+
 bool Rpkg::canExtract() {
-    return extractionDataInitComplete;
+    return extractionDataInitComplete && !unknownGameVersion;
 }
 
 int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, const ResourceType type) {
     CPPTRACE_TRY
-    {
-            const NavKitSettings & navKitSettings = NavKitSettings::getInstance();
+        {
+            const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
             const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
             const std::string resourceFolder = navKitSettings.outputFolder + "\\" + (type == NAVP
-            ? "navp"
-            : type == AIRG
-            ? "airg"
-            : "tga");
-            char**hashesNeeded = new char*[hashes.size()];
+                    ? "navp"
+                    : type == AIRG
+                    ? "airg"
+                    : "tga");
+            char** hashesNeeded = new char*[hashes.size()];
 
             for (size_t i = 0; i < hashes.size(); ++i) {
-            hashesNeeded[i] = new char[hashes[i].size() + 1];
-            std::strcpy(hashesNeeded[i], hashes[i].c_str());
-            
+                hashesNeeded[i] = new char[hashes[i].size() + 1];
+                std::strcpy(hashesNeeded[i], hashes[i].c_str());
+            }
+            extract_resources_from_rpkg(
+                runtimeFolder.c_str(),
+                hashesNeeded,
+                hashes.size(),
+                partitionManager,
+                resourceFolder.c_str(),
+                type == NAVP ? "NAVP" : type == AIRG ? "AIRG" : "TEXT",
+                Logger::rustLogCallback);
         }
-        extract_resources_from_rpkg(
-            runtimeFolder.c_str(),
-            hashesNeeded,
-            hashes.size(),
-            partitionManager,
-            resourceFolder.c_str(),
-            type == NAVP ? "NAVP" : type == AIRG ? "AIRG" : "TEXT",
-            Logger::rustLogCallback);
-        
-    }
-    CPPTRACE_CATCH(const std::exception & e)
-    {
+    CPPTRACE_CATCH(const std::exception & e) {
         std::string msg = "Error extracting Resources.";
         msg += e.what();
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
         return -1;
-    }
-    catch
-    (...)
-    {
+    } catch
+    (...) {
         Logger::log(NK_ERROR, "Error extracting Resource.");
         return -1;
     }

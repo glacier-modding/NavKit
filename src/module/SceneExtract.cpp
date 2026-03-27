@@ -10,6 +10,7 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
@@ -31,7 +32,7 @@ void SceneExtract::handleExtractFromGameClicked() {
 }
 
 bool SceneExtract::canExtractFromGame() const {
-    return !extractingFromGame;
+    return !extractingFromGame && !Rpkg::unknownGameVersion;
 }
 
 bool SceneExtract::canExtractFromGameAndBuildObj() const {
