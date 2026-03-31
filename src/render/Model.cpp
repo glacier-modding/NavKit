@@ -189,7 +189,7 @@ void Model::loadModelData(std::string const& path) {
         path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-        std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
+        Logger::log(NK_ERROR, "ERROR::ASSIMP::%s", importer.GetErrorString());
         return;
     }
     directory = path.substr(0, path.find_last_of('/'));
@@ -199,8 +199,6 @@ void Model::loadModelData(std::string const& path) {
     if (directory == path) {
         directory = "";
     }
-
-    texturesLoaded.clear();
 
     Logger::log(NK_DEBUG, "Loading model: %s, base directory: %s", path.c_str(), directory.c_str());
 

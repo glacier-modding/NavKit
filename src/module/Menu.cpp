@@ -177,7 +177,7 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 break;
             case IDM_FILE_SAVE_OBJ:
                 SceneMesh::getInstance().handleSaveObjClicked();
-                Logger::log(NK_DEBUG, "File -> Save Obj clicked");
+                Logger::log(NK_DEBUG, "File -> Save Obj and Mtl clicked");
                 break;
             case IDM_FILE_SAVE_BLEND:
                 SceneMesh::getInstance().handleSaveBlendClicked();

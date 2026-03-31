@@ -110,7 +110,7 @@ void SceneMesh::updateObjDialogControls(const HWND hDlg) {
 
 INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
                                                   LPARAM lParam) {
-    SceneMesh& obj = getInstance();
+    SceneMesh& sceneMesh = getInstance();
     switch (message) {
     case WM_INITDIALOG: {
         updateObjDialogControls(hDlg);
@@ -120,63 +120,65 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT me
         switch (LOWORD(wParam)) {
         case IDC_RADIO_MESH_TYPE_ALOC:
         case IDC_RADIO_MESH_TYPE_PRIM: {
-            obj.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
-            obj.saveObjSettings();
+            sceneMesh.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
+            sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                        obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                        sceneMesh.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
         case IDC_RADIO_BUILD_TYPE_COPY:
         case IDC_RADIO_BUILD_TYPE_INSTANCE: {
-            obj.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
-            obj.saveObjSettings();
+            sceneMesh.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
+            sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                        obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+                        sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
         case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
-            obj.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Filter to include box set to %s.", obj.filterToIncludeBox ? "true" : "false");
+            sceneMesh.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Filter to include box set to %s.", sceneMesh.filterToIncludeBox ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
         case IDC_CHECK_SKIP_RPKG_EXTRACT: {
-            obj.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
-            obj.saveObjSettings();
+            sceneMesh.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT)
+                                                       ? COPY
+                                                       : INSTANCE;
+            sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.",
-                        obj.skipExtractingAlocsOrPrims ? "true" : "false");
+                        sceneMesh.skipExtractingAlocsOrPrims ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
         case IDC_CHECK_EXTRACT_TEXTURE_FILES: {
-            obj.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Extract textures set to %s.", obj.extractTextures ? "true" : "false");
+            sceneMesh.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Extract textures set to %s.", sceneMesh.extractTextures ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
         case IDC_CHECK_APPLY_TEXTURES: {
-            obj.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Apply textures set to %s.", obj.applyTextures ? "true" : "false");
+            sceneMesh.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Apply textures set to %s.", sceneMesh.applyTextures ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
         case IDC_BUTTON_RESET_DEFAULTS: {
-            obj.resetDefaults();
+            sceneMesh.resetDefaults();
             updateObjDialogControls(hDlg);
-            Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+            Logger::log(NK_INFO, "Prim LODs set to %s.", sceneMesh.buildPrimLodsString().c_str());
             Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                        obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                        sceneMesh.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
             Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                        obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
-            obj.saveObjSettings();
+                        sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+            sceneMesh.saveSceneMeshSettings();
             break;
         }
         case WM_CLOSE:
@@ -187,9 +189,9 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT me
             if (LOWORD(wParam) >= IDC_CHECK_PRIM_LOD_1 && LOWORD(wParam) <= IDC_CHECK_PRIM_LOD_8) {
                 const int index = LOWORD(wParam) - IDC_CHECK_PRIM_LOD_1;
                 const bool isChecked = IsDlgButtonChecked(hDlg, LOWORD(wParam)) == BST_CHECKED;
-                obj.primLods[index] = isChecked;
-                obj.saveObjSettings();
-                Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+                sceneMesh.primLods[index] = isChecked;
+                sceneMesh.saveSceneMeshSettings();
+                Logger::log(NK_INFO, "Prim LODs set to %s.", sceneMesh.buildPrimLodsString().c_str());
             }
             break;
         }
@@ -487,17 +489,34 @@ void SceneMesh::copyFile(const std::string& from, const std::string& to, const s
         return;
     }
 
-    const auto start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Copying %s from '%s' to '%s'...", filetype.c_str(), from.c_str(), to.c_str());
 
     try {
         std::filesystem::copy(from, to, std::filesystem::copy_options::overwrite_existing);
-
-        const auto end = std::chrono::high_resolution_clock::now();
-        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving %s in %lld ms.", filetype.c_str(), duration.count());
     } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
+    }
+
+    if (filetype == "Obj" && !getInstance().model.texturesLoaded.empty()) {
+        if (const std::string mtlFromFileName = from.substr(0, from.size() - 3) + "mtl";
+            std::filesystem::exists(mtlFromFileName)) {
+            const std::string mtlToFileName = to.substr(0, from.size() - 3) + "mtl";
+            start = std::chrono::high_resolution_clock::now();
+            Logger::log(NK_INFO, "Copying Mtl from '%s' to '%s'...", from.c_str(), to.c_str());
+            try {
+                std::filesystem::copy(mtlFromFileName, mtlToFileName,
+                                      std::filesystem::copy_options::overwrite_existing);
+                const auto end = std::chrono::high_resolution_clock::now();
+                const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                Logger::log(NK_INFO, "Finished saving Mtl in %lld ms.", duration.count());
+            } catch (const std::filesystem::filesystem_error& e) {
+                Logger::log(NK_ERROR, "Error copying Mtl file: %s", e.what());
+            }
+        }
     }
 }
 
@@ -786,7 +805,7 @@ void SceneMesh::loadSettings() {
     applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
 }
 
-void SceneMesh::saveObjSettings() const {
+void SceneMesh::saveSceneMeshSettings() const {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
 
     const char* meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";

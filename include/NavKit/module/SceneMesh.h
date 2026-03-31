@@ -133,7 +133,7 @@ public:
 
     [[nodiscard]] std::string buildPrimLodsString() const;
 
-    void saveObjSettings() const;
+    void saveSceneMeshSettings() const;
 
     void resetDefaults();
 
