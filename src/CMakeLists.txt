@@ -37,6 +37,7 @@ set(RENDER_SOURCES
         render/Mesh.cpp
         render/Model.cpp
         render/Shader.cpp
+        render/stb_image_impl.cpp
 )
 set(UTIL_SOURCES
         util/CommandRunner.cpp

@@ -55,6 +55,7 @@ Navp::~Navp() = default;
 HWND Navp::hNavpDialog = nullptr;
 std::string Navp::selectedRpkgNavp{};
 std::map<std::string, std::string> Navp::navpHashIoiStringMap;
+std::mutex Navp::navpHashIoiStringMapMutex;
 
 GLuint Navp::navMeshTriVAO = 0;
 GLuint Navp::navMeshTriVBO = 0;

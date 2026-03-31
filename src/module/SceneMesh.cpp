@@ -30,30 +30,30 @@
 #include "../../include/NavWeakness/NavPower.h"
 
 SceneMesh::SceneMesh() : loadObjName("Load Obj"),
-             saveObjName("Save Obj"),
-             lastObjFileName("Load Obj"),
-             lastSaveObjFileName("Save Obj"),
-             objLoaded(false),
-             showObj(true),
-             loadObj(false),
-             startedSceneMeshGeneration(false),
-             blenderSceneMeshBuildStarted(false),
-             blenderSceneMeshGenerationDone(false),
-             blendFileOnlyBuild(false),
-             blendFileAndObjBuild(false),
-             filterToIncludeBox(true),
-             errorBuilding(false),
-             skipExtractingAlocsOrPrims(false),
-             errorExtracting(false),
-             extractingResources(false),
-             doneExtractingAlocsOrPrims(false),
-             doObjHitTest(false),
-             meshTypeForBuild(ALOC),
-             sceneMeshBuildType(COPY),
-             primLods{true, true, true, true, true, true, true, true},
-             blendFileBuilt(false),
-             extractTextures(false),
-             applyTextures(false) {}
+                         saveObjName("Save Obj"),
+                         lastObjFileName("Load Obj"),
+                         lastSaveObjFileName("Save Obj"),
+                         objLoaded(false),
+                         showObj(true),
+                         loadObj(false),
+                         startedSceneMeshGeneration(false),
+                         blenderSceneMeshBuildStarted(false),
+                         blenderSceneMeshGenerationDone(false),
+                         blendFileOnlyBuild(false),
+                         blendFileAndObjBuild(false),
+                         filterToIncludeBox(true),
+                         errorBuilding(false),
+                         skipExtractingAlocsOrPrims(false),
+                         errorExtracting(false),
+                         extractingResources(false),
+                         doneExtractingAlocsOrPrims(false),
+                         doObjHitTest(false),
+                         meshTypeForBuild(ALOC),
+                         sceneMeshBuildType(COPY),
+                         primLods{true, true, true, true, true, true, true, true},
+                         blendFileBuilt(false),
+                         extractTextures(false),
+                         applyTextures(false) {}
 
 HWND SceneMesh::hSceneMeshDialog = nullptr;
 
@@ -108,8 +108,9 @@ void SceneMesh::updateObjDialogControls(const HWND hDlg) {
     CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
 }
 
-INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
-    SceneMesh& obj = getInstance();
+INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
+                                                  LPARAM lParam) {
+    SceneMesh& sceneMesh = getInstance();
     switch (message) {
     case WM_INITDIALOG: {
         updateObjDialogControls(hDlg);
@@ -119,63 +120,65 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT me
         switch (LOWORD(wParam)) {
         case IDC_RADIO_MESH_TYPE_ALOC:
         case IDC_RADIO_MESH_TYPE_PRIM: {
-            obj.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
-            obj.saveObjSettings();
+            sceneMesh.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
+            sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                        obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                        sceneMesh.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
         case IDC_RADIO_BUILD_TYPE_COPY:
         case IDC_RADIO_BUILD_TYPE_INSTANCE: {
-            obj.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
-            obj.saveObjSettings();
+            sceneMesh.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
+            sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                        obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+                        sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
         case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
-            obj.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Filter to include box set to %s.", obj.filterToIncludeBox ? "true" : "false");
+            sceneMesh.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Filter to include box set to %s.", sceneMesh.filterToIncludeBox ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
         case IDC_CHECK_SKIP_RPKG_EXTRACT: {
-            obj.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
-            obj.saveObjSettings();
+            sceneMesh.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT)
+                                                       ? COPY
+                                                       : INSTANCE;
+            sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.",
-                        obj.skipExtractingAlocsOrPrims ? "true" : "false");
+                        sceneMesh.skipExtractingAlocsOrPrims ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
         case IDC_CHECK_EXTRACT_TEXTURE_FILES: {
-            obj.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Extract textures set to %s.", obj.extractTextures ? "true" : "false");
+            sceneMesh.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Extract textures set to %s.", sceneMesh.extractTextures ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
         case IDC_CHECK_APPLY_TEXTURES: {
-            obj.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
-            obj.saveObjSettings();
-            Logger::log(NK_INFO, "Apply textures set to %s.", obj.applyTextures ? "true" : "false");
+            sceneMesh.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Apply textures set to %s.", sceneMesh.applyTextures ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
         case IDC_BUTTON_RESET_DEFAULTS: {
-            obj.resetDefaults();
+            sceneMesh.resetDefaults();
             updateObjDialogControls(hDlg);
-            Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+            Logger::log(NK_INFO, "Prim LODs set to %s.", sceneMesh.buildPrimLodsString().c_str());
             Logger::log(NK_INFO, "Mesh type for build set to %s.",
-                        obj.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
+                        sceneMesh.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
             Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                        obj.sceneMeshBuildType == COPY ? "Copy" : "Instance");
-            obj.saveObjSettings();
+                        sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
+            sceneMesh.saveSceneMeshSettings();
             break;
         }
         case WM_CLOSE:
@@ -186,9 +189,9 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT me
             if (LOWORD(wParam) >= IDC_CHECK_PRIM_LOD_1 && LOWORD(wParam) <= IDC_CHECK_PRIM_LOD_8) {
                 const int index = LOWORD(wParam) - IDC_CHECK_PRIM_LOD_1;
                 const bool isChecked = IsDlgButtonChecked(hDlg, LOWORD(wParam)) == BST_CHECKED;
-                obj.primLods[index] = isChecked;
-                obj.saveObjSettings();
-                Logger::log(NK_INFO, "Prim LODs set to %s.", obj.buildPrimLodsString().c_str());
+                sceneMesh.primLods[index] = isChecked;
+                sceneMesh.saveSceneMeshSettings();
+                Logger::log(NK_INFO, "Prim LODs set to %s.", sceneMesh.buildPrimLodsString().c_str());
             }
             break;
         }
@@ -368,67 +371,35 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
     }
     std::set<std::string> neededTextHashes{};
     if (shouldExtractTextures()) {
-        scene.matis.clear();
-        scene.primMatis.clear();
         simdjson::ondemand::parser parser;
-        Logger::log(NK_INFO, "Extracting MATIs from Rpkg files.");
+        Logger::log(NK_INFO, "Extracting texture files from Rpkg files.");
         for (auto& mesh : scene.meshes) {
-            if (scene.primMatis.contains(mesh.primHash)) {
+            if (!scene.primMatis.contains(mesh.primHash)) {
+                Logger::log(NK_WARN, "Prim matis missing prim hash: {}.", mesh.primHash.c_str());
                 continue;
             }
-            scene.primMatis.insert({mesh.primHash, {}});
-            scene.primMatis[mesh.primHash].primHash = mesh.primHash;
-            const auto primMatis = get_all_referenced_hashes_by_hash_from_rpkg_files(
-                mesh.primHash.c_str(),
-                Rpkg::partitionManager,
-                Logger::rustLogCallback);
-            if (primMatis == nullptr) {
-                Logger::log(NK_ERROR, "Error getting references from %s from Rpkg files.", mesh.primHash.c_str());
-                errorExtracting = true;
-                return;
-            }
-            for (int i = 0; i < primMatis->length; i++) {
-                std::string matiHash = get_string_from_list(primMatis, i);
-                if (std::ranges::find(scene.primMatis[mesh.primHash].matiHashes, matiHash) != scene.primMatis[mesh.
-                    primHash].matiHashes.end()) {
-                    Logger::log(NK_DEBUG, "Duplicate mati hash %s found in references for %s.", matiHash.c_str(),
-                                mesh.primHash.c_str());
+            for (auto primMatiHashes = scene.primMatis[mesh.primHash].matiHashes; const auto& matiHash :
+                 primMatiHashes) {
+                if (!scene.matis.contains(matiHash)) {
+                    Logger::log(NK_WARN, "Matis missing for prim: {} mati: {}.", mesh.primHash.c_str(),
+                                matiHash.c_str());
                     continue;
                 }
-                scene.primMatis[mesh.primHash].matiHashes.push_back(matiHash);
-                Logger::log(NK_DEBUG, "Added %s to %s mati hashes.", matiHash.c_str(), mesh.primHash.c_str());
-                if (scene.matis.contains(matiHash)) {
-                    continue;
-                }
-                if (char* matiJson = get_mati_json_by_hash(matiHash.c_str(), Rpkg::partitionManager,
-                                                           Logger::rustLogCallback); matiJson != nullptr) {
-                    std::string matiJsonString = matiJson;
-                    const auto json = simdjson::padded_string(matiJsonString);
-                    auto jsonDocument = parser.iterate(json);
-                    Json::Mati mati;
-                    try {
-                        Logger::log(NK_DEBUG, "Reading mati json for %s.", matiHash.c_str());
-                        mati.readJsonFromMatiFile(jsonDocument);
-                        scene.matis.insert({matiHash, mati});
-                        Logger::log(NK_DEBUG, "Added %s to scene mati hashes.", matiHash.c_str());
-                    } catch (const std::exception& e) {
-                        Logger::log(NK_ERROR, "Error getting Mati JSON for %s: %s", matiHash.c_str(), e.what());
-                        free_string(matiJson);
-                        continue;
-                        // errorExtracting = true;
-                        // return;
-                    }
-                    free_string(matiJson);
-                    Logger::log(NK_INFO, "Found diffuse texture %s for mati %s with mati id %s for mesh %s.",
-                                mati.diffuse.c_str(), matiHash.c_str(), mati.hash.c_str(),
-                                mesh.primHash.c_str());
-                    auto diffuseHash = mati.diffuse;
-                    auto normalHash = mati.normal;
-                    auto specularHash = mati.specular;
-                    neededTextHashes.insert(diffuseHash);
-                    // neededTextHashes.insert(normalHash);
-                    // neededTextHashes.insert(specularHash);
-                }
+                auto diffuseHash = scene.matis[matiHash].diffuse;
+                Logger::log(NK_INFO, "Found diffuse texture %s for mesh %s.",
+                            diffuseHash.c_str(),
+                            mesh.primHash.c_str());
+                neededTextHashes.insert(diffuseHash);
+                auto normalHash = scene.matis[matiHash].normal;
+                Logger::log(NK_INFO, "Found normal texture %s for mesh %s.",
+                            normalHash.c_str(),
+                            mesh.primHash.c_str());
+                neededTextHashes.insert(normalHash);
+                auto specularHash = scene.matis[matiHash].specular;
+                Logger::log(NK_INFO, "Found specular texture %s for mesh %s.",
+                            specularHash.c_str(),
+                            mesh.primHash.c_str());
+                neededTextHashes.insert(specularHash);
             }
         }
         Logger::log(NK_INFO, "Found %d text files to extract from Rpkg files.", neededTextHashes.size());
@@ -445,9 +416,6 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
         } else {
             Logger::log(NK_INFO, "No text files to extract from Rpkg files.");
         }
-
-        Logger::log(NK_INFO, "Saving texture data to %s scene file.", Scene::OUTPUT_SCENE_FILE_NAME.c_str());
-        scene.saveScene(scene.lastLoadSceneFile);
     }
     Logger::log(NK_INFO, "Finished extracting %ss from Rpkg files.", meshFileType.c_str());
     doneExtractingAlocsOrPrims = true;
@@ -521,17 +489,34 @@ void SceneMesh::copyFile(const std::string& from, const std::string& to, const s
         return;
     }
 
-    const auto start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Copying %s from '%s' to '%s'...", filetype.c_str(), from.c_str(), to.c_str());
 
     try {
         std::filesystem::copy(from, to, std::filesystem::copy_options::overwrite_existing);
-
-        const auto end = std::chrono::high_resolution_clock::now();
-        const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving %s in %lld ms.", filetype.c_str(), duration.count());
     } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
+    }
+
+    if (filetype == "Obj" && !getInstance().model.texturesLoaded.empty()) {
+        if (const std::string mtlFromFileName = from.substr(0, from.size() - 3) + "mtl";
+            std::filesystem::exists(mtlFromFileName)) {
+            const std::string mtlToFileName = to.substr(0, from.size() - 3) + "mtl";
+            start = std::chrono::high_resolution_clock::now();
+            Logger::log(NK_INFO, "Copying Mtl from '%s' to '%s'...", from.c_str(), to.c_str());
+            try {
+                std::filesystem::copy(mtlFromFileName, mtlToFileName,
+                                      std::filesystem::copy_options::overwrite_existing);
+                const auto end = std::chrono::high_resolution_clock::now();
+                const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                Logger::log(NK_INFO, "Finished saving Mtl in %lld ms.", duration.count());
+            } catch (const std::filesystem::filesystem_error& e) {
+                Logger::log(NK_ERROR, "Error copying Mtl file: %s", e.what());
+            }
+        }
     }
 }
 
@@ -616,8 +601,14 @@ void SceneMesh::loadObjMesh() {
 void SceneMesh::renderObj() const {
     const Renderer& renderer = Renderer::getInstance();
 
+    static int logCounterObj = 0;
+    if (logCounterObj < 10) {
+        Logger::log(NK_DEBUG, "SceneMesh::renderObj: meshes count: %zu, objLoaded: %d", model.meshes.size(), objLoaded);
+        logCounterObj++;
+    }
+
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
 
     renderer.shader.use();
 
@@ -634,7 +625,7 @@ void SceneMesh::renderObj() const {
     renderer.shader.setMat4("view", renderer.view);
     renderer.shader.setMat4("model", modelTransform);
     renderer.shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelTransform))));
-    renderer.shader.setVec4("flatColor", glm::vec4(0.50f, 0.5f, 0.5f, 1.0f));
+    renderer.shader.setVec4("flatColor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
     model.draw(renderer.shader, renderer.projection * renderer.view);
 }
@@ -713,7 +704,8 @@ bool SceneMesh::canBuildObjFromScene() const {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Scene& scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingResources && navKitSettings.blenderSet
-        && scene.sceneLoaded && !blenderSceneMeshBuildStarted && !blenderSceneMeshGenerationDone && Rpkg::extractionDataInitComplete;
+        && scene.sceneLoaded && !blenderSceneMeshBuildStarted && !blenderSceneMeshGenerationDone &&
+        Rpkg::extractionDataInitComplete;
 }
 
 bool SceneMesh::canSaveBlend() const {
@@ -813,7 +805,7 @@ void SceneMesh::loadSettings() {
     applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
 }
 
-void SceneMesh::saveObjSettings() const {
+void SceneMesh::saveSceneMeshSettings() const {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
 
     const char* meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";

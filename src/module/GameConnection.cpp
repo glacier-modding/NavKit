@@ -121,7 +121,7 @@ int GameConnection::listNavKitSceneEntities() const {
     }
     const auto file_write_queue = std::make_unique<rsj::ConcurrentQueue<std::string>>();
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
-    std::thread writer_thread([&] {
+    std::jthread writer_thread([&](std::stop_token stoken) {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
         const std::string outputFolder = NavKitSettings::getInstance().outputFolder;
         std::ofstream f(outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME, std::ios::app);
@@ -131,7 +131,7 @@ int GameConnection::listNavKitSceneEntities() const {
             return;
         }
 
-        while (true) {
+        while (!stoken.stop_requested()) {
             if (auto message_to_write = file_write_queue->try_pop(); message_to_write.has_value()) {
                 if (message_to_write.value() == SENTINEL_MESSAGE) {
                     break;
@@ -149,7 +149,20 @@ int GameConnection::listNavKitSceneEntities() const {
     bool done = false;
     int messagesReceived = 0;
     while (!done) {
+        if (!ws || ws->getReadyState() == WebSocket::CLOSED) {
+            Logger::log(NK_ERROR, "GameConnection: Editor connection closed unexpectedly.");
+            file_write_queue->push(SENTINEL_MESSAGE);
+            if (writer_thread.joinable()) {
+                writer_thread.join();
+            }
+            return 1;
+        }
+
         ws->poll(10);
+        if (!ws || ws->getReadyState() == WebSocket::CLOSED) {
+            continue;
+        }
+
         ws->dispatch([&](const std::string& message) {
             messagesReceived++;
             if (message == "Done sending entities.") {
