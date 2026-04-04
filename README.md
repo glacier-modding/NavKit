@@ -11,7 +11,7 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 
 # Full generation of Navp and Airg (Scene Extraction, Navp generation, Airg generation)
 1. Download the latest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and run the installer
-1. Install ZHMModSDK (Usually you will want to use https://github.com/OrfeasZ/ZHMModSDK/releases/latest, but for NavKit version 2.4.0 you will want to use the SDK artifact from this build: https://github.com/dbierek/ZHMModSDK/actions/runs/20363060518)
+1. Install ZHMModSDK (Usually you will want to use https://github.com/OrfeasZ/ZHMModSDK/releases/latest, but at the moment use the SDK artifact mentioned in the NavKit release you are using)
 1. Install Blender (tested with 3.4 and 4.3 https://download.blender.org/release/Blender4.3/)
 1. Install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
 1. Start Hitman and enter a mission
