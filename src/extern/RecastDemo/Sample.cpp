@@ -464,7 +464,8 @@ void Sample::saveAll(const char* s_OutputFileName)
 
 	std::ofstream f(s_OutputFileName);
 	f << std::fixed << std::boolalpha;
-	f << "{\"Areas\":[";
+
+    f << R"({"NavpJsonVersion":"0.1","Sections":[{"NavGraphs":[{"Areas":[)";
 	std::vector<int> tilePolyCounts;
 	for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex) {
 		const dtMeshTile* tile = mesh->getTile(tileIndex);
@@ -582,8 +583,6 @@ void Sample::saveAll(const char* s_OutputFileName)
 			f << "]}";
 		}
 	}
-	f << "],";
-	f << R"("NavpJsonVersion": "0.1")";
-	f << "}";
+	f << "}]}]}";
 	f.close();
 }

@@ -55,6 +55,9 @@ public:
 
     static void updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIndex);
 
+    static int getTotalAreaCount(const NavPower::NavMesh* navMesh);
+    static NavPower::Area& getAreaByIndex(const NavPower::NavMesh* navMesh, int index);
+
     static void updateHitTestBuffers(const NavPower::NavMesh* navMesh);
 
     void renderPfSeedPoints() const;

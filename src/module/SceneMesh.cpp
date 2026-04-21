@@ -223,17 +223,21 @@ void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
     std::vector<std::vector<int>> faces;
     std::map<Vec3, int> pointsToIndexMap;
     int pointCount = 1;
-    for (const auto& [m_area, m_edges] : navp.navMesh->m_areas) {
-        std::vector<int> face;
-        for (const auto edge : m_edges) {
-            auto point = edge->m_pos;
-            if (!pointsToIndexMap.contains(point)) {
-                vertices.push_back(point);
-                pointsToIndexMap[point] = pointCount++;
+    for (auto section : navp.navMesh->m_aSections) {
+        for (auto navGraph : section.m_aNavGraphs) {
+            for (const auto& [m_area, m_edges] : navGraph.m_areas) {
+                std::vector<int> face;
+                for (const auto edge : m_edges) {
+                    auto point = edge->m_pos;
+                    if (!pointsToIndexMap.contains(point)) {
+                        vertices.push_back(point);
+                        pointsToIndexMap[point] = pointCount++;
+                    }
+                    face.push_back(pointsToIndexMap[point]);
+                }
+                faces.push_back(face);
             }
-            face.push_back(pointsToIndexMap[point]);
         }
-        faces.push_back(face);
     }
     std::ofstream f(fileName);
     f.clear();
@@ -587,11 +591,7 @@ void SceneMesh::loadObjMesh() {
         }
     } else {
         modelFuture.wait();
-        Logger::log(NK_ERROR, "Error loading obj.");
-        const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-        if (recastAdapter.getVertCount() == 0) {
-            Logger::log(NK_ERROR, "Cannot load Obj, Obj has 0 vertices.");
-        }
+        Logger::log(NK_ERROR, "Error loading obj. Obj may have too many vertices or have 0 vertices.");
         model.meshes.clear();
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();

@@ -284,7 +284,7 @@ bool Airg::canBuildAirg() const {
 }
 
 void Airg::handleBuildAirgClicked() {
-    if (const Navp& navp = Navp::getInstance(); navp.navMesh->m_areas.size() > 65535) {
+    if (const Navp& navp = Navp::getInstance(); Navp::getTotalAreaCount(navp.navMesh) > 65535) {
         Logger::log(
             NK_ERROR,
             "Loaded NAVP has too many areas. Ensure the scene has PF Seed Points and has a fully contained boundary.");
