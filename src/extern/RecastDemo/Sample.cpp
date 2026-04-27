@@ -457,132 +457,132 @@ struct PolyInfo {
 
 void Sample::saveAll(const char* s_OutputFileName)
 {
-	const dtNavMesh* mesh = m_navMesh;
-	if (!mesh) return;
+    const dtNavMesh* mesh = m_navMesh;
+    if (!mesh) return;
 
-	remove(s_OutputFileName);
+    remove(s_OutputFileName);
 
-	std::ofstream f(s_OutputFileName);
-	f << std::fixed << std::boolalpha;
+    std::ofstream f(s_OutputFileName);
+    f << std::fixed << std::boolalpha;
 
-    f << R"({"NavpJsonVersion":"0.1","Sections":[{"NavGraphs":[{"Areas":[)";
-	std::vector<int> tilePolyCounts;
-	for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex) {
-		const dtMeshTile* tile = mesh->getTile(tileIndex);
-		if (!tile || !tile->header || !tile->dataSize) {
-			tilePolyCounts.push_back(0);
-			continue;
-		}
-		tilePolyCounts.push_back(tile->header->polyCount);
-	}
-	int totalAreaCount = 0;
-	for (int count : tilePolyCounts) {
-		totalAreaCount += count;
-	}
-	std::vector<unsigned short> allPolyflags;
-	int curPoly = 0;
-	std::vector<PolyInfo> indexToPolyInfo(totalAreaCount, {-1, -1});
+    f << R"({"NavpJsonVersion":"0.2","Sections":[{"NavGraphs":[{"Areas":[)";
+    std::vector<int> tilePolyCounts;
+    for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex) {
+        const dtMeshTile* tile = mesh->getTile(tileIndex);
+        if (!tile || !tile->header || !tile->dataSize) {
+            tilePolyCounts.push_back(0);
+            continue;
+        }
+        tilePolyCounts.push_back(tile->header->polyCount);
+    }
+    int totalAreaCount = 0;
+    for (int count : tilePolyCounts) {
+        totalAreaCount += count;
+    }
+    std::vector<unsigned short> allPolyflags;
+    int curPoly = 0;
+    std::vector<PolyInfo> indexToPolyInfo(totalAreaCount, {-1, -1});
 
-	for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex) {
-		const dtMeshTile *tile = mesh->getTile(tileIndex);
-		if (!tile || !tile->header || !tile->dataSize) {
-			continue;
-		}
-		for (int polyIndex = 0; polyIndex < tile->header->polyCount; polyIndex++) {
-			allPolyflags.push_back(tile->polys[polyIndex].flags);
-			if (tile->polys[polyIndex].flags != SAMPLE_POLYFLAGS_DISABLED) {
-				const int totalIndex = getTotalIndex(tileIndex, polyIndex, tilePolyCounts);
-				indexToPolyInfo[totalIndex] = {tileIndex, polyIndex, curPoly++};
-			}
-		}
-	}
-	curPoly = 0;
-	bool validAreaFound = false;
-	// Store tiles.
-	for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex)
-	{
-		const dtMeshTile* tile = mesh->getTile(tileIndex);
-		if (!tile || !tile->header || !tile->dataSize) continue;
-		int numPolys = tile->header->polyCount;
-		for (int polyIndex = 0; polyIndex < numPolys; polyIndex++) {
-			const dtPoly& poly = tile->polys[polyIndex];
+    for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex) {
+        const dtMeshTile *tile = mesh->getTile(tileIndex);
+        if (!tile || !tile->header || !tile->dataSize) {
+            continue;
+        }
+        for (int polyIndex = 0; polyIndex < tile->header->polyCount; polyIndex++) {
+            allPolyflags.push_back(tile->polys[polyIndex].flags);
+            if (tile->polys[polyIndex].flags != SAMPLE_POLYFLAGS_DISABLED) {
+                const int totalIndex = getTotalIndex(tileIndex, polyIndex, tilePolyCounts);
+                indexToPolyInfo[totalIndex] = {tileIndex, polyIndex, curPoly++};
+            }
+        }
+    }
+    curPoly = 0;
+    bool validAreaFound = false;
+    // Store tiles.
+    for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex)
+    {
+        const dtMeshTile* tile = mesh->getTile(tileIndex);
+        if (!tile || !tile->header || !tile->dataSize) continue;
+        int numPolys = tile->header->polyCount;
+        for (int polyIndex = 0; polyIndex < numPolys; polyIndex++) {
+            const dtPoly& poly = tile->polys[polyIndex];
 
-			const int totalIndex = getTotalIndex(tileIndex, polyIndex, tilePolyCounts);
-			if (poly.flags == SAMPLE_POLYFLAGS_DISABLED) {
-				continue;
-			}
-			if (validAreaFound) {
-				f << ",";
-			}
-			if (!validAreaFound) {
-				validAreaFound = true;
-			}
-			f << "{";
-			f << R"("Area":{"Index":)" << indexToPolyInfo[totalIndex].totalPolyIndex;
-			f << "},";
-			f << "\"Edges\":[";
+            const int totalIndex = getTotalIndex(tileIndex, polyIndex, tilePolyCounts);
+            if (poly.flags == SAMPLE_POLYFLAGS_DISABLED) {
+                continue;
+            }
+            if (validAreaFound) {
+                f << ",";
+            }
+            if (!validAreaFound) {
+                validAreaFound = true;
+            }
+            f << "{";
+            f << R"("Area":{"Index":)" << indexToPolyInfo[totalIndex].totalPolyIndex;
+            f << "},";
+            f << "\"Edges\":[";
 
-			int numVerts = poly.vertCount;
-			for (int vi = 0; vi < numVerts; vi++) {
-				unsigned short vertIndex = poly.verts[vi];
-				float X = tile->verts[vertIndex * 3];
-				float Y = -tile->verts[vertIndex * 3 + 2];
-				float Z = tile->verts[vertIndex * 3 + 1];
-				f << "{";
-				for (unsigned int linkIndex = poly.firstLink; linkIndex != DT_NULL_LINK; linkIndex = tile->links[linkIndex].next)
-				{
-					const dtLink& link = tile->links[linkIndex];
-					if (link.edge != vi) {
-						continue;
-					}
-					const dtMeshTile* targetTile = nullptr;
-					const dtPoly* targetPoly = nullptr;
-					mesh->getTileAndPolyByRef(link.ref, &targetTile, &targetPoly);
-					if (targetTile && targetPoly)
-					{
-						int targetTileIndex = -1;
-						for (int i = 0; i < mesh->getMaxTiles(); ++i) {
-							if (mesh->getTile(i) == targetTile) {
-								targetTileIndex = i;
-								break;
-							}
-						}
-						if (targetTileIndex != -1) {
-							int targetPolyIndex = -1;
-							for (int i = 0; i < targetTile->header->polyCount; ++i) {
-								if (&targetTile->polys[i] == targetPoly) {
-									targetPolyIndex = i;
-									break;
-								}
-							}
-							if (targetPolyIndex != -1) {
-								int neiTotalIndex = getTotalIndex(targetTileIndex, targetPolyIndex, tilePolyCounts);
-								if (neiTotalIndex < totalAreaCount && neiTotalIndex != -1) {
-									if (allPolyflags[neiTotalIndex] != SAMPLE_POLYFLAGS_DISABLED) {
-										f << "\"Adjacent Area\":";
-										f << indexToPolyInfo[neiTotalIndex].totalPolyIndex + 1 << ",";
-									}
-								}
-							}
-						}
-					}
-				}
-				f << "\"Position\":";
-				f << "{";
-				f << "\"X\":" << X << ",";
-				f << "\"Y\":" << Y << ",";
-				f << "\"Z\":" << Z;
-				f << "}";
-				f << "}";
-				if (vi < numVerts - 1)
-				{
-					f << ",";
-				}
-			}
+            int numVerts = poly.vertCount;
+            for (int vi = 0; vi < numVerts; vi++) {
+                unsigned short vertIndex = poly.verts[vi];
+                float X = tile->verts[vertIndex * 3];
+                float Y = -tile->verts[vertIndex * 3 + 2];
+                float Z = tile->verts[vertIndex * 3 + 1];
+                f << "{";
+                for (unsigned int linkIndex = poly.firstLink; linkIndex != DT_NULL_LINK; linkIndex = tile->links[linkIndex].next)
+                {
+                    const dtLink& link = tile->links[linkIndex];
+                    if (link.edge != vi) {
+                        continue;
+                    }
+                    const dtMeshTile* targetTile = nullptr;
+                    const dtPoly* targetPoly = nullptr;
+                    mesh->getTileAndPolyByRef(link.ref, &targetTile, &targetPoly);
+                    if (targetTile && targetPoly)
+                    {
+                        int targetTileIndex = -1;
+                        for (int i = 0; i < mesh->getMaxTiles(); ++i) {
+                            if (mesh->getTile(i) == targetTile) {
+                                targetTileIndex = i;
+                                break;
+                            }
+                        }
+                        if (targetTileIndex != -1) {
+                            int targetPolyIndex = -1;
+                            for (int i = 0; i < targetTile->header->polyCount; ++i) {
+                                if (&targetTile->polys[i] == targetPoly) {
+                                    targetPolyIndex = i;
+                                    break;
+                                }
+                            }
+                            if (targetPolyIndex != -1) {
+                                int neiTotalIndex = getTotalIndex(targetTileIndex, targetPolyIndex, tilePolyCounts);
+                                if (neiTotalIndex < totalAreaCount && neiTotalIndex != -1) {
+                                    if (allPolyflags[neiTotalIndex] != SAMPLE_POLYFLAGS_DISABLED) {
+                                        f << "\"Adjacent Area\":";
+                                        f << indexToPolyInfo[neiTotalIndex].totalPolyIndex + 1 << ",";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                f << "\"Position\":";
+                f << "{";
+                f << "\"X\":" << X << ",";
+                f << "\"Y\":" << Y << ",";
+                f << "\"Z\":" << Z;
+                f << "}";
+                f << "}";
+                if (vi < numVerts - 1)
+                {
+                    f << ",";
+                }
+            }
 
-			f << "]}";
-		}
-	}
-	f << "}]}]}";
-	f.close();
+            f << "]}";
+        }
+    }
+    f << "]}]}]}";
+    f.close();
 }

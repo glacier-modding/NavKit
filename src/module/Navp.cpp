@@ -316,8 +316,8 @@ void Navp::renderPfSeedPointsForHitTest() const {
                 {0, 0, 0, 1},
                 true,
                 {
-                    static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 true,
                 {
@@ -372,8 +372,8 @@ void Navp::renderExclusionBoxesForHitTest() const {
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
                 true,
                 {
-                    static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 true,
                 {

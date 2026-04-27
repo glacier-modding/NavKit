@@ -659,9 +659,9 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     Navp::getInstance().renderPfSeedPointsForHitTest();
     Navp::getInstance().renderExclusionBoxesForHitTest();
     Airg::getInstance().renderAirgForHitTest();
-    const SceneMesh& obj = SceneMesh::getInstance();
-    if (obj.showObj && obj.objLoaded) {
-        obj.renderObj();
+    const SceneMesh& sceneMesh = SceneMesh::getInstance();
+    if (sceneMesh.showObj && sceneMesh.objLoaded) {
+        RecastAdapter::getInstance().renderRecastNavmesh(false);
     }
     GLubyte pixel[4];
     glReadBuffer(GL_COLOR_ATTACHMENT0);
