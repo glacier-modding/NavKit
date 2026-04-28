@@ -21,7 +21,6 @@ void main()
         } else {
             FragColor = flatColor;
         }
-        FragColor.rgb *= 1.2;
         FragColor.a *= flatColor.a;
         return;
     }

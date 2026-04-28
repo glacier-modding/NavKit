@@ -653,7 +653,7 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
         Logger::log(NK_ERROR, ("FB error, status: 0x" + std::to_string(static_cast<int>(status))).c_str());
 
         printf("FB error, status: 0x%x\n", status);
-        return HitTestResult(NONE, -1);
+        return {NONE, -1};
     }
     Navp::getInstance().renderNavMeshForHitTest();
     Navp::getInstance().renderPfSeedPointsForHitTest();
@@ -668,20 +668,21 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glUseProgram(0);
-    const int selectedIndex = static_cast<int>(pixel[1]) * 255 + static_cast<int>(pixel[2]);
 
-    if (selectedIndex == 65280) {
-        return HitTestResult(NONE, -1);
+    if (pixel[0] == 255) {
+        return {NONE, -1};
     }
+
+    const int selectedIndex = static_cast<int>(pixel[1]) * 256 + static_cast<int>(pixel[2]);
     HitTestType result = NONE;
-    if (static_cast<int>(pixel[0]) == NAVMESH_AREA) {
+    if (pixel[0] == NAVMESH_AREA) {
         result = NAVMESH_AREA;
-    } else if (static_cast<int>(pixel[0]) == AIRG_WAYPOINT) {
+    } else if (pixel[0] == AIRG_WAYPOINT) {
         result = AIRG_WAYPOINT;
-    } else if (static_cast<int>(pixel[0]) == PF_SEED_POINT) {
+    } else if (pixel[0] == PF_SEED_POINT) {
         result = PF_SEED_POINT;
-    } else if (static_cast<int>(pixel[0]) == PF_EXCLUSION_BOX) {
+    } else if (pixel[0] == PF_EXCLUSION_BOX) {
         result = PF_EXCLUSION_BOX;
     }
-    return HitTestResult(result, result != NONE ? selectedIndex : -1);
+    return {result, result != NONE ? selectedIndex : -1};
 }

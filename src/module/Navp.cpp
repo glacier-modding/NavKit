@@ -231,8 +231,8 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
         const auto& [area, edges] = getAreaByIndex(navMesh, i);
 
         const float r = static_cast<float>(NAVMESH_AREA) / 255.0f;
-        const float g = static_cast<float>(i / 255) / 255.0f;
-        const float b = static_cast<float>(i % 255) / 255.0f;
+        const float g = static_cast<float>((i >> 8) & 0xFF) / 255.0f;
+        const float b = static_cast<float>(i & 0xFF) / 255.0f;
         const glm::vec4 color(r, g, b, 1.0f);
 
         if (edges.size() >= 3) {
@@ -321,8 +321,8 @@ void Navp::renderPfSeedPointsForHitTest() const {
                 },
                 true,
                 {
-                    static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 1.0);
             i++;
@@ -377,8 +377,8 @@ void Navp::renderExclusionBoxesForHitTest() const {
                 },
                 true,
                 {
-                    static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 1.0);
             i++;
