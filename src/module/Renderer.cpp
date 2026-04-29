@@ -619,9 +619,6 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-    // 1. Disable depth writing so transparent boxes don't "cut holes" in the floor
-    // 2. Increase offset units to -2.0 to be more aggressive against Z-fighting
-    glDepthMask(GL_FALSE);
     glPolygonOffset(-2.0f, -2.0f);
 
     if (filled && !filledVertices.empty()) {
@@ -638,7 +635,6 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
         glDrawArrays(GL_LINES, 0, outlinedVertices.size() / 3);
     }
 
-    glDepthMask(GL_TRUE);
     glPolygonOffset(0.0f, 0.0f);
     glBindVertexArray(0);
     glUseProgram(0);

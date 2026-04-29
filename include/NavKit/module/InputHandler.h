@@ -34,6 +34,7 @@ public:
     float moveUp;
     float moveDown;
 
+    static constexpr int MENU_HEIGHT = 20;
     static constexpr int QUIT = 1;
     static constexpr float BASE_KEYBOARD_SPEED = 22.0f;
     static constexpr float SHIFT_SPEED_MULTIPLIER = 4.0f;
