@@ -601,12 +601,6 @@ void SceneMesh::loadObjMesh() {
 void SceneMesh::renderObj() const {
     const Renderer& renderer = Renderer::getInstance();
 
-    static int logCounterObj = 0;
-    if (logCounterObj < 10) {
-        Logger::log(NK_DEBUG, "SceneMesh::renderObj: meshes count: %zu, objLoaded: %d", model.meshes.size(), objLoaded);
-        logCounterObj++;
-    }
-
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 

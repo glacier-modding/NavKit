@@ -231,7 +231,7 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
         const auto& [area, edges] = getAreaByIndex(navMesh, i);
 
         const float r = static_cast<float>(NAVMESH_AREA) / 255.0f;
-        const float g = static_cast<float>((i >> 8) & 0xFF) / 255.0f;
+        const float g = static_cast<float>(i >> 8 & 0xFF) / 255.0f;
         const float b = static_cast<float>(i & 0xFF) / 255.0f;
         const glm::vec4 color(r, g, b, 1.0f);
 
@@ -580,9 +580,11 @@ void Navp::renderNavMesh() {
         if (showNavpIndices) {
             int areaIndex = 0;
             for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
-                const auto& [area, edges] = getAreaByIndex(navMesh, i);
+                const auto& area = getAreaByIndex(navMesh, i);
+                const auto& edges = area.m_edges;
+                const Vec3 pos = area.m_area->m_pos;
                 renderer.drawText(std::to_string(areaIndex + 1), {
-                                      area->m_pos.X, area->m_pos.Z + 0.1f, -area->m_pos.Y
+                                      pos.X, pos.Z + 0.1f, -pos.Y
                                   }, colorBlue, 20);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;

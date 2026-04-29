@@ -297,16 +297,8 @@ void Renderer::renderFrame() {
     if (const SceneMesh& obj = SceneMesh::getInstance(); obj.objLoaded && obj.showObj) {
         GLboolean blendEnabled;
         glGetBooleanv(GL_BLEND, &blendEnabled);
-        static bool blendLogged = false;
-        if (!blendLogged) {
-            Logger::log(NK_DEBUG, "Renderer::renderFrame: GL_BLEND is %s", blendEnabled ? "ENABLED" : "DISABLED");
-            blendLogged = true;
-        }
         glEnable(GL_TEXTURE_2D);
 
-        // Note: If obj.renderObj() contains both the floor and the grease spot,
-        // applying the offset here moves both, which doesn't fix fighting between them.
-        // However, we'll keep a slight offset to prevent fighting with the grid.
         glPolygonOffset(-1.0f, -1.0f);
         obj.renderObj();
         glPolygonOffset(0.0f, 0.0f);
@@ -474,6 +466,8 @@ void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 colo
     if (font->Error()) {
         return;
     }
+
+    glUseProgram(0);
 
     glPushMatrix();
     glTranslatef(pos.X, pos.Y, pos.Z);
