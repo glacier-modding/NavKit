@@ -36,10 +36,6 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>&
     for (const auto& t : textures) {
         if (t.uploadFormat == GL_RGBA) {
             isTransparent = true;
-            // We assume RGBA textures might need blending, 
-            // but the shader handles cutout with discard.
-            // If it's a known format or we could check the data, we'd be more sure.
-            // For now, let's treat RGBA as "could be transparent".
             break;
         }
     }
@@ -65,30 +61,11 @@ void Mesh::draw(const Shader& shader) const {
 
         shader.setInt(name + number, static_cast<int>(i));
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
-
-        static int logCounterBind = 0;
-        if (logCounterBind < 10) {
-            Logger::log(NK_DEBUG, "Mesh::draw bind: unit=%d, name=%s, id=%u, valid=%d", i, (name + number).c_str(),
-                        textures[i].id, glIsTexture(textures[i].id));
-            logCounterBind++;
-        }
     }
 
     shader.setBool("useTexture", !textures.empty());
     if (!textures.empty()) {
-        static int logCounterTex = 0;
-        if (logCounterTex < 10) {
-            Logger::log(NK_DEBUG, "Mesh::draw: using textures, count: %zu, useTexture: 1, useFlatColor: 0",
-                        textures.size());
-            logCounterTex++;
-        }
         shader.setBool("useFlatColor", false);
-    } else {
-        static int logCounterNoTex = 0;
-        if (logCounterNoTex < 10) {
-            Logger::log(NK_DEBUG, "Mesh::draw: no textures, useTexture: 0");
-            logCounterNoTex++;
-        }
     }
 
     shader.use();
@@ -100,11 +77,6 @@ void Mesh::draw(const Shader& shader) const {
 }
 
 void Mesh::setupMesh() {
-    if (VAO != 0) {
-        Logger::log(NK_INFO, "Mesh::setupMesh: VAO is not null");
-        return;
-    }
-
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);

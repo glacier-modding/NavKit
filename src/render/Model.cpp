@@ -59,11 +59,8 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
 
         texture.loaded = true;
         stbi_image_free(data);
-        Logger::log(NK_DEBUG, "Texture loaded successfully using stb_image: %s (%dx%d, %d channels)", 
-                    filename.c_str(), width, height, nrChannels);
     } else {
-        Logger::log(NK_ERROR, "Texture failed to load at path: %s. Reason: %s", 
-                    filename.c_str(), stbi_failure_reason());
+        Logger::log(NK_ERROR, "Texture failed to load at path: %s. Reason: %s", filename.c_str(), stbi_failure_reason());
     }
 
     return texture;
@@ -102,14 +99,8 @@ Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScen
                 vec.x = mesh->mTextureCoords[0][i].x;
                 vec.y = mesh->mTextureCoords[0][i].y;
                 vertex.texCoords = vec;
-                if (i == 0) {
-                    Logger::log(NK_DEBUG, "Mesh %s has UVs: %f, %f", mesh->mName.C_Str(), vec.x, vec.y);
-                }
             } else {
                 vertex.texCoords = glm::vec2(0.0f, 0.0f);
-                if (i == 0) {
-                    Logger::log(NK_DEBUG, "Mesh %s has NO UVs", mesh->mName.C_Str());
-                }
             }
 
             if (mesh->HasVertexColors(0)) {
@@ -200,8 +191,6 @@ void Model::loadModelData(std::string const& path) {
         directory = "";
     }
 
-    Logger::log(NK_DEBUG, "Loading model: %s, base directory: %s", path.c_str(), directory.c_str());
-
     meshes.clear();
     texturesLoaded.clear();
 
@@ -241,8 +230,6 @@ void Model::initGl() {
             glTexImage2D(GL_TEXTURE_2D, 0, texture.internalFormat, texture.width, texture.height, 0,
                          texture.uploadFormat, GL_UNSIGNED_BYTE, texture.data.data());
             glGenerateMipmap(GL_TEXTURE_2D);
-
-            Logger::log(NK_DEBUG, "Texture uploaded to GPU (ID:%u): %s", texture.id, texture.path.C_Str());
 
             texture.data.clear();
             texture.data.shrink_to_fit();

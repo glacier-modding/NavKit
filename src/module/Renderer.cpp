@@ -297,16 +297,8 @@ void Renderer::renderFrame() {
     if (const SceneMesh& obj = SceneMesh::getInstance(); obj.objLoaded && obj.showObj) {
         GLboolean blendEnabled;
         glGetBooleanv(GL_BLEND, &blendEnabled);
-        static bool blendLogged = false;
-        if (!blendLogged) {
-            Logger::log(NK_DEBUG, "Renderer::renderFrame: GL_BLEND is %s", blendEnabled ? "ENABLED" : "DISABLED");
-            blendLogged = true;
-        }
         glEnable(GL_TEXTURE_2D);
 
-        // Note: If obj.renderObj() contains both the floor and the grease spot,
-        // applying the offset here moves both, which doesn't fix fighting between them.
-        // However, we'll keep a slight offset to prevent fighting with the grid.
         glPolygonOffset(-1.0f, -1.0f);
         obj.renderObj();
         glPolygonOffset(0.0f, 0.0f);
@@ -475,6 +467,8 @@ void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 colo
         return;
     }
 
+    glUseProgram(0);
+
     glPushMatrix();
     glTranslatef(pos.X, pos.Y, pos.Z);
 
@@ -619,9 +613,6 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-    // 1. Disable depth writing so transparent boxes don't "cut holes" in the floor
-    // 2. Increase offset units to -2.0 to be more aggressive against Z-fighting
-    glDepthMask(GL_FALSE);
     glPolygonOffset(-2.0f, -2.0f);
 
     if (filled && !filledVertices.empty()) {
@@ -638,7 +629,6 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
         glDrawArrays(GL_LINES, 0, outlinedVertices.size() / 3);
     }
 
-    glDepthMask(GL_TRUE);
     glPolygonOffset(0.0f, 0.0f);
     glBindVertexArray(0);
     glUseProgram(0);
@@ -653,35 +643,36 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
         Logger::log(NK_ERROR, ("FB error, status: 0x" + std::to_string(static_cast<int>(status))).c_str());
 
         printf("FB error, status: 0x%x\n", status);
-        return HitTestResult(NONE, -1);
+        return {NONE, -1};
     }
     Navp::getInstance().renderNavMeshForHitTest();
     Navp::getInstance().renderPfSeedPointsForHitTest();
     Navp::getInstance().renderExclusionBoxesForHitTest();
     Airg::getInstance().renderAirgForHitTest();
-    const SceneMesh& obj = SceneMesh::getInstance();
-    if (obj.showObj && obj.objLoaded) {
-        obj.renderObj();
+    const SceneMesh& sceneMesh = SceneMesh::getInstance();
+    if (sceneMesh.showObj && sceneMesh.objLoaded) {
+        RecastAdapter::getInstance().renderRecastNavmesh(false);
     }
     GLubyte pixel[4];
     glReadBuffer(GL_COLOR_ATTACHMENT0);
     glReadPixels(mx, my, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pixel);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glUseProgram(0);
-    const int selectedIndex = static_cast<int>(pixel[1]) * 255 + static_cast<int>(pixel[2]);
 
-    if (selectedIndex == 65280) {
-        return HitTestResult(NONE, -1);
+    if (pixel[0] == 255) {
+        return {NONE, -1};
     }
+
+    const int selectedIndex = static_cast<int>(pixel[1]) * 256 + static_cast<int>(pixel[2]);
     HitTestType result = NONE;
-    if (static_cast<int>(pixel[0]) == NAVMESH_AREA) {
+    if (pixel[0] == NAVMESH_AREA) {
         result = NAVMESH_AREA;
-    } else if (static_cast<int>(pixel[0]) == AIRG_WAYPOINT) {
+    } else if (pixel[0] == AIRG_WAYPOINT) {
         result = AIRG_WAYPOINT;
-    } else if (static_cast<int>(pixel[0]) == PF_SEED_POINT) {
+    } else if (pixel[0] == PF_SEED_POINT) {
         result = PF_SEED_POINT;
-    } else if (static_cast<int>(pixel[0]) == PF_EXCLUSION_BOX) {
+    } else if (pixel[0] == PF_EXCLUSION_BOX) {
         result = PF_EXCLUSION_BOX;
     }
-    return HitTestResult(result, result != NONE ? selectedIndex : -1);
+    return {result, result != NONE ? selectedIndex : -1};
 }

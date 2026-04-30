@@ -284,7 +284,7 @@ bool Airg::canBuildAirg() const {
 }
 
 void Airg::handleBuildAirgClicked() {
-    if (const Navp& navp = Navp::getInstance(); navp.navMesh->m_areas.size() > 65535) {
+    if (const Navp& navp = Navp::getInstance(); Navp::getTotalAreaCount(navp.navMesh) > 65535) {
         Logger::log(
             NK_ERROR,
             "Loaded NAVP has too many areas. Ensure the scene has PF Seed Points and has a fully contained boundary.");
@@ -381,18 +381,20 @@ void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<Ai
     const float r = 0.1f;
     const float z = waypoint.vPos.z + 0.03f;
     const glm::vec3 center(waypoint.vPos.x, z, -waypoint.vPos.y);
+    constexpr glm::vec3 normal(0.0f, 1.0f, 0.0f);
+    constexpr float step = std::numbers::pi_v<float> / 4.0f;
 
     if (selected || forceFan) {
         for (int i = 0; i < 8; i++) {
-            const float a1 = static_cast<float>(i) / 8.0f * std::numbers::pi * 2;
-            const float a2 = static_cast<float>(i + 1) / 8.0f * std::numbers::pi * 2;
+            const float a1 = static_cast<float>(i) * step;
+            const float a2 = static_cast<float>(i + 1) * step;
 
             const glm::vec3 p1(waypoint.vPos.x + cosf(a1) * r, z, -(waypoint.vPos.y + sinf(a1) * r));
             const glm::vec3 p2(waypoint.vPos.x + cosf(a2) * r, z, -(waypoint.vPos.y + sinf(a2) * r));
 
-            triVerts.push_back({center, glm::vec3(0, 1, 0), color});
-            triVerts.push_back({p1, glm::vec3(0, 1, 0), color});
-            triVerts.push_back({p2, glm::vec3(0, 1, 0), color});
+            triVerts.push_back({center, normal, color});
+            triVerts.push_back({p2,     normal, color});
+            triVerts.push_back({p1,     normal, color});
         }
     } else {
         // Line Loop
@@ -641,8 +643,8 @@ void Airg::renderAirgForHitTest() const {
             for (size_t i = 0; i < numWaypoints; i++) {
                 const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
                 const float r = static_cast<float>(AIRG_WAYPOINT) / 255.0f;
-                const float g = static_cast<float>(i / 255) / 255.0f;
-                const float b = static_cast<float>(i % 255) / 255.0f;
+                const float g = static_cast<float>(i >> 8 & 0xFF) / 255.0f;
+                const float b = static_cast<float>(i & 0xFF) / 255.0f;
                 glm::vec4 color(r, g, b, 1.0f);
                 addWaypointGeometry(triVerts, lineVerts, waypoint, true, color, true);
             }
@@ -694,7 +696,7 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
     selectedWaypointIndex = index;
     if (index != -1 && index < reasoningGrid->m_WaypointList.size()) {
         const Waypoint waypoint = reasoningGrid->m_WaypointList[index];
-        std::string msg = "Airg Waypoint " + std::to_string(index);
+        std::string msg = "Selected Airg Waypoint " + std::to_string(index);
         for (int i = 0; i < waypoint.nNeighbors.size(); i++) {
             const int neighborIndex = waypoint.nNeighbors[i];
             if (neighborIndex != 65535) {

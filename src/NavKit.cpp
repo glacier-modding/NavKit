@@ -20,6 +20,7 @@
  * SOFTWARE.
 */
 #include <SDL.h>
+#include <SDL_syswm.h>
 #include <cpptrace/from_current.hpp>
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Gui.h"
@@ -34,7 +35,47 @@
 #include "../include/NavKit/util/ErrorHandler.h"
 #include "../include/NavKit/util/FileUtil.h"
 #include "../include/NavKit/util/UpdateChecker.h"
+#include <windows.h>
+
 #undef main
+
+void runFrameIteration() {
+    Renderer::getInstance().renderFrame();
+    InputHandler::getInstance().hitTest();
+    Gui::getInstance().drawGui();
+
+    SceneExtract::getInstance().finalizeExtractScene();
+    SceneMesh::getInstance().finalizeSceneMeshBuild();
+    Navp::getInstance().finalizeBuild();
+    SceneMesh::getInstance().finalizeLoad();
+    Airg::getInstance().finalizeSave();
+    SceneMesh::getInstance().finalizeExtractResources();
+    Renderer::getInstance().finalizeFrame();
+}
+
+bool mainLoopIteration() {
+    if (InputHandler::getInstance().handleInput() == InputHandler::QUIT) {
+        return false;
+    }
+    runFrameIteration();
+    return true;
+}
+
+static int SDLCALL eventFilter(void* userdata, SDL_Event* event) {
+    if (event->type == SDL_SYSWMEVENT) {
+        const SDL_SysWMmsg* wmMsg = event->syswm.msg;
+        if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
+            if (wmMsg->msg.win.msg == WM_ENTERMENULOOP) {
+                SetTimer(wmMsg->msg.win.hwnd, 1, 1, nullptr);
+            } else if (wmMsg->msg.win.msg == WM_EXITMENULOOP) {
+                KillTimer(wmMsg->msg.win.hwnd, 1);
+            } else if (wmMsg->msg.win.msg == WM_TIMER) {
+                runFrameIteration();
+            }
+        }
+    }
+    return 1;
+}
 
 int SDL_main(const int argc, char** argv) {
     CPPTRACE_TRY
@@ -49,34 +90,16 @@ int SDL_main(const int argc, char** argv) {
             }
             renderer.initShaders();
             SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
+            SDL_SetEventFilter(eventFilter, nullptr);
 
             UpdateChecker& updateChecker = UpdateChecker::getInstance();
             updateChecker.startUpdateCheck();
 
-            SceneExtract& sceneExtract = SceneExtract::getInstance();
-            Navp& navp = Navp::getInstance();
-            SceneMesh& obj = SceneMesh::getInstance();
-            Airg& airg = Airg::getInstance();
-            InputHandler& inputHandler = InputHandler::getInstance();
             Menu::updateMenuState();
-            Gui& gui = Gui::getInstance();
             bool isRunning = true;
             Logger::log(NK_INFO, "NavKit initialized.");
             while (isRunning) {
-                if (inputHandler.handleInput() == InputHandler::QUIT) {
-                    isRunning = false;
-                }
-                renderer.renderFrame();
-                inputHandler.hitTest();
-                gui.drawGui();
-
-                sceneExtract.finalizeExtractScene();
-                obj.finalizeSceneMeshBuild();
-                navp.finalizeBuild();
-                obj.finalizeLoad();
-                airg.finalizeSave();
-                obj.finalizeExtractResources();
-                renderer.finalizeFrame();
+                isRunning = mainLoopIteration();
             }
 
             NFD_Quit();

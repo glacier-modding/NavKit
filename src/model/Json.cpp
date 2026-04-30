@@ -41,7 +41,7 @@ void Json::Vec3::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Vec3::writeJson(std::ostream& f, const std::string& propertyName) const {
-    f << R"(")" << propertyName << R"(":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << "}";
+    f << R"(")" << propertyName << R"(":{"x":)" << x << R"(,"y":)" << y << R"(,"z":)" << z << "}";
 }
 
 void Json::Rotation::readJson(simdjson::ondemand::object json) {
@@ -52,7 +52,7 @@ void Json::Rotation::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Rotation::writeJson(std::ostream& f) const {
-    f << R"("rotation":{"x":)" << x << R"(,"y":)" << y << R"(,"z": )" << z << R"(,"w": )" << w << "}";
+    f << R"("rotation":{"x":)" << x << R"(,"y":)" << y << R"(,"z":)" << z << R"(,"w":)" << w << "}";
 }
 
 void Json::PfBoxType::readJson(simdjson::ondemand::object json) {
@@ -72,7 +72,7 @@ void Json::Vec3Wrapped::readJson(simdjson::ondemand::object json) {
 
 void Json::Vec3Wrapped::writeJson(std::ostream& f, std::string propertyName) const {
     f << R"(")" << propertyName << R"(":{"type":")" << type << R"(","data":{"x":)" << data.x << R"(,"y":)" << data.y <<
-        R"(,"z": )" << data.z <<
+        R"(,"z":)" << data.z <<
         "}}";
 }
 
@@ -124,7 +124,7 @@ void Json::Mesh::writeJson(std::ostream& f) const {
         R"(","roomName":")" << roomName <<
         R"(","roomFolderName":")" << roomFolderName <<
         R"(","entity":{"id":")" << entity.id <<
-        R"(","name":")" << entity.name;
+        R"(","name":")" << entity.name << R"(",)";
         entity.position.writeJson(f);
         f << ",";
         entity.rotation.writeJson(f);

@@ -71,11 +71,6 @@ void Rpkg::initExtractionData() {
         Logger::log(NK_INFO, "Done reading filtered hash list.");
     });
 
-    std::jthread hashListThread([]() {
-        Logger::log(NK_INFO, "Getting full hash list.");
-        getHashList();
-    });
-
     partitionManager = scan_packages(retailFolder.c_str(), gameVersion.c_str(), Logger::rustLogCallback);
     extractionDataInitComplete = true;
     Logger::log(NK_INFO, "Done scanning resource packages.");
@@ -104,45 +99,48 @@ void Rpkg::initExtractionData() {
         }
     });
 
+    // Disabling for now since it's not actually used yet
+    // std::jthread hashListThread([]() {
+    //     Logger::log(NK_INFO, "Getting full hash list.");
+    //     getHashList();
+    // });
+
     navpThread.join();
     airgThread.join();
     filteredHashListThread.join();
-    hashListThread.join();
+    // hashListThread.join();
 
-    Logger::log(NK_INFO, "Loading hash list into memory.");
-
-    RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
-    Logger::log(NK_INFO, "Total hash list entries: %d, adding entries...", hashListRustStringList->length);
-
-    const int numThreads = std::thread::hardware_concurrency();
-    const int entriesPerThread = (hashListRustStringList->length + numThreads - 1) / numThreads;
-    std::vector<std::jthread> workers;
-
-    for (int t = 0; t < numThreads; ++t) {
-        workers.emplace_back([t, entriesPerThread, hashListRustStringList]() {
-            const int start = t * entriesPerThread;
-            const int end = std::min(start + entriesPerThread, static_cast<int>(hashListRustStringList->length));
-            for (int i = start; i < end; i++) {
-                std::string hash = hashListRustStringList->entries[i];
-                const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
-                std::string path = pathCStr ? pathCStr : "";
-                const char* hintCStr = hash_list_get_hint_by_hash(hashList, hash.c_str());
-                std::string ioiString = hintCStr ? hintCStr : "";
-                auto typeInt = hash_list_get_resource_type_by_hash(hashList, hash.c_str());
-                char typeChars[4];
-                std::memcpy(typeChars, &typeInt, sizeof(typeInt));
-                std::string type(typeChars, sizeof(typeChars));
-
-                std::lock_guard lock(hashMapsMutex);
-                hashToHashListEntryMap.insert({hash, {hash, ioiString, type}});
-                ioiStringToHashListEntryMap.insert({ioiString, {hash, ioiString, type}});
-            }
-        });
-    }
-
-    workers.clear();
-
-    Logger::log(NK_INFO, "Done getting full hash list.");
+    // Logger::log(NK_INFO, "Loading hash list into memory.");
+    // RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
+    // Logger::log(NK_INFO, "Total hash list entries: %d, adding entries...", hashListRustStringList->length);
+    //
+    // const int numThreads = std::thread::hardware_concurrency();
+    // const int entriesPerThread = (hashListRustStringList->length + numThreads - 1) / numThreads;
+    // std::vector<std::jthread> workers;
+    //
+    // for (int t = 0; t < numThreads; ++t) {
+    //     workers.emplace_back([t, entriesPerThread, hashListRustStringList]() {
+    //         const int start = t * entriesPerThread;
+    //         const int end = std::min(start + entriesPerThread, static_cast<int>(hashListRustStringList->length));
+    //         for (int i = start; i < end; i++) {
+    //             std::string hash = hashListRustStringList->entries[i];
+    //             const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
+    //             std::string path = pathCStr ? pathCStr : "";
+    //             const char* hintCStr = hash_list_get_hint_by_hash(hashList, hash.c_str());
+    //             std::string ioiString = hintCStr ? hintCStr : "";
+    //             auto typeInt = hash_list_get_resource_type_by_hash(hashList, hash.c_str());
+    //             char typeChars[4];
+    //             std::memcpy(typeChars, &typeInt, sizeof(typeInt));
+    //             std::string type(typeChars, sizeof(typeChars));
+    //
+    //             std::lock_guard lock(hashMapsMutex);
+    //             hashToHashListEntryMap.insert({hash, {hash, ioiString, type}});
+    //             ioiStringToHashListEntryMap.insert({ioiString, {hash, ioiString, type}});
+    //         }
+    //     });
+    // }
+    // workers.clear();
+    // Logger::log(NK_INFO, "Done getting full hash list.");
     Menu::updateMenuState();
 }
 

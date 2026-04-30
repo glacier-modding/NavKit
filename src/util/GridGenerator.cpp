@@ -136,8 +136,18 @@ void GridGenerator::GenerateGrid() {
 void GridGenerator::GetGridProperties() {
     const Grid& grid = Grid::getInstance();
     const Navp& navp = Navp::getInstance();
-    Vec3 min = navp.navMesh->m_graphHdr->m_bbox.m_min;
-    const Vec3 max = navp.navMesh->m_graphHdr->m_bbox.m_max;
+    Vec3 min{10000.0f, 10000.0f, 10000.0f};
+    Vec3 max{-10000.0f, -10000.0f, -10000.0f};
+    for (const auto section : navp.navMesh->m_aSections) {
+        for (const auto navGraph : section.m_aNavGraphs) {
+            min.X = std::min(min.X, navGraph.m_hdr->m_bbox.m_min.X);
+            min.Y = std::min(min.Y, navGraph.m_hdr->m_bbox.m_min.Y);
+            min.Z = std::min(min.Z, navGraph.m_hdr->m_bbox.m_min.Z);
+            max.X = std::min(max.X, navGraph.m_hdr->m_bbox.m_max.X);
+            max.Y = std::min(max.Y, navGraph.m_hdr->m_bbox.m_max.Y);
+            max.Z = std::min(max.Z, navGraph.m_hdr->m_bbox.m_max.Z);
+        }
+    }
     min.X += grid.xOffset;
     min.Y += grid.yOffset;
     const int gridXSize = std::ceil((max.X - min.X) / grid.spacing);
@@ -166,7 +176,7 @@ void GridGenerator::GenerateWaypointNodes() {
     const float invSpacing = 1.0f / spacing;
 
     waypointCells.clear();
-    const int areaCount = navMesh->m_areas.size();
+    const int areaCount = Navp::getTotalAreaCount(navMesh);
     const unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
     std::vector<std::jthread> threads;
     std::mutex waypointCellsMutex;
@@ -186,7 +196,7 @@ void GridGenerator::GenerateWaypointNodes() {
                 Logger::log(NK_INFO, "[Thread %d] Progress: %d / %d areas processed...", thread_id,
                             current_total_processed, areaCount);
             }
-            auto& area = navMesh->m_areas[areaIndex];
+            NavPower::Area area = Navp::getAreaByIndex(navMesh, areaIndex);
             auto [m_min, m_max] = Pathfinding::calculateBBox(&area);
             const Vec3 normal = area.CalculateNormal();
             const Vec3& v1 = {area.m_edges[0]->m_pos.X, area.m_edges[0]->m_pos.Y, area.m_edges[0]->m_pos.Z};

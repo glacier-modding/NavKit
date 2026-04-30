@@ -84,27 +84,26 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
     std::vector<NavVertex> triVertices;
     std::vector<NavVertex> lineVertices;
 
-    for (int i = 0; i < navMesh->m_areas.size(); ++i) {
-        const auto& area = navMesh->m_areas[i];
+    for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
+        const auto& [area, edges] = getAreaByIndex(navMesh, i);
         bool selected = (i == selectedIndex);
 
         // Determine Area Color
         glm::vec4 areaColor;
-        bool isStairs = area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS;
-        if (isStairs) {
+        if (area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) {
             areaColor = selected ? glm::vec4(1.0, 1.0, 0.5, 1.0) : glm::vec4(0.5, 0.5, 0.0, 1.0);
         } else {
             areaColor = selected ? glm::vec4(0.0, 0.9, 0.0, 1.0) : glm::vec4(0.0, 0.5, 0.0, 1.0);
         }
 
         // Triangulate (Fan)
-        if (area.m_edges.size() >= 3) {
-            const auto& v0 = area.m_edges[0];
+        if (edges.size() >= 3) {
+            const auto& v0 = edges[0];
             glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
 
-            for (size_t j = 1; j < area.m_edges.size() - 1; ++j) {
-                const auto& v1 = area.m_edges[j];
-                const auto& v2 = area.m_edges[j + 1];
+            for (size_t j = 1; j < edges.size() - 1; ++j) {
+                const auto& v1 = edges[j];
+                const auto& v2 = edges[j + 1];
 
                 glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
                 glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
@@ -116,9 +115,9 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
         }
 
         // Lines
-        for (size_t j = 0; j < area.m_edges.size(); ++j) {
-            auto vStart = area.m_edges[j];
-            auto vEnd = area.m_edges[(j + 1) % area.m_edges.size()];
+        for (size_t j = 0; j < edges.size(); ++j) {
+            auto vStart = edges[j];
+            auto vEnd = edges[(j + 1) % edges.size()];
 
             glm::vec3 pStart(vStart->m_pos.X, vStart->m_pos.Z + 0.01f, -vStart->m_pos.Y);
             glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + 0.01f, -vEnd->m_pos.Y);
@@ -135,7 +134,7 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
         }
 
         // Portal Loops (Circles)
-        for (auto vertex : area.m_edges) {
+        for (auto vertex : edges) {
             if (vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
                 const float r = 0.05f;
                 glm::vec4 circleColor(1.0, 1.0, 1.0, 1.0);
@@ -199,27 +198,50 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
     glBindVertexArray(0);
 }
 
+int Navp::getTotalAreaCount(const NavPower::NavMesh* navMesh) {
+    int areaCount = 0;
+    for (const auto& section : navMesh->m_aSections) {
+        for (const auto& navGraph : section.m_aNavGraphs) {
+            areaCount += navGraph.m_areas.size();
+        }
+    }
+    return areaCount;
+}
+
+NavPower::Area& Navp::getAreaByIndex(const NavPower::NavMesh* navMesh, const int index) {
+    int curAreaIndex = 0;
+    for (auto& section : const_cast<NavPower::NavMesh*>(navMesh)->m_aSections) {
+        for (auto& navGraph : section.m_aNavGraphs) {
+            if (index < curAreaIndex + static_cast<int>(navGraph.m_areas.size())) {
+                return navGraph.m_areas[index - curAreaIndex];
+            }
+            curAreaIndex += navGraph.m_areas.size();
+        }
+    }
+    throw std::runtime_error("Area index out of bounds");
+}
+
 void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
     if (!navMesh) {
         return;
     }
     std::vector<NavVertex> vertices;
 
-    for (int i = 0; i < navMesh->m_areas.size(); ++i) {
-        const auto& area = navMesh->m_areas[i];
+    for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
+        const auto& [area, edges] = getAreaByIndex(navMesh, i);
 
         const float r = static_cast<float>(NAVMESH_AREA) / 255.0f;
-        const float g = static_cast<float>(i / 255) / 255.0f;
-        const float b = static_cast<float>(i % 255) / 255.0f;
+        const float g = static_cast<float>(i >> 8 & 0xFF) / 255.0f;
+        const float b = static_cast<float>(i & 0xFF) / 255.0f;
         const glm::vec4 color(r, g, b, 1.0f);
 
-        if (area.m_edges.size() >= 3) {
-            const auto& v0 = area.m_edges[0];
+        if (edges.size() >= 3) {
+            const auto& v0 = edges[0];
             const glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
 
-            for (size_t j = 1; j < area.m_edges.size() - 1; ++j) {
-                const auto& v1 = area.m_edges[j];
-                const auto& v2 = area.m_edges[j + 1];
+            for (size_t j = 1; j < edges.size() - 1; ++j) {
+                const auto& v1 = edges[j];
+                const auto& v2 = edges[j + 1];
                 const glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
                 const glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
 
@@ -294,13 +316,13 @@ void Navp::renderPfSeedPointsForHitTest() const {
                 {0, 0, 0, 1},
                 true,
                 {
-                    static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 true,
                 {
-                    static_cast<float>(PF_SEED_POINT) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 1.0);
             i++;
@@ -350,13 +372,13 @@ void Navp::renderExclusionBoxesForHitTest() const {
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
                 true,
                 {
-                    static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 true,
                 {
-                    static_cast<float>(PF_EXCLUSION_BOX) / 255.05f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.05f
+                    static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f
                 },
                 1.0);
             i++;
@@ -390,7 +412,8 @@ bool Navp::areaIsStairs(const NavPower::Area& area) {
 }
 
 void Navp::setStairsFlags() const {
-    for (auto& area : navMesh->m_areas) {
+    for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
+        auto& area = getAreaByIndex(navMesh, i);
         const Vec3 normal = area.CalculateNormal();
         const Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
         const float horizontalMagnitude = std::sqrt(
@@ -414,8 +437,8 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
         Logger::log(NK_INFO, ("Deselected area: " + std::to_string(selectedNavpAreaIndex + 1)).c_str());
     }
     selectedNavpAreaIndex = index;
-    if (index != -1 && index < navMesh->m_areas.size()) {
-        auto& selectedArea = navMesh->m_areas[index];
+    if (index != -1 && index < getTotalAreaCount(navMesh)) {
+        auto& selectedArea = getAreaByIndex(navMesh, index);
         Logger::log(NK_INFO, ("Selected area: " + std::to_string(index + 1)).c_str());
         const Vec3 pos = selectedArea.m_area->m_pos;
         char v[16];
@@ -556,20 +579,23 @@ void Navp::renderNavMesh() {
         const Vec3 colorPink = {1.0f, .7f, 1.0f};
         if (showNavpIndices) {
             int areaIndex = 0;
-            for (const NavPower::Area& area : navMesh->m_areas) {
+            for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
+                const auto& area = getAreaByIndex(navMesh, i);
+                const auto& edges = area.m_edges;
+                const Vec3 pos = area.m_area->m_pos;
                 renderer.drawText(std::to_string(areaIndex + 1), {
-                                      area.m_area->m_pos.X, area.m_area->m_pos.Z + 0.1f, -area.m_area->m_pos.Y
+                                      pos.X, pos.Z + 0.1f, -pos.Y
                                   }, colorBlue, 20);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
-                    for (const auto vertex : area.m_edges) {
+                    for (const auto vertex : edges) {
                         renderer.drawText(std::to_string(edgeIndex + 1),
                                           {vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y},
                                           vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
                                               ? colorRed
                                               : colorGreen, 20);
                         if (vertex->m_pAdjArea != nullptr) {
-                            const auto nextVertex = area.m_edges[(edgeIndex + 1) % area.m_edges.size()];
+                            const auto nextVertex = edges[(edgeIndex + 1) % edges.size()];
                             Vec3 midpoint = (vertex->m_pos + nextVertex->m_pos) / 2.0f;
                             const int neighborAreaIndex = binaryAreaToAreaIndexMap[vertex->m_pAdjArea];
                             renderer.drawText(std::to_string(neighborAreaIndex),
@@ -651,15 +677,15 @@ void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const
             OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
                 NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
             std::swap(*navMesh, reloadedNavMesh);
-            
+
         }
             if (isFromJson) {
             OutputNavMesh_NAVP_Write(navMesh, outputNavpFilename.c_str());
             loadNavMeshFileData(outputNavpFilename);
-            
+
         }else {
             loadNavMeshFileData(fileName);
-            
+
         }
     }
     CPPTRACE_CATCH(const std::exception & e)
@@ -728,13 +754,13 @@ void Navp::buildNavp() {
             Logger::log(NK_INFO, msg.data());
             setSelectedNavpAreaIndex(-1);
             Menu::updateMenuState();
-            
+
         }else {
             Logger::log(NK_ERROR, "Error building Navp");
             building = false;
             navpBuildDone.store(false);
             Menu::updateMenuState();
-            
+
         }
     }
     CPPTRACE_CATCH(const std::exception & e)
@@ -844,8 +870,8 @@ void Navp::handleSaveNavpClicked() {
 bool Navp::stairsAreaSelected() const {
     return selectedNavpAreaIndex == -1
                ? false
-               : selectedNavpAreaIndex < navMesh->m_areas.size()
-               ? areaIsStairs(navMesh->m_areas[selectedNavpAreaIndex])
+               : selectedNavpAreaIndex < getTotalAreaCount(navMesh)
+               ? areaIsStairs(getAreaByIndex(navMesh, selectedNavpAreaIndex))
                : false;
 }
 
@@ -863,16 +889,16 @@ bool Navp::canSave() const {
 
 void Navp::handleEditStairsClicked() const {
     if (selectedNavpAreaIndex != -1) {
-        const NavPower::AreaUsageFlags newType = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+        const NavPower::AreaUsageFlags newType = (getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags ==
                                                NavPower::AreaUsageFlags::AREA_STEPS)
                                                ? NavPower::AreaUsageFlags::AREA_FLAT
                                                : NavPower::AreaUsageFlags::AREA_STEPS;
-        const std::string newTypeString = (navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags ==
+        const std::string newTypeString = (getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags ==
                                         NavPower::AreaUsageFlags::AREA_STEPS)
                                         ? "AREA_FLAT"
                                         : "AREA_STEPS";
         Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
-        navMesh->m_areas[selectedNavpAreaIndex].m_area->m_usageFlags = newType;
+        getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags = newType;
         navMeshDirty = true;
         Menu::updateMenuState();
     }
@@ -886,7 +912,8 @@ void Navp::buildAreaMaps() {
     binaryAreaToAreaMap.clear();
     posToAreaMap.clear();
     int areaIndex = 1;
-    for (NavPower::Area& area : navMesh->m_areas) {
+    for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
+        auto& area = getAreaByIndex(navMesh, i);
         binaryAreaToAreaIndexMap.emplace(area.m_area, areaIndex);
         binaryAreaToAreaMap.emplace(area.m_area, &area);
         posToAreaMap.emplace(area.m_area->m_pos, &area);
