@@ -493,140 +493,68 @@ void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 colo
 void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled,
                        const Vec3 fillColor, const bool outlined,
                        const Vec3 outlineColor, const float alpha) const {
-    static GLuint vao = 0, vbo = 0;
-    if (vao == 0) {
-        glGenVertexArrays(1, &vao);
-        glGenBuffers(1, &vbo);
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    static GLuint filledVao = 0, filledVbo = 0;
+    static GLuint outlineVao = 0, outlineVbo = 0;
+
+    if (filledVao == 0) {
+        constexpr float unitCube[] = {
+            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f, -0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f,
+            -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+            -0.5f,-0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f,-0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
+             0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f, 0.5f,  0.5f,-0.5f, 0.5f,
+            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
+            -0.5f, 0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f
+        };
+        glGenVertexArrays(1, &filledVao);
+        glGenBuffers(1, &filledVbo);
+        glBindVertexArray(filledVao);
+        glBindBuffer(GL_ARRAY_BUFFER, filledVbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(unitCube), unitCube, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(nullptr));
+
+        constexpr float unitOutline[] = {
+            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f,
+             0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f,-0.5f,-0.5f,
+            -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f,
+             0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
+            -0.5f,-0.5f,-0.5f, -0.5f,-0.5f, 0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f,
+             0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f,-0.5f, -0.5f, 0.5f, 0.5f
+        };
+        glGenVertexArrays(1, &outlineVao);
+        glGenBuffers(1, &outlineVbo);
+        glBindVertexArray(outlineVao);
+        glBindBuffer(GL_ARRAY_BUFFER, outlineVbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(unitOutline), unitOutline, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(nullptr));
         glBindVertexArray(0);
     }
 
-    std::vector<float> filledVertices;
-    std::vector<float> outlinedVertices;
-
-    auto addQuad = [&](Vec3 v1, Vec3 v2, Vec3 v3, Vec3 v4) {
-        if (filled) {
-            filledVertices.push_back(pos.X + v1.X);
-            filledVertices.push_back(pos.Y + v1.Y);
-            filledVertices.push_back(pos.Z + v1.Z);
-            filledVertices.push_back(pos.X + v2.X);
-            filledVertices.push_back(pos.Y + v2.Y);
-            filledVertices.push_back(pos.Z + v2.Z);
-            filledVertices.push_back(pos.X + v3.X);
-            filledVertices.push_back(pos.Y + v3.Y);
-            filledVertices.push_back(pos.Z + v3.Z);
-
-            filledVertices.push_back(pos.X + v1.X);
-            filledVertices.push_back(pos.Y + v1.Y);
-            filledVertices.push_back(pos.Z + v1.Z);
-            filledVertices.push_back(pos.X + v3.X);
-            filledVertices.push_back(pos.Y + v3.Y);
-            filledVertices.push_back(pos.Z + v3.Z);
-            filledVertices.push_back(pos.X + v4.X);
-            filledVertices.push_back(pos.Y + v4.Y);
-            filledVertices.push_back(pos.Z + v4.Z);
-        }
-        if (outlined) {
-            outlinedVertices.push_back(pos.X + v1.X);
-            outlinedVertices.push_back(pos.Y + v1.Y);
-            outlinedVertices.push_back(pos.Z + v1.Z);
-            outlinedVertices.push_back(pos.X + v2.X);
-            outlinedVertices.push_back(pos.Y + v2.Y);
-            outlinedVertices.push_back(pos.Z + v2.Z);
-
-            outlinedVertices.push_back(pos.X + v2.X);
-            outlinedVertices.push_back(pos.Y + v2.Y);
-            outlinedVertices.push_back(pos.Z + v2.Z);
-            outlinedVertices.push_back(pos.X + v3.X);
-            outlinedVertices.push_back(pos.Y + v3.Y);
-            outlinedVertices.push_back(pos.Z + v3.Z);
-
-            outlinedVertices.push_back(pos.X + v3.X);
-            outlinedVertices.push_back(pos.Y + v3.Y);
-            outlinedVertices.push_back(pos.Z + v3.Z);
-            outlinedVertices.push_back(pos.X + v4.X);
-            outlinedVertices.push_back(pos.Y + v4.Y);
-            outlinedVertices.push_back(pos.Z + v4.Z);
-
-            outlinedVertices.push_back(pos.X + v4.X);
-            outlinedVertices.push_back(pos.Y + v4.Y);
-            outlinedVertices.push_back(pos.Z + v4.Z);
-            outlinedVertices.push_back(pos.X + v1.X);
-            outlinedVertices.push_back(pos.Y + v1.Y);
-            outlinedVertices.push_back(pos.Z + v1.Z);
-        }
-    };
-
-    // Bottom
-    addQuad(
-        rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation)
-    );
-    // Top
-    addQuad(
-        rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation)
-    );
-    // Left
-    addQuad(
-        rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation)
-    );
-    // Right
-    addQuad(
-        rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation)
-    );
-    // Front
-    addQuad(
-        rotatePoint({-size.X / 2, -size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, -size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, -size.Y / 2, -size.Z / 2}, rotation)
-    );
-    // Back
-    addQuad(
-        rotatePoint({-size.X / 2, +size.Y / 2, -size.Z / 2}, rotation),
-        rotatePoint({-size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, +size.Y / 2, +size.Z / 2}, rotation),
-        rotatePoint({+size.X / 2, +size.Y / 2, -size.Z / 2}, rotation)
-    );
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(pos.X, pos.Y, pos.Z));
+    const glm::quat q(rotation.w, rotation.x, rotation.y, rotation.z);
+    model = model * glm::mat4_cast(q);
+    model = glm::scale(model, glm::vec3(size.X, size.Y, size.Z));
 
     shader.use();
     shader.setBool("useFlatColor", true);
     shader.setBool("useVertexColor", false);
     shader.setMat4("projection", projection);
     shader.setMat4("view", view);
-    shader.setMat4("model", glm::mat4(1.0f));
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    shader.setMat4("model", model);
 
     glPolygonOffset(-2.0f, -2.0f);
 
-    if (filled && !filledVertices.empty()) {
-        glBufferData(GL_ARRAY_BUFFER, filledVertices.size() * sizeof(float), filledVertices.data(), GL_DYNAMIC_DRAW);
-        // Use the alpha parameter provided to the function
+    if (filled) {
+        glBindVertexArray(filledVao);
         shader.setVec4("flatColor", glm::vec4(fillColor.X, fillColor.Y, fillColor.Z, alpha));
-        glDrawArrays(GL_TRIANGLES, 0, filledVertices.size() / 3);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
     }
 
-    if (outlined && !outlinedVertices.empty()) {
-        glBufferData(GL_ARRAY_BUFFER, outlinedVertices.size() * sizeof(float), outlinedVertices.data(),
-                     GL_DYNAMIC_DRAW);
+    if (outlined) {
+        glBindVertexArray(outlineVao);
         shader.setVec4("flatColor", glm::vec4(outlineColor.X, outlineColor.Y, outlineColor.Z, alpha));
-        glDrawArrays(GL_LINES, 0, outlinedVertices.size() / 3);
+        glDrawArrays(GL_LINES, 0, 24);
     }
 
     glPolygonOffset(0.0f, 0.0f);

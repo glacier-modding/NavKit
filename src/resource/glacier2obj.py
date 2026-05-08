@@ -2563,7 +2563,7 @@ def load_volume_boxes(json_data, volume_types):
 
 
 def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box,
-                  apply_textures):
+                  apply_textures, output_to_blend):
     start = timer()
     log("INFO", "Loading scenario.", "load_scenario")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
@@ -2575,7 +2575,8 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
     room_color_index = 0
     room_folder_color_index = 0
 
-    load_volume_boxes(data, ["gates", "rooms", "aiArea"])
+    if output_to_blend:
+        load_volume_boxes(data, ["gates", "rooms", "aiArea"])
 
     # Get the "pathfinding include" box
     pf_include_box_info = None
@@ -2959,9 +2960,9 @@ def main():
     # Ensure the render engine is set to EEVEE so transparency properties are active
     # In 4.2+, EEVEE Next is 'BLENDER_EEVEE_NEXT'
     bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
-
+    output_to_blend = output_path[-4:] == 'both' or output_path[-5:] == 'blend'
     scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
-                             apply_textures)
+                             apply_textures, output_to_blend)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path, "main")
         return 1

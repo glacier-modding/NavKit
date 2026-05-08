@@ -142,6 +142,7 @@ void Rpkg::initExtractionData() {
     // workers.clear();
     // Logger::log(NK_INFO, "Done getting full hash list.");
     Menu::updateMenuState();
+    Logger::log(NK_INFO, "Done initializing.");
 }
 
 void Rpkg::checkHitmanVersion() {

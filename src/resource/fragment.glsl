@@ -28,7 +28,7 @@ void main()
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(vec3(0.5, 0.866, 0.5));
     float diff = max(dot(norm, lightDir), 0.0);
-    float ambientStrength = 0.3; 
+    float ambientStrength = 0.1;
     vec3 lightIntensity = vec3(ambientStrength + diff);
 
     vec4 texColor;
