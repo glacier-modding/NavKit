@@ -23,6 +23,7 @@ class Sample;
 class BuildContext;
 class InputGeom;
 class DebugDrawGL;
+class SceneMeshHitTestResult;
 
 class RecastAdapter {
     RecastAdapter();
@@ -101,7 +102,9 @@ public:
 
     dtPolyRef getAdjacentPoly(dtPolyRef poly, int edgeIndex) const;
 
-    void doHitTest(int mx, int my);
+    void setMarker(const SceneMeshHitTestResult& result);
+
+    SceneMeshHitTestResult doHitTest(int mx, int my);
 
     void loadSettings() const;
 

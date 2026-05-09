@@ -202,7 +202,7 @@ void InputHandler::hitTest() const {
     const Gui& gui = Gui::getInstance();
     Navp& navp = Navp::getInstance();
     Airg& airg = Airg::getInstance();
-    SceneMesh& obj = SceneMesh::getInstance();
+    SceneMesh& sceneMesh = SceneMesh::getInstance();
     RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     const Renderer& renderer = Renderer::getInstance();
     if (!gui.mouseOverMenu) {
@@ -210,15 +210,13 @@ void InputHandler::hitTest() const {
             (navp.doNavpExclusionBoxHitTest && navp.showPfExclusionBoxes) ||
             (navp.doNavpPfSeedPointHitTest && navp.showPfSeedPoints) ||
             (airg.doAirgHitTest && airg.airgLoaded && airg.showAirg) ||
-            (obj.doObjHitTest && obj.objLoaded && obj.showObj)) {
-            const HitTestResult hitTestResult = renderer.hitTestRender(mousePos[0], mousePos[1]);
-            if (hitTestResult.type == NAVMESH_AREA) {
-                if (hitTestResult.selectedIndex == navp.selectedNavpAreaIndex) {
-                    navp.setSelectedNavpAreaIndex(-1);
-                } else {
-                    navp.setSelectedNavpAreaIndex(hitTestResult.selectedIndex);
-                }
-            } else if (hitTestResult.type == AIRG_WAYPOINT) {
+            (sceneMesh.doObjHitTest && sceneMesh.objLoaded && sceneMesh.showObj)) {
+            SceneMeshHitTestResult sceneMeshHitResult;
+            if (sceneMesh.showObj && sceneMesh.objLoaded && sceneMesh.doObjHitTest) {
+                sceneMeshHitResult = recastAdapter.doHitTest(mousePos[0], mousePos[1]);
+            }
+
+            if (const HitTestResult hitTestResult = renderer.hitTestRender(mousePos[0], mousePos[1]); hitTestResult.type == AIRG_WAYPOINT) {
                 if (hitTestResult.selectedIndex == airg.selectedWaypointIndex) {
                     airg.setSelectedAirgWaypointIndex(-1);
                 } else {
@@ -240,18 +238,29 @@ void InputHandler::hitTest() const {
                 } else {
                     navp.setSelectedExclusionBoxIndex(hitTestResult.selectedIndex);
                 }
+            } else if (hitTestResult.type == NAVMESH_AREA) {
+                if (hitTestResult.selectedIndex == navp.selectedNavpAreaIndex) {
+                    navp.setSelectedNavpAreaIndex(-1);
+                } else {
+                    navp.setSelectedNavpAreaIndex(hitTestResult.selectedIndex);
+                }
             } else {
-                navp.setSelectedNavpAreaIndex(-1);
-                airg.setSelectedAirgWaypointIndex(-1);
-                if (obj.showObj && obj.objLoaded) {
-                    recastAdapter.doHitTest(mousePos[0], mousePos[1]);
+                if (hitTestResult.type == NONE && sceneMeshHitResult.hitIndex == -1) {
+                    navp.setSelectedNavpAreaIndex(-1);
+                    airg.setSelectedAirgWaypointIndex(-1);
+                    navp.setSelectedExclusionBoxIndex(-1);
+                    navp.setSelectedPfSeedPointIndex(-1);
+                }
+                if (sceneMeshHitResult.hitIndex != -1) {
+                    recastAdapter.setMarker(sceneMeshHitResult);
                 }
             }
+
             navp.doNavpHitTest = false;
             navp.doNavpExclusionBoxHitTest = false;
             navp.doNavpPfSeedPointHitTest = false;
             airg.doAirgHitTest = false;
-            obj.doObjHitTest = false;
+            sceneMesh.doObjHitTest = false;
         }
     }
     Menu::updateMenuState();

@@ -27,6 +27,19 @@ public:
     int selectedIndex;
 };
 
+class SceneMeshHitTestResult {
+public:
+    SceneMeshHitTestResult() : hitTime(0.0f), hitIndex(-1) {
+        rayStart[0] = rayStart[1] = rayStart[2] = 0.0f;
+        rayEnd[0] = rayEnd[1] = rayEnd[2] = 0.0f;
+    }
+
+    float rayStart[3];
+    float rayEnd[3];
+    float hitTime;
+    int hitIndex;
+};
+
 class Renderer {
 public:
     Renderer();

@@ -953,7 +953,35 @@ dtPolyRef RecastAdapter::getAdjacentPoly(const dtPolyRef polyRef, const int edge
     return 0;
 }
 
-void RecastAdapter::doHitTest(const int mx, const int my) {
+void RecastAdapter::setMarker(const SceneMeshHitTestResult& result) {
+    markerPositionSet = true;
+    markerPosition[0] = result.rayStart[0] + (result.rayEnd[0] - result.rayStart[0]) * result.hitTime;
+    markerPosition[1] = result.rayStart[1] + (result.rayEnd[1] - result.rayStart[1]) * result.hitTime;
+    markerPosition[2] = result.rayStart[2] + (result.rayEnd[2] - result.rayStart[2]) * result.hitTime;
+    for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
+        if (result.hitIndex >= vertexRange.first && result.hitIndex < vertexRange.second) {
+            selectedObject = object;
+            break;
+        }
+    }
+    std::string meshNameString;
+    std::string roomString;
+    if (Scene::getInstance().sceneLoaded) {
+        if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
+            selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
+            meshNameString = mesh->entity.name;
+            roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
+            }
+    }
+    Logger::log(
+        NK_INFO,
+        ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
+            std::to_string(result.hitIndex) + roomString +
+            ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
+            std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
+}
+
+SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
     float rayStart[3];
     float rayEnd[3];
     float hitTime;
@@ -967,40 +995,23 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
     rayEnd[0] = (float)x;
     rayEnd[1] = (float)y;
     rayEnd[2] = (float)z;
-    const int hit = inputGeom->raycastMesh(rayStart, rayEnd, hitTime);
-    if (hit != -1) {
-        // Marker
-        markerPositionSet = true;
-        markerPosition[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
-        markerPosition[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
-        markerPosition[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
-        for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
-            if (hit >= vertexRange.first && hit < vertexRange.second) {
-                selectedObject = object;
-                break;
-            }
-        }
-        std::string meshNameString;
-        std::string roomString;
-        if (Scene::getInstance().sceneLoaded) {
-            if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
-                selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
-                meshNameString = mesh->entity.name;
-                roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
-            }
-        }
-        Logger::log(
-            NK_INFO,
-            ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
-                std::to_string(hit) + roomString +
-                ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
-                std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
-    } else {
-        if (SDL_GetModState()) {
-            // Marker
-            markerPositionSet = false;
-        }
+    SceneMeshHitTestResult result;
+    if (const int hitIndex = inputGeom->raycastMesh(rayStart, rayEnd, hitTime); hitIndex != -1) {
+        result.hitIndex = hitIndex;
+        result.rayStart[0] = rayStart[0];
+        result.rayStart[1] = rayStart[1];
+        result.rayStart[2] = rayStart[2];
+        result.rayEnd[0] = rayEnd[0];
+        result.rayEnd[1] = rayEnd[1];
+        result.rayEnd[2] = rayEnd[2];
+        result.hitTime = hitTime;
+        return result;
     }
+    result.hitIndex = -1;
+    if (SDL_GetModState()) {
+        markerPositionSet = false;
+    }
+    return result;
 }
 
 void RecastAdapter::loadSettings() const {
