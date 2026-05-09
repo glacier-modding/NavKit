@@ -32,11 +32,13 @@ namespace Pathfinding {
 
     NavPower::BBox calculateBBox(const NavPower::Area* area);
 
-    Vec3* GetClosestPosInArea2d_G2_EdgeIndex(Vec3* navPowerResult,
+    Vec3* GetClosestPosInArea2d_G2_EdgeIndex(dtNavMeshQuery* navQuery,
+                                             Vec3* navPowerResult,
                                              dtPolyRef poly, const Vec3* navPowerPos,
                                              int* edgeIndex);
 
     Vec3* GetClosestPosInArea2d_G2_ClosestPos(
+        dtNavMeshQuery* navQuery,
         Vec3* resultNavPower,
         dtPolyRef polyRef,
         const Vec3* posWCoordNavPower,

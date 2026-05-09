@@ -442,6 +442,7 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
     if (!mesh) {
         return;
     }
+    dtNavMeshQuery* navQuery = sample->getNavMeshQuery();
     for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); tileIndex++) {
         const dtMeshTile* tile = mesh->getTile(tileIndex);
         if (!tile || !tile->header) {
@@ -474,14 +475,14 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
 
         for (int polyIndex = 0; polyIndex < tile->header->polyCount; polyIndex++) {
             const dtPolyRef polyRef = getPoly(tileIndex, polyIndex);
-            auto edges = getEdges(polyRef);
+            auto edges = getEdges(navQuery, polyRef);
             glBegin(GL_LINE_LOOP);
             glVertex3f(edges[0].X, edges[0].Y, edges[0].Z);
             glVertex3f(edges[1].X, edges[1].Y, edges[1].Z);
             glVertex3f(edges[2].X, edges[2].Y, edges[2].Z);
             glEnd();
-            auto centroid = calculateCentroid(polyRef);
-            renderer.drawText(("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex)).c_str(),
+            auto centroid = calculateCentroid(navQuery, polyRef);
+            renderer.drawText("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex),
                               {centroid.X, centroid.Y, centroid.Z}, color);
         }
     }
@@ -1085,8 +1086,16 @@ Vec3 RecastAdapter::convertFromRecastToNavPower(Vec3 pos) {
     return {pos.X, -pos.Z, pos.Y};
 }
 
-std::vector<Vec3> RecastAdapter::getEdges(const dtPolyRef polyRef) const {
-    const dtNavMesh* mesh = sample->getNavMesh();
+std::vector<Vec3> RecastAdapter::getEdges(const dtNavMeshQuery* navQuery, const dtPolyRef polyRef) {
+    if (!navQuery) {
+        return {};
+    }
+
+    const dtNavMesh* mesh = navQuery->getAttachedNavMesh();
+    if (!mesh) {
+        return {};
+    }
+
     unsigned int salt = 0;
     unsigned int tileIndex = 0;
     unsigned int polyIndex = 0;
@@ -1106,8 +1115,11 @@ std::vector<Vec3> RecastAdapter::getEdges(const dtPolyRef polyRef) const {
     return edges;
 }
 
-Vec3 RecastAdapter::calculateNormal(const dtPolyRef polyRef) const {
-    const std::vector<Vec3> edges = getEdges(polyRef);
+Vec3 RecastAdapter::calculateNormal(dtNavMeshQuery* navQuery, const dtPolyRef polyRef) const {
+    const std::vector<Vec3> edges = getEdges(navQuery, polyRef);
+    if (edges.size() < 3) {
+        return {0.0f, 1.0f, 0.0f};
+    }
     const Vec3 v0 = edges.at(0);
     const Vec3 v1 = edges.at(1);
     const Vec3 v2 = edges.at(2);
@@ -1118,9 +1130,13 @@ Vec3 RecastAdapter::calculateNormal(const dtPolyRef polyRef) const {
     return cross.GetUnitVec();
 }
 
-Vec3 RecastAdapter::calculateCentroid(const dtPolyRef polyRef) const {
-    const std::vector<Vec3> edges = getEdges(polyRef);
-    const Vec3 normal = calculateNormal(polyRef);
+Vec3 RecastAdapter::calculateCentroid(dtNavMeshQuery* navQuery, const dtPolyRef polyRef) const {
+    const std::vector<Vec3> edges = getEdges(navQuery, polyRef);
+    if (edges.empty()) {
+        return {0.0f, 0.0f, 0.0f};
+    }
+
+    const Vec3 normal = calculateNormal(navQuery, polyRef);
     const Vec3 v0 = edges.at(0);
     const Vec3 v1 = edges.at(1);
 

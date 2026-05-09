@@ -138,14 +138,14 @@ void GridGenerator::GetGridProperties() {
     const Navp& navp = Navp::getInstance();
     Vec3 min{10000.0f, 10000.0f, 10000.0f};
     Vec3 max{-10000.0f, -10000.0f, -10000.0f};
-    for (const auto section : navp.navMesh->m_aSections) {
-        for (const auto navGraph : section.m_aNavGraphs) {
+    for (const auto& section : navp.navMesh->m_aSections) {
+        for (const auto& navGraph : section.m_aNavGraphs) {
             min.X = std::min(min.X, navGraph.m_hdr->m_bbox.m_min.X);
             min.Y = std::min(min.Y, navGraph.m_hdr->m_bbox.m_min.Y);
             min.Z = std::min(min.Z, navGraph.m_hdr->m_bbox.m_min.Z);
-            max.X = std::min(max.X, navGraph.m_hdr->m_bbox.m_max.X);
-            max.Y = std::min(max.Y, navGraph.m_hdr->m_bbox.m_max.Y);
-            max.Z = std::min(max.Z, navGraph.m_hdr->m_bbox.m_max.Z);
+            max.X = std::max(max.X, navGraph.m_hdr->m_bbox.m_max.X);
+            max.Y = std::max(max.Y, navGraph.m_hdr->m_bbox.m_max.Y);
+            max.Z = std::max(max.Z, navGraph.m_hdr->m_bbox.m_max.Z);
         }
     }
     min.X += grid.xOffset;
@@ -241,13 +241,13 @@ void GridGenerator::GenerateWaypointNodes() {
                             cells.push_back(newCell);
                         } else {
                             bool shouldAddNewCell = true;
-                            for (auto cell : cells) {
+                            for (auto& cell : cells) {
                                 // 2.25 * tan(18) degrees = 0.73
                                 if (abs(cellZIndex - cell.fZ) < 0.73) {
                                     if (cellInArea) {
                                         // Add the point to an existing cell
-                                        if (cells.back().m_Points.empty()) {
-                                            cells.back().m_Points.push_back({
+                                        if (cell.m_Points.empty()) {
+                                            cell.m_Points.push_back({
                                                 vMappedPos.x, vMappedPos.y, vMappedPos.z, 0.0
                                             });
                                         }
@@ -282,18 +282,10 @@ void GridGenerator::GenerateWaypointNodes() {
         }
     }
 
-    const int minX = floor((grid->m_Properties.vMin.x) / spacing);
-    const int minY = floor((grid->m_Properties.vMin.y) / spacing);
-    const int maxX = floor((grid->m_Properties.vMax.x) / spacing);
-    const int maxY = floor((grid->m_Properties.vMax.y) / spacing);
-    for (int y = minY; y <= maxY; ++y) {
-        for (int x = minX; x <= maxX; ++x) {
-            int offset = x + y * grid->m_Properties.nGridWidth;
-            auto& cells = waypointCells[offset];
-            std::ranges::sort(cells, [](const Pathfinding::SGCell& a, const Pathfinding::SGCell& b) {
-                return a.fZ < b.fZ;
-            });
-        }
+    for (auto& cells : waypointCells | std::views::values) {
+        std::ranges::sort(cells, [](const Pathfinding::SGCell& a, const Pathfinding::SGCell& b) {
+            return a.fZ < b.fZ;
+        });
     }
     Logger::log(NK_INFO, "Finished generating waypoint nodes.");
 }
@@ -307,8 +299,11 @@ void GridGenerator::GenerateWaypointConnectivityMap() {
     m_WaypointMap.clear();
 
     int waypointIndex = 0;
+    const int nGridWidth = static_cast<int>(airg.reasoningGrid->m_Properties.nGridWidth);
+
+    Logger::log(NK_INFO, "Checking for possible waypoint locations within grid bounds: %d, %d", nGridWidth, nGridWidth);
     for (const auto& cells : waypointCells | std::views::values) {
-        for (auto cell : cells) {
+        for (const auto& cell : cells) {
             for (const auto point : cell.m_Points) {
                 Waypoint waypoint;
                 waypoint.vPos = {point.x, point.y, point.z + 0.001f, 1.0};
@@ -321,7 +316,6 @@ void GridGenerator::GenerateWaypointConnectivityMap() {
                 const float4 vPos = {point.x, point.y, point.z, 0.0};
                 const Vec4 vMinVec4 = airg.reasoningGrid->m_Properties.vMin;
                 const float4 vMin = {vMinVec4.x, vMinVec4.y, vMinVec4.z, 0.0};
-                const int nGridWidth = airg.reasoningGrid->m_Properties.nGridWidth;
 
                 const int x = floor((vPos.x - vMin.x) / fGridSpacing);
                 const int y = floor((vPos.y - vMin.y) / fGridSpacing);
@@ -336,11 +330,15 @@ void GridGenerator::GenerateWaypointConnectivityMap() {
 
                 // Add waypoint to the waypoint list and corresponding entry in the map
                 if (nOffset != -1) {
-                    if (waypointIndex % 100 == 0) {
-                        Logger::log(NK_INFO,
-                                    ("Adding new waypoint. position: X: " + std::to_string(waypoint.vPos.x) + " Y: " +
-                                        std::to_string(waypoint.vPos.y) + " Z: " + std::to_string(waypoint.vPos.z)).
-                                    c_str());
+                    if (waypointIndex >= 65535) {
+                        Logger::log(
+                            NK_ERROR, "Critical: Waypoint limit (65535) reached. Aborting to prevent overflow.");
+                        airg.reasoningGrid->m_nNodeCount = airg.reasoningGrid->m_WaypointList.size();
+                        return;
+                    }
+                    if (waypointIndex == 0 || waypointIndex % 500 == 0) {
+                        Logger::log(NK_INFO, "Adding new waypoint #%d. position: X: %0.2f Y: %0.2f Z: %0.2f",
+                                    waypointIndex, waypoint.vPos.x, waypoint.vPos.y, waypoint.vPos.z);
                     }
                     m_WaypointMap[nOffset].push_back(waypointIndex);
                     airg.reasoningGrid->m_WaypointList.push_back(waypoint);
@@ -447,7 +445,7 @@ void GridGenerator::AlignNodes() {
                     distance.y < distanceThreshold
                 ) {
                     Navp& navp = Navp::getInstance();
-                    auto centroidNavPower = recastAirgAdapter.calculateCentroid(remappedLocation.polyRef);
+                    auto centroidNavPower = recastAirgAdapter.calculateCentroid(&navQuery, remappedLocation.polyRef);
                     auto area = navp.posToAreaMap.find(centroidNavPower);
                     float radius = 0.1;
                     if ((area != navp.posToAreaMap.end() && area->second->m_area->m_usageFlags ==
@@ -705,7 +703,7 @@ Pathfinding::ZPFLocation* GridGenerator::MapLocation_Internal(
     for (int i = 0; i < areasToCheckCount; ++i) {
         dtPolyRef polyRef = 0;
         polyRef = closestReachablePolys[i];
-        GetClosestPosInArea2d_G2_ClosestPos(&candidatePosNavPower, polyRef, &vPosNavPowerVec3, &data);
+        GetClosestPosInArea2d_G2_ClosestPos(navQuery, &candidatePosNavPower, polyRef, &vPosNavPowerVec3, &data);
 
         float4 candidatePosNavPower4 = {
             candidatePosNavPower.X, candidatePosNavPower.Y, candidatePosNavPower.Z, static_cast<float>(i)
@@ -812,7 +810,7 @@ float4 GridGenerator::MapToCell(dtNavMeshQuery* navQuery, const float4* vCellNav
                 distance.z <= distanceThreshold.z) {
                 RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
                 const Vec3 centroidNavPower = RecastAdapter::convertFromRecastToNavPower(
-                    recastAirgAdapter.calculateCentroid(pfLocation.polyRef));
+                    recastAirgAdapter.calculateCentroid(navQuery, pfLocation.polyRef));
                 if (const auto areaNavPowerPos = area.m_area->m_pos;
                     abs(centroidNavPower.X - areaNavPowerPos.X) < 0.1 &&
                     abs(centroidNavPower.Y - areaNavPowerPos.Y) < 0.1 &&
@@ -860,7 +858,9 @@ bool GridGenerator::IsInside(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation*
     // Check if the remapped location has a valid area
     if (remappedLocationValid) {
         // Calculate the distance between the original and remapped locations
-        const float4 remappedNavPowerPos = {remappedLocation.pos.x, remappedLocation.pos.y, remappedLocation.pos.z, 1.0f};
+        const float4 remappedNavPowerPos = {
+            remappedLocation.pos.x, remappedLocation.pos.y, remappedLocation.pos.z, 1.0f
+        };
         const float4 distance = remappedNavPowerPos - navPowerPos;
         const float distanceSquared = distance.x * distance.x + distance.y * distance.y + distance.z * distance.z;
 
@@ -928,7 +928,7 @@ void GridGenerator::GetCellBitmap(const float4* vNavPowerPosition, bool* pBitmap
                     Navp& navp = Navp::getInstance();
                     RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
                     auto centroidNavPowerVec3 = RecastAdapter::convertFromRecastToNavPower(
-                        recastAirgAdapter.calculateCentroid(cellLocation.polyRef));
+                        recastAirgAdapter.calculateCentroid(&navQuery, cellLocation.polyRef));
                     auto area = navp.posToAreaMap.find(centroidNavPowerVec3);
                     if (area != navp.posToAreaMap.end() && area->second->m_area->m_usageFlags ==
                         NavPower::AreaUsageFlags::AREA_STEPS) {
@@ -1041,7 +1041,7 @@ bool GridGenerator::NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFL
     for (int areaIndex = 0; areaIndex < numAreas; ++areaIndex) {
         int numEdges = 0;
         dtPolyRef polyRef = polys[areaIndex];
-        numEdges = recastAirgAdapter.getEdges(polyRef).size();
+        numEdges = recastAirgAdapter.getEdges(navQuery, polyRef).size();
         // Iterate through each edge of the current area
         for (int edgeIndex = 0; edgeIndex < numEdges; ++edgeIndex) {
             // Get adjacent area and check if it's valid
@@ -1052,9 +1052,10 @@ bool GridGenerator::NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFL
                 continue;
             }
             polyRef = polys[areaIndex];
-            auto edgesRecast = recastAirgAdapter.getEdges(polyRef);
+            auto edgesRecast = recastAirgAdapter.getEdges(navQuery, polyRef);
             const Vec3 edgeNavPowerStart = RecastAdapter::convertFromRecastToNavPower(edgesRecast[edgeIndex]);
-            const Vec3 edgeNavPowerEnd = RecastAdapter::convertFromRecastToNavPower(edgesRecast[(edgeIndex + 1) % numEdges]);
+            const Vec3 edgeNavPowerEnd = RecastAdapter::convertFromRecastToNavPower(
+                edgesRecast[(edgeIndex + 1) % numEdges]);
 
             // Calculate the closest point on the edge
             float4 edgeNavPowerStartPos = {edgeNavPowerStart.X, edgeNavPowerStart.Y, edgeNavPowerStart.Z, 1.0f};
