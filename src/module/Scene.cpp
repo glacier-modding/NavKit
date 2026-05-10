@@ -184,8 +184,8 @@ void Scene::loadScene(const std::string& fileName, const std::function<void()>& 
     loadMeshes(errorCallback, jsonDocument);
     loadPfBoxes(errorCallback, jsonDocument);
     loadPfSeedPoints(errorCallback, jsonDocument);
-    loadRoomsAndVolumes(errorCallback, jsonDocument);
     loadMatis(errorCallback, jsonDocument);
+    loadRoomsAndVolumes(errorCallback, jsonDocument);
     loadPrimMatis(errorCallback, jsonDocument);
 
     callback();
