@@ -23,6 +23,7 @@ class Sample;
 class BuildContext;
 class InputGeom;
 class DebugDrawGL;
+class SceneMeshHitTestResult;
 
 class RecastAdapter {
     RecastAdapter();
@@ -101,7 +102,9 @@ public:
 
     dtPolyRef getAdjacentPoly(dtPolyRef poly, int edgeIndex) const;
 
-    void doHitTest(int mx, int my);
+    void setMarker(const SceneMeshHitTestResult& result);
+
+    SceneMeshHitTestResult doHitTest(int mx, int my);
 
     void loadSettings() const;
 
@@ -111,11 +114,11 @@ public:
 
     static Vec3 convertFromRecastToNavPower(Vec3 pos);
 
-    std::vector<Vec3> getEdges(dtPolyRef polyRef) const;
+    static std::vector<Vec3> getEdges(const dtNavMeshQuery* navQuery, dtPolyRef polyRef) ;
 
-    Vec3 calculateNormal(dtPolyRef polyRef) const;
+    Vec3 calculateNormal(dtNavMeshQuery* navQuery, dtPolyRef polyRef) const;
 
-    Vec3 calculateCentroid(dtPolyRef polyRef) const;
+    Vec3 calculateCentroid(dtNavMeshQuery* navQuery, dtPolyRef polyRef) const;
 
     const dtNavMesh* getNavMesh() const;
 

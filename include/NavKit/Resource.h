@@ -152,6 +152,8 @@
 #define IDC_CHECK_SKIP_RPKG_EXTRACT             30414
 #define IDC_CHECK_EXTRACT_TEXTURE_FILES         30415
 #define IDC_CHECK_APPLY_TEXTURES                30416
+#define IDC_BUTTON_SELECT_ALL_LODS              30417
+#define IDC_BUTTON_DESELECT_ALL_LODS            30418
 
 #define IDD_EXTRACT_NAVP_DIALOG                 30500
 #define IDC_COMBOBOX_NAVP                       30501

@@ -99,6 +99,9 @@ void SceneMesh::updateObjDialogControls(const HWND hDlg) {
     for (int i = 0; i < 8; ++i) {
         EnableWindow(GetDlgItem(hDlg, IDC_CHECK_PRIM_LOD_1 + i), isPrim);
     }
+    EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_SELECT_ALL_LODS), isPrim);
+    EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_DESELECT_ALL_LODS), isPrim);
+
     CheckRadioButton(hDlg, IDC_RADIO_BUILD_TYPE_COPY, IDC_RADIO_BUILD_TYPE_INSTANCE,
                      obj.sceneMeshBuildType == COPY ? IDC_RADIO_BUILD_TYPE_COPY : IDC_RADIO_BUILD_TYPE_INSTANCE);
 
@@ -166,6 +169,18 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(const HWND hDlg, const UINT me
             sceneMesh.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
             sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Apply textures set to %s.", sceneMesh.applyTextures ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
+
+        case IDC_BUTTON_SELECT_ALL_LODS:
+        case IDC_BUTTON_DESELECT_ALL_LODS: {
+            const bool check = LOWORD(wParam) == IDC_BUTTON_SELECT_ALL_LODS;
+            for (bool& primLod : sceneMesh.primLods) {
+                primLod = check;
+            }
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Prim LODs %s.", check ? "all selected" : "all deselected");
             updateObjDialogControls(hDlg);
             return TRUE;
         }

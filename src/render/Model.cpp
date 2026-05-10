@@ -1,5 +1,3 @@
-#include <iostream>
-#include <fstream>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -9,15 +7,17 @@
 #include <vector>
 #include <future>
 #include <map>
-#include <numeric>
 #include <GL/glew.h>
 #include <SDL.h>
+#include <mutex>
 
 #include <stb_image.h>
 #include "../../include/NavKit/render/Model.h"
 #include "../../include/NavKit/module/Logger.h"
 
 #include <ranges>
+
+static std::mutex g_TextureMutex;
 
 Texture loadTextureDataFromFile(const char* path, const std::string& directory) {
     Texture texture;
@@ -60,7 +60,8 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
         texture.loaded = true;
         stbi_image_free(data);
     } else {
-        Logger::log(NK_ERROR, "Texture failed to load at path: %s. Reason: %s", filename.c_str(), stbi_failure_reason());
+        Logger::log(NK_ERROR, "Texture failed to load at path: %s. Reason: %s", filename.c_str(),
+                    stbi_failure_reason());
     }
 
     return texture;
@@ -74,10 +75,18 @@ Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScen
     std::vector<unsigned int> indices;
     std::vector<Texture> textures;
 
-    unsigned int vertexOffset = 0;
-
+    unsigned int totalVertices = 0;
+    unsigned int totalIndices = 0;
     for (aiMesh* mesh : batch) {
-        for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+        totalVertices += mesh->mNumVertices;
+        totalIndices += mesh->mNumFaces * 3;
+    }
+    vertices.reserve(totalVertices);
+    indices.reserve(totalIndices);
+
+    unsigned int vertexOffset = 0;
+    for (aiMesh* mesh : batch) {
+        for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
             Vertex vertex;
             glm::vec3 vector;
             vector.x = mesh->mVertices[i].x;
@@ -115,9 +124,9 @@ Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScen
             vertices.push_back(vertex);
         }
 
-        for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
+        for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
             aiFace face = mesh->mFaces[i];
-            for (unsigned int j = 0; j < face.mNumIndices; j++) {
+            for (unsigned int j = 0; j < face.mNumIndices; ++j) {
                 indices.push_back(face.mIndices[j] + vertexOffset);
             }
         }
@@ -152,23 +161,30 @@ std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextur
                                                        const std::string& directory,
                                                        std::vector<Texture>& texturesLoaded) {
     std::vector<Texture> textures;
-    for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
+    for (unsigned int i = 0; i < mat->GetTextureCount(type); ++i) {
         aiString str;
         mat->GetTexture(type, i, &str);
         bool skip = false;
-        for (unsigned int j = 0; j < texturesLoaded.size(); j++) {
-            if (std::strcmp(texturesLoaded[j].path.data, str.C_Str()) == 0) {
-                textures.push_back(texturesLoaded[j]);
-                skip = true;
-                break;
+        {
+            std::lock_guard lock(g_TextureMutex);
+            for (unsigned int j = 0; j < texturesLoaded.size(); ++j) {
+                if (std::strcmp(texturesLoaded[j].path.data, str.C_Str()) == 0) {
+                    textures.push_back(texturesLoaded[j]);
+                    skip = true;
+                    break;
+                }
             }
         }
+
         if (!skip) {
             Texture texture = loadTextureDataFromFile(str.C_Str(), directory);
             texture.type = typeName;
             texture.path = str;
             textures.push_back(texture);
-            texturesLoaded.push_back(texture);
+            {
+                std::lock_guard lock(g_TextureMutex);
+                texturesLoaded.push_back(texture);
+            }
         }
     }
     return textures;
@@ -194,7 +210,7 @@ void Model::loadModelData(std::string const& path) {
     meshes.clear();
     texturesLoaded.clear();
 
-    std::map<std::string, std::vector<aiMesh*>> batches;
+    std::map<std::pair<std::string, unsigned int>, std::vector<aiMesh*>> batches;
 
     for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
         aiMesh* mesh = scene->mMeshes[i];
@@ -205,13 +221,18 @@ void Model::loadModelData(std::string const& path) {
             batchId = name.substr(0, underscorePos);
         }
 
-        std::string key = batchId + "_" + std::to_string(mesh->mMaterialIndex);
-
-        batches[key].push_back(mesh);
+        batches[{batchId, mesh->mMaterialIndex}].push_back(mesh);
     }
 
-    for (auto& [key, batch] : batches) {
-        meshes.push_back(processBatchedMeshes(batch, scene, directory, texturesLoaded));
+    std::vector<std::future<Mesh>> meshFutures;
+    for (auto& batch : batches | std::views::values) {
+        meshFutures.push_back(std::async(std::launch::async, [this, &batch, scene]() {
+            return processBatchedMeshes(batch, scene, this->directory, this->texturesLoaded);
+        }));
+    }
+
+    for (auto& fut : meshFutures) {
+        meshes.push_back(fut.get());
     }
 }
 

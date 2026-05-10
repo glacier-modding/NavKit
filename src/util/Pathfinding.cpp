@@ -9,15 +9,15 @@
 
 namespace Pathfinding {
     NavPower::BBox calculateBBox(const NavPower::Area* area) {
-        const float s_minFloat = -300000000000;
-        const float s_maxFloat = 300000000000;
+        constexpr float sMinFloat = -300000000000.0f;
+        constexpr float sMaxFloat = 300000000000.0f;
         NavPower::BBox bbox;
-        bbox.m_min.X = s_maxFloat;
-        bbox.m_min.Y = s_maxFloat;
-        bbox.m_min.Z = s_maxFloat;
-        bbox.m_max.X = s_minFloat;
-        bbox.m_max.Y = s_minFloat;
-        bbox.m_max.Z = s_minFloat;
+        bbox.m_min.X = sMaxFloat;
+        bbox.m_min.Y = sMaxFloat;
+        bbox.m_min.Z = sMaxFloat;
+        bbox.m_max.X = sMinFloat;
+        bbox.m_max.Y = sMinFloat;
+        bbox.m_max.Z = sMinFloat;
         for (auto& edge : area->m_edges) {
             bbox.m_max.X = std::max(bbox.m_max.X, edge->m_pos.X);
             bbox.m_max.Y = std::max(bbox.m_max.Y, edge->m_pos.Y);
@@ -29,7 +29,8 @@ namespace Pathfinding {
         return bbox;
     }
 
-    Vec3* GetClosestPosInArea2d_G2_EdgeIndex(Vec3* navPowerResult,
+    Vec3* GetClosestPosInArea2d_G2_EdgeIndex(dtNavMeshQuery* navQuery,
+                                             Vec3* navPowerResult,
                                              const dtPolyRef polyRef, const Vec3* navPowerPos,
                                              int* edgeIndex) {
         *edgeIndex = -1;
@@ -38,7 +39,7 @@ namespace Pathfinding {
         // Check if point is in polygon
         int numEdges = 0;
         const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
-        const std::vector<Vec3> polyEdges = recastAirgAdapter.getEdges(polyRef);
+        const std::vector<Vec3> polyEdges = RecastAdapter::getEdges(navQuery, polyRef);
         numEdges = polyEdges.size();
         for (int i = 0; i < numEdges; ++i) {
             const int j = (i + 1) % numEdges;
@@ -56,7 +57,7 @@ namespace Pathfinding {
         }
         if (edgeIntersections % 2 == 1) {
             const Vec3 normalNavPower = RecastAdapter::convertFromRecastToNavPower(
-                recastAirgAdapter.calculateNormal(polyRef));
+                recastAirgAdapter.calculateNormal(navQuery, polyRef));
             const Vec3 v1NavPower = RecastAdapter::convertFromRecastToNavPower(polyEdges[0]);
             navPowerResult->X = navPowerPos->X;
             navPowerResult->Y = navPowerPos->Y;
@@ -92,7 +93,7 @@ namespace Pathfinding {
                 navPowerResult->X = projectionNavPower.X;
                 navPowerResult->Y = projectionNavPower.Y;
                 const Vec3 normalNavPower = RecastAdapter::convertFromRecastToNavPower(
-                    recastAirgAdapter.calculateNormal(polyRef));
+                    recastAirgAdapter.calculateNormal(navQuery, polyRef));
                 const float dNavPower = -(v1NavPower.X * normalNavPower.X + v1NavPower.Y * normalNavPower.Y + v1NavPower
                     .Z * normalNavPower.Z);
                 navPowerResult->Z = -(projectionNavPower.X * normalNavPower.X + projectionNavPower.Y * normalNavPower.Y
@@ -103,20 +104,20 @@ namespace Pathfinding {
     }
 
     Vec3* GetClosestPosInArea2d_G2_ClosestPos(
+        dtNavMeshQuery* navQuery,
         Vec3* resultNavPower,
         const dtPolyRef polyRef,
         const Vec3* posWCoordNavPower,
         ClosestPositionData* pDataOut) {
         bool valid = false;
-        GridGenerator& gridGenerator = GridGenerator::getInstance();
         valid = polyRef != 0;
         if (valid) {
             Vec3 closestNavPowerPos;
-            const Vec3 closestRecastPos = RecastAdapter::getAirgInstance().calculateCentroid(polyRef);
+            const Vec3 closestRecastPos = RecastAdapter::getAirgInstance().calculateCentroid(navQuery, polyRef);
             closestNavPowerPos = RecastAdapter::convertFromRecastToNavPower(closestRecastPos);
 
             int edgeIndex = -1;
-            GetClosestPosInArea2d_G2_EdgeIndex(&closestNavPowerPos, polyRef, posWCoordNavPower, &edgeIndex);
+            GetClosestPosInArea2d_G2_EdgeIndex(navQuery, &closestNavPowerPos, polyRef, posWCoordNavPower, &edgeIndex);
 
             if (pDataOut) {
                 pDataOut->edgeIndex = edgeIndex;

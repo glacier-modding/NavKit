@@ -1,5 +1,7 @@
 #include "../../include/NavKit/model/Json.h"
 
+#include <algorithm>
+#include <type_traits>
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Scene.h"
 
@@ -22,9 +24,31 @@ std::string Json::toString(std::string_view val) {
 template <typename t, typename> Json::JsonValueProxy::operator t() {
     using simdT = typename SimdJsonTypeMap<t>::type;
     simdT val;
-    if (json[field].get(val) == simdjson::SUCCESS) {
+
+    if (simdjson::ondemand::value jsonValue = json[field]; jsonValue.get(val) == simdjson::SUCCESS) {
         Logger::log(NK_DEBUG, "Field: %s value: %s", field.c_str(), toString(val).c_str());
         return static_cast<t>(val);
+    } else if constexpr (std::is_arithmetic_v<t>) {
+        std::string_view strVal;
+        if (simdjson::error_code err; (err = jsonValue.get_string().get(strVal)) == simdjson::SUCCESS) {
+            try {
+                if constexpr (std::is_integral_v<t>) {
+                    val = static_cast<simdT>(std::stoll(std::string(strVal)));
+                } else if constexpr (std::is_floating_point_v<t>) {
+                    val = static_cast<simdT>(std::stod(std::string(strVal)));
+                }
+                Logger::log(NK_DEBUG, "Field: %s value (from string conversion): %s", field.c_str(),
+                            toString(val).c_str());
+                return static_cast<t>(val);
+            } catch (const std::exception& e) {
+                Logger::log(NK_ERROR, "Error converting string '%s' to numeric type for field: %s. Exception: %s",
+                            std::string(strVal).c_str(), field.c_str(), e.what());
+            }
+        } else {
+            Logger::log(
+                NK_ERROR, "Error getting value for field: %s. Not a direct numeric or string value. Simdjson error: %s",
+                field.c_str(), simdjson::error_message(err));
+        }
     }
     Logger::log(NK_ERROR, "Error getting value for field: %s", field.c_str());
     return {};
@@ -125,12 +149,12 @@ void Json::Mesh::writeJson(std::ostream& f) const {
         R"(","roomFolderName":")" << roomFolderName <<
         R"(","entity":{"id":")" << entity.id <<
         R"(","name":")" << entity.name << R"(",)";
-        entity.position.writeJson(f);
-        f << ",";
-        entity.rotation.writeJson(f);
-        f << ",";
-        entity.scale.writeJson(f);
-        f << "}}";
+    entity.position.writeJson(f);
+    f << ",";
+    entity.rotation.writeJson(f);
+    f << ",";
+    entity.scale.writeJson(f);
+    f << "}}";
 }
 
 Json::Meshes::Meshes(simdjson::ondemand::array meshesJson) {
@@ -180,7 +204,21 @@ void Json::PfBoxes::readPathfindingBBoxes() {
             Vec3 s = entity.scale.data;
             Rotation r = entity.rotation;
             PfBoxType type = entity.type;
-            scene.includeBox = {id, name, p, s, r, type};
+            if (scene.includeBox.id.empty()) {
+                scene.includeBox = {id, name, p, s, r, type};
+            } else {
+                // Set scene.includeBox pos, scale, and rotation to be the span of the two boxes
+                float minX = std::min(scene.includeBox.pos.x - scene.includeBox.scale.x / 2.0f, p.x - s.x / 2.0f);
+                float minY = std::min(scene.includeBox.pos.y - scene.includeBox.scale.y / 2.0f, p.y - s.y / 2.0f);
+                float minZ = std::min(scene.includeBox.pos.z - scene.includeBox.scale.z / 2.0f, p.z - s.z / 2.0f);
+                float maxX = std::max(scene.includeBox.pos.x + scene.includeBox.scale.x / 2.0f, p.x + s.x / 2.0f);
+                float maxY = std::max(scene.includeBox.pos.y + scene.includeBox.scale.y / 2.0f, p.y + s.y / 2.0f);
+                float maxZ = std::max(scene.includeBox.pos.z + scene.includeBox.scale.z / 2.0f, p.z + s.z / 2.0f);
+
+                scene.includeBox.pos = {(minX + maxX) / 2.0f, (minY + maxY) / 2.0f, (minZ + maxZ) / 2.0f};
+                scene.includeBox.scale = {maxX - minX, maxY - minY, maxZ - minZ};
+                scene.includeBox.rotation = {0, 0, 0, 1};
+            }
             includeBoxFound = true;
         }
         if (entity.type.data == EXCLUDE_TYPE) {

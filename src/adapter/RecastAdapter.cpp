@@ -442,6 +442,7 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
     if (!mesh) {
         return;
     }
+    dtNavMeshQuery* navQuery = sample->getNavMeshQuery();
     for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); tileIndex++) {
         const dtMeshTile* tile = mesh->getTile(tileIndex);
         if (!tile || !tile->header) {
@@ -474,14 +475,14 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
 
         for (int polyIndex = 0; polyIndex < tile->header->polyCount; polyIndex++) {
             const dtPolyRef polyRef = getPoly(tileIndex, polyIndex);
-            auto edges = getEdges(polyRef);
+            auto edges = getEdges(navQuery, polyRef);
             glBegin(GL_LINE_LOOP);
             glVertex3f(edges[0].X, edges[0].Y, edges[0].Z);
             glVertex3f(edges[1].X, edges[1].Y, edges[1].Z);
             glVertex3f(edges[2].X, edges[2].Y, edges[2].Z);
             glEnd();
-            auto centroid = calculateCentroid(polyRef);
-            renderer.drawText(("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex)).c_str(),
+            auto centroid = calculateCentroid(navQuery, polyRef);
+            renderer.drawText("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex),
                               {centroid.X, centroid.Y, centroid.Z}, color);
         }
     }
@@ -952,7 +953,35 @@ dtPolyRef RecastAdapter::getAdjacentPoly(const dtPolyRef polyRef, const int edge
     return 0;
 }
 
-void RecastAdapter::doHitTest(const int mx, const int my) {
+void RecastAdapter::setMarker(const SceneMeshHitTestResult& result) {
+    markerPositionSet = true;
+    markerPosition[0] = result.rayStart[0] + (result.rayEnd[0] - result.rayStart[0]) * result.hitTime;
+    markerPosition[1] = result.rayStart[1] + (result.rayEnd[1] - result.rayStart[1]) * result.hitTime;
+    markerPosition[2] = result.rayStart[2] + (result.rayEnd[2] - result.rayStart[2]) * result.hitTime;
+    for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
+        if (result.hitIndex >= vertexRange.first && result.hitIndex < vertexRange.second) {
+            selectedObject = object;
+            break;
+        }
+    }
+    std::string meshNameString;
+    std::string roomString;
+    if (Scene::getInstance().sceneLoaded) {
+        if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
+            selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
+            meshNameString = mesh->entity.name;
+            roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
+            }
+    }
+    Logger::log(
+        NK_INFO,
+        ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
+            std::to_string(result.hitIndex) + roomString +
+            ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
+            std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
+}
+
+SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
     float rayStart[3];
     float rayEnd[3];
     float hitTime;
@@ -966,40 +995,23 @@ void RecastAdapter::doHitTest(const int mx, const int my) {
     rayEnd[0] = (float)x;
     rayEnd[1] = (float)y;
     rayEnd[2] = (float)z;
-    const int hit = inputGeom->raycastMesh(rayStart, rayEnd, hitTime);
-    if (hit != -1) {
-        // Marker
-        markerPositionSet = true;
-        markerPosition[0] = rayStart[0] + (rayEnd[0] - rayStart[0]) * hitTime;
-        markerPosition[1] = rayStart[1] + (rayEnd[1] - rayStart[1]) * hitTime;
-        markerPosition[2] = rayStart[2] + (rayEnd[2] - rayStart[2]) * hitTime;
-        for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
-            if (hit >= vertexRange.first && hit < vertexRange.second) {
-                selectedObject = object;
-                break;
-            }
-        }
-        std::string meshNameString;
-        std::string roomString;
-        if (Scene::getInstance().sceneLoaded) {
-            if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
-                selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
-                meshNameString = mesh->entity.name;
-                roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
-            }
-        }
-        Logger::log(
-            NK_INFO,
-            ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
-                std::to_string(hit) + roomString +
-                ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
-                std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
-    } else {
-        if (SDL_GetModState()) {
-            // Marker
-            markerPositionSet = false;
-        }
+    SceneMeshHitTestResult result;
+    if (const int hitIndex = inputGeom->raycastMesh(rayStart, rayEnd, hitTime); hitIndex != -1) {
+        result.hitIndex = hitIndex;
+        result.rayStart[0] = rayStart[0];
+        result.rayStart[1] = rayStart[1];
+        result.rayStart[2] = rayStart[2];
+        result.rayEnd[0] = rayEnd[0];
+        result.rayEnd[1] = rayEnd[1];
+        result.rayEnd[2] = rayEnd[2];
+        result.hitTime = hitTime;
+        return result;
     }
+    result.hitIndex = -1;
+    if (SDL_GetModState()) {
+        markerPositionSet = false;
+    }
+    return result;
 }
 
 void RecastAdapter::loadSettings() const {
@@ -1085,8 +1097,16 @@ Vec3 RecastAdapter::convertFromRecastToNavPower(Vec3 pos) {
     return {pos.X, -pos.Z, pos.Y};
 }
 
-std::vector<Vec3> RecastAdapter::getEdges(const dtPolyRef polyRef) const {
-    const dtNavMesh* mesh = sample->getNavMesh();
+std::vector<Vec3> RecastAdapter::getEdges(const dtNavMeshQuery* navQuery, const dtPolyRef polyRef) {
+    if (!navQuery) {
+        return {};
+    }
+
+    const dtNavMesh* mesh = navQuery->getAttachedNavMesh();
+    if (!mesh) {
+        return {};
+    }
+
     unsigned int salt = 0;
     unsigned int tileIndex = 0;
     unsigned int polyIndex = 0;
@@ -1106,8 +1126,11 @@ std::vector<Vec3> RecastAdapter::getEdges(const dtPolyRef polyRef) const {
     return edges;
 }
 
-Vec3 RecastAdapter::calculateNormal(const dtPolyRef polyRef) const {
-    const std::vector<Vec3> edges = getEdges(polyRef);
+Vec3 RecastAdapter::calculateNormal(dtNavMeshQuery* navQuery, const dtPolyRef polyRef) const {
+    const std::vector<Vec3> edges = getEdges(navQuery, polyRef);
+    if (edges.size() < 3) {
+        return {0.0f, 1.0f, 0.0f};
+    }
     const Vec3 v0 = edges.at(0);
     const Vec3 v1 = edges.at(1);
     const Vec3 v2 = edges.at(2);
@@ -1118,9 +1141,13 @@ Vec3 RecastAdapter::calculateNormal(const dtPolyRef polyRef) const {
     return cross.GetUnitVec();
 }
 
-Vec3 RecastAdapter::calculateCentroid(const dtPolyRef polyRef) const {
-    const std::vector<Vec3> edges = getEdges(polyRef);
-    const Vec3 normal = calculateNormal(polyRef);
+Vec3 RecastAdapter::calculateCentroid(dtNavMeshQuery* navQuery, const dtPolyRef polyRef) const {
+    const std::vector<Vec3> edges = getEdges(navQuery, polyRef);
+    if (edges.empty()) {
+        return {0.0f, 0.0f, 0.0f};
+    }
+
+    const Vec3 normal = calculateNormal(navQuery, polyRef);
     const Vec3 v0 = edges.at(0);
     const Vec3 v1 = edges.at(1);
 

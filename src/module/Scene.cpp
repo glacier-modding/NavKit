@@ -60,6 +60,7 @@ void Scene::loadMeshes(const std::function<void()>& errorCallback,
                        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::Meshes newMeshes;
     try {
+        Logger::log(NK_INFO, "Loading meshes.");
         newMeshes = Json::Meshes(jsonDocument["meshes"]);
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
@@ -73,6 +74,7 @@ void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
                         simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::PfBoxes pfBoxes;
     try {
+        Logger::log(NK_INFO, "Loading Pathfinding boxes.");
         pfBoxes = Json::PfBoxes(jsonDocument["pfBoxes"]);
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
@@ -95,7 +97,9 @@ void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
 
 void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
+        Logger::log(NK_INFO, "Checking NavKit scene version.");
         version = static_cast<int>(static_cast<uint64_t>(jsonDocument["version"]));
+        Logger::log(NK_INFO, "NavKit scene version: %d", version);
     } catch (...) {
         Logger::log(NK_INFO, "Version field not found in scene, defaulting to version zero.");
         version = 0;
@@ -106,6 +110,7 @@ void Scene::loadPfSeedPoints(const std::function<void()>& errorCallback,
                              simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::PfSeedPoints newPfSeedPoints;
     try {
+        Logger::log(NK_INFO, "Loading Pathfinding seed points.");
         newPfSeedPoints = Json::PfSeedPoints(jsonDocument["pfSeedPoints"]);
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
@@ -122,9 +127,9 @@ void Scene::loadRoomsAndVolumes(const std::function<void()>& errorCallback,
         gates = Json::Gates(jsonDocument["gates"]).gates;
         Logger::log(NK_INFO, "Loading Rooms.");
         rooms = Json::Rooms(jsonDocument["rooms"]).rooms;
-        Logger::log(NK_INFO, "Loading Ai Area Worlds.");
+        Logger::log(NK_INFO, "Loading AI Area Worlds.");
         aiAreaWorlds = Json::AiAreaWorlds(jsonDocument["aiAreaWorld"]).aiAreaWorlds;
-        Logger::log(NK_INFO, "Loading Ai Areas.");
+        Logger::log(NK_INFO, "Loading AI Areas.");
         aiAreas = Json::AiAreas(jsonDocument["aiArea"]).aiAreas;
         Logger::log(NK_INFO, "Loading Volume Boxes.");
         volumeBoxes = Json::VolumeBoxes(jsonDocument["volumeBoxes"]).volumeBoxes;
@@ -179,8 +184,8 @@ void Scene::loadScene(const std::string& fileName, const std::function<void()>& 
     loadMeshes(errorCallback, jsonDocument);
     loadPfBoxes(errorCallback, jsonDocument);
     loadPfSeedPoints(errorCallback, jsonDocument);
-    loadRoomsAndVolumes(errorCallback, jsonDocument);
     loadMatis(errorCallback, jsonDocument);
+    loadRoomsAndVolumes(errorCallback, jsonDocument);
     loadPrimMatis(errorCallback, jsonDocument);
 
     callback();
