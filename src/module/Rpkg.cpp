@@ -149,11 +149,11 @@ void Rpkg::checkHitmanVersion() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
     std::map<std::string, std::string> gameHashes({
-        std::pair("eba61aa0a92b76579e977fb9a057bb81", "epic"), // base game
-        std::pair("e64c439a45c8c868956345c99b2d036b", "epic"), // ansel unlock
-        std::pair("062d384cae3813e5e0fbc1e2861e4f88", "steam"), // base game
-        std::pair("18c2ff82f076f7904d4f0fcaa2e0d2f6", "steam"), // ansel unlock
-        std::pair("37df6b0755060b48e0959516b0deea62", "microsoft")
+        std::pair("1c3e5cb4e51944f8374a6ca039cb530e", "epic"), // base game
+        std::pair("53c768cc385875e422880361fc05b9e3", "epic"), // ansel unlock
+        std::pair("6dd73b2cd3a76ae5d2699411964b9c1a", "steam"), // base game
+        std::pair("0ccb38015165d2879b3e15cd5a90afaf", "steam"), // ansel unlock
+        std::pair("5a5e69504fc410338ae07ef611acd718", "microsoft")
     });
 
     if (!(std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg") || std::filesystem::exists(
