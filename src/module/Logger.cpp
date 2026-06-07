@@ -21,11 +21,10 @@ void Logger::doLog(const char* msg, const int len) {
     }
 
     std::lock_guard lock(logMutex);
-    if (logBuffer.size() >= MAX_MESSAGES - 1) {
+    if (logBuffer.size() >= MAX_MESSAGES) {
         logBuffer.pop_front();
-    } else {
-        messageCount++;
     }
+    messageCount++;
     logBuffer.push_back(msg);
 }
 

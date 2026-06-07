@@ -38,8 +38,17 @@ int InputHandler::handleInput() {
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_WINDOWEVENT:
-            if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+            if (event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
                 renderer.handleResize();
+
+                const Uint32 windowFlags = SDL_GetWindowFlags(renderer.window);
+                Renderer::FullscreenMode mode = Renderer::WINDOWED;
+                if (windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+                    mode = Renderer::BORDERLESS_FULLSCREEN;
+                } else if (windowFlags & SDL_WINDOW_MAXIMIZED) {
+                    mode = Renderer::MAXIMIZED;
+                }
+                renderer.handleFullscreen(mode);
             }
             if (event.window.event == SDL_WINDOWEVENT_MOVED) {
                 renderer.handleMoved();
@@ -50,6 +59,14 @@ int InputHandler::handleInput() {
             // Handle any key presses here.
             if (event.key.keysym.sym == SDLK_TAB) {
                 Gui::getInstance().showMenu = !gui.showMenu;
+            }
+            if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
+                const Uint32 windowFlags = SDL_GetWindowFlags(renderer.window);
+                if (windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+                    renderer.handleFullscreen(Renderer::WINDOWED);
+                } else {
+                    renderer.handleFullscreen(Renderer::BORDERLESS_FULLSCREEN);
+                }
             }
             break;
 

@@ -148,25 +148,26 @@ void Rpkg::initExtractionData() {
 void Rpkg::checkHitmanVersion() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
-    std::map<std::string, std::string> gameHashes({
-        std::pair("1c3e5cb4e51944f8374a6ca039cb530e", "epic"), // base game
-        std::pair("53c768cc385875e422880361fc05b9e3", "epic"), // ansel unlock
-        std::pair("6dd73b2cd3a76ae5d2699411964b9c1a", "steam"), // base game
-        std::pair("0ccb38015165d2879b3e15cd5a90afaf", "steam"), // ansel unlock
-        std::pair("5a5e69504fc410338ae07ef611acd718", "microsoft")
+    static constexpr const char* GAME_VERSION = "3.270.0";
+    static std::map<std::string, std::string> gameHashes({
+        std::pair("3b4b9ce155c1b00828613b18506dd795", "epic"), // base game
+        std::pair("831fa458660ca9e4a1f6ee1b2fc098e5", "epic"), // ansel unlock
+        std::pair("9ea2968927e7fd69d7a6f3104b193726", "steam"), // base game
+        std::pair("a09ba30672470b517f075a7d707e5f9f", "steam"), // ansel unlock
+        std::pair("4fd41b03dfd8a780b959c74ad155245f", "microsoft")
     });
 
-    if (!(std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg") || std::filesystem::exists(
+    if (!(std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") || std::filesystem::exists(
         hitmanFolder + "\\Retail\\HITMAN3.exe"))) {
         Logger::log(NK_ERROR, "HITMAN3.exe couldn't be located, please re-read the installation instructions!");
     }
 
-    if (std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg") && !std::filesystem::exists(
+    if (std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") && !std::filesystem::exists(
         hitmanFolder + "\\MicrosoftGame.Config")) {
         Logger::log(NK_ERROR, "The game config couldn't be located, please re-read the installation instructions!");
     }
     std::string platform;
-    if (std::filesystem::exists(hitmanFolder + "\\Retail\\Runtime\\chunk0.rpkg")) {
+    if (std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)")) {
         const std::string hash = QuickDigest5::fileToHash(hitmanFolder + "\\MicrosoftGame.Config");
         platform = gameHashes.contains(hash) ? gameHashes[hash] : "undefined";
     } else {
@@ -180,7 +181,7 @@ void Rpkg::checkHitmanVersion() {
         );
         unknownGameVersion = true;
     } else {
-        Logger::log(NK_INFO, "Detected game platform: %s", platform.c_str());
+        Logger::log(NK_INFO, "Detected game platform: %s version %s", platform.c_str(), GAME_VERSION);
     }
 }
 
@@ -198,15 +199,13 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
                 : type == AIRG
                 ? "airg"
                 : "tga");
-            char** hashesNeeded = new char*[hashes.size()];
-
+            std::vector<const char*> hashPtrs(hashes.size());
             for (size_t i = 0; i < hashes.size(); ++i) {
-                hashesNeeded[i] = new char[hashes[i].size() + 1];
-                std::strcpy(hashesNeeded[i], hashes[i].c_str());
+                hashPtrs[i] = hashes[i].c_str();
             }
             extract_resources_from_rpkg(
                 runtimeFolder.c_str(),
-                hashesNeeded,
+                hashPtrs.data(),
                 hashes.size(),
                 partitionManager,
                 resourceFolder.c_str(),

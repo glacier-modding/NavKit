@@ -740,7 +740,7 @@ void Navp::buildNavp() {
         building = true;
         Menu::updateMenuState();
         Logger::log(NK_INFO, "Beginning Recast build...");
-            if (recastAdapter.handleBuild()) {
+        if (recastAdapter.handleBuild()) {
             Logger::log(NK_INFO, "Done with Recast build.");
             Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
             recastAdapter.findPfSeedPointAreas();
@@ -754,13 +754,11 @@ void Navp::buildNavp() {
             Logger::log(NK_INFO, msg.data());
             setSelectedNavpAreaIndex(-1);
             Menu::updateMenuState();
-
-        }else {
+        } else {
             Logger::log(NK_ERROR, "Error building Navp");
             building = false;
             navpBuildDone.store(false);
             Menu::updateMenuState();
-
         }
     }
     CPPTRACE_CATCH(const std::exception & e)

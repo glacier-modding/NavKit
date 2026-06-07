@@ -42,6 +42,12 @@ public:
 
 class Renderer {
 public:
+    enum FullscreenMode {
+        WINDOWED,
+        MAXIMIZED,
+        BORDERLESS_FULLSCREEN
+    };
+
     Renderer();
 
     ~Renderer();
@@ -73,6 +79,8 @@ public:
     void updateFrameRate();
 
     void handleResize();
+
+    void handleFullscreen(FullscreenMode mode) const;
 
     void renderFrame();
 

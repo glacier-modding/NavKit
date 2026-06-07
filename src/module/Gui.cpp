@@ -75,25 +75,33 @@ void Gui::drawGui() {
                       imguiRGBA(255, 255, 255, 128));
 
         if (showLog) {
-            if (imguiBeginScrollArea("Log", 20, 20,
-                                     renderer.width - 40,
-                                     renderer.height > 440
-                                         ? 220
-                                         : static_cast<int>(static_cast<double>(renderer.height) * 0.2),
-                                     &logScroll)) {
-                mouseOverMenu = true;
-            }
+            const int logAreaHeight = renderer.height > 440
+                                          ? 220
+                                          : static_cast<int>(static_cast<double>(renderer.height) * 0.2);
             Logger &logger = Logger::getInstance();
             std::lock_guard lock(logger.getLogMutex());
-
             const std::deque<std::string>& logBuffer = logger.getLogBuffer();
-            for (auto it = logBuffer.cbegin();
-                 it != logBuffer.cend(); ++it) {
-                imguiLabel(it->c_str());
+            const int totalLogCount = logger.getLogCount();
+            constexpr int lineHeight = 20;
+            constexpr int headerHeight = 25;
+            constexpr int padding = 10;
+            const int visibleHeight = logAreaHeight - headerHeight;
+            const int contentHeight = static_cast<int>(logBuffer.size()) * lineHeight + padding;
+            const int maxScroll = std::max(0, contentHeight - visibleHeight);
+            if (lastLogCount != totalLogCount) {
+                const int addedLogs = (lastLogCount == -1) ? totalLogCount : (totalLogCount - lastLogCount);
+                const int prevBufferSize = std::max(0, static_cast<int>(logBuffer.size()) - addedLogs);
+                const int prevMaxScroll = std::max(0, (prevBufferSize * lineHeight + padding) - visibleHeight);
+                if (constexpr int threshold = 1; lastLogCount == -1 || logScroll >= prevMaxScroll - threshold || logScroll >= maxScroll - threshold) {
+                    logScroll = maxScroll;
+                }
+                lastLogCount = totalLogCount;
             }
-            if (const int logCount = logger.getLogCount(); lastLogCount != logCount) {
-                logScroll = std::max(0, logCount * 20 - 160);
-                lastLogCount = logCount;
+            if (imguiBeginScrollArea("Log", 20, 20, renderer.width - 40, logAreaHeight, &logScroll)) {
+                mouseOverMenu = true;
+            }
+            for (auto it = logBuffer.cbegin(); it != logBuffer.cend(); ++it) {
+                imguiLabel(it->c_str());
             }
             imguiEndScrollArea();
         }

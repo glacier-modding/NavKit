@@ -132,21 +132,33 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
     SDL_SetWindowMinimumSize(window, 200, 100);
-    initFrameBuffer(width, height);
 
     if (!window) {
         printf("Could not initialise SDL opengl\nError: %s\n", SDL_GetError());
         SDL_Quit();
         return false;
     }
-    const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
-                y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
-    if (x == -1.0f || y == -1.0f) {
-        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    const char* modeStr = persistedSettings.getValue("Renderer", "fullscreen", "WINDOWED");
+    if (strcmp(modeStr, "BORDERLESS_FULLSCREEN") == 0) {
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_GetWindowSize(window, &width, &height);
+        SDL_SetWindowPosition(window, 0, 0);
+    } else if (strcmp(modeStr, "MAXIMIZED") == 0) {
+        SDL_MaximizeWindow(window);
+        SDL_GetWindowSize(window, &width, &height);
+        SDL_SetWindowPosition(window, 0, 0);
     } else {
-        SDL_SetWindowPosition(window, x, y);
+        const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
+                    y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
+        if (x == -1.0f || y == -1.0f) {
+            SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        } else {
+            SDL_SetWindowPosition(window, static_cast<int>(x), static_cast<int>(y));
+        }
     }
-    const std::string navKitVersion = NavKit_VERSION_MAJOR
+    initFrameBuffer(width, height);
+
+    constexpr std::string_view navKitVersion = NavKit_VERSION_MAJOR
         "."
         NavKit_VERSION_MINOR
         "."
@@ -207,6 +219,9 @@ void Renderer::loadSettings() {
 
 void Renderer::handleMoved() {
     updateFrameRate();
+    if (const Uint32 windowFlags = SDL_GetWindowFlags(window); windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP || windowFlags & SDL_WINDOW_MAXIMIZED) {
+        return;
+    }
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     int x;
     int y;
@@ -214,6 +229,52 @@ void Renderer::handleMoved() {
     persistedSettings.setValue("Renderer", "windowX", std::to_string(x));
     persistedSettings.setValue("Renderer", "windowY", std::to_string(y));
     persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
+    persistedSettings.save();
+}
+
+void Renderer::handleFullscreen(const FullscreenMode mode) const {
+    if (!window) {
+        return;
+    }
+    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    FullscreenMode currentMode = WINDOWED;
+    if (const char* modeStr = persistedSettings.getValue("Renderer", "fullscreen", "WINDOWED"); strcmp(modeStr, "BORDERLESS_FULLSCREEN") == 0) {
+        currentMode = BORDERLESS_FULLSCREEN;
+    } else if (strcmp(modeStr, "MAXIMIZED") == 0) {
+        currentMode = MAXIMIZED;
+    }
+    if (currentMode == mode) {
+        return;
+    }
+
+    std::string modeStr = "WINDOWED";
+    switch (mode) {
+        case BORDERLESS_FULLSCREEN:
+            SDL_SetWindowPosition(window, 0, 0);
+            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+            modeStr = "BORDERLESS_FULLSCREEN";
+            break;
+        case MAXIMIZED:
+            SDL_SetWindowFullscreen(window, 0);
+            SDL_MaximizeWindow(window);
+            modeStr = "MAXIMIZED";
+            break;
+        case WINDOWED:
+    default:
+            const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
+                        y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
+            if (x == -1.0f || y == -1.0f) {
+                SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            } else {
+                SDL_SetWindowPosition(window, static_cast<int>(x), static_cast<int>(y));
+            }
+            SDL_SetWindowFullscreen(window, 0);
+            SDL_RestoreWindow(window);
+            break;
+    }
+
+    Logger::log(NK_INFO, (std::string("Setting fullscreen mode to: ") + modeStr).c_str());
+    persistedSettings.setValue("Renderer", "fullscreen", modeStr);
     persistedSettings.save();
 }
 
