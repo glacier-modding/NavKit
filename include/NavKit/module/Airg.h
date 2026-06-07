@@ -70,8 +70,6 @@ public:
 
     static int visibilityDataSize(const ReasoningGrid* reasoningGrid, int waypointIndex);
 
-    void build();
-
     static void addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
                                     const Waypoint& waypoint, bool selected, const glm::vec4& color,
                                     bool forceFan = false);
@@ -116,6 +114,7 @@ public:
 
     void handleBuildAirgClicked();
 
+    static void buildAirg(Airg* airg);
     [[nodiscard]] bool canEnterConnectWaypointMode() const;
 
     void handleConnectWaypointClicked();

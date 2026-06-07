@@ -294,8 +294,10 @@ void Airg::handleBuildAirgClicked() {
     airgBuilding = true;
     delete reasoningGrid;
     reasoningGrid = new ReasoningGrid();
+    airgDirty = true;
+    airgHitTestDirty = true;
     Logger::log(NK_INFO, "Building Airg from Airg");
-    build();
+    backgroundWorker.emplace(&Airg::buildAirg, this);
 }
 
 bool Airg::canEnterConnectWaypointMode() const {
@@ -422,8 +424,13 @@ int Airg::visibilityDataSize(const ReasoningGrid* reasoningGrid, const int waypo
     return offset2 - offset1;
 }
 
-void Airg::build() {
-    backgroundWorker.emplace(&GridGenerator::build, &GridGenerator::getInstance());
+void Airg::buildAirg(Airg* airg) {
+    GridGenerator::getInstance().build();
+    airg->airgBuilding = false;
+    airg->airgLoaded = true;
+    airgDirty = true;
+    airgHitTestDirty = true;
+    Menu::updateMenuState();
 }
 
 void Airg::renderAirg() {

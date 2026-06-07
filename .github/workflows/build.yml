@@ -25,6 +25,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/extern/vcpkg/packages
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+            
       - name: Setup VS environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -61,6 +69,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/extern/vcpkg/packages
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
 
       - name: Setup VS environment
         uses: ilammy/msvc-dev-cmd@v1
