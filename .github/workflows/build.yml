@@ -10,9 +10,9 @@ on:
 jobs:
   validate_build:
     name: Validate Build
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
 
     strategy:
       matrix:
@@ -39,8 +39,8 @@ jobs:
             vcpkg-${{ runner.os }}-
             
       - name: Create vcpkg cache directory
-        run: |
-          mkdir -p ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+        shell: pwsh
+        run: New-Item -Path "${{ env.VCPKG_DEFAULT_BINARY_CACHE }}" -ItemType Directory -Force
 
       - name: Build ${{ matrix.config }}
         run: |
@@ -56,10 +56,10 @@ jobs:
 
   create_release:
     name: Create Release with MSI
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/v')
     env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
 
     needs: validate_build
 
@@ -88,8 +88,8 @@ jobs:
             vcpkg-${{ runner.os }}-
 
       - name: Create vcpkg cache directory
-        run: |
-          mkdir -p ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+        shell: pwsh
+        run: New-Item -Path "${{ env.VCPKG_DEFAULT_BINARY_CACHE }}" -ItemType Directory -Force
 
       - name: Install WiX v6 Toolset from MSI
         shell: pwsh
