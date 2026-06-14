@@ -11,6 +11,9 @@ jobs:
   validate_build:
     name: Validate Build
     runs-on: windows-latest
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+
     strategy:
       matrix:
         config: [ debug, release ]
@@ -28,16 +31,13 @@ jobs:
       - name: Restore vcpkg cache
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/extern/vcpkg/packages
+          path: |
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            vcpkg_installed/
           key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
             
-      - name: Setup VS environment
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
       - name: Build ${{ matrix.config }}
         run: |
           cmake --preset x64-${{ matrix.config }}
@@ -54,6 +54,9 @@ jobs:
     name: Create Release with MSI
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+
     needs: validate_build
 
     permissions:
@@ -73,15 +76,12 @@ jobs:
       - name: Restore vcpkg cache
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/extern/vcpkg/packages
+          path: |
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            vcpkg_installed/
           key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
-
-      - name: Setup VS environment
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
 
       - name: Install WiX v6 Toolset from MSI
         shell: pwsh
