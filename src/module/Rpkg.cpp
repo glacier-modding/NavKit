@@ -154,7 +154,7 @@ void Rpkg::checkHitmanVersion() {
         std::pair("6ce4ebfdd9e22e179206281d818850f5", "epic"), // ansel unlock
         std::pair("4f1b7753a40359bde5d4aa013257c5f1", "steam"), // base game
         std::pair("406865e7486cbc3b77a5f22fd73fbe00", "steam"), // ansel unlock
-        std::pair("4fd41b03dfd8a780b959c74ad155245f", "microsoft")
+        std::pair("cfdf300263b03d625099226882eafe84", "microsoft")
     });
 
     if (!(std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") || std::filesystem::exists(
