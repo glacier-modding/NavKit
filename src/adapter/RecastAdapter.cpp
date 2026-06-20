@@ -688,8 +688,8 @@ void RecastAdapter::excludeNonReachableAreas() const {
         c_str());
 }
 
-void RecastAdapter::save(const std::string& data) const {
-    sample->saveAll(data.c_str());
+void RecastAdapter::save(const std::string& data, bool isKnt) const {
+    sample->saveAll(data.c_str(), isKnt);
 }
 
 int RecastAdapter::getVertCount() const {

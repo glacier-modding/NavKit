@@ -925,7 +925,7 @@ void Navp::finalizeBuild() {
         const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         outputNavpFilename = navKitSettings.outputFolder + "\\output.navp.json";
-        recastAdapter.save(outputNavpFilename);
+        recastAdapter.save(outputNavpFilename, false);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
         navpBuildDone.store(false);
         building = false;

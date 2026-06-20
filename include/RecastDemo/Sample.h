@@ -136,7 +136,7 @@ public:
 	virtual ~Sample();
 
 	dtNavMesh* loadAll(const char* path);
-	void saveAll(const char* s_OutputFileName);
+	void saveAll(const char* s_OutputFileName, bool isKnt);
 	void setContext(BuildContext* ctx) { m_ctx = ctx; }
 	
 	void setTool(SampleTool* tool);

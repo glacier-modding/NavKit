@@ -455,7 +455,7 @@ struct PolyInfo {
 	int totalPolyIndex;
 };
 
-void Sample::saveAll(const char* s_OutputFileName)
+void Sample::saveAll(const char* s_OutputFileName, bool isKnt)
 {
     const dtNavMesh* mesh = m_navMesh;
     if (!mesh) return;
@@ -464,8 +464,8 @@ void Sample::saveAll(const char* s_OutputFileName)
 
     std::ofstream f(s_OutputFileName);
     f << std::fixed << std::boolalpha;
-
-    f << R"({"NavpJsonVersion":"0.2","Sections":[{"NavGraphs":[{"Areas":[)";
+    std::string_view game = isKnt ? "Knt" : "HM";
+    f << R"({"NavpJsonVersion":"0.3","Game":")" << game << R"(","Sections":[{"NavGraphs":[{"Areas":[)";
     std::vector<int> tilePolyCounts;
     for (int tileIndex = 0; tileIndex < mesh->getMaxTiles(); ++tileIndex) {
         const dtMeshTile* tile = mesh->getTile(tileIndex);

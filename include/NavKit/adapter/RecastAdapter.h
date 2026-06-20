@@ -82,7 +82,7 @@ public:
 
     void excludeNonReachableAreas() const;
 
-    void save(const std::string& data) const;
+    void save(const std::string& data, bool isKnt) const;
 
     [[nodiscard]] int getVertCount() const;
 

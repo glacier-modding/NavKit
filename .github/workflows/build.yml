@@ -12,7 +12,8 @@ jobs:
     name: Validate Build
     runs-on: windows-2022
     env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg_cache,readwrite"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}\vcpkg_cache
 
     strategy:
       matrix:
@@ -32,15 +33,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-            vcpkg_installed/
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/*/vcpkg_installed/
           key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
             
       - name: Create vcpkg cache directory
         shell: pwsh
-        run: New-Item -Path "${{ env.VCPKG_DEFAULT_BINARY_CACHE }}" -ItemType Directory -Force
+        run: New-Item -Path "${{ env.VCPKG_CACHE_DIR }}" -ItemType Directory -Force
 
       - name: Build ${{ matrix.config }}
         run: |
@@ -59,7 +60,8 @@ jobs:
     runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/v')
     env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg_cache,readwrite"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}\vcpkg_cache
 
     needs: validate_build
 
@@ -81,15 +83,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-            vcpkg_installed/
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/*/vcpkg_installed/
           key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
 
       - name: Create vcpkg cache directory
         shell: pwsh
-        run: New-Item -Path "${{ env.VCPKG_DEFAULT_BINARY_CACHE }}" -ItemType Directory -Force
+        run: New-Item -Path "${{ env.VCPKG_CACHE_DIR }}" -ItemType Directory -Force
 
       - name: Install WiX v6 Toolset from MSI
         shell: pwsh

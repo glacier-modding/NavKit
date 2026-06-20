@@ -69,7 +69,7 @@ bool GridGenerator::initRecastAirgAdapter() {
         return true;
     }
     const std::string outputNavpFilename = navKitSettings.outputFolder + "\\outputForAirg.navp.json";
-    recastAirgAdapter.save(outputNavpFilename);
+    recastAirgAdapter.save(outputNavpFilename, false);
 
     Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, false, true);
     return false;

@@ -1,4 +1,7 @@
 #include "../../include/NavKit/module/Rpkg.h"
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#pragma comment(lib, "Version.lib")
 #include <mutex>
 #include <fstream>
 
@@ -22,6 +25,45 @@ std::map<std::string, HashListEntry> Rpkg::hashToHashListEntryMap{};
 std::map<std::string, HashListEntry> Rpkg::ioiStringToHashListEntryMap{};
 std::mutex Rpkg::hashMapsMutex;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
+
+void PrintExeVersion(const std::wstring& filePath) {
+    // 1. Get the size of the version information block
+    DWORD handle = 0;
+    DWORD size = GetFileVersionInfoSizeW(filePath.c_str(), &handle);
+
+    if (size == 0) {
+        std::wcerr << L"Failed to get version size for: " << filePath << std::endl;
+        return;
+    }
+
+    // 2. Allocate a buffer to store the version data
+    std::vector<BYTE> buffer(size);
+    if (!GetFileVersionInfoW(filePath.c_str(), 0, size, buffer.data())) {
+        std::wcerr << L"Failed to retrieve version info." << std::endl;
+        return;
+    }
+
+    // 3. Query the fixed file information structure
+    VS_FIXEDFILEINFO* fileInfo = nullptr;
+    UINT len = 0;
+    if (!VerQueryValueW(buffer.data(), L"\\", reinterpret_cast<LPVOID*>(&fileInfo), &len) || len == 0) {
+        std::wcerr << L"Failed to query root version value." << std::endl;
+        return;
+    }
+
+    // 4. Extract major, minor, build, and revision numbers
+    DWORD major = HIWORD(fileInfo->dwFileVersionMS);
+    DWORD minor = LOWORD(fileInfo->dwFileVersionMS);
+    DWORD build = HIWORD(fileInfo->dwFileVersionLS);
+    DWORD revision = LOWORD(fileInfo->dwFileVersionLS);
+
+    // Output format matching your image (e.g., 3.270.1.0)
+    std::wcout << L"File Version: "
+               << major << L"."
+               << minor << L"."
+               << build << L"."
+               << revision << std::endl;
+}
 
 void Rpkg::initExtractionData() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
@@ -148,7 +190,7 @@ void Rpkg::initExtractionData() {
 void Rpkg::checkHitmanVersion() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
-    static constexpr const char* GAME_VERSION = "3.270.0";
+    static constexpr const char* GAME_VERSION = "3.270.1";
     static std::map<std::string, std::string> gameHashes({
         std::pair("b894cfa2f11b6db52db587a21de688b2", "epic"), // base game
         std::pair("6ce4ebfdd9e22e179206281d818850f5", "epic"), // ansel unlock
