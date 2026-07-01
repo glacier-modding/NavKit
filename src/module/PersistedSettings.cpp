@@ -1,5 +1,6 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include "../../include/NavKit/module/PersistedSettings.h"
-
 #include <filesystem>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -8,37 +9,41 @@
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 
-PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {}
+PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
+
+    iniPath = (exeDir / "NavKit.ini").string();
+    oldIniPath = (exeDir / "NavKit.ini.old").string();
+}
 
 void PersistedSettings::load() {
     ini.SetUnicode();
 
-    const std::string iniFileName = "NavKit.ini";
-    const std::string oldIniFileName = "NavKit.ini.old";
-
-    if (std::filesystem::exists(oldIniFileName)) {
+    if (std::filesystem::exists(oldIniPath)) {
         Logger::log(NK_INFO, "Old settings file found. Merging settings...");
         CSimpleIniA oldIni;
         oldIni.SetUnicode();
-        if (oldIni.LoadFile(oldIniFileName.c_str()) >= 0) {
-            if (ini.LoadFile(iniFileName.c_str()) < 0) {
+        if (oldIni.LoadFile(oldIniPath.c_str()) >= 0) {
+            if (ini.LoadFile(iniPath.c_str()) < 0) {
                 Logger::log(NK_ERROR, "New NavKit.ini not found. Creating a new one from old settings.");
             }
 
             CSimpleIniA::TNamesDepend sections;
             oldIni.GetAllSections(sections);
-            // Merge from old settings using the previous settings schema
-            if (const auto backgroundColor = oldIni.GetValue("Colors", "backgroundColor", ""); backgroundColor[0] !=
+
+            if (const auto backgroundColor = oldIni.GetValue("NavKit", "backgroundColor", ""); backgroundColor[0] !=
                 '\0') {
                 ini.SetValue("NavKit", "backgroundColor", backgroundColor);
             }
-            if (const auto hitman = oldIni.GetValue("Paths", "hitman", ""); hitman[0] != '\0') {
+            if (const auto hitman = oldIni.GetValue("NavKit", "hitman", ""); hitman[0] != '\0') {
                 ini.SetValue("NavKit", "hitman", hitman);
             }
-            if (const auto output = oldIni.GetValue("Paths", "output", ""); output[0] != '\0') {
+            if (const auto output = oldIni.GetValue("NavKit", "output", ""); output[0] != '\0') {
                 ini.SetValue("NavKit", "output", output);
             }
-            if (const auto blender = oldIni.GetValue("Paths", "blender", ""); blender[0] != '\0') {
+            if (const auto blender = oldIni.GetValue("NavKit", "blender", ""); blender[0] != '\0') {
                 ini.SetValue("NavKit", "blender", blender);
             }
             // Merge from old settings that match the new settings schema
@@ -59,23 +64,22 @@ void PersistedSettings::load() {
             save();
         } else {
             Logger::log(
-                NK_ERROR, "Failed to load NavKit.ini.old for merging. Loading current NavKit.ini if it exists.");
-            ini.LoadFile(iniFileName.c_str());
+                NK_ERROR, "Failed to load NavKit.ini.old for merging. Loading current settings if they exist.");
+            ini.LoadFile(iniPath.c_str());
         }
 
         try {
-            std::filesystem::remove(oldIniFileName);
+            std::filesystem::remove(oldIniPath);
             Logger::log(NK_INFO, "Removed temporary old settings file.");
         } catch (const std::filesystem::filesystem_error& e) {
             Logger::log(NK_ERROR, "Failed to delete NavKit.ini.old: %s", e.what());
         }
     } else {
-        ini.LoadFile(iniFileName.c_str());
+        ini.LoadFile(iniPath.c_str());
     }
 
-    if (std::filesystem::exists(iniFileName)) {
-        const std::filesystem::path fullPath = std::filesystem::absolute(iniFileName);
-        Logger::log(NK_INFO, "Loading settings from %s...", fullPath.string().c_str());
+    if (std::filesystem::exists(iniPath)) {
+        Logger::log(NK_INFO, "Loading settings from %s...", iniPath.c_str());
     } else {
         Logger::log(NK_INFO, "No NavKit.ini found, using default settings.");
     }
@@ -87,8 +91,8 @@ void PersistedSettings::load() {
 }
 
 void PersistedSettings::save() const {
-    if (ini.SaveFile("NavKit.ini") == SI_FAIL) {
-        Logger::log(NK_ERROR, "Error saving settings file");
+    if (ini.SaveFile(iniPath.c_str()) == SI_FAIL) {
+        Logger::log(NK_ERROR, "Error saving settings file to %s", iniPath.c_str());
     }
 }
 

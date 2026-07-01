@@ -95,18 +95,18 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
         } else {
             areaColor = selected ? glm::vec4(0.0, 0.9, 0.0, 1.0) : glm::vec4(0.0, 0.5, 0.0, 1.0);
         }
-
+        constexpr float zRenderOffset = 0.5f;
         // Triangulate (Fan)
         if (edges.size() >= 3) {
             const auto& v0 = edges[0];
-            glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
+            glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z + zRenderOffset, -v0->m_pos.Y);
 
             for (size_t j = 1; j < edges.size() - 1; ++j) {
                 const auto& v1 = edges[j];
                 const auto& v2 = edges[j + 1];
 
-                glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
-                glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
+                glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z + zRenderOffset, -v1->m_pos.Y);
+                glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z + zRenderOffset, -v2->m_pos.Y);
 
                 triVertices.push_back({p0, glm::vec3(0, 1, 0), areaColor});
                 triVertices.push_back({p1, glm::vec3(0, 1, 0), areaColor});
@@ -119,8 +119,8 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
             auto vStart = edges[j];
             auto vEnd = edges[(j + 1) % edges.size()];
 
-            glm::vec3 pStart(vStart->m_pos.X, vStart->m_pos.Z + 0.01f, -vStart->m_pos.Y);
-            glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + 0.01f, -vEnd->m_pos.Y);
+            glm::vec3 pStart(vStart->m_pos.X, vStart->m_pos.Z + zRenderOffset + 0.01f, -vStart->m_pos.Y);
+            glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + zRenderOffset + 0.1f, -vEnd->m_pos.Y);
 
             auto getEdgeColor = [&](const NavPower::Binary::Edge* v) {
                 if (v->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
@@ -143,8 +143,8 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
                     float a1 = static_cast<float>(k) / 8.0f * std::numbers::pi * 2;
                     float a2 = static_cast<float>(k + 1) / 8.0f * std::numbers::pi * 2;
 
-                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1) * r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a1) * r));
-                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2) * r, vertex->m_pos.Z, -(vertex->m_pos.Y + sinf(a2) * r));
+                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1) * r, vertex->m_pos.Z + zRenderOffset, -(vertex->m_pos.Y + sinf(a1) * r));
+                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2) * r, vertex->m_pos.Z + zRenderOffset, -(vertex->m_pos.Y + sinf(a2) * r));
 
                     lineVertices.push_back({glP1, glm::vec3(0, 1, 0), circleColor});
                     lineVertices.push_back({glP2, glm::vec3(0, 1, 0), circleColor});

@@ -380,8 +380,9 @@ char* Airg::openSaveAirgFileDialog(char* lastAirgFolder) {
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
                                const Waypoint& waypoint, const bool selected, const glm::vec4& color,
                                const bool forceFan) {
-    const float r = 0.1f;
-    const float z = waypoint.vPos.z + 0.03f;
+    constexpr float r = 0.1f;
+    constexpr float zRenderOffset = 0.53f;
+    const float z = waypoint.vPos.z + zRenderOffset;
     const glm::vec3 center(waypoint.vPos.x, z, -waypoint.vPos.y);
     constexpr glm::vec3 normal(0.0f, 1.0f, 0.0f);
     constexpr float step = std::numbers::pi_v<float> / 4.0f;
@@ -460,8 +461,8 @@ void Airg::renderAirg() {
     if (airgDirty) {
         std::vector<AirgVertex> triVerts;
         std::vector<AirgVertex> lineVerts;
-
         for (int i = 0; i < reasoningGrid->m_WaypointList.size(); i++) {
+            constexpr float zRenderOffset = 0.52f;
             const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
             bool selected = (i == selectedWaypointIndex);
 
@@ -477,13 +478,13 @@ void Airg::renderAirg() {
 
                 // Boundary
                 glm::vec4 boundaryColor(0.8, 0.8, 0.8, 0.6);
-                glm::vec3 p1(x - reasoningGrid->m_Properties.fGridSpacing / 2, z,
+                glm::vec3 p1(x - reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
                              -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
-                glm::vec3 p2(x - reasoningGrid->m_Properties.fGridSpacing / 2, z,
+                glm::vec3 p2(x - reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
                              -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-                glm::vec3 p3(x + reasoningGrid->m_Properties.fGridSpacing / 2, z,
+                glm::vec3 p3(x + reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
                              -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
-                glm::vec3 p4(x + reasoningGrid->m_Properties.fGridSpacing / 2, z,
+                glm::vec3 p4(x + reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
                              -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
 
                 lineVerts.push_back({p1, glm::vec3(0, 1, 0), boundaryColor});
@@ -540,10 +541,10 @@ void Airg::renderAirg() {
                             float zChange = selected ? 0.001 : 0.01;
                             float zc = waypoint.vPos.z + zChange;
 
-                            glm::vec3 cp1(bx, zc, byRaw);
-                            glm::vec3 cp2(bx, zc, byRaw + bw);
-                            glm::vec3 cp3(bx + bw, zc, byRaw + bw);
-                            glm::vec3 cp4(bx + bw, zc, byRaw);
+                            glm::vec3 cp1(bx, zc + zRenderOffset, byRaw);
+                            glm::vec3 cp2(bx, zc + zRenderOffset, byRaw + bw);
+                            glm::vec3 cp3(bx + bw, zc + zRenderOffset, byRaw + bw);
+                            glm::vec3 cp4(bx + bw, zc + zRenderOffset, byRaw);
 
                             triVerts.push_back({cp1, glm::vec3(0, 1, 0), cellColor});
                             triVerts.push_back({cp2, glm::vec3(0, 1, 0), cellColor});
@@ -565,8 +566,8 @@ void Airg::renderAirg() {
                 if (waypoint.nNeighbors[neighborIndex] != 65535 && waypoint.nNeighbors[neighborIndex] < reasoningGrid->
                     m_WaypointList.size()) {
                     const Waypoint& neighbor = reasoningGrid->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
-                    glm::vec3 pStart(waypoint.vPos.x, waypoint.vPos.z + 0.01f, -waypoint.vPos.y);
-                    glm::vec3 pEnd(neighbor.vPos.x, neighbor.vPos.z + 0.01f, -neighbor.vPos.y);
+                    glm::vec3 pStart(waypoint.vPos.x, waypoint.vPos.z  + zRenderOffset + 0.01f, -waypoint.vPos.y);
+                    glm::vec3 pEnd(neighbor.vPos.x, neighbor.vPos.z  + zRenderOffset + 0.01f, -neighbor.vPos.y);
                     lineVerts.push_back({pStart, glm::vec3(0, 1, 0), wpColor});
                     lineVerts.push_back({pEnd, glm::vec3(0, 1, 0), wpColor});
                 }

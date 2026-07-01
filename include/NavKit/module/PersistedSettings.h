@@ -1,10 +1,13 @@
 #pragma once
 #include <SimpleIni.h>
+#include <string>
 
 class PersistedSettings {
     explicit PersistedSettings();
 
     CSimpleIniA ini;
+    std::string iniPath;
+    std::string oldIniPath;
 
 public:
     static PersistedSettings& getInstance() {
