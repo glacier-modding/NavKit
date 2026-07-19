@@ -16,6 +16,10 @@ set(MODEL_SOURCES
         model/VisionData.cpp
         model/Json.cpp
 )
+set(NAVWEAKNESS_SOURCES
+        extern/NavWeakness/NavPower.cpp
+        extern/NavWeakness/NavWeakness.cpp
+)
 set(MODULE_SOURCES
         module/Airg.cpp
         module/GameConnection.cpp
@@ -53,6 +57,7 @@ add_library(NavKitLib STATIC
         extern/easywsclient/easywsclient.cpp
         extern/QuickDigest/quickdigest5.cpp
         ${RECAST_DEMO_SOURCES}
+        ${NAVWEAKNESS_SOURCES}
         ${MODEL_SOURCES}
         ${MODULE_SOURCES}
         ${RENDER_SOURCES}
@@ -68,14 +73,6 @@ set_target_properties(navkit-rpkg-lib PROPERTIES
         IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll.lib"
         IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll"
         IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll"
-)
-
-add_library(NavWeakness SHARED IMPORTED GLOBAL)
-set_target_properties(NavWeakness PROPERTIES
-        IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.lib"
-        IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.lib"
-        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/NavWeakness.dll"
-        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/NavWeakness.dll"
 )
 
 add_library(ResourceLib_HM3 SHARED IMPORTED GLOBAL)
@@ -98,7 +95,6 @@ target_include_directories(NavKitLib
 target_link_libraries(NavKitLib PUBLIC
         GLEW::GLEW
         navkit-rpkg-lib
-        NavWeakness
         OpenGL::GL
         RecastNavigation::DebugUtils
         RecastNavigation::Detour
@@ -126,7 +122,6 @@ target_compile_definitions(NavKit PRIVATE NOMINMAX)
 target_link_libraries(NavKit PRIVATE NavKitLib)
 set(RUNTIME_TARGET_DEPENDENCIES
         navkit-rpkg-lib
-        NavWeakness
         ResourceLib_HM3
 )
 set(RUNTIME_TARGET_DEPENDENCIES ${RUNTIME_TARGET_DEPENDENCIES} PARENT_SCOPE)

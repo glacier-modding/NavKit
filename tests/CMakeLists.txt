@@ -9,7 +9,6 @@ target_link_libraries(NavKitTests PRIVATE
 )
 
 set(TEST_DLLS
-        "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/NavWeakness.dll"
         "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/ResourceLib_HM3.dll"
         "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/nfd.dll"
 )

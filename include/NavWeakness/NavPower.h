@@ -1,6 +1,7 @@
 /*
-NavPower.h - v2.0.0
-A header file for use with NavPower's binary navmesh files.
+NavPower.h - v3.0.0
+A header file for use with NavPower's binary navmesh files. Adapted for use
+in NavKit.
 
 Licensed under the MIT License
 SPDX-License-Identifier: MIT
@@ -33,6 +34,7 @@ SOFTWARE.
 #include <iostream>
 #include <algorithm>
 #include <stdlib.h>
+#include <limits>
 
 #if _WIN32
 #define SIMD_PATH "..\\..\\extern\\simdjson\\simdjson.h"
@@ -68,6 +70,13 @@ namespace NavPower
         void writeBinary(std::ostream& f);
 
         void copy(BBox o);
+
+        bool Contains(const Vec3& p) const
+        {
+            return p.X >= m_min.X && p.X <= m_max.X &&
+                   p.Y >= m_min.Y && p.Y <= m_max.Y &&
+                   p.Z >= m_min.Z && p.Z <= m_max.Z;
+        }
     };
 
     enum Axis
@@ -107,6 +116,24 @@ namespace NavPower
     // The binary formats of NavPower data structures
     namespace Binary
     {
+        // POD Struct exactly matching the file layout (320 bytes)
+        struct NavGraphHeaderLayout {
+            uint32_t m_version;
+            uint32_t m_layer;
+            uint32_t m_areaBytes;
+            uint32_t m_kdTreeBytes;
+            uint32_t m_linkRecordBytes;
+            uint32_t m_totalBytes;
+            float m_buildScale;
+            float m_voxSize;
+            float m_radius;
+            float m_stepHeight;
+            float m_height;
+            struct { float min[3]; float max[3]; } m_bbox;
+            uint32_t m_buildUpAxis;
+            uint8_t m_pad[252];
+        };
+
         class Header
         {
         public:
@@ -140,15 +167,15 @@ namespace NavPower
             void writeBinary(std::ostream& f);
         };
 
-        class NavGraphHeaderHm
+        class NavGraphHeaderBase
         {
         public:
-            uint32_t m_version = 0x28;
+            uint32_t m_version{};
             uint32_t m_layer = 0;
-            uint32_t m_areaBytes;
-            uint32_t m_kdTreeBytes;
+            uint32_t m_areaBytes{};
+            uint32_t m_kdTreeBytes{};
             uint32_t m_linkRecordBytes = 0;
-            uint32_t m_totalBytes;
+            uint32_t m_totalBytes{};
             float m_buildScale = 2.0f;
             float m_voxSize = 0.1f;
             float m_radius = 0.2f;
@@ -160,34 +187,39 @@ namespace NavPower
             // It is however identical in all files, changing it to all 0x00 makes NPCs disappear completely
             uint8_t m_pad[252] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,191,20,214,126,45,220,142,102,131,239,87,73,97,255,105,143,97,205,209,30,157,156,22,114,114,230,29,240,132,79,74,119,2,215,232,57,44,83,203,201,18,30,51,116,158,12,244,213,212,159,212,164,89,126,53,207,50,34,244,204,207,211,144,45,72,211,143,117,230,217,29,42,229,192,247,43,120,129,135,68,14,95,80,0,212,97,141,190,123,5,21,7,59,51,130,31,24,112,146,218,100,84,206,177,133,62,105,21,248,70,106,4,150,115,14,217,22,47,103,104,212,247,74,74,208,87,104,118 };
 
-            void writeBinary(std::ostream& f);
+            virtual void writeBinary(std::ostream& f) = 0;
+            virtual void readBinary(std::istream& f) = 0;
+            [[nodiscard]] virtual size_t getSize() const { return sizeof(NavGraphHeaderLayout); }
         };
 
-        class NavGraphHeaderKnt
+        class NavGraphHeaderHm : public NavGraphHeaderBase
         {
         public:
-            uint32_t m_version = 0x30;
-            uint32_t m_layer = 0;
-            uint32_t m_areaBytes;
-            uint32_t m_kdTreeBytes;
+            NavGraphHeaderHm()
+            {
+                m_version = 0x28;
+            }
+            void writeBinary(std::ostream& f) override;
+            void readBinary(std::istream& f) override;
+        };
+
+        class NavGraphHeaderKnt : public NavGraphHeaderBase
+        {
+        public:
             uint32_t m_unknown0 = 0;
             uint32_t m_unknown1 = 0;
             uint32_t m_unknown2 = 56;
-            uint32_t m_linkRecordBytes = 0;
-            uint32_t m_totalBytes;
             uint32_t m_unknown3 = 0;
-            float m_buildScale = 2.0f;
-            float m_voxSize = 0.1f;
-            float m_radius = 0.2f;
-            float m_stepHeight = 0.3f;
-            float m_height = 1.8f; // Human Height
-            BBox m_bbox;
-            Axis m_buildUpAxis = Axis::Z;
-            // In NAVPs from 007 First Light the padding isn't just 0x00
-            // It is however identical in all files, changing it to all 0x00 makes NPCs disappear completely
-            uint8_t m_pad[252] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,191,20,214,126,45,220,142,102,131,239,87,73,97,255,105,143,97,205,209,30,157,156,22,114,114,230,29,240,132,79,74,119,2,215,232,57,44,83,203,201,18,30,51,116,158,12,244,213,212,159,212,164,89,126,53,207,50,34,244,204,207,211,144,45,72,211,143,117,230,217,29,42,229,192,247,43,120,129,135,68,14,95,80,0,212,97,141,190,123,5,21,7,59,51,130,31,24,112,146,218,100,84,206,177,133,62,105,21,248,70,106,4,150,115,14,217,22,47,103,104,212,247,74,74,208,87,104,118 };
 
-            void writeBinary(std::ostream& f);
+            NavGraphHeaderKnt()
+            {
+                m_version = 0x30;
+            }
+            void writeBinary(std::ostream& f) override;
+            void readBinary(std::istream& f) override;
+            [[nodiscard]] size_t getSize() const override {
+                return sizeof(NavGraphHeaderLayout) + 16;
+            }
         };
 
         class AreaFlags
@@ -346,11 +378,6 @@ namespace NavPower
         };
     }; // namespace Binary
 
-    // Requires a pointer to the NavGraph, fixes Area pointers in the NavGraph
-    // The reason we do this is so it actually points to an area in memory and
-    // not a pointer to a location in the file relative to the start of the NavGraph
-    void FixAreaPointers(uintptr_t data, size_t areaBytes);
-
     class Area
     {
     public:
@@ -430,21 +457,27 @@ namespace NavPower
         uint32_t m_splitAxis;
     };
 
-    BBox generateBbox(std::vector<Area> s_areas);
+    BBox generateBbox(const std::vector<Area>& s_areas);
     bool compareX(Area& a1, Area& a2);
     bool compareY(Area& a1, Area& a2);
     bool compareZ(Area& a1, Area& a2);
 
+    struct KDTreeResult
+    {
+        uint32_t m_axis;
+        BBox m_bbox;
+        Binary::Area* m_pArea;
+        bool m_isLeaf;
+    };
+
     class NavGraph
     {
     public:
-        union {
-            Binary::NavGraphHeaderHm* m_hdr;
-            Binary::NavGraphHeaderKnt* m_hdrKnt;
-        };
+        Binary::NavGraphHeaderBase* m_hdr;
         std::vector<Area> m_areas;
         Binary::KDTreeData* m_kdTreeData;
         Binary::KDNode* m_rootKDNode;
+        bool m_isKnt;
 
         NavGraph() {};
         NavGraph(auto s_NavGraphJson);
@@ -457,6 +490,10 @@ namespace NavPower
 
         // Build m_areas area pointer to NavGraph offset map so the KD Tree can set the primoffset
         std::map<Binary::Area*, uint32_t> AreaPointerToNavGraphOffsetMap();
+
+        // Spatially traverses the KD-tree to find the leaf bounding box for a given position.
+        // This is the most reliable way to find which KD-leaf an area belongs to without relying on pointers.
+        BBox FindLeafBBoxForPosition(Vec3 pos);
 
         // Build m_areas NavGraph offset to index map so the KD Tree can get the area index from the primoffset
         std::map<uint32_t, uint32_t> AreaNavGraphOffsetToIndexMap();
@@ -481,54 +518,15 @@ namespace NavPower
         void read(uintptr_t& p_data, bool& p_isKnt);
 
         // This parses the k-d tree and outputs it as a vector of bounding boxes
-        std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> ParseKDTree()
-        {
-            std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> depthToSplitAndBboxMap;
-            std::vector<KDTreeHelper> kdNodes;
-            std::vector<std::pair<uint32_t, BBox>> newVector;
-            depthToSplitAndBboxMap.insert({ 0, newVector });
-            kdNodes.push_back(KDTreeHelper{
-                m_rootKDNode,
-                m_kdTreeData->m_bbox,
-                0,
-                0});
+        std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> ParseKDTree();
 
-            while (!kdNodes.empty())
-            {
-                KDTreeHelper parent = kdNodes.back();
-                kdNodes.pop_back();
-                uint32_t depth = parent.m_depth + 1;
-                if (depthToSplitAndBboxMap.find(depth) == depthToSplitAndBboxMap.end()) {
-                    std::vector<std::pair<uint32_t, BBox>> newNodeVector;
-                    depthToSplitAndBboxMap.insert({ depth, newNodeVector });
-                }
-                depthToSplitAndBboxMap[depth].push_back(std::pair<uint32_t, BBox>(parent.m_splitAxis, BBox(parent.m_bbox)));
-                if (!parent.m_node->IsLeaf())
-                {
-                    Axis splitAxis = parent.m_node->GetSplitAxis();
+        // This parses the k-d tree and outputs it as a vector of bounding boxes
+        std::map<uint32_t, std::vector<KDTreeResult>> ParseKDTreeToKDTreeResult();
 
-                    // Left Node
-                    kdNodes.push_back(KDTreeHelper{
-                        parent.m_node->GetLeft(),
-                        parent.m_bbox,
-                        depth,
-                        uint32_t(splitAxis) });
-
-                    kdNodes.back().m_bbox.m_max[splitAxis] = parent.m_node->m_dLeft;
-
-                    // Right Node
-                    kdNodes.push_back(KDTreeHelper{
-                        parent.m_node->GetRight(),
-                        parent.m_bbox,
-                        depth,
-                        uint32_t(splitAxis) });
-
-                    kdNodes.back().m_bbox.m_min[splitAxis] = parent.m_node->m_dRight;
-                }
-            }
-
-            return depthToSplitAndBboxMap;
-        }
+        // Requires a pointer to the NavGraph, fixes Area pointers in the NavGraph
+        // The reason we do this is so it actually points to an area in memory and
+        // not a pointer to a location in the file relative to the start of the NavGraph
+        void FixAreaPointers(uintptr_t navGraphStart, size_t areaBytes);
     };
 
     class Section
@@ -554,7 +552,7 @@ namespace NavPower
     public:
         Binary::Header* m_hdr;
         std::vector<Section> m_aSections;
-        bool m_isKnt;
+        bool m_isKnt = false;
 
         NavMesh() {};
         NavMesh(const char* p_NavGraphJsonPath);

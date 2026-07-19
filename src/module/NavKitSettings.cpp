@@ -20,7 +20,7 @@ void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.backgroundColor = 0.16f;
     settings.hitmanFolder = R"(C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)";
     settings.outputFolder = R"(D:\workspace\output)";
-    settings.blenderPath = R"(C:\Program Files\Blender Foundation\Blender 3.4\blender.exe)";
+    settings.blenderPath = R"(C:\Program Files\Blender Foundation\Blender 4.3\blender.exe)";
     settings.showDebugLogs = false;
 }
 

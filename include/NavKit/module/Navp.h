@@ -3,10 +3,14 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <optional>
+#include <thread>
+#include <atomic>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <GL/glew.h>
 
+#include "../../NavWeakness/NavPower.h"
 #include "../model/Json.h"
 
 struct Vec3;
@@ -82,6 +86,8 @@ public:
 
     void renderNavMeshForHitTest() const;
 
+    void renderKdTree();
+
     void finalizeBuild();
 
     static void updateNavpDialogControls(HWND hwnd);
@@ -94,6 +100,15 @@ public:
 
     void buildAreaMaps();
 
+    struct CachedKdNode {
+        uint32_t depth;
+        NavPower::BBox bbox;
+        NavPower::Binary::Area* pArea;
+        bool isLeaf;
+    };
+    std::vector<CachedKdNode> kdTreeNodes;
+    std::map<NavPower::Binary::Area*, CachedKdNode*> cachedKdNodes;
+
     void setSelectedNavpAreaIndex(int index);
 
     void setSelectedPfSeedPointIndex(int index);
@@ -101,14 +116,15 @@ public:
     void setSelectedExclusionBoxIndex(int index);
 
     NavPower::NavMesh* navMesh{};
-    std::vector<char> navMeshFileData{};
     std::map<NavPower::Binary::Area*, NavPower::Area*> binaryAreaToAreaMap;
     std::map<Vec3, NavPower::Area*> posToAreaMap;
     int selectedNavpAreaIndex;
+    std::optional<NavPower::BBox> selectedLeafBBox;
     int selectedPfSeedPointIndex;
     int selectedExclusionBoxIndex;
     bool navpLoaded;
     bool showNavp;
+    bool showKdTree;
     bool showNavpIndices;
     bool showPfExclusionBoxes;
     bool showPfSeedPoints;
@@ -150,8 +166,6 @@ public:
 
     static void updateExclusionBoxConvexVolumes();
 
-    void loadNavMeshFileData(const std::string& fileName);
-
     void loadNavMesh(const std::string& fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
     std::atomic<bool> navpBuildDone{false};
@@ -166,8 +180,6 @@ public:
     static std::mutex navpHashIoiStringMapMutex;
 
 private:
-    static void renderArea(const NavPower::Area& area, bool selected);
-
     static bool areaIsStairs(const NavPower::Area& area);
 
     void setStairsFlags() const;

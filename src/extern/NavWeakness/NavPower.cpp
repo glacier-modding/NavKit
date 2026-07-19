@@ -1,0 +1,1518 @@
+/*
+NavPower.cpp - v3.0.0
+A header file for use with NavPower's binary navmesh files. Adapted for use
+in NavKit.
+
+Licensed under the MIT License
+SPDX-License-Identifier: MIT
+Copyright (c) 2022+ Anthony Fuller et al.
+
+Permission is hereby  granted, free of charge, to any  person obtaining a copy
+of this software and associated  documentation files (the "Software"), to deal
+in the Software  without restriction, including without  limitation the rights
+to  use, copy,  modify, merge,  publish, distribute,  sublicense, and/or  sell
+copies  of  the Software,  and  to  permit persons  to  whom  the Software  is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE  IS PROVIDED "AS  IS", WITHOUT WARRANTY  OF ANY KIND,  EXPRESS OR
+IMPLIED,  INCLUDING BUT  NOT  LIMITED TO  THE  WARRANTIES OF  MERCHANTABILITY,
+FITNESS FOR  A PARTICULAR PURPOSE AND  NONINFRINGEMENT. IN NO EVENT  SHALL THE
+AUTHORS  OR COPYRIGHT  HOLDERS  BE  LIABLE FOR  ANY  CLAIM,  DAMAGES OR  OTHER
+LIABILITY, WHETHER IN AN ACTION OF  CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+#pragma once
+
+#include "../../include/NavWeakness/NavPower.h"
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <set>
+#include <limits>
+
+#include "../../../include/NavKit/module/Logger.h"
+
+uint32_t RangeCheck(uint32_t val, uint32_t min, uint32_t max)
+{
+    if (val > max) return max;
+    if (val < min) return min;
+    return val;
+}
+
+namespace NavPower
+{
+
+    std::string AxisToString(Axis axis)
+    {
+        switch (axis)
+        {
+        case Axis::X:
+            return "X-Axis";
+        case Axis::Y:
+            return "Y-Axis";
+        case Axis::Z:
+            return "Z-Axis";
+        case Axis::UNDEF:
+            return "Undefined-Axis";
+        default:
+            return "ERROR IN AXIS CONV FUNC";
+        }
+    }
+
+    Axis AxisStringToEnumValue(auto p_Axis)
+    {
+        if (p_Axis.compare("X-Axis") == 0)
+        {
+            return Axis::X;
+        }
+        else if (p_Axis.compare("Y-Axis") == 0)
+        {
+            return Axis::Y;
+        }
+        else
+        {
+            return Axis::Z;
+        }
+    };
+
+    std::string AreaUsageFlagToString(AreaUsageFlags p_AreaUsageFlag)
+    {
+        switch (p_AreaUsageFlag)
+        {
+        case AreaUsageFlags::AREA_FLAT:
+            return "Flat";
+        case AreaUsageFlags::AREA_STEPS:
+            return "Steps";
+        default:
+            return "UNKNOWN!";
+        }
+    };
+
+    AreaUsageFlags AreaUsageFlagStringToEnumValue(auto p_AreaUsageFlag)
+    {
+        if (p_AreaUsageFlag.compare("Flat") == 0)
+        {
+            return AreaUsageFlags::AREA_FLAT;
+        }
+        else if (p_AreaUsageFlag.compare("Steps") == 0)
+        {
+            return AreaUsageFlags::AREA_STEPS;
+        }
+        else
+        {
+            return AreaUsageFlags::AREA_FLAT;
+        }
+    };
+
+    std::string EdgeTypeToString(EdgeType p_EdgeType)
+    {
+        switch (p_EdgeType)
+        {
+        case EdgeType::EDGE_NORMAL:
+            return "Normal";
+        case EdgeType::EDGE_PORTAL:
+            return "Portal";
+        default:
+            return "UNKNOWN!";
+        }
+    };
+
+    EdgeType EdgeTypeStringToEnumValue(auto p_EdgeType)
+    {
+        if (p_EdgeType.compare("Normal") == 0)
+        {
+            return EdgeType::EDGE_NORMAL;
+        }
+        else
+        {
+            return EdgeType::EDGE_PORTAL;
+        }
+    }
+
+    void BBox::writeBinary(std::ostream& f)
+    {
+        m_min.writeBinary(f);
+        m_max.writeBinary(f);
+    }
+
+    void BBox::copy(BBox o)
+    {
+        m_min.X = o.m_min.X;
+        m_min.Y = o.m_min.Y;
+        m_min.Z = o.m_min.Z;
+        m_max.X = o.m_max.X;
+        m_max.Y = o.m_max.Y;
+        m_max.Z = o.m_max.Z;
+    }
+
+    namespace Binary {
+        void Binary::Header::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_endianFlag, sizeof(m_endianFlag));
+            f.write((char*)&m_version, sizeof(m_version));
+            f.write((char*)&m_imageSize, sizeof(m_imageSize));
+            f.write((char*)&m_checksum, sizeof(m_checksum));
+            f.write((char*)&m_runtimeFlags, sizeof(m_runtimeFlags));
+            f.write((char*)&m_constantFlags, sizeof(m_constantFlags));
+        }
+
+        void Binary::SectionHeader::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_id, sizeof(m_id));
+            f.write((char*)&m_size, sizeof(m_size));
+            f.write((char*)&m_pointerSize, sizeof(m_pointerSize));
+        }
+
+        void Binary::NavSetHeader::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_endianFlag, sizeof(m_endianFlag));
+            f.write((char*)&m_version, sizeof(m_version));
+            f.write((char*)&m_numGraphs, sizeof(m_numGraphs));
+        }
+
+        void NavGraphHeaderBase::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_version, sizeof(m_version));
+            f.write((char*)&m_layer, sizeof(m_layer));
+            f.write((char*)&m_areaBytes, sizeof(m_areaBytes));
+            f.write((char*)&m_kdTreeBytes, sizeof(m_kdTreeBytes));
+            f.write((char*)&m_linkRecordBytes, sizeof(m_linkRecordBytes));
+            f.write((char*)&m_totalBytes, sizeof(m_totalBytes));
+            f.write((char*)&m_buildScale, sizeof(m_buildScale));
+            f.write((char*)&m_voxSize, sizeof(m_voxSize));
+            f.write((char*)&m_radius, sizeof(m_radius));
+            f.write((char*)&m_stepHeight, sizeof(m_stepHeight));
+            f.write((char*)&m_height, sizeof(m_height));
+            m_bbox.writeBinary(f);
+            f.write((char*)&m_buildUpAxis, sizeof(m_buildUpAxis));
+            f.write((char*)&m_pad, sizeof(m_pad));
+        }
+
+        void NavGraphHeaderBase::readBinary(std::istream& f)
+        {
+            f.read((char*)&m_version, sizeof(m_version));
+            f.read((char*)&m_layer, sizeof(m_layer));
+            f.read((char*)&m_areaBytes, sizeof(m_areaBytes));
+            f.read((char*)&m_kdTreeBytes, sizeof(m_kdTreeBytes));
+            f.read((char*)&m_linkRecordBytes, sizeof(m_linkRecordBytes));
+            f.read((char*)&m_totalBytes, sizeof(m_totalBytes));
+            f.read((char*)&m_buildScale, sizeof(m_buildScale));
+            f.read((char*)&m_voxSize, sizeof(m_voxSize));
+            f.read((char*)&m_radius, sizeof(m_radius));
+            f.read((char*)&m_stepHeight, sizeof(m_stepHeight));
+            f.read((char*)&m_height, sizeof(m_height));
+            f.read((char*)&m_bbox.m_min.X, sizeof(float));
+            f.read((char*)&m_bbox.m_min.Y, sizeof(float));
+            f.read((char*)&m_bbox.m_min.Z, sizeof(float));
+            f.read((char*)&m_bbox.m_max.X, sizeof(float));
+            f.read((char*)&m_bbox.m_max.Y, sizeof(float));
+            f.read((char*)&m_bbox.m_max.Z, sizeof(float));
+            f.read((char*)&m_buildUpAxis, sizeof(m_buildUpAxis));
+            f.read((char*)&m_pad, sizeof(m_pad));
+        }
+
+        void Binary::NavGraphHeaderHm::writeBinary(std::ostream& f)
+        {
+            NavGraphHeaderBase::writeBinary(f);
+        }
+
+        void Binary::NavGraphHeaderHm::readBinary(std::istream& f)
+        {
+            NavGraphHeaderBase::readBinary(f);
+        }
+
+        void Binary::NavGraphHeaderKnt::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_version, sizeof(m_version));
+            f.write((char*)&m_layer, sizeof(m_layer));
+            f.write((char*)&m_areaBytes, sizeof(m_areaBytes));
+            f.write((char*)&m_kdTreeBytes, sizeof(m_kdTreeBytes));
+            f.write((char*)&m_unknown0, sizeof(m_unknown0));
+            f.write((char*)&m_unknown1, sizeof(m_unknown1));
+            f.write((char*)&m_unknown2, sizeof(m_unknown2));
+            f.write((char*)&m_linkRecordBytes, sizeof(m_linkRecordBytes));
+            f.write((char*)&m_totalBytes, sizeof(m_totalBytes));
+            f.write((char*)&m_unknown3, sizeof(m_unknown3));
+            f.write((char*)&m_buildScale, sizeof(m_buildScale));
+            f.write((char*)&m_voxSize, sizeof(m_voxSize));
+            f.write((char*)&m_radius, sizeof(m_radius));
+            f.write((char*)&m_stepHeight, sizeof(m_stepHeight));
+            f.write((char*)&m_height, sizeof(m_height));
+            m_bbox.writeBinary(f);
+            f.write((char*)&m_buildUpAxis, sizeof(m_buildUpAxis));
+            f.write((char*)&m_pad, sizeof(m_pad));
+        }
+
+        void Binary::NavGraphHeaderKnt::readBinary(std::istream& f)
+        {
+            f.read((char*)&m_version, sizeof(m_version));
+            f.read((char*)&m_layer, sizeof(m_layer));
+            f.read((char*)&m_areaBytes, sizeof(m_areaBytes));
+            f.read((char*)&m_kdTreeBytes, sizeof(m_kdTreeBytes));
+            f.read((char*)&m_unknown0, sizeof(m_unknown0));
+            f.read((char*)&m_unknown1, sizeof(m_unknown1));
+            f.read((char*)&m_unknown2, sizeof(m_unknown2));
+            f.read((char*)&m_linkRecordBytes, sizeof(m_linkRecordBytes));
+            f.read((char*)&m_totalBytes, sizeof(m_totalBytes));
+            f.read((char*)&m_unknown3, sizeof(m_unknown3));
+            f.read((char*)&m_buildScale, sizeof(m_buildScale));
+            f.read((char*)&m_voxSize, sizeof(m_voxSize));
+            f.read((char*)&m_radius, sizeof(m_radius));
+            f.read((char*)&m_stepHeight, sizeof(m_stepHeight));
+            f.read((char*)&m_height, sizeof(m_height));
+            f.read((char*)&m_bbox.m_min.X, sizeof(float));
+            f.read((char*)&m_bbox.m_min.Y, sizeof(float));
+            f.read((char*)&m_bbox.m_min.Z, sizeof(float));
+            f.read((char*)&m_bbox.m_max.X, sizeof(float));
+            f.read((char*)&m_bbox.m_max.Y, sizeof(float));
+            f.read((char*)&m_bbox.m_max.Z, sizeof(float));
+            f.read((char*)&m_buildUpAxis, sizeof(m_buildUpAxis));
+            f.read((char*)&m_pad, sizeof(m_pad));
+        }
+
+        void Binary::AreaFlags::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_flags1, sizeof(m_flags1));
+            f.write((char*)&m_flags2, sizeof(m_flags2));
+            f.write((char*)&m_flags3, sizeof(m_flags3));
+            f.write((char*)&m_flags4, sizeof(m_flags4));
+        }
+        bool Binary::AreaFlags::operator==(AreaFlags const& other) const
+        {
+            bool eq = true;
+            eq &= m_flags1 == other.m_flags1;
+            eq &= m_flags2 == other.m_flags2;
+            eq &= m_flags3 == other.m_flags3;
+            eq &= m_flags4 == other.m_flags4;
+            return eq;
+        }
+
+        void Binary::Area::writeJson(std::ostream& f, uint64_t s_areaIndex)
+        {
+            f << "{";
+            f << "\"Index\":" << s_areaIndex;
+            if (m_usageFlags != AreaUsageFlags::AREA_FLAT)
+            {
+                f << ",\"Type\":";
+                f << "\"" << AreaUsageFlagToString(m_usageFlags) << "\"";
+            }
+            f << "}";
+        }
+
+        void Binary::Area::readJson(auto p_Json)
+        {
+            auto result = p_Json.find_field("Type");
+            if (result.error() == simdjson::SUCCESS) {
+                m_usageFlags = AreaUsageFlagStringToEnumValue(std::string{ std::string_view(p_Json["Type"]) });
+            }
+            else
+            {
+                m_usageFlags = AreaUsageFlags::AREA_FLAT;
+            }
+            m_flags.m_flags1 = 0x1FC0000;
+            m_flags.m_flags2 = 0;
+            m_flags.SetIslandNum(262143);
+            m_flags.SetAreaUsageCount(0);
+            m_flags.SetObCostMult(1);
+            m_flags.SetStaticCostMult(1);
+            m_flags.m_flags3 = 0;
+            m_flags.m_flags4 = 0;
+        }
+
+        void Binary::Area::writeBinary(std::ostream& f)
+        {
+            f.write((char*)&m_pProxy, sizeof(m_pProxy));
+            f.write((char*)&m_dynAreaData, sizeof(m_dynAreaData));
+            f.write((char*)&m_pFirstLink, sizeof(m_pFirstLink));
+            f.write((char*)&m_pSearchParent, sizeof(m_pSearchParent));
+            m_pos.writeBinary(f);
+            f.write((char*)&m_radius, sizeof(m_radius));
+            f.write((char*)&m_searchCost, sizeof(m_searchCost));
+            f.write((char*)&m_usageFlags, sizeof(m_usageFlags));
+            m_flags.writeBinary(f);
+        }
+
+        bool Binary::Area::operator==(Binary::Area const& other) const
+        {
+            bool eq = true;
+            eq &= m_pProxy == other.m_pProxy;
+            eq &= m_dynAreaData == other.m_dynAreaData;
+            eq &= m_pFirstLink == other.m_pFirstLink;
+            eq &= m_pSearchParent == other.m_pSearchParent;
+            eq &= m_pos == other.m_pos;
+            eq &= m_radius == other.m_radius;
+            eq &= m_searchCost == other.m_searchCost;
+            eq &= m_usageFlags == other.m_usageFlags;
+            eq &= m_flags == other.m_flags;
+            return eq;
+        }
+
+        void Binary::Edge::writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap)
+        {
+            f << "{";
+            if (m_pAdjArea != NULL)
+            {
+                f << "\"Adjacent Area\":";
+                // Replace pointer to adjacent area with index of adjacent area + 1, with 0 being null
+                std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition = p_AreaPointerToIndexMap->find(m_pAdjArea);
+                if (s_MapPosition == p_AreaPointerToIndexMap->end())
+                {
+                    throw std::runtime_error("Area pointer not found in AreaPointerToIndexMap.");
+                }
+                uint32_t s_AdjAreaIndex = s_MapPosition->second;
+                f << s_AdjAreaIndex << ",";
+            }
+            f << "\"Position\":";
+            m_pos.writeJson(f);
+            if (GetType() != EDGE_NORMAL)
+            {
+                f << ",\"Type\":\"" << EdgeTypeToString(GetType()) << "\"";
+            }
+            f << "}";
+        }
+
+        void Binary::Edge::readJson(simdjson::ondemand::object p_Json)
+        {
+            auto adjacentAreaResult = p_Json.find_field("Adjacent Area");
+            if (adjacentAreaResult.error() == simdjson::SUCCESS) {
+                int64_t m_pAdjAreaJson = int64_t(p_Json["Adjacent Area"]);
+                // Store index of adjacent area + 1 in m_pAdjArea until the area addresses are calculated
+                m_pAdjArea = reinterpret_cast<Binary::Area*>(m_pAdjAreaJson);
+            }
+            else
+            {
+                m_pAdjArea = 0;
+            }
+            simdjson::ondemand::object m_posJson = p_Json["Position"];
+            m_pos.readJson(m_posJson);
+            m_flags1 = 0xFFFF0000;
+            SetPartition(false);
+            SetObID(0);
+            auto result = p_Json.find_field("Type");
+            if (result.error() == simdjson::SUCCESS) {
+                SetType(EdgeTypeStringToEnumValue(std::string{ std::string_view(p_Json["Type"]) }));
+            }
+            else
+            {
+                SetType(EDGE_NORMAL);
+            }
+        }
+
+        void Edge::updateAdjacentDistances(const Area* m_pParentArea) {
+            if (m_pAdjArea != nullptr) {
+                m_flags2 = CalcScaledDistBetweenAreaCenters(m_pAdjArea->m_pos, m_pParentArea->m_pos);
+            }
+            else
+            {
+                m_flags2 = 0;
+            }
+        }
+
+        void Binary::Edge::writeBinary(std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap)
+        {
+            if (m_pAdjArea != NULL)
+            {
+                // Convert adjacent Area pointer to Area file offset
+                Area* s_pAdjAreaFixed;
+                std::map<Binary::Area*, Binary::Area*>::const_iterator s_MapPosition = s_AreaPointerToOffsetPointerMap->find(m_pAdjArea);
+                if (s_MapPosition == s_AreaPointerToOffsetPointerMap->end())
+                {
+                    throw std::runtime_error("Area pointer not found in s_AreaPointerToOffsetPointerMap.");
+                }
+                else {
+                    s_pAdjAreaFixed = reinterpret_cast<Binary::Area*>(s_MapPosition->second);
+                }
+
+
+                f.write((char*)&s_pAdjAreaFixed, sizeof(m_pAdjArea));
+            }
+            else
+            {
+                f.write((char*)&m_pAdjArea, sizeof(m_pAdjArea));
+            }
+            m_pos.writeBinary(f);
+            f.write((char*)&m_flags1, sizeof(m_flags1));
+            f.write((char*)&m_flags2, sizeof(m_flags2));
+            f.write((char*)&m_pad, sizeof(m_pad));
+        }
+
+        bool Binary::Edge::operator==(Binary::Edge const& other) const
+        {
+            bool eq = true;
+            eq &= m_pAdjArea == other.m_pAdjArea;
+            eq &= m_pos == other.m_pos;
+            eq &= m_flags1 == other.m_flags1;
+            eq &= m_flags2 == other.m_flags2;
+            return eq;
+        }
+
+        void Binary::KDTreeData::writeBinary(std::ostream& f)
+        {
+            m_bbox.writeBinary(f);
+            f.write((char*)&m_size, sizeof(m_size));
+        }
+
+        std::pair<uint32_t, NavPower::Area> Binary::KDLeaf::GetArea(std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap, std::vector<NavPower::Area>& s_NavMeshAreas)
+        {
+            std::map<uint32_t, uint32_t>::const_iterator s_MapPosition = s_AreaNavGraphOffsetToIndexMap.find(GetPrimOffset());
+            if (s_MapPosition == s_AreaNavGraphOffsetToIndexMap.end())
+            {
+                throw std::runtime_error("Area not found");
+            }
+            uint32_t index = s_MapPosition->second - 1;
+            NavPower::Area area = s_NavMeshAreas[index];
+            return std::make_pair(index, area);
+        }
+
+        std::vector<std::pair<uint32_t, NavPower::Area>> Binary::KDNode::GetAreas(std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap, std::vector<NavPower::Area>& s_NavMeshAreas)
+        {
+            std::vector<std::pair<uint32_t, NavPower::Area>> s_indexAreaPairs;
+            if (!IsLeaf())
+            {
+                KDNode* s_Left = GetLeft();
+                for (std::pair<uint32_t, NavPower::Area>& indexAreaPair : s_Left->GetAreas(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas))
+                {
+                    s_indexAreaPairs.push_back(indexAreaPair);
+                }
+                KDNode* s_Right = GetRight();
+                for (std::pair<uint32_t, NavPower::Area>& indexAreaPair : s_Right->GetAreas(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas))
+                {
+                    s_indexAreaPairs.push_back(indexAreaPair);
+                }
+            }
+            else {
+                KDLeaf* p_thisLeaf = reinterpret_cast<KDLeaf*>(this);
+                std::pair<uint32_t, NavPower::Area> indexAreaPair = p_thisLeaf->GetArea(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas);
+                std::vector<std::pair<uint32_t, NavPower::Area>> pairs;
+                pairs.push_back(indexAreaPair);
+                return pairs;
+            }
+            return s_indexAreaPairs;
+        }
+
+        void Binary::KDNode::writeBinary(std::ostream& f, uintptr_t p_KdTreeEnd)
+        {
+            f.write((char*)&m_data, sizeof(m_data));
+            if (!IsLeaf())
+            {
+                f.write((char*)&m_dLeft, sizeof(m_dLeft));
+                f.write((char*)&m_dRight, sizeof(m_dRight));
+                KDNode* s_Left = GetLeft();
+                if (reinterpret_cast<uintptr_t>(s_Left) == p_KdTreeEnd)
+                {
+                    return;
+                }
+                s_Left->writeBinary(f, p_KdTreeEnd);
+                KDNode* s_Right = GetRight();
+                s_Right->writeBinary(f, p_KdTreeEnd);
+            }
+        }
+    }
+
+    bool isKnt(const uint32_t version) {
+        return version == 0x30;
+    }
+
+    void Area::writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap)
+    {
+        f << "{\"Area\":";
+        std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition = p_AreaPointerToIndexMap->find(m_area);
+        if (s_MapPosition == p_AreaPointerToIndexMap->end())
+        {
+            throw std::runtime_error("Area not found");
+        }
+        m_area->writeJson(f, s_MapPosition->second);
+        f << ",\"Edges\":[";
+        bool first = true;
+        for (auto& edge : m_edges)
+        {
+            if (!first)
+            {
+                f << ",";
+            }
+            edge->writeJson(f, p_AreaPointerToIndexMap);
+            first = false;
+        }
+        f << "]}";
+    }
+
+    void Area::readJson(auto p_Json)
+    {
+        simdjson::ondemand::object m_areaJson = p_Json["Area"];
+        m_area = new Binary::Area;
+        m_area->readJson(m_areaJson);
+        simdjson::ondemand::array m_edgesJson = p_Json["Edges"];
+        for (auto edgeJson : m_edgesJson)
+        {
+            Binary::Edge* edge = new Binary::Edge;
+            edge->readJson(edgeJson);
+            m_edges.push_back(edge);
+        }
+        m_area->m_pos = CalculateCentroid();
+        m_area->m_flags.SetNumEdges(m_edges.size());
+        m_area->m_flags.SetBasisVert(CalculateBasisVert());
+    }
+
+    void Area::writeBinary(std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap)
+    {
+        m_area->writeBinary(f);
+        for (auto& edge : m_edges)
+        {
+            edge->writeBinary(f, s_AreaPointerToOffsetPointerMap);
+        }
+    }
+
+    Vec3 Area::CalculateCentroid()
+    {
+        Vec3 normal = CalculateNormal();
+        Vec3 v0 = m_edges.at(0)->m_pos;
+        Vec3 v1 = m_edges.at(1)->m_pos;
+
+        Vec3 u = (v1 - v0).GetUnitVec();
+        Vec3 v = u.Cross(normal).GetUnitVec();
+
+        std::vector<Vec3> mappedPoints;
+        for (Binary::Edge* edge : m_edges) 
+        {
+            Vec3 relativePos = edge->m_pos - v0;
+            float uCoord = relativePos.Dot(u);
+            float vCoord = relativePos.Dot(v);
+            Vec3 uvv = Vec3(uCoord, vCoord, 0.0);
+            mappedPoints.push_back(uvv);
+        }
+        float sum = 0;
+        for (int i = 0; i < mappedPoints.size(); i++)
+        {
+            int nextI = (i + 1) % mappedPoints.size();
+            sum += mappedPoints[i].X * mappedPoints[nextI].Y - mappedPoints[nextI].X * mappedPoints[i].Y;
+        }
+        float area = sum / 2;
+        if (area < 0)
+        {
+            area *= -1;
+        }
+
+        float sumX = 0;
+        float sumY = 0;
+        for (int i = 0; i < mappedPoints.size(); i++) {
+            int nextI = (i + 1) % mappedPoints.size();
+            float x0 = mappedPoints[i].X;
+            float x1 = mappedPoints[nextI].X;
+            float y0 = mappedPoints[i].Y;
+            float y1 = mappedPoints[nextI].Y;
+
+            float doubleArea = (x0 * y1) - (x1 * y0);
+            sumX += (x0 + x1) * doubleArea;
+            sumY += (y0 + y1) * doubleArea;
+        }
+
+        float cu = sumX / (6.0 * area);
+        float cv = sumY / (6.0 * area);
+
+        Vec3 cucv = Vec3(1, cu, cv);
+        Vec3 xuv = Vec3(v0.X, u.X, v.X);
+        Vec3 yuv = Vec3(v0.Y, u.Y, v.Y);
+        Vec3 zuv = Vec3(v0.Z, u.Z, v.Z);
+        float x = xuv.Dot(cucv);
+        float y = yuv.Dot(cucv);
+        float z = zuv.Dot(cucv);
+        return Vec3(x, y, z);
+    }
+
+    bool Area::operator==(Area const& other) const
+    {
+        bool eq = true;
+        eq &= m_area == other.m_area;
+        if (m_edges.size() != other.m_edges.size())
+        {
+            return false;
+        }
+        for (int i = 0; i < m_edges.size(); i++)
+        {
+            eq &= m_edges[i] == other.m_edges[i];
+        }
+
+        return eq;
+    }
+
+    bool Area::operator<(Area const& other) const
+    {
+        return m_area->m_pos.X < other.m_area->m_pos.X;
+    }
+
+    void Area::updateAdjacentDistances() const {
+        for (auto& edge : m_edges)
+        {
+            edge->updateAdjacentDistances(m_area);
+        }
+    }
+
+    BBox generateBbox(const std::vector<Area>& s_areas)
+    {
+        BBox bbox;
+        bbox.m_min.X = bbox.m_min.Y = bbox.m_min.Z = std::numeric_limits<float>::max();
+        bbox.m_max.X = bbox.m_max.Y = bbox.m_max.Z = -std::numeric_limits<float>::max();
+
+        if (s_areas.empty()) return bbox;
+
+        for (auto& area : s_areas)
+        {
+            for (auto& edge : area.m_edges)
+            {
+                bbox.m_min.X = std::min(bbox.m_min.X, edge->m_pos.X);
+                bbox.m_min.Y = std::min(bbox.m_min.Y, edge->m_pos.Y);
+                bbox.m_min.Z = std::min(bbox.m_min.Z, edge->m_pos.Z);
+                bbox.m_max.X = std::max(bbox.m_max.X, edge->m_pos.X);
+                bbox.m_max.Y = std::max(bbox.m_max.Y, edge->m_pos.Y);
+                bbox.m_max.Z = std::max(bbox.m_max.Z, edge->m_pos.Z);
+            }
+        }
+        return bbox;
+    }
+
+    bool compareX(Area& a1, Area& a2)
+    {
+        return a1.m_area->m_pos.X < a2.m_area->m_pos.X;
+    }
+
+    bool compareY(Area& a1, Area& a2)
+    {
+        return a1.m_area->m_pos.Y < a2.m_area->m_pos.Y;
+    }
+
+    bool compareZ(Area& a1, Area& a2)
+    {
+        return a1.m_area->m_pos.Z < a2.m_area->m_pos.Z;
+    }
+
+    // Build m_areas pointer to index map so the pointers can be replaced with indices (+1) in the JSON file
+    std::map<Binary::Area*, uint32_t> NavGraph::AreaPointerToIndexMap()
+    {
+        std::map<Binary::Area*, uint32_t> s_AreaPointerToIndexMap;
+        uint32_t s_AreaIndex = 1;
+        for (Area area : m_areas)
+        {
+            s_AreaPointerToIndexMap.emplace(area.m_area, s_AreaIndex);
+            s_AreaIndex++;
+        }
+        return s_AreaPointerToIndexMap;
+    }
+
+    // Build m_areas index to pointer map so the indices (+1) in the JSON file can be replaced with pointers
+    std::map<uint64_t, Binary::Area*> NavGraph::AreaIndexToPointerMap()
+    {
+        std::map<uint64_t, Binary::Area*> s_AreaIndexToPointerMap;
+        uint64_t s_AreaIndex = 1;
+        for (Area area : m_areas)
+        {
+            s_AreaIndexToPointerMap.emplace(s_AreaIndex, area.m_area);
+            s_AreaIndex++;
+        }
+        return s_AreaIndexToPointerMap;
+    }
+
+    // Build m_areas area pointer to NavGraph offset map so the KD Tree can set the primoffset
+    std::map<Binary::Area*, uint32_t> NavGraph::AreaPointerToNavGraphOffsetMap()
+    {
+        std::map<Binary::Area*, uint32_t> s_AreaPointerToNavGraphOffsetMap;
+        uint32_t s_headerSize = m_hdr->getSize();
+        uint32_t s_areaBytes = s_headerSize;
+        for (auto& area : m_areas)
+        {
+            s_AreaPointerToNavGraphOffsetMap.emplace(area.m_area, s_areaBytes);
+            s_areaBytes += sizeof(Binary::Area);
+            s_areaBytes += sizeof(Binary::Edge) * area.m_edges.size();
+        }
+        return s_AreaPointerToNavGraphOffsetMap;
+    }
+
+    BBox NavGraph::FindLeafBBoxForPosition(Vec3 pos)
+    {
+        BBox currentBBox = m_kdTreeData->m_bbox;
+        Binary::KDNode* currentNode = m_rootKDNode;
+
+        while (currentNode && !currentNode->IsLeaf())
+        {
+            Axis axis = currentNode->GetSplitAxis();
+
+            // Compare the position coordinate on the split axis against child boundaries.
+            // m_dLeft is the maximum boundary for the left child, m_dRight is the minimum for the right.
+            if (pos[axis] <= currentNode->m_dLeft)
+            {
+                currentBBox.m_max[axis] = currentNode->m_dLeft;
+                currentNode = currentNode->GetLeft();
+            }
+            else
+            {
+                currentBBox.m_min[axis] = currentNode->m_dRight;
+                currentNode = currentNode->GetRight();
+            }
+        }
+        return currentBBox;
+    }
+    std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> NavGraph::ParseKDTree()
+    {
+        std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> depthToSplitAndBboxMap;
+        std::vector<KDTreeHelper> kdNodes;
+        std::vector<std::pair<uint32_t, BBox>> newVector;
+        depthToSplitAndBboxMap.insert({ 0, newVector });
+        kdNodes.push_back(KDTreeHelper{
+            m_rootKDNode,
+            m_kdTreeData->m_bbox,
+            0,
+            0});
+
+        while (!kdNodes.empty())
+        {
+            KDTreeHelper parent = kdNodes.back();
+            kdNodes.pop_back();
+            uint32_t depth = parent.m_depth + 1;
+            if (depthToSplitAndBboxMap.find(depth) == depthToSplitAndBboxMap.end()) {
+                std::vector<std::pair<uint32_t, BBox>> newNodeVector;
+                depthToSplitAndBboxMap.insert({ depth, newNodeVector });
+            }
+            depthToSplitAndBboxMap[depth].push_back(std::pair<uint32_t, BBox>(parent.m_splitAxis, BBox(parent.m_bbox)));
+            if (!parent.m_node->IsLeaf())
+            {
+                Axis splitAxis = parent.m_node->GetSplitAxis();
+
+                // Left Node
+                kdNodes.push_back(KDTreeHelper{
+                    parent.m_node->GetLeft(),
+                    parent.m_bbox,
+                    depth,
+                    uint32_t(splitAxis) });
+
+                kdNodes.back().m_bbox.m_max[splitAxis] = parent.m_node->m_dLeft;
+
+                // Right Node
+                kdNodes.push_back(KDTreeHelper{
+                    parent.m_node->GetRight(),
+                    parent.m_bbox,
+                    depth,
+                    uint32_t(splitAxis) });
+
+                kdNodes.back().m_bbox.m_min[splitAxis] = parent.m_node->m_dRight;
+            }
+        }
+
+        return depthToSplitAndBboxMap;
+    }
+
+    std::map<uint32_t, std::vector<KDTreeResult>> NavGraph::ParseKDTreeToKDTreeResult()
+        {
+            std::map<uint32_t, std::vector<KDTreeResult>> depthToSplitAndBboxMap;
+            std::map<uint32_t, Binary::Area*> offsetToAreaMap;
+            for (auto const& [ptr, offset] : AreaPointerToNavGraphOffsetMap())
+            {
+                offsetToAreaMap[offset] = ptr;
+            }
+
+            std::vector<KDTreeHelper> kdNodes;
+            std::vector<KDTreeResult> newVector;
+            depthToSplitAndBboxMap.insert({ 0, newVector });
+            kdNodes.push_back(KDTreeHelper{
+                m_rootKDNode,
+                m_kdTreeData->m_bbox,
+                0,
+                0});
+
+            while (!kdNodes.empty())
+            {
+                KDTreeHelper parent = kdNodes.back();
+                kdNodes.pop_back();
+                uint32_t depth = parent.m_depth + 1;
+                if (depthToSplitAndBboxMap.find(depth) == depthToSplitAndBboxMap.end()) {
+                    std::vector<KDTreeResult> newNodeVector;
+                    depthToSplitAndBboxMap.insert({ depth, newNodeVector });
+                }
+
+                // Identify if this specific node is a leaf. If so, mark it with Axis 3 (UNDEF).
+                uint32_t nodeAxis = parent.m_node->IsLeaf() ? (uint32_t)Axis::UNDEF : (uint32_t)parent.m_node->GetSplitAxis();
+
+                Binary::Area* pArea = nullptr;
+                if (parent.m_node->IsLeaf())
+                {
+                    uint32_t offset = ((Binary::KDLeaf*)parent.m_node)->GetPrimOffset();
+                    if (offsetToAreaMap.count(offset))
+                    {
+                        pArea = offsetToAreaMap[offset];
+                    }
+                }
+
+                depthToSplitAndBboxMap[depth].push_back({ nodeAxis, BBox(parent.m_bbox), pArea, parent.m_node->IsLeaf() });
+                if (!parent.m_node->IsLeaf())
+                {
+                    Axis splitAxis = parent.m_node->GetSplitAxis();
+
+                    // Left Node
+                    kdNodes.push_back(KDTreeHelper{
+                        parent.m_node->GetLeft(),
+                        parent.m_bbox,
+                        depth,
+                        uint32_t(splitAxis) });
+
+                    kdNodes.back().m_bbox.m_max[splitAxis] = parent.m_node->m_dLeft;
+
+                    // Right Node
+                    kdNodes.push_back(KDTreeHelper{
+                        parent.m_node->GetRight(),
+                        parent.m_bbox,
+                        depth,
+                        uint32_t(splitAxis) });
+
+                    kdNodes.back().m_bbox.m_min[splitAxis] = parent.m_node->m_dRight;
+                }
+            }
+
+            return depthToSplitAndBboxMap;
+        }
+
+    // Build m_areas NavGraph offset to index map so the KD Tree can get the area index from the primoffset
+    std::map<uint32_t, uint32_t> NavGraph::AreaNavGraphOffsetToIndexMap()
+    {
+        std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap;
+        uint32_t s_headerSize = m_hdr->getSize();
+        uint32_t s_areaBytes = s_headerSize;
+        uint32_t s_areaIndex = 1;
+        for (auto& area : m_areas)
+        {
+            s_AreaNavGraphOffsetToIndexMap.emplace(s_areaBytes, s_areaIndex);
+            s_areaBytes += sizeof(Binary::Area);
+            s_areaBytes += sizeof(Binary::Edge) * area.m_edges.size();
+            s_areaIndex++;
+        }
+        return s_AreaNavGraphOffsetToIndexMap;
+    }
+
+
+    void NavGraph::FixAreaPointers(uintptr_t navGraphStart, size_t areaBytes)
+    {
+        uintptr_t curIndex = navGraphStart + m_hdr->getSize();
+        size_t areaEndPtr = curIndex + areaBytes;
+
+        while (curIndex != areaEndPtr)
+        {
+            if (curIndex > areaEndPtr) {
+                Logger::log(NK_ERROR, "Address mismatch with area pointers: curIndex: %u, areaEndPth: %u", curIndex, areaEndPtr);
+                throw std::runtime_error("Address mismatch with area pointers");
+            }
+            Binary::Area* curArea = reinterpret_cast<Binary::Area*>(curIndex);
+            curIndex += sizeof(Binary::Area);
+            for (uint32_t i = 0; i < curArea->m_flags.GetNumEdges(); i++)
+            {
+                Binary::Edge* curEdge = (Binary::Edge*)curIndex;
+                curIndex += sizeof(Binary::Edge);
+
+                Binary::Area* adjArea = curEdge->m_pAdjArea;
+                if (adjArea != NULL)
+                    curEdge->m_pAdjArea = (Binary::Area*)(navGraphStart + (char*)adjArea);
+            }
+        }
+    }
+
+    void NavGraph::writeJson(std::ostream& f)
+    {
+        f << std::fixed << std::setprecision(4) << std::boolalpha;
+        f << "{\"Areas\":[";
+        if (m_areas.empty())
+        {
+            throw std::runtime_error("Areas empty");
+        }
+        // Build area pointer to m_areas index map so the pointers can be replaced with indices in the JSON file
+        std::map<Binary::Area*, uint32_t> s_AreaPointerToIndexMap = AreaPointerToIndexMap();
+
+        bool first = true;
+        for (auto& area : m_areas)
+        {
+            if (!first)
+            {
+                f << ",";
+            }
+            area.writeJson(f, &s_AreaPointerToIndexMap);
+            first = false;
+        }
+        f << "]}";
+    }
+
+    NavGraph::KdTreeGenerationHelper NavGraph::splitAreas(std::vector<Area> s_originalAreas)
+    {
+        KdTreeGenerationHelper nodeSplits;
+        BBox areasBbox = generateBbox(s_originalAreas);
+        nodeSplits.splitAxis = Axis::X;
+        float xDiff = areasBbox.m_max.X - areasBbox.m_min.X;
+        float yDiff = areasBbox.m_max.Y - areasBbox.m_min.Y;
+        float zDiff = areasBbox.m_max.Z - areasBbox.m_min.Z;
+        if (yDiff >= xDiff)
+        {
+            nodeSplits.splitAxis = Axis::Y;
+        }
+        if (zDiff >= xDiff && zDiff >= yDiff)
+        {
+            nodeSplits.splitAxis = Axis::Z;
+        }
+
+        std::vector<Area> s_sortedAreas = s_originalAreas;
+
+        if (nodeSplits.splitAxis == Axis::X)
+        {
+            sort(s_sortedAreas.begin(), s_sortedAreas.end(), compareX);
+        }
+        else if (nodeSplits.splitAxis == Axis::Y)
+        {
+            sort(s_sortedAreas.begin(), s_sortedAreas.end(), compareY);
+        }
+        else {
+            sort(s_sortedAreas.begin(), s_sortedAreas.end(), compareZ);
+        }
+
+        std::vector<Area> s_areasWithPosEqualToMedianValue;
+        int middleIndex = s_sortedAreas.size() / 2;
+        Area middleArea = s_sortedAreas[middleIndex];
+        float medianValue = 0;
+
+        if (nodeSplits.splitAxis == Axis::X)
+        {
+            medianValue = middleArea.m_area->m_pos.X;
+        }
+        else if (nodeSplits.splitAxis == Axis::Y)
+        {
+            medianValue = middleArea.m_area->m_pos.Y;
+        }
+        else
+        {
+            medianValue = middleArea.m_area->m_pos.Z;
+        }
+
+        // Split areas into three vectors and make a vector of overlapping areas:
+        //  1. Completely to the left of the median
+        //  2. Split value equal to the median value
+        //  3. Completely to the right of the median
+        for (int index = 0; index < s_originalAreas.size(); index++)
+        {
+            float pos = 0;
+            if (nodeSplits.splitAxis == Axis::X)
+            {
+                pos = s_originalAreas[index].m_area->m_pos.X;
+            }
+            else if (nodeSplits.splitAxis == Axis::Y)
+            {
+                pos = s_originalAreas[index].m_area->m_pos.Y;
+            }
+            else
+            {
+                pos = s_originalAreas[index].m_area->m_pos.Z;
+            }
+            if (pos == medianValue)
+            {
+                s_areasWithPosEqualToMedianValue.push_back(s_originalAreas[index]);
+            }
+            else
+            {
+                if (pos < medianValue)
+                {
+                    nodeSplits.left.push_back(s_originalAreas[index]);
+                }
+                if (pos > medianValue)
+                {
+                    nodeSplits.right.push_back(s_originalAreas[index]);
+                }
+            }
+        }
+
+        // Handle areas that have the same median split value as the median area
+        for (int index = 0; index < s_areasWithPosEqualToMedianValue.size(); index++)
+        {
+            if (nodeSplits.left.size() < s_originalAreas.size() / 2)
+            {
+                nodeSplits.left.push_back(s_areasWithPosEqualToMedianValue[index]);
+            }
+            else
+            {
+                nodeSplits.right.push_back(s_areasWithPosEqualToMedianValue[index]);
+            }
+        }
+
+        // Set left split based on max of split axis of left areas and right split based on min of split axis of right areas
+        BBox leftAreasBBox = generateBbox(nodeSplits.left);
+        BBox rightAreasBBox = generateBbox(nodeSplits.right);
+        if (nodeSplits.splitAxis == Axis::X)
+        {
+            nodeSplits.s_LeftSplit = leftAreasBBox.m_max.X + 0.0002;
+            nodeSplits.s_RightSplit = rightAreasBBox.m_min.X - 0.0002;
+        }
+        else if (nodeSplits.splitAxis == Axis::Y)
+        {
+            nodeSplits.s_LeftSplit = leftAreasBBox.m_max.Y + 0.0002;
+            nodeSplits.s_RightSplit = rightAreasBBox.m_min.Y - 0.0002;
+        }
+        else
+        {
+            nodeSplits.s_LeftSplit = leftAreasBBox.m_max.Z + 0.0002;
+            nodeSplits.s_RightSplit = rightAreasBBox.m_min.Z - 0.0002;
+        }
+        return nodeSplits;
+    }
+
+    uint32_t NavGraph::generateKdTree(uintptr_t s_nodePtr, std::vector<Area>& s_areas, std::map<Binary::Area*, uint32_t>& p_AreaPointerToNavGraphOffsetMap)
+    {
+        if (s_areas.size() == 0)
+        {
+            throw std::runtime_error("Area list empty.");
+        }
+        if (s_areas.size() == 1)
+        {
+            Binary::KDLeaf* leaf = new (reinterpret_cast<Binary::KDLeaf*>(s_nodePtr))Binary::KDLeaf;
+            Binary::Area* p_area = s_areas[0].m_area;
+
+            std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition = p_AreaPointerToNavGraphOffsetMap.find(p_area);
+            if (s_MapPosition != p_AreaPointerToNavGraphOffsetMap.end())
+            {
+                leaf->m_data = 0x80000000;
+                leaf->SetIsLeaf(true);
+                leaf->SetPrimOffset(s_MapPosition->second);
+            }
+            return sizeof(Binary::KDLeaf);
+        }
+
+        KdTreeGenerationHelper nodeSplits = splitAreas(s_areas);
+
+        Binary::KDNode* node = new (reinterpret_cast<Binary::KDNode*>(s_nodePtr)) Binary::KDNode;
+        node->m_dLeft = nodeSplits.s_LeftSplit;
+        node->m_dRight = nodeSplits.s_RightSplit;
+
+        node->SetIsLeaf(false);
+        node->SetSplitAxis(nodeSplits.splitAxis);
+        uint32_t s_Size = sizeof(Binary::KDNode);
+        s_Size += generateKdTree(s_nodePtr + s_Size, nodeSplits.left, p_AreaPointerToNavGraphOffsetMap);
+        node->SetRightOffset(s_Size);
+        s_Size += generateKdTree(s_nodePtr + s_Size, nodeSplits.right, p_AreaPointerToNavGraphOffsetMap);
+        return s_Size;
+    }
+
+    NavGraph::NavGraph(auto s_NavGraphJson) {
+        readJson(s_NavGraphJson, false);
+    }
+
+    void NavGraph::readJson(auto s_NavGraphJson, const bool s_IsKnt)
+    {
+        if (s_IsKnt) {
+            m_hdr = new Binary::NavGraphHeaderKnt();
+        } else {
+            m_hdr = new Binary::NavGraphHeaderHm();
+        }
+        m_isKnt = s_IsKnt;
+        simdjson::ondemand::array s_AreasJson = s_NavGraphJson["Areas"];
+
+        for (auto areaJson : s_AreasJson)
+        {
+            Area a_Area;
+            a_Area.readJson(areaJson);
+            m_areas.push_back(a_Area);
+        }
+        uint32_t s_areaBytes = 0;
+        uint64_t s_AreaIndex = 0;
+        std::map<uint64_t, Binary::Area*> s_AreaIndexToPointerMap = AreaIndexToPointerMap();
+        for (auto& area : m_areas)
+        {
+            s_areaBytes += sizeof(Binary::Area) + sizeof(Binary::Edge) * area.m_edges.size();
+            float s_radius = -1.;
+            for (Binary::Edge* edge : area.m_edges)
+            {
+                s_radius = std::max(s_radius, area.m_area->m_pos.DistanceTo(edge->m_pos));
+                if (reinterpret_cast<uint64_t>(edge->m_pAdjArea) != 0)
+                {
+                    // Convert index of adjacent area + 1 back to Area pointer
+                    s_AreaIndex = reinterpret_cast<uint64_t>(edge->m_pAdjArea);
+                    std::map<uint64_t, Binary::Area*>::const_iterator s_MapPosition = s_AreaIndexToPointerMap.find(s_AreaIndex);
+                    if (s_MapPosition == s_AreaIndexToPointerMap.end())
+                    {
+                        throw std::runtime_error("Area index not found in s_AreaIndexToPointerMap.");
+                    }
+                    else {
+                        edge->m_pAdjArea = reinterpret_cast<Binary::Area*>(s_MapPosition->second);
+                    }
+                }
+            }
+            area.m_area->m_radius = s_radius;
+        }
+
+        for (auto area : m_areas)
+        {
+            area.updateAdjacentDistances();
+        }
+
+        m_kdTreeData = new Binary::KDTreeData();
+
+        // Calculate Bbox Areas and Edges
+        BBox bbox = generateBbox(m_areas);
+
+        m_hdr->m_bbox.copy(bbox);
+        m_kdTreeData->m_bbox.m_min.X = bbox.m_min.X - 0.0002;
+        m_kdTreeData->m_bbox.m_min.Y = bbox.m_min.Y - 0.0002;
+        m_kdTreeData->m_bbox.m_min.Z = bbox.m_min.Z - 0.0002;
+        m_kdTreeData->m_bbox.m_max.X = bbox.m_max.X + 0.0002;
+        m_kdTreeData->m_bbox.m_max.Y = bbox.m_max.Y + 0.0002;
+        m_kdTreeData->m_bbox.m_max.Z = bbox.m_max.Z + 0.0002;
+
+        // Set tree size and allocate tree memory
+        // Num Nodes = Num Areas - 1
+        // sizeof(Node) = 12
+        // Num Leaves = Num Areas
+        // sizeof(Leaf) = 4
+        // Tree size: 12 * Num Nodes + 4 * Num Leaves
+        m_kdTreeData->m_size = 12 * (m_areas.size() - 1) + 4 * m_areas.size();
+        m_rootKDNode = (Binary::KDNode*)malloc(m_kdTreeData->m_size);
+
+        // Calculate K-D Tree from Areas and Edges
+        std::map<Binary::Area*, uint32_t> s_AreaPointerToNavGraphOffsetMap = AreaPointerToNavGraphOffsetMap();
+        generateKdTree(reinterpret_cast<uintptr_t>(m_rootKDNode), m_areas, s_AreaPointerToNavGraphOffsetMap);
+
+        // Set size fields
+        m_hdr->m_areaBytes = s_areaBytes;
+        m_hdr->m_kdTreeBytes = sizeof(Binary::KDTreeData) + m_kdTreeData->m_size;
+        m_hdr->m_totalBytes = m_hdr->getSize() + m_hdr->m_areaBytes + m_hdr->m_kdTreeBytes;
+    }
+
+    void NavGraph::writeBinary(std::ostream& f) {
+        // Build m_areas area pointer to NavGraph offset pointer map so the offsets can be written instead of the memory pointers
+        std::map<Binary::Area*, Binary::Area*> s_AreaPointerToOffsetPointerMap;
+        unsigned char* s_AreaOffset;
+
+        m_hdr->writeBinary(f);
+        s_AreaOffset = reinterpret_cast<unsigned char*>(m_hdr->getSize());
+
+        for (auto area : m_areas)
+        {
+            Binary::Area* s_areaOffsetPtr = reinterpret_cast<Binary::Area*>(s_AreaOffset);
+            s_AreaPointerToOffsetPointerMap.emplace(area.m_area, s_areaOffsetPtr);
+            s_AreaOffset += sizeof(Binary::Area);
+            s_AreaOffset += sizeof(Binary::Edge) * area.m_edges.size();
+        }
+        for (auto& area : m_areas)
+        {
+            area.writeBinary(f, &s_AreaPointerToOffsetPointerMap);
+        }
+        m_kdTreeData->writeBinary(f);
+
+        uintptr_t p_KdTreeEnd = reinterpret_cast<uintptr_t>(m_rootKDNode) + m_kdTreeData->m_size;
+        m_rootKDNode->writeBinary(f, p_KdTreeEnd);
+    }
+
+    void NavGraph::read(uintptr_t& p_data, bool& p_isKnt)
+    {
+        const uintptr_t s_startPointer = p_data;
+        uintptr_t s_endPointer{};
+
+        const uint32_t s_version = *reinterpret_cast<uint32_t*>(p_data);
+        m_isKnt = isKnt(s_version);
+        p_isKnt = m_isKnt;
+
+        if (m_isKnt) {
+            m_hdr = new Binary::NavGraphHeaderKnt();
+        } else {
+            m_hdr = new Binary::NavGraphHeaderHm();
+        }
+
+        std::string header_data(reinterpret_cast<char*>(p_data), m_hdr->getSize());
+        std::istringstream iss(header_data);
+        m_hdr->readBinary(iss);
+
+        p_data += m_hdr->getSize();
+        FixAreaPointers(s_startPointer, m_hdr->m_areaBytes);
+        s_endPointer = p_data + m_hdr->m_areaBytes;
+
+        while (p_data < s_endPointer)
+        {
+            Area s_area{};
+            s_area.m_area = (Binary::Area*)p_data;
+            p_data += sizeof(Binary::Area);
+
+            for (uint32_t i = 0; i < s_area.m_area->m_flags.GetNumEdges(); ++i)
+            {
+                s_area.m_edges.push_back((Binary::Edge*)p_data);
+                p_data += sizeof(Binary::Edge);
+            }
+
+            m_areas.push_back(s_area);
+        }
+        if (p_data != s_endPointer) {
+            throw std::runtime_error("Data offset after reading Area data does not match Areas size");
+        }
+        Logger::log(NK_DEBUG, "Outputting KD Tree data...");
+        auto ad = static_cast<unsigned int>(p_data);
+        m_kdTreeData = (Binary::KDTreeData*)p_data;
+        auto x = m_kdTreeData->m_bbox.m_min.X;
+        auto y = m_kdTreeData->m_bbox.m_min.Y;
+        auto z = m_kdTreeData->m_bbox.m_min.Z;
+        auto mx = m_kdTreeData->m_bbox.m_min.X;
+        auto my = m_kdTreeData->m_bbox.m_min.Y;
+        auto mz = m_kdTreeData->m_bbox.m_min.Z;
+        auto s =  m_kdTreeData->m_size;
+
+        Logger::log(NK_DEBUG, "KD Tree Data: Memory address: %u BBox min: (%.2f, %.2f, %.2) Bbox max: (%.2f, %.2f, %.2f) Size: %u", ad, x, y, z, mx, my, mz, s);
+        p_data += sizeof(Binary::KDTreeData);
+        ad = static_cast<unsigned int>(p_data);
+        s_endPointer = p_data + m_kdTreeData->m_size;
+        auto end = static_cast<unsigned int>(s_endPointer);
+        Logger::log(NK_DEBUG, "KD Tree Start memory address: %u, End memory address: %u", ad, end);
+
+        m_rootKDNode = (Binary::KDNode*)p_data;
+        auto d = m_rootKDNode->m_data;
+        auto l = m_rootKDNode->m_dLeft;
+        auto r = m_rootKDNode->m_dRight;
+
+        Logger::log(NK_DEBUG, "Root node: Data: %u Left: %.2f Right: %.2f", d, l, r);
+        while (p_data < s_endPointer)
+        {
+            Binary::KDNode* s_KDNode = (Binary::KDNode*)p_data;
+            Binary::KDLeaf* s_KDLeaf = (Binary::KDLeaf*)p_data;
+
+            if (s_KDNode->IsLeaf()) {
+                d = s_KDLeaf->m_data;
+                Logger::log(NK_DEBUG, "Leaf: Data: %u", d);
+                p_data += sizeof(Binary::KDLeaf);
+            } else {
+                d = s_KDNode->m_data;
+                l = s_KDNode->m_dLeft;
+                r = s_KDNode->m_dRight;
+                Logger::log(NK_DEBUG, "Node: Data: %u Left: %.2f Right: %.2f", d, l, r);
+                p_data += sizeof(Binary::KDNode);
+            }
+        }
+        ad = static_cast<unsigned int>(p_data);
+
+        if (p_data != s_endPointer) {
+            Logger::log(NK_ERROR, "KDTree - What was read does not match the total bytes!");
+            throw std::runtime_error("Data offset after reading KDTree data does not match KDTree size");
+        }
+        Logger::log(NK_DEBUG, "Read KD Tree successfully. Current memory address: %u, KD Tree end memory address %u", ad, end);
+        auto totalGraphSize = p_data - s_startPointer;
+        auto totalBytes = static_cast<unsigned long long>(m_hdr->m_totalBytes);
+        ad = static_cast<unsigned int>(p_data);
+        end = static_cast<unsigned int>(s_startPointer + totalBytes);
+        if (totalGraphSize != totalBytes)
+        {
+            Logger::log(NK_ERROR, "NavGraph - What was read does not match the total bytes. Current memory address: %u, end memory address %u", ad, end);
+            throw std::runtime_error("Data offset after reading NavGraph does not match total bytes");
+        }
+        Logger::log(NK_DEBUG, "Read NavGraph successfully. Current memory address: %u, end memory address %u", ad, end);
+    }
+
+    // This function was made by github.com/OrfeasZ aka NoFaTe
+    uint32_t CalculateChecksum(void* p_Data, uint32_t p_Size)
+    {
+        uint32_t s_BytesToCheck = p_Size;
+
+        // Looks like this checksum algorithm will skip a few bytes at the end
+        // if the size is not a multiple of 4.
+        if (s_BytesToCheck % 4 != 0)
+            s_BytesToCheck -= s_BytesToCheck % 4;
+
+        if (s_BytesToCheck <= 0)
+            return 0;
+
+        uint32_t s_Checksum = 0;
+
+        // Checksum is calculated in groups of 4 bytes.
+        const uint32_t s_ByteGroupCount = s_BytesToCheck / 4;
+        auto* s_Data = static_cast<uint32_t*>(p_Data);
+
+        // This seems to be treating the data as an array of 32-bit integers
+        // which it then adds together after swapping their endianness, in order
+        // to get to the final checksum.
+        for (uint32_t i = 0; i < s_ByteGroupCount; ++i, ++s_Data)
+            s_Checksum += c_byteswap_ulong(*s_Data);
+
+        return s_Checksum;
+    }
+
+    void Section::read(uintptr_t& p_data, bool& p_isKnt)
+    {
+        m_hdr = (Binary::SectionHeader*)p_data;
+        p_data += sizeof(Binary::SectionHeader);
+
+        if (m_hdr->m_size == 0) return;
+
+        // Sectionheader->m_size excludes the header.
+        uintptr_t s_startPointer = p_data;
+        uintptr_t s_endPointer{};
+
+        m_setHdr = (Binary::NavSetHeader*)p_data;
+        p_data += sizeof(Binary::NavSetHeader);
+
+        for (uint32_t i = 0; i < m_setHdr->m_numGraphs; ++i) {
+            NavGraph s_Graph;
+            s_Graph.read(p_data, p_isKnt);
+            m_aNavGraphs.push_back(s_Graph);
+        }
+
+        if ((p_data - s_startPointer) != m_hdr->m_size)
+        {
+            printf("[WARNING] Section - What we read does not match the section size!\n");
+            throw std::runtime_error("Data offset after reading Section does not match section size");
+        }
+    }
+
+    void Section::writeJson(std::ofstream& f)
+    {
+        f << "{\"NavGraphs\":[";
+        bool first = true;
+        for (auto s_NavGraph : m_aNavGraphs)
+        {
+            if (!first) {
+                f << ",";
+            }
+            s_NavGraph.writeJson(f);
+            first = false;
+        }
+        f << "]}";
+    }
+
+    void Section::writeBinary(std::ostream& f)
+    {
+        m_hdr->writeBinary(f);
+        m_setHdr->writeBinary(f);
+        for (auto& s_NavGraph : m_aNavGraphs) {
+            s_NavGraph.writeBinary(f);
+        }
+    }
+
+    void Section::readJson(auto p_SectionJson, bool s_IsKnt)
+    {
+        m_hdr = new Binary::SectionHeader();
+        m_setHdr = new Binary::NavSetHeader();
+        m_hdr->m_size = sizeof(Binary::NavSetHeader);
+        for (const auto& navGraphJson : p_SectionJson["NavGraphs"]) {
+            NavGraph s_NavGraph;
+            s_NavGraph.readJson(navGraphJson, s_IsKnt);
+            m_hdr->m_size += s_NavGraph.m_hdr->m_totalBytes;
+            m_aNavGraphs.push_back(s_NavGraph);
+        }
+        m_setHdr->m_numGraphs = static_cast<uint32_t>(m_aNavGraphs.size());
+    }
+
+    NavMesh::NavMesh(const char* p_NavGraphJsonPath) {
+        readJson(p_NavGraphJsonPath);
+    }
+    unsigned int CalculateNavMeshSize(NavMesh* navMesh) {
+        unsigned int size = 0;
+        size += sizeof(Binary::Header);
+        for (auto section : navMesh->m_aSections) {
+            size += sizeof(Binary::SectionHeader);
+            size += sizeof(Binary::NavSetHeader);
+            for (auto graph: section.m_aNavGraphs) {
+                size += graph.m_hdr->getSize();
+                size += sizeof(Binary::Area) * graph.m_areas.size();
+                for (auto area : graph.m_areas) {
+                    size += sizeof(Binary::Edge) * area.m_edges.size();
+                }
+                size += sizeof(Binary::KDTreeData);
+                size += graph.m_kdTreeData->m_size;
+            }
+        }
+        return size;
+    }
+
+    void NavMesh::read(uintptr_t p_data, uint32_t p_filesize)
+    {
+        uintptr_t s_startPointer = p_data;
+
+        m_hdr = (Binary::Header*)p_data;
+        p_data += sizeof(Binary::Header);
+
+        // Read Sections
+        while ((p_data - s_startPointer) < p_filesize) {
+            Section s_Section;
+            s_Section.read(p_data, m_isKnt);
+            m_aSections.push_back(s_Section);
+        }
+        unsigned int totalRead = p_data - s_startPointer;
+        unsigned int size = CalculateNavMeshSize(this);
+        unsigned int filesize = p_filesize;
+        unsigned int ad = p_data;
+        Logger::log(NK_DEBUG, "Done reading Navp file. Current memory address: %u, Total size read: %u, Total calculated size: %u, Total file size: %u", ad, totalRead, size, filesize);
+        if (totalRead != filesize) {
+            // throw std::runtime_error("Data offset after reading from navp file does not match filesize");
+            Logger::log(NK_ERROR, "Data offset after reading from navp file does not match filesize");
+        }
+    }
+
+    void NavMesh::readJson(const char* p_NavGraphJsonPath)
+    {
+        simdjson::ondemand::parser s_Parser;
+        simdjson::padded_string s_Json = simdjson::padded_string::load(p_NavGraphJsonPath);
+        simdjson::ondemand::document s_NavMeshDocument = s_Parser.iterate(s_Json);
+        auto s_NavpJsonVersion = std::string{ std::string_view(s_NavMeshDocument["NavpJsonVersion"]) };
+        if (s_NavpJsonVersion != "0.3")
+        {
+            std::cerr << "This version of NavWeakness only supports version 0.3. NavpJsonVersion " << s_NavpJsonVersion << std::endl;
+            throw std::runtime_error("This version of NavWeakness only supports version 0.3");
+        }
+        m_hdr = new Binary::Header();
+        m_hdr->m_imageSize = 0;
+        auto s_Game = std::string{ std::string_view(s_NavMeshDocument["Game"]) };
+        m_isKnt = s_Game == "Knt";
+
+        auto s_SectionsJson = s_NavMeshDocument["Sections"];
+        for (auto s_SectionJson : s_SectionsJson) {
+            Section s_Section;
+            s_Section.readJson(s_SectionJson, m_isKnt);
+            m_aSections.push_back(s_Section);
+            // Set size fields
+            m_hdr->m_imageSize += sizeof(Binary::SectionHeader) + s_Section.m_hdr->m_size;
+        }
+
+
+        // Recalculate the checksum in case the JSON file was manually edited
+        // Write the Navmesh to a temporary NAVP binary file
+        std::string p_ChecksumCalculationTempPath(p_NavGraphJsonPath);
+        p_ChecksumCalculationTempPath.append(".TEMP");
+        std::filesystem::remove(p_ChecksumCalculationTempPath);
+        std::ofstream fileOutputStream(p_ChecksumCalculationTempPath, std::ios::out | std::ios::binary | std::ios::app);
+        writeBinary(fileOutputStream);
+        // Read the entire file to memory.
+        fileOutputStream.close();
+        if (!std::filesystem::is_regular_file(p_NavGraphJsonPath))
+            throw std::runtime_error("Input path is not a regular file.");
+        const long s_FileSize = std::filesystem::file_size(p_ChecksumCalculationTempPath);
+        std::ifstream s_FileStream(p_ChecksumCalculationTempPath, std::ios::in | std::ios::binary);
+        if (!s_FileStream)
+            throw std::runtime_error("Error creating input file stream.");
+        void* s_FileData = malloc(s_FileSize);
+        s_FileStream.read(static_cast<char*>(s_FileData), s_FileSize);
+        s_FileStream.close();
+        std::filesystem::remove(p_ChecksumCalculationTempPath);
+        const auto s_FileStartPtr = reinterpret_cast<uintptr_t>(s_FileData);
+        const uint32_t s_Checksum = CalculateChecksum(reinterpret_cast<void*>(s_FileStartPtr + sizeof(Binary::Header)), (s_FileSize - sizeof(Binary::Header)));
+        m_hdr->m_checksum = s_Checksum;
+    }
+
+    void NavMesh::writeJson(std::ofstream& f) {
+        f << "{\"NavpJsonVersion\":\"0.3\",\"Game\":\"";
+        f << (m_isKnt ? "Knt" : "HM");
+        f << "\",\"Sections\":[";
+        bool first = true;
+        for (auto s_Section : m_aSections) {
+            if (!first) {
+                f << ",";
+            }
+            s_Section.writeJson(f);
+            first = false;
+        }
+        f << "]}";
+    }
+
+    void NavMesh::writeBinary(std::ostream& f)
+    {
+        m_hdr->writeBinary(f);
+        for (auto s_Section : m_aSections) {
+            s_Section.writeBinary(f);
+        }
+    }
+}

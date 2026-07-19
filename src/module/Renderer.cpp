@@ -370,6 +370,9 @@ void Renderer::renderFrame() {
     }
     if (Navp& navp = Navp::getInstance(); navp.navpLoaded && navp.showNavp) {
         navp.renderNavMesh();
+        if (navp.showKdTree) {
+            navp.renderKdTree();
+        }
     }
     const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     if (const Navp& navp = Navp::getInstance(); navp.navpLoaded && navp.showRecastDebugInfo) {

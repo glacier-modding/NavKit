@@ -3,6 +3,7 @@
 #include <CommCtrl.h>
 #include <fstream>
 #include <functional>
+#include <algorithm>
 #include <filesystem>
 #include <map>
 #include <vector>
@@ -23,6 +24,7 @@
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
@@ -35,6 +37,7 @@ Navp::Navp()
       selectedExclusionBoxIndex(-1),
       navpLoaded(false),
       showNavp(true),
+      showKdTree(true),
       showNavpIndices(false),
       showPfExclusionBoxes(true),
       showPfSeedPoints(true),
@@ -120,7 +123,7 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
             auto vEnd = edges[(j + 1) % edges.size()];
 
             glm::vec3 pStart(vStart->m_pos.X, vStart->m_pos.Z + zRenderOffset + 0.01f, -vStart->m_pos.Y);
-            glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + zRenderOffset + 0.1f, -vEnd->m_pos.Y);
+            glm::vec3 pEnd(vEnd->m_pos.X, vEnd->m_pos.Z + zRenderOffset + 0.01f, -vEnd->m_pos.Y);
 
             auto getEdgeColor = [&](const NavPower::Binary::Edge* v) {
                 if (v->GetType() == NavPower::EdgeType::EDGE_PORTAL) {
@@ -236,14 +239,15 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
         const glm::vec4 color(r, g, b, 1.0f);
 
         if (edges.size() >= 3) {
+            constexpr float zRenderOffset = 0.5f;
             const auto& v0 = edges[0];
-            const glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z, -v0->m_pos.Y);
+            const glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z + zRenderOffset, -v0->m_pos.Y);
 
             for (size_t j = 1; j < edges.size() - 1; ++j) {
                 const auto& v1 = edges[j];
                 const auto& v2 = edges[j + 1];
-                const glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z, -v1->m_pos.Y);
-                const glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z, -v2->m_pos.Y);
+                const glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z + zRenderOffset, -v1->m_pos.Y);
+                const glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z + zRenderOffset, -v2->m_pos.Y);
 
                 vertices.push_back({p0, glm::vec3(0), color});
                 vertices.push_back({p1, glm::vec3(0), color});
@@ -437,6 +441,11 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
         Logger::log(NK_INFO, ("Deselected area: " + std::to_string(selectedNavpAreaIndex + 1)).c_str());
     }
     selectedNavpAreaIndex = index;
+
+    // Always reset the leaf BBox when selection changes to avoid showing stale data
+    // if the subsequent KD-tree lookup fails.
+    selectedLeafBBox.reset();
+
     if (index != -1 && index < getTotalAreaCount(navMesh)) {
         auto& selectedArea = getAreaByIndex(navMesh, index);
         Logger::log(NK_INFO, ("Selected area: " + std::to_string(index + 1)).c_str());
@@ -474,10 +483,48 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
             float cosineAngle = dotProduct / (normalMagnitude * horizontalMagnitude);
             cosineAngle = std::clamp(cosineAngle, -1.0f, 1.0f);
             const float angleRadians = std::acos(cosineAngle);
-            angleDegrees = angleRadians * 180.0f / M_PI;
+            angleDegrees = angleRadians * 180.0f / std::numbers::pi_v<float>;
         }
         msg += " Angle: " + std::to_string(angleDegrees);
         Logger::log(NK_INFO, (msg).c_str());
+
+        const CachedKdNode* leafNode = nullptr;
+        if (auto it = cachedKdNodes.find(selectedArea.m_area); it != cachedKdNodes.end()) {
+            leafNode = it->second;
+        }
+
+        if (leafNode) {
+            std::vector<const CachedKdNode*> path;
+            for (const auto& node : kdTreeNodes) {
+                if (node.depth < leafNode->depth &&
+                    node.bbox.m_min.X <= leafNode->bbox.m_min.X && node.bbox.m_max.X >= leafNode->bbox.m_max.X &&
+                    node.bbox.m_min.Y <= leafNode->bbox.m_min.Y && node.bbox.m_max.Y >= leafNode->bbox.m_max.Y &&
+                    node.bbox.m_min.Z <= leafNode->bbox.m_min.Z && node.bbox.m_max.Z >= leafNode->bbox.m_max.Z) {
+                    path.push_back(&node);
+                }
+            }
+            std::sort(path.begin(), path.end(), [](auto* a, auto* b) { return a->depth < b->depth; });
+            path.push_back(leafNode);
+
+            std::string kdLog = "Area " + std::to_string(index + 1) + " KD Path: ";
+            for (size_t i = 0; i < path.size(); ++i) {
+                const auto* curr = path[i];
+                if (curr->isLeaf) {
+                    kdLog += "[Leaf Depth " + std::to_string(curr->depth) + "]";
+                } else {
+                    const auto* next = path[i + 1];
+                    char axis = 'X'; float val = 0.0f;
+                    if (std::abs(curr->bbox.m_min.X - next->bbox.m_min.X) > 0.001f) { axis = 'X'; val = next->bbox.m_min.X; }
+                    else if (std::abs(curr->bbox.m_max.X - next->bbox.m_max.X) > 0.001f) { axis = 'X'; val = next->bbox.m_max.X; }
+                    else if (std::abs(curr->bbox.m_min.Y - next->bbox.m_min.Y) > 0.001f) { axis = 'Y'; val = next->bbox.m_min.Y; }
+                    else if (std::abs(curr->bbox.m_max.Y - next->bbox.m_max.Y) > 0.001f) { axis = 'Y'; val = next->bbox.m_max.Y; }
+                    else if (std::abs(curr->bbox.m_min.Z - next->bbox.m_min.Z) > 0.001f) { axis = 'Z'; val = next->bbox.m_min.Z; }
+                    else { axis = 'Z'; val = next->bbox.m_max.Z; }
+                    kdLog += "D" + std::to_string(curr->depth) + "(" + axis + ":" + std::to_string(val).substr(0, std::to_string(val).find('.') + 3) + ") -> ";
+                }
+            }
+            Logger::log(NK_INFO, kdLog.c_str());
+        }
     }
     Menu::updateMenuState();
 }
@@ -633,26 +680,72 @@ void Navp::renderNavMeshForHitTest() const {
     }
 }
 
-void Navp::loadNavMeshFileData(const std::string& fileName) {
-    if (!std::filesystem::is_regular_file(fileName)) {
-        throw std::runtime_error("Input path is not a regular file.");
+void Navp::renderKdTree() {
+    if (!showKdTree || !navMesh || loading || !navpLoaded || selectedNavpAreaIndex == -1) {
+        return;
     }
 
-    const long s_FileSize = std::filesystem::file_size(fileName);
+    Renderer& renderer = Renderer::getInstance();
+    constexpr float zRenderOffset = 0.5f;
 
-    if (s_FileSize < sizeof(NavPower::NavMesh)) {
-        throw std::runtime_error("Invalid NavMesh File.");
+    NavPower::Binary::Area* selectedAreaPtr = getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area;
+
+    const CachedKdNode* selectedLeafNode = nullptr;
+    if (auto it = cachedKdNodes.find(selectedAreaPtr); it != cachedKdNodes.end()) {
+        selectedLeafNode = it->second;
     }
 
-    std::ifstream s_FileStream(fileName, std::ios::in | std::ios::binary);
+    for (const auto& node : kdTreeNodes) {
+        bool isSelectedLeaf = false;
+        bool isParentOfSelected = false;
 
-    if (!s_FileStream) {
-        throw std::runtime_error("Error creating input file stream.");
+        if (&node == selectedLeafNode) {
+            isSelectedLeaf = true;
+        } else if (selectedLeafNode && node.depth < selectedLeafNode->depth &&
+                   node.bbox.m_min.X <= selectedLeafNode->bbox.m_min.X && node.bbox.m_max.X >= selectedLeafNode->bbox.m_max.X &&
+                   node.bbox.m_min.Y <= selectedLeafNode->bbox.m_min.Y && node.bbox.m_max.Y >= selectedLeafNode->bbox.m_max.Y &&
+                   node.bbox.m_min.Z <= selectedLeafNode->bbox.m_min.Z && node.bbox.m_max.Z >= selectedLeafNode->bbox.m_max.Z) {
+            isParentOfSelected = true;
+        }
+
+        if (!isSelectedLeaf && !isParentOfSelected) {
+            continue;
+        }
+
+        const int depth = node.depth;
+        const auto& bbox = node.bbox;
+
+        glm::vec3 color; // Base level color
+        switch (depth % 6) {
+            case 0: color = {1.0f, 0.3f, 0.3f}; break; // Soft Red
+            case 1: color = {0.3f, 1.0f, 0.3f}; break; // Soft Green
+            case 2: color = {0.3f, 0.3f, 1.0f}; break; // Soft Blue
+            case 3: color = {1.0f, 1.0f, 0.3f}; break; // Yellow
+            case 4: color = {1.0f, 0.3f, 1.0f}; break; // Magenta
+            case 5: color = {0.3f, 1.0f, 1.0f}; break; // Cyan
+        }
+
+        Vec3 outlineColor = isSelectedLeaf ? Vec3{1.0f, 1.0f, 1.0f} : Vec3{color.r, color.g, color.b};
+
+        Vec3 center = (bbox.m_min + bbox.m_max) * 0.5f;
+        Vec3 size = bbox.m_max - bbox.m_min;
+
+        float inset = static_cast<float>(depth) * 0.02f;
+        float szX = (std::max)(0.05f, size.X - inset);
+        float szZ = (std::max)(0.05f, size.Z - inset);
+        float szY = (std::max)(0.05f, size.Y - inset);
+
+        renderer.drawBox(
+            {center.X, center.Z + zRenderOffset, -center.Y},
+            {szX, szZ, -szY},
+            {0, 0, 0, 1},
+            false,
+            {0, 0, 0},
+            true,
+            outlineColor,
+            1.0f
+        );
     }
-
-    navMeshFileData.resize(s_FileSize);
-
-    s_FileStream.read(navMeshFileData.data(), s_FileSize);
 }
 
 void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const bool isFromBuildingNavp, const bool isFromBuildingAirg) {
@@ -664,32 +757,25 @@ void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const
     loading = true;
     CPPTRACE_TRY
     {
-            NavPower::NavMesh newNavMesh = isFromJson
-                                               ? LoadNavMeshFromJson(fileName.c_str())
-                                               : LoadNavMeshFromBinary(fileName.c_str());
+        NavPower::NavMesh newNavMesh = isFromJson
+                                               ? NavWeakness::LoadNavMeshFromJson(fileName.c_str())
+                                               : NavWeakness::LoadNavMeshFromBinary(fileName.c_str());
         std::swap(*navMesh, newNavMesh);
-            const NavKitSettings & navKitSettings = NavKitSettings::getInstance();
-            if (isFromBuildingNavp || isFromBuildingAirg) {
+        const NavKitSettings & navKitSettings = NavKitSettings::getInstance();
+        if (isFromBuildingNavp || isFromBuildingAirg) {
             setStairsFlags();
             outputNavpFilename = navKitSettings.outputFolder + (isFromBuildingNavp
                                                                     ? "\\output.navp"
                                                                     : "\\outputForAirg.navp");
-            OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
-                NavPower::NavMesh reloadedNavMesh = LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
+            NavWeakness::OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
+                NavPower::NavMesh reloadedNavMesh = NavWeakness::LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
             std::swap(*navMesh, reloadedNavMesh);
-
-        }
-            if (isFromJson) {
-            OutputNavMesh_NAVP_Write(navMesh, outputNavpFilename.c_str());
-            loadNavMeshFileData(outputNavpFilename);
-
-        }else {
-            loadNavMeshFileData(fileName);
-
         }
     }
     CPPTRACE_CATCH(const std::exception & e)
     {
+        ErrorHandler::openErrorDialog("Error loading Navp file '" + std::string(fileName) + "': " + std::string(e.what()) + "\n\nStack Trace:\n" +
+            cpptrace::from_current_exception().to_string());
         msg = "Error loading Navp file '";
         msg += fileName;
         msg += "': ";
@@ -830,17 +916,17 @@ void Navp::saveNavMesh(const std::string& fileName, const std::string& extension
         std::ranges::transform(upper_extension, upper_extension.begin(), ::toupper);
 
         if (upper_extension == "JSON") {
-            OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
+            NavWeakness::OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
         } else if (upper_extension == "NAVP") {
             const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
             const std::string tempOutputJSONFilename = navKitSettings.outputFolder + "\\temp_save.navp.json";
 
-            OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
+            NavWeakness::OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
 
-            NavPower::NavMesh newNavMesh = LoadNavMeshFromJson(tempOutputJSONFilename.c_str());
+            NavPower::NavMesh newNavMesh = NavWeakness::LoadNavMeshFromJson(tempOutputJSONFilename.c_str());
             std::swap(*navMesh, newNavMesh);
 
-            OutputNavMesh_NAVP_Write(navMesh, fileName.c_str());
+            NavWeakness::OutputNavMesh_NAVP_Write(navMesh, fileName.c_str());
             buildAreaMaps();
         }
 
@@ -908,14 +994,36 @@ void Navp::handleBuildNavpClicked() {
 
 void Navp::buildAreaMaps() {
     binaryAreaToAreaMap.clear();
+    binaryAreaToAreaIndexMap.clear();
     posToAreaMap.clear();
-    int areaIndex = 1;
-    for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
-        auto& area = getAreaByIndex(navMesh, i);
-        binaryAreaToAreaIndexMap.emplace(area.m_area, areaIndex);
-        binaryAreaToAreaMap.emplace(area.m_area, &area);
-        posToAreaMap.emplace(area.m_area->m_pos, &area);
-        areaIndex++;
+    kdTreeNodes.clear();
+    cachedKdNodes.clear();
+
+    if (!navMesh) return;
+
+    int globalAreaIndex = 1;
+    for (auto& section : const_cast<NavPower::NavMesh*>(navMesh)->m_aSections) {
+        for (auto& navGraph : section.m_aNavGraphs) {
+            // 1. Build standard area mappings for this specific graph
+            for (auto& area : navGraph.m_areas) {
+                binaryAreaToAreaIndexMap.emplace(area.m_area, globalAreaIndex++);
+                binaryAreaToAreaMap.emplace(area.m_area, &area);
+                posToAreaMap.emplace(area.m_area->m_pos, &area);
+            }
+
+            // 2. Parse the KD-Tree and store nodes
+            auto depthMap = const_cast<NavPower::NavGraph&>(navGraph).ParseKDTreeToKDTreeResult();
+            for (const auto& [depth, bboxPairs] : depthMap) {
+                for (const auto& [axis, bbox, pArea, isLeaf] : bboxPairs) {
+                    // Store in the vector for iteration/rendering
+                    kdTreeNodes.push_back({ depth, bbox, pArea, isLeaf });
+                    // If it's a leaf and has a resolved area pointer, map the area pointer to this specific node for O(1) lookup
+                    if (isLeaf && pArea) {
+                        cachedKdNodes[pArea] = &kdTreeNodes.back();
+                    }
+                }
+            }
+        }
     }
 }
 
