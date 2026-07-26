@@ -1122,6 +1122,19 @@ void Navp::buildAreaMaps() {
             cachedKdNodes[node.pArea] = &node;
         }
     }
+    uint32_t areaIndex = 0;
+    bool missingArea = false;
+    for (auto& area : navMesh->m_aSections[0].m_aNavGraphs[0].m_areas) {
+        auto node = cachedKdNodes.find(area.m_area);
+        if (node == cachedKdNodes.end()) {
+            Logger::log(NK_ERROR, "Area not found in cached KD tree: %u", areaIndex);
+            missingArea = true;
+        }
+        areaIndex++;
+    }
+    if (!missingArea) {
+        Logger::log(NK_INFO, "Area map built successfully.");
+    }
 }
 
 void Navp::finalizeBuild() {
