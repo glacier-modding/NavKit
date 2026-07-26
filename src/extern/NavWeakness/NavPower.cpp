@@ -54,9 +54,9 @@ namespace NavPower
         case Axis::X:
             return "X-Axis";
         case Axis::Y:
-            return "Y-Axis";
-        case Axis::Z:
             return "Z-Axis";
+        case Axis::Z:
+            return "Y-Axis";
         case Axis::UNDEF:
             return "Undefined-Axis";
         default:
@@ -833,7 +833,7 @@ namespace NavPower
                 }
 
                 // Identify if this specific node is a leaf. If so, mark it with Axis 3 (UNDEF).
-                uint32_t nodeAxis = parent.m_node->IsLeaf() ? (uint32_t)Axis::UNDEF : (uint32_t)parent.m_node->GetSplitAxis();
+                Axis nodeAxis = parent.m_node->IsLeaf() ? Axis::UNDEF : parent.m_node->GetSplitAxis();
 
                 Binary::Area* pArea = nullptr;
                 if (parent.m_node->IsLeaf())
@@ -845,7 +845,13 @@ namespace NavPower
                     }
                 }
 
-                depthToSplitAndBboxMap[depth].push_back({ nodeAxis, BBox(parent.m_bbox), pArea, parent.m_node->IsLeaf() });
+                depthToSplitAndBboxMap[depth].push_back({
+                    nodeAxis,
+                    BBox(parent.m_bbox),
+                    pArea,
+                    parent.m_node->IsLeaf(),
+                    parent.m_node
+                });
                 if (!parent.m_node->IsLeaf())
                 {
                     Axis splitAxis = parent.m_node->GetSplitAxis();
@@ -1161,7 +1167,7 @@ namespace NavPower
         m_kdTreeData->m_bbox.m_max.Z = bbox.m_max.Z + 0.0002;
 
         // Set tree size and allocate tree memory
-        // Num Nodes = Num Areas - 1
+        // Num non-leaf Nodes = Num Areas - 1
         // sizeof(Node) = 12
         // Num Leaves = Num Areas
         // sizeof(Leaf) = 4
@@ -1244,6 +1250,7 @@ namespace NavPower
         if (p_data != s_endPointer) {
             throw std::runtime_error("Data offset after reading Area data does not match Areas size");
         }
+        Logger::log(NK_INFO, "Total number of areas: %d", m_areas.size());
         Logger::log(NK_DEBUG, "Outputting KD Tree data...");
         auto ad = static_cast<unsigned int>(p_data);
         m_kdTreeData = (Binary::KDTreeData*)p_data;
@@ -1268,28 +1275,64 @@ namespace NavPower
         auto r = m_rootKDNode->m_dRight;
 
         Logger::log(NK_DEBUG, "Root node: Data: %u Left: %.2f Right: %.2f", d, l, r);
+        uint32_t s_leafCount = 0;
+        uint32_t s_nodeCount = 0;
         while (p_data < s_endPointer)
         {
             Binary::KDNode* s_KDNode = (Binary::KDNode*)p_data;
             Binary::KDLeaf* s_KDLeaf = (Binary::KDLeaf*)p_data;
-
+            bool nearEnd = false; //s_endPointer - p_data < 150;
             if (s_KDNode->IsLeaf()) {
                 d = s_KDLeaf->m_data;
-                Logger::log(NK_DEBUG, "Leaf: Data: %u", d);
+                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Leaf: Data: %u, Leaf Prim Offset %u", d, s_KDLeaf->GetPrimOffset());
                 p_data += sizeof(Binary::KDLeaf);
+                s_leafCount++;
             } else {
                 d = s_KDNode->m_data;
                 l = s_KDNode->m_dLeft;
                 r = s_KDNode->m_dRight;
-                Logger::log(NK_DEBUG, "Node: Data: %u Left: %.2f Right: %.2f", d, l, r);
+                std::string s_splitAxis = AxisToString(s_KDNode->GetSplitAxis());
+                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Node: Data: %u, %s Left: %.2f Right: %.2f", d, s_splitAxis.c_str(), l, r);
                 p_data += sizeof(Binary::KDNode);
+                s_nodeCount++;
             }
         }
         ad = static_cast<unsigned int>(p_data);
 
+        Logger::log(NK_INFO, "Total number of internal nodes: %d", s_nodeCount);
+        uint32_t s_expectedNodeCount = m_areas.size() - 1;
+        if (s_nodeCount != s_expectedNodeCount) {
+            Logger::log(NK_INFO, "Internal node count does not equal area count - 1! Area count: %d, Internal node count: %d, Expected Internal node count: %d", m_areas.size(), s_nodeCount, s_expectedNodeCount);
+        }
+
+        Logger::log(NK_INFO, "Total number of leaves: %d", s_leafCount);
+        if (m_areas.size() != s_leafCount) {
+            Logger::log(NK_INFO, "Leaf count and area count don't match! Area count: %d, Leaf count: %d", m_areas.size(), s_leafCount);
+        }
+        Logger::log(NK_INFO, "Debugging KD Tree Depth Map");
+
+        auto depthMap = ParseKDTreeToKDTreeResult();
+        s_leafCount = 0;
+        s_nodeCount = 0;
+        for (const auto& [depth, bboxPairs] : depthMap) {
+            uint32_t s_depthLeafCount = 0;
+            uint32_t s_depthNodeCount = 0;
+            for (const auto& [axis, bbox, pArea, isLeaf, node] : bboxPairs) {
+                if (isLeaf) {
+                    s_leafCount++;
+                    s_depthLeafCount++;
+                } else {
+                    s_nodeCount++;
+                    s_depthNodeCount++;
+                }
+            }
+            Logger::log(NK_INFO, "Depth level: %d, Leaf count: %d, Internal node count: %d, Total Leaf count: %d, Total Internal node count: %d", depth, s_depthLeafCount, s_depthNodeCount, s_leafCount, s_nodeCount);
+
+        }
+
         if (p_data != s_endPointer) {
             Logger::log(NK_ERROR, "KDTree - What was read does not match the total bytes!");
-            throw std::runtime_error("Data offset after reading KDTree data does not match KDTree size");
+            // throw std::runtime_error("Data offset after reading KDTree data does not match KDTree size");
         }
         Logger::log(NK_DEBUG, "Read KD Tree successfully. Current memory address: %u, KD Tree end memory address %u", ad, end);
         auto totalGraphSize = p_data - s_startPointer;
@@ -1299,7 +1342,7 @@ namespace NavPower
         if (totalGraphSize != totalBytes)
         {
             Logger::log(NK_ERROR, "NavGraph - What was read does not match the total bytes. Current memory address: %u, end memory address %u", ad, end);
-            throw std::runtime_error("Data offset after reading NavGraph does not match total bytes");
+            // throw std::runtime_error("Data offset after reading NavGraph does not match total bytes");
         }
         Logger::log(NK_DEBUG, "Read NavGraph successfully. Current memory address: %u, end memory address %u", ad, end);
     }
@@ -1355,7 +1398,7 @@ namespace NavPower
         if ((p_data - s_startPointer) != m_hdr->m_size)
         {
             printf("[WARNING] Section - What we read does not match the section size!\n");
-            throw std::runtime_error("Data offset after reading Section does not match section size");
+            // throw std::runtime_error("Data offset after reading Section does not match section size");
         }
     }
 

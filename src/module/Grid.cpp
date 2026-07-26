@@ -20,7 +20,7 @@ Grid::Grid() {
     xOffset = 0;
     yOffset = 0;
     gridWidth = std::ceil((xMax - xMin) / spacing);
-    showGrid = true;
+    showGrid = false;
 }
 
 void Grid::loadBoundsFromAirg() {

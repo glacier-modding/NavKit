@@ -45,6 +45,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Show &Navp",                               IDM_VIEW_NAVP_SHOW_NAVP, CHECKED
         MENUITEM "Show Navp &Indices",                       IDM_VIEW_NAVP_SHOW_INDICES
+        MENUITEM "Show &KD Tree",                            IDM_VIEW_NAVP_SHOW_KD_TREE
         MENUITEM "Show &Exclusion Boxes",                    IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, CHECKED
         MENUITEM "Show &Seed Points",                        IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, CHECKED
         MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO

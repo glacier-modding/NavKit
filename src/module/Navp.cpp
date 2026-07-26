@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <map>
+#include <set>
 #include <vector>
 #include <glm/glm.hpp>
 #include <cpptrace/from_current.hpp>
@@ -37,7 +38,7 @@ Navp::Navp()
       selectedExclusionBoxIndex(-1),
       navpLoaded(false),
       showNavp(true),
-      showKdTree(true),
+      showKdTree(false),
       showNavpIndices(false),
       showPfExclusionBoxes(true),
       showPfSeedPoints(true),
@@ -249,9 +250,9 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
                 const glm::vec3 p1(v1->m_pos.X, v1->m_pos.Z + zRenderOffset, -v1->m_pos.Y);
                 const glm::vec3 p2(v2->m_pos.X, v2->m_pos.Z + zRenderOffset, -v2->m_pos.Y);
 
-                vertices.push_back({p0, glm::vec3(0), color});
-                vertices.push_back({p1, glm::vec3(0), color});
-                vertices.push_back({p2, glm::vec3(0), color});
+                vertices.push_back({p0, glm::vec3(0, 1, 0), color});
+                vertices.push_back({p1, glm::vec3(0, 1, 0), color});
+                vertices.push_back({p2, glm::vec3(0, 1, 0), color});
             }
         }
     }
@@ -495,16 +496,11 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
 
         if (leafNode) {
             std::vector<const CachedKdNode*> path;
-            for (const auto& node : kdTreeNodes) {
-                if (node.depth < leafNode->depth &&
-                    node.bbox.m_min.X <= leafNode->bbox.m_min.X && node.bbox.m_max.X >= leafNode->bbox.m_max.X &&
-                    node.bbox.m_min.Y <= leafNode->bbox.m_min.Y && node.bbox.m_max.Y >= leafNode->bbox.m_max.Y &&
-                    node.bbox.m_min.Z <= leafNode->bbox.m_min.Z && node.bbox.m_max.Z >= leafNode->bbox.m_max.Z) {
-                    path.push_back(&node);
-                }
+            for (const CachedKdNode* curr = leafNode; curr != nullptr; ) {
+                path.emplace_back(curr);
+                curr = (curr->parentIndex != -1) ? &kdTreeNodes[curr->parentIndex] : nullptr;
             }
-            std::sort(path.begin(), path.end(), [](auto* a, auto* b) { return a->depth < b->depth; });
-            path.push_back(leafNode);
+            std::reverse(path.begin(), path.end());
 
             std::string kdLog = "Area " + std::to_string(index + 1) + " KD Path: ";
             for (size_t i = 0; i < path.size(); ++i) {
@@ -514,13 +510,15 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
                 } else {
                     const auto* next = path[i + 1];
                     char axis = 'X'; float val = 0.0f;
+                    std::string axisString = NavPower::AxisToString(curr->axis).substr(0, 1);
                     if (std::abs(curr->bbox.m_min.X - next->bbox.m_min.X) > 0.001f) { axis = 'X'; val = next->bbox.m_min.X; }
                     else if (std::abs(curr->bbox.m_max.X - next->bbox.m_max.X) > 0.001f) { axis = 'X'; val = next->bbox.m_max.X; }
                     else if (std::abs(curr->bbox.m_min.Y - next->bbox.m_min.Y) > 0.001f) { axis = 'Y'; val = next->bbox.m_min.Y; }
                     else if (std::abs(curr->bbox.m_max.Y - next->bbox.m_max.Y) > 0.001f) { axis = 'Y'; val = next->bbox.m_max.Y; }
                     else if (std::abs(curr->bbox.m_min.Z - next->bbox.m_min.Z) > 0.001f) { axis = 'Z'; val = next->bbox.m_min.Z; }
                     else { axis = 'Z'; val = next->bbox.m_max.Z; }
-                    kdLog += "D" + std::to_string(curr->depth) + "(" + axis + ":" + std::to_string(val).substr(0, std::to_string(val).find('.') + 3) + ") -> ";
+                    kdLog += "D" + std::to_string(curr->depth) + "(" + axisString + ":" + std::to_string(val).substr(0, std::to_string(val).find('.') + 3) + ") ";
+                    kdLog += "Left: " + std::to_string(curr->node->m_dLeft) + " Right: " + std::to_string(curr->node->m_dRight) + " -> ";
                 }
             }
             Logger::log(NK_INFO, kdLog.c_str());
@@ -626,18 +624,19 @@ void Navp::renderNavMesh() {
         const Vec3 colorPink = {1.0f, .7f, 1.0f};
         if (showNavpIndices) {
             int areaIndex = 0;
+            constexpr float zRenderOffset = 0.5f;
             for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
                 const auto& area = getAreaByIndex(navMesh, i);
                 const auto& edges = area.m_edges;
                 const Vec3 pos = area.m_area->m_pos;
                 renderer.drawText(std::to_string(areaIndex + 1), {
-                                      pos.X, pos.Z + 0.1f, -pos.Y
+                                      pos.X, pos.Z + 0.1f + zRenderOffset, -pos.Y
                                   }, colorBlue, 20);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
                     for (const auto vertex : edges) {
                         renderer.drawText(std::to_string(edgeIndex + 1),
-                                          {vertex->m_pos.X, vertex->m_pos.Z + 0.1f, -vertex->m_pos.Y},
+                                          {vertex->m_pos.X, vertex->m_pos.Z + 0.1f + zRenderOffset, -vertex->m_pos.Y},
                                           vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
                                               ? colorRed
                                               : colorGreen, 20);
@@ -646,7 +645,7 @@ void Navp::renderNavMesh() {
                             Vec3 midpoint = (vertex->m_pos + nextVertex->m_pos) / 2.0f;
                             const int neighborAreaIndex = binaryAreaToAreaIndexMap[vertex->m_pAdjArea];
                             renderer.drawText(std::to_string(neighborAreaIndex),
-                                              {midpoint.X, midpoint.Z + 0.1f, -midpoint.Y},
+                                              {midpoint.X, midpoint.Z + 0.1f + zRenderOffset, -midpoint.Y},
                                               colorPink, 20);
                         }
                         edgeIndex++;
@@ -695,25 +694,27 @@ void Navp::renderKdTree() {
         selectedLeafNode = it->second;
     }
 
-    for (const auto& node : kdTreeNodes) {
-        bool isSelectedLeaf = false;
-        bool isParentOfSelected = false;
+    if (!selectedLeafNode) return;
 
-        if (&node == selectedLeafNode) {
-            isSelectedLeaf = true;
-        } else if (selectedLeafNode && node.depth < selectedLeafNode->depth &&
-                   node.bbox.m_min.X <= selectedLeafNode->bbox.m_min.X && node.bbox.m_max.X >= selectedLeafNode->bbox.m_max.X &&
-                   node.bbox.m_min.Y <= selectedLeafNode->bbox.m_min.Y && node.bbox.m_max.Y >= selectedLeafNode->bbox.m_max.Y &&
-                   node.bbox.m_min.Z <= selectedLeafNode->bbox.m_min.Z && node.bbox.m_max.Z >= selectedLeafNode->bbox.m_max.Z) {
-            isParentOfSelected = true;
+    // Structural ancestor lookup: follow the parentIndex chain
+    std::set<const CachedKdNode*> pathNodes;
+    for (const CachedKdNode* curr = selectedLeafNode; curr != nullptr; ) {
+        pathNodes.insert(curr);
+        if (curr->parentIndex != -1) {
+            curr = &kdTreeNodes[curr->parentIndex];
+        } else {
+            curr = nullptr;
         }
+    }
 
-        if (!isSelectedLeaf && !isParentOfSelected) {
+    for (const auto& node : kdTreeNodes) {
+        if (pathNodes.find(&node) == pathNodes.end()) {
             continue;
         }
 
         const int depth = node.depth;
         const auto& bbox = node.bbox;
+        bool isSelectedLeaf = (&node == selectedLeafNode);
 
         glm::vec3 color; // Base level color
         switch (depth % 6) {
@@ -724,26 +725,83 @@ void Navp::renderKdTree() {
             case 4: color = {1.0f, 0.3f, 1.0f}; break; // Magenta
             case 5: color = {0.3f, 1.0f, 1.0f}; break; // Cyan
         }
+        // switch (node.axis) {
+        //     case NavPower::Axis::X: color = {1.0f, 0.0f, 0.0f}; break; // X Red
+        //     case NavPower::Axis::Y: color = {0.0f, 0.0f, 1.0f}; break; // Z Blue
+        //     case NavPower::Axis::Z: color = {0.0f, 1.0f, 0.0f}; break; // Y Green
+        //     case NavPower::UNDEF: color = {1.0f, 1.0f, 1.0f}; break; // Blue
+        //     break;
+        // }
+
 
         Vec3 outlineColor = isSelectedLeaf ? Vec3{1.0f, 1.0f, 1.0f} : Vec3{color.r, color.g, color.b};
+        Vec3 dimmedColor = { outlineColor.X * 0.33f, outlineColor.Y * 0.33f, outlineColor.Z * 0.33f };
 
         Vec3 center = (bbox.m_min + bbox.m_max) * 0.5f;
-        Vec3 size = bbox.m_max - bbox.m_min;
+        float inset = 0.0f; //static_cast<float>(depth) * 0.05f;
 
-        float inset = static_cast<float>(depth) * 0.02f;
-        float szX = (std::max)(0.05f, size.X - inset);
-        float szZ = (std::max)(0.05f, size.Z - inset);
-        float szY = (std::max)(0.05f, size.Y - inset);
+        auto drawPart = [&](const NavPower::BBox& partBbox, bool dimmed, bool isLeaf) {
+            if (dimmed) {
+                return;
+            }
+            Vec3 partCenter = (partBbox.m_min + partBbox.m_max) * 0.5f;
+            Vec3 partSize = partBbox.m_max - partBbox.m_min;
 
-        renderer.drawBox(
-            {center.X, center.Z + zRenderOffset, -center.Y},
-            {szX, szZ, -szY},
-            {0, 0, 0, 1},
-            false,
-            {0, 0, 0},
-            true,
+            float szX = (std::max)(0.01f, partSize.X - (isLeaf ? 0.0f : inset));
+            float szY = (std::max)(0.01f, partSize.Y - (isLeaf ? 0.0f : inset));
+            float szZ = (std::max)(0.01f, partSize.Z - (isLeaf ? 0.0f : inset));
+
+            Vec3 pCenter = { partCenter.X, partCenter.Z + zRenderOffset, -partCenter.Y };
+            Vec3 pSize = { szX, szZ, -szY };
+
+            renderer.drawBox(
+                pCenter,
+                pSize,
+                { 0, 0, 0, 1 },
+                false,
+                { 0, 0, 0 },
+                true,
+                dimmed ? dimmedColor : outlineColor,
+                1.0f
+            );
+        };
+
+        if (node.isLeaf) {
+            drawPart(bbox, false, true);
+        } else {
+            const float splitVal = (node.node->m_dLeft + node.node->m_dRight) * 0.5f;
+            float bboxSplitMin = 0.0f;
+            float bboxSplitMax = 0.0f;
+            switch (node.axis) {
+                case NavPower::Axis::X: bboxSplitMin = selectedLeafNode->bbox.m_min.X; bboxSplitMax = selectedLeafNode->bbox.m_max.X; break;
+                case NavPower::Axis::Y: bboxSplitMin = selectedLeafNode->bbox.m_min.Y; bboxSplitMax = selectedLeafNode->bbox.m_max.Y; break;
+                case NavPower::Axis::Z: bboxSplitMin = selectedLeafNode->bbox.m_min.Z; bboxSplitMax = selectedLeafNode->bbox.m_max.Z; break;
+            case NavPower::UNDEF:
+                break;
+            }
+            const float leafCenterOnAxis = (bboxSplitMin + bboxSplitMax) * 0.5f;
+            const bool leafIsLeft = leafCenterOnAxis < splitVal;
+
+            NavPower::BBox leftBbox = bbox;
+            leftBbox.m_max[node.axis] = node.node->m_dLeft;
+            drawPart(leftBbox, !leafIsLeft, false);
+
+            NavPower::BBox rightBbox = bbox;
+            rightBbox.m_min[node.axis] = node.node->m_dRight;
+            drawPart(rightBbox, leafIsLeft, false);
+
+            if (leafIsLeft) {
+                center = (leftBbox.m_min + leftBbox.m_max) * 0.5f;
+            } else {
+                center = (rightBbox.m_min + rightBbox.m_max) * 0.5f;
+            }
+        }
+        std::string text = std::to_string(depth) + " " + (depth == 1 ? "Root" : (isSelectedLeaf ? "Leaf" : NavPower::AxisToString(node.axis)));
+        renderer.drawText(
+            text,
+            {center.X, center.Z + zRenderOffset + static_cast<float>(depth) / 5.0f, -center.Y},
             outlineColor,
-            1.0f
+            20.0
         );
     }
 }
@@ -1001,28 +1059,67 @@ void Navp::buildAreaMaps() {
 
     if (!navMesh) return;
 
+    kdTreeNodes.reserve(getTotalAreaCount(navMesh) * 2);
+
     int globalAreaIndex = 1;
     for (auto& section : const_cast<NavPower::NavMesh*>(navMesh)->m_aSections) {
         for (auto& navGraph : section.m_aNavGraphs) {
-            // 1. Build standard area mappings for this specific graph
             for (auto& area : navGraph.m_areas) {
                 binaryAreaToAreaIndexMap.emplace(area.m_area, globalAreaIndex++);
                 binaryAreaToAreaMap.emplace(area.m_area, &area);
                 posToAreaMap.emplace(area.m_area->m_pos, &area);
             }
 
-            // 2. Parse the KD-Tree and store nodes
-            auto depthMap = const_cast<NavPower::NavGraph&>(navGraph).ParseKDTreeToKDTreeResult();
-            for (const auto& [depth, bboxPairs] : depthMap) {
-                for (const auto& [axis, bbox, pArea, isLeaf] : bboxPairs) {
-                    // Store in the vector for iteration/rendering
-                    kdTreeNodes.push_back({ depth, bbox, pArea, isLeaf });
-                    // If it's a leaf and has a resolved area pointer, map the area pointer to this specific node for O(1) lookup
-                    if (isLeaf && pArea) {
-                        cachedKdNodes[pArea] = &kdTreeNodes.back();
-                    }
+            // Build a temporary map for leaf area resolution
+            std::map<uint32_t, NavPower::Binary::Area*> offsetToAreaMap;
+            for (auto const& [ptr, offset] : const_cast<NavPower::NavGraph&>(navGraph).AreaPointerToNavGraphOffsetMap()) {
+                offsetToAreaMap[offset] = ptr;
+            }
+
+            // Perform a manual traversal to capture structural parent hierarchy
+            struct TraversalState {
+                NavPower::Binary::KDNode* node;
+                NavPower::BBox bbox;
+                uint32_t depth;
+                int parentIdx;
+            };
+
+            std::vector<TraversalState> stack;
+            stack.push_back({ navGraph.m_rootKDNode, navGraph.m_kdTreeData->m_bbox, 1, -1 });
+
+            while (!stack.empty()) {
+                TraversalState current = stack.back();
+                stack.pop_back();
+
+                NavPower::Binary::Area* pArea = nullptr;
+                bool isLeaf = current.node->IsLeaf();
+                NavPower::Axis axis = isLeaf ? NavPower::Axis::UNDEF : current.node->GetSplitAxis();
+
+                if (isLeaf) {
+                    uint32_t offset = ((NavPower::Binary::KDLeaf*)current.node)->GetPrimOffset();
+                    if (offsetToAreaMap.count(offset)) pArea = offsetToAreaMap[offset];
+                }
+
+                int currentIdx = static_cast<int>(kdTreeNodes.size());
+                kdTreeNodes.push_back({ current.depth, current.bbox, pArea, isLeaf, axis, current.node, current.parentIdx });
+
+                if (!isLeaf) {
+                    NavPower::Axis splitAxis = current.node->GetSplitAxis();
+                    NavPower::BBox rightBbox = current.bbox;
+                    rightBbox.m_min[splitAxis] = current.node->m_dRight;
+                    stack.push_back({ current.node->GetRight(), rightBbox, current.depth + 1, currentIdx });
+
+                    NavPower::BBox leftBbox = current.bbox;
+                    leftBbox.m_max[splitAxis] = current.node->m_dLeft;
+                    stack.push_back({ current.node->GetLeft(), leftBbox, current.depth + 1, currentIdx });
                 }
             }
+        }
+    }
+
+    for (auto& node : kdTreeNodes) {
+        if (node.isLeaf && node.pArea) {
+            cachedKdNodes[node.pArea] = &node;
         }
     }
 }

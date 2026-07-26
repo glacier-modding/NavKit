@@ -464,10 +464,11 @@ namespace NavPower
 
     struct KDTreeResult
     {
-        uint32_t m_axis;
+        Axis m_axis;
         BBox m_bbox;
         Binary::Area* m_pArea;
         bool m_isLeaf;
+        Binary::KDNode* node;
     };
 
     class NavGraph

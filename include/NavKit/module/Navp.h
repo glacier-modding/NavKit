@@ -105,6 +105,9 @@ public:
         NavPower::BBox bbox;
         NavPower::Binary::Area* pArea;
         bool isLeaf;
+        NavPower::Axis axis;
+        NavPower::Binary::KDNode* node;
+        int parentIndex = -1;
     };
     std::vector<CachedKdNode> kdTreeNodes;
     std::map<NavPower::Binary::Area*, CachedKdNode*> cachedKdNodes;

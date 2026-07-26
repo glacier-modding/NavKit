@@ -221,6 +221,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_INDICES, Navp::getInstance().showNavpIndices,
                                        "Show Navp Indices");
                 break;
+            case IDM_VIEW_NAVP_SHOW_KD_TREE:
+                handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_KD_TREE, Navp::getInstance().showKdTree,
+                                       "Show KD Tree");
+                break;
             case IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES:
                 handleCheckboxMenuItem(
                     IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, Navp::getInstance().showPfExclusionBoxes,

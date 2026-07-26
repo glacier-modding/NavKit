@@ -76,7 +76,7 @@ void Gui::drawGui() {
 
         if (showLog) {
             const int logAreaHeight = renderer.height > 440
-                                          ? 220
+                                          ? 250
                                           : static_cast<int>(static_cast<double>(renderer.height) * 0.2);
             Logger &logger = Logger::getInstance();
             std::lock_guard lock(logger.getLogMutex());
