@@ -118,26 +118,56 @@ void Rpkg::initExtractionData() {
     Logger::log(NK_INFO, "Done scanning resource packages.");
 
     std::jthread navpThread([]() {
-        const auto navpFilesInRpkgs = get_all_resources_hashes_by_type_from_rpkg_files(
+        const auto navpFilesInRpkgsRustStringList = get_all_resources_hashes_by_type_from_rpkg_files(
             partitionManager, "NAVP", Logger::rustLogCallback);
         std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
-        for (int i = 0; i < navpFilesInRpkgs->length; i++) {
-            if (std::string navpHash = get_string_from_list(navpFilesInRpkgs, i); !Navp::navpHashIoiStringMap.
-                contains(navpHash)) {
+        std::set<std::string> navpFilesInRpkgs;
+
+        for (int i = 0; i < navpFilesInRpkgsRustStringList->length; i++) {
+            navpFilesInRpkgs.insert(std::string(get_string_from_list(navpFilesInRpkgsRustStringList, i)));
+        }
+        // Insert Navp files from RPKG into map
+        for (const auto& navpHash : navpFilesInRpkgs) {
+            if (!Navp::navpHashIoiStringMap.contains(navpHash)) {
                 Navp::navpHashIoiStringMap[navpHash] = navpHash;
             }
+        }
+        std::set<std::string> toErase;
+        // Remove Navp files not in RPKG from map
+        for (const auto& navpHash : Navp::navpHashIoiStringMap | std::views::keys) {
+            if (!navpFilesInRpkgs.contains(navpHash)) {
+                toErase.insert(navpHash);
+            }
+        }
+        for (const auto& navpHash : toErase) {
+            Navp::navpHashIoiStringMap.erase(navpHash);
         }
     });
 
     std::jthread airgThread([]() {
-        const auto airgFilesInRpkgs = get_all_resources_hashes_by_type_from_rpkg_files(
+        const auto airgFilesInRpkgsRustStringList = get_all_resources_hashes_by_type_from_rpkg_files(
             partitionManager, "AIRG", Logger::rustLogCallback);
         std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
-        for (int i = 0; i < airgFilesInRpkgs->length; i++) {
-            if (std::string airgHash = get_string_from_list(airgFilesInRpkgs, i); !Airg::airgHashIoiStringMap.
-                contains(airgHash)) {
+        std::set<std::string> airgFilesInRpkgs;
+
+        for (int i = 0; i < airgFilesInRpkgsRustStringList->length; i++) {
+            airgFilesInRpkgs.insert(std::string(get_string_from_list(airgFilesInRpkgsRustStringList, i)));
+        }
+        // Insert Airg files from RPKG into map
+        for (const auto& airgHash : airgFilesInRpkgs) {
+            if (!Airg::airgHashIoiStringMap.contains(airgHash)) {
                 Airg::airgHashIoiStringMap[airgHash] = airgHash;
             }
+        }
+        std::set<std::string> toErase;
+        // Remove Airg files not in RPKG from map
+        for (const auto& airgHash : Airg::airgHashIoiStringMap | std::views::keys) {
+            if (!airgFilesInRpkgs.contains(airgHash)) {
+                toErase.insert(airgHash);
+            }
+        }
+        for (const auto& airgHash : toErase) {
+            Airg::airgHashIoiStringMap.erase(airgHash);
         }
     });
 
