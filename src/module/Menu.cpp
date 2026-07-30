@@ -105,6 +105,7 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_EDIT_NAVP_STAIRS, isAreaSelected);
     setMenuItemEnabled(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.canEnterConnectWaypointMode());
+    setMenuItemEnabled(IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.canEnterConnectWaypointMode());
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
     setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
@@ -124,6 +125,8 @@ void Menu::updateMenuState() {
     setMenuItemChecked(IDM_EDIT_NAVP_STAIRS, isStairs, "Stairs Area");
     setMenuItemChecked(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled,
                        "Connect Waypoint Mode Enabled");
+    setMenuItemChecked(IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled,
+                       "Disconnect Waypoint Mode Enabled");
 }
 
 void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const char* itemName) {
@@ -206,6 +209,11 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 airg.handleConnectWaypointClicked();
                 break;
 
+            case IDM_EDIT_AIRG_DISCONNECT_WAYPOINT:
+                Logger::log(NK_DEBUG, "Edit -> Airg Disconnect Waypoint clicked");
+                airg.handleDisconnectWaypointClicked();
+                break;
+
             case IDM_VIEW_SCENE_SHOW_BBOX:
                 handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_BBOX, Scene::getInstance().showBBox, "Show Bounding Box");
                 break;
@@ -234,6 +242,13 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 handleCheckboxMenuItem(
                     IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, Navp::getInstance().showPfSeedPoints,
                     "Show Seed Points");
+                break;
+            case IDM_VIEW_NAVP_Z_RENDER_OFFSET:
+                handleCheckboxMenuItem(
+                    IDM_VIEW_NAVP_Z_RENDER_OFFSET, Navp::getInstance().doZRenderOffset,
+                    "Z Render Offset");
+                Navp::navMeshDirty = true;
+                Navp::hitTestDirty = true;
                 break;
             case IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO:
                 handleCheckboxMenuItem(

@@ -67,7 +67,6 @@ bool Airg::airgDirty = true;
 GLuint Airg::airgHitTestVao = 0;
 GLuint Airg::airgHitTestVbo = 0;
 int Airg::airgHitTestCount = 0;
-bool Airg::airgHitTestDirty = true;
 
 static std::string formatFloat(const float val) {
     std::stringstream ss;
@@ -295,12 +294,16 @@ void Airg::handleBuildAirgClicked() {
     delete reasoningGrid;
     reasoningGrid = new ReasoningGrid();
     airgDirty = true;
-    airgHitTestDirty = true;
+    airgDirty = true;
     Logger::log(NK_INFO, "Building Airg from Airg");
     backgroundWorker.emplace(&Airg::buildAirg, this);
 }
 
 bool Airg::canEnterConnectWaypointMode() const {
+    return airgLoaded && selectedWaypointIndex != -1;
+}
+
+bool Airg::canEnterDisconnectWaypointMode() const {
     return airgLoaded && selectedWaypointIndex != -1;
 }
 
@@ -310,6 +313,16 @@ void Airg::handleConnectWaypointClicked() {
         Logger::log(NK_INFO, "Entering Connect Waypoint mode. Start waypoint: %d", selectedWaypointIndex);
     } else {
         Logger::log(NK_INFO, "Exiting Connect Waypoint mode.");
+    }
+    Menu::updateMenuState();
+}
+
+void Airg::handleDisconnectWaypointClicked() {
+    disconnectWaypointModeEnabled = !disconnectWaypointModeEnabled;
+    if (disconnectWaypointModeEnabled) {
+        Logger::log(NK_INFO, "Entering Disconnect Waypoint mode. Start waypoint: %d", selectedWaypointIndex);
+    } else {
+        Logger::log(NK_INFO, "Exiting Disconnect Waypoint mode.");
     }
     Menu::updateMenuState();
 }
@@ -364,7 +377,41 @@ void Airg::connectWaypoints(const int startWaypointIndex, const int endWaypointI
     Logger::log(NK_INFO,
                 ("Connected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(
                     endWaypointIndex)).c_str());
+    airgDirty = true;
     Logger::log(NK_INFO, "Exiting Connect Waypoint mode.");
+}
+
+void Airg::disconnectWaypoints(const int startWaypointIndex, const int endWaypointIndex) {
+    Waypoint& startWaypoint = reasoningGrid->m_WaypointList[startWaypointIndex];
+    bool connected = false;
+    for (int direction = 0; direction < 8; ++direction) {
+        if (startWaypoint.nNeighbors[direction] == endWaypointIndex) {
+            startWaypoint.nNeighbors[direction] = -1;
+            connected = true;
+        }
+    }
+    disconnectWaypointModeEnabled = false;
+    if (!connected) {
+        Logger::log(NK_INFO, "Waypoints already disconnected.");
+        return;
+    }
+    Waypoint& endWaypoint = reasoningGrid->m_WaypointList[endWaypointIndex];
+
+    for (int direction = 0; direction < 8; ++direction) {
+        if (endWaypoint.nNeighbors[direction] == startWaypointIndex) {
+            endWaypoint.nNeighbors[direction] = -1;
+        }
+    }
+    Menu::updateMenuState();
+    if (startWaypointIndex == -1 || endWaypointIndex == -1) {
+        Logger::log(NK_INFO, "Exiting Disconnect Waypoint mode.");
+        return;
+    }
+    Logger::log(NK_INFO,
+                ("Disconnected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(
+                    endWaypointIndex)).c_str());
+    airgDirty = true;
+    Logger::log(NK_INFO, "Exiting Disconnect Waypoint mode.");
 }
 
 char* Airg::openAirgFileDialog(const char* lastAirgFolder) {
@@ -430,7 +477,7 @@ void Airg::buildAirg(Airg* airg) {
     airg->airgBuilding = false;
     airg->airgLoaded = true;
     airgDirty = true;
-    airgHitTestDirty = true;
+    airgDirty = true;
     Menu::updateMenuState();
 }
 
@@ -643,39 +690,36 @@ void Airg::renderAirg() {
 
 void Airg::renderAirgForHitTest() const {
     if (showAirg && airgLoaded) {
-        if (airgHitTestDirty) {
-            std::vector<AirgVertex> triVerts;
-            std::vector<AirgVertex> lineVerts; // Unused for hit test, but needed for helper
+        std::vector<AirgVertex> triVerts;
+        std::vector<AirgVertex> lineVerts; // Unused for hit test, but needed for helper
 
-            const int numWaypoints = reasoningGrid->m_WaypointList.size();
-            for (size_t i = 0; i < numWaypoints; i++) {
-                const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
-                const float r = static_cast<float>(AIRG_WAYPOINT) / 255.0f;
-                const float g = static_cast<float>(i >> 8 & 0xFF) / 255.0f;
-                const float b = static_cast<float>(i & 0xFF) / 255.0f;
-                glm::vec4 color(r, g, b, 1.0f);
-                addWaypointGeometry(triVerts, lineVerts, waypoint, true, color, true);
-            }
-
-            if (airgHitTestVao == 0) {
-                glGenVertexArrays(1, &airgHitTestVao);
-            }
-            if (airgHitTestVbo == 0) {
-                glGenBuffers(1, &airgHitTestVbo);
-            }
-            glBindVertexArray(airgHitTestVao);
-            glBindBuffer(GL_ARRAY_BUFFER, airgHitTestVbo);
-            glBufferData(GL_ARRAY_BUFFER, triVerts.size() * sizeof(AirgVertex), triVerts.data(), GL_STATIC_DRAW);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, pos));
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, normal));
-            glEnableVertexAttribArray(2);
-            glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, color));
-            airgHitTestCount = triVerts.size();
-            glBindVertexArray(0);
-            airgHitTestDirty = false;
+        const int numWaypoints = reasoningGrid->m_WaypointList.size();
+        for (size_t i = 0; i < numWaypoints; i++) {
+            const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
+            const float r = static_cast<float>(AIRG_WAYPOINT) / 255.0f;
+            const float g = static_cast<float>(i >> 8 & 0xFF) / 255.0f;
+            const float b = static_cast<float>(i & 0xFF) / 255.0f;
+            glm::vec4 color(r, g, b, 1.0f);
+            addWaypointGeometry(triVerts, lineVerts, waypoint, true, color, true);
         }
+
+        if (airgHitTestVao == 0) {
+            glGenVertexArrays(1, &airgHitTestVao);
+        }
+        if (airgHitTestVbo == 0) {
+            glGenBuffers(1, &airgHitTestVbo);
+        }
+        glBindVertexArray(airgHitTestVao);
+        glBindBuffer(GL_ARRAY_BUFFER, airgHitTestVbo);
+        glBufferData(GL_ARRAY_BUFFER, triVerts.size() * sizeof(AirgVertex), triVerts.data(), GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, pos));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, normal));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(AirgVertex), (void*)offsetof(AirgVertex, color));
+        airgHitTestCount = triVerts.size();
+        glBindVertexArray(0);
 
         const Renderer& renderer = Renderer::getInstance();
         renderer.shader.use();
@@ -878,7 +922,7 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
     airg->airgLoading = false;
     airg->airgLoaded = true;
     airgDirty = true;
-    airgHitTestDirty = true;
+    airgDirty = true;
     Grid::getInstance().loadBoundsFromAirg();
     Menu::updateMenuState();
 }

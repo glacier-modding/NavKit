@@ -17,6 +17,7 @@
 #define IDM_FILE_EXIT                           1020
 #define IDM_EDIT_NAVP_STAIRS                    1100
 #define IDM_EDIT_AIRG_CONNECT_WAYPOINT          1101
+#define IDM_EDIT_AIRG_DISCONNECT_WAYPOINT       1102
 #define IDM_SETTINGS_NAVKIT                     1200
 #define IDM_SETTINGS_SCENE                      1201
 #define IDM_SETTINGS_RECAST                     1202
@@ -28,6 +29,7 @@
 #define IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS       1303
 #define IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO    1304
 #define IDM_VIEW_NAVP_SHOW_KD_TREE              1305
+#define IDM_VIEW_NAVP_Z_RENDER_OFFSET           1306
 #define IDM_VIEW_OBJ_SHOW_OBJ                   1310
 #define IDM_VIEW_AIRG_SHOW_AIRG                 1320
 #define IDM_VIEW_AIRG_SHOW_INDICES              1321

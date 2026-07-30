@@ -111,6 +111,7 @@ public:
     };
     std::vector<CachedKdNode> kdTreeNodes;
     std::map<NavPower::Binary::Area*, CachedKdNode*> cachedKdNodes;
+    bool doZRenderOffset;
 
     void setSelectedNavpAreaIndex(int index);
 

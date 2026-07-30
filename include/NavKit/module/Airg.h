@@ -52,6 +52,7 @@ public:
     bool airgLoading;
     bool airgBuilding;
     bool connectWaypointModeEnabled;
+    bool disconnectWaypointModeEnabled;
     std::vector<bool> airgSaveState;
     bool showAirg;
     bool showAirgIndices;
@@ -88,6 +89,8 @@ public:
 
     void connectWaypoints(int startWaypointIndex, int endWaypointIndex);
 
+    void disconnectWaypoints(int startWaypointIndex, int endWaypointIndex);
+
     void setLastLoadFileName(const char* fileName);
 
     void setLastSaveFileName(const char* fileName);
@@ -117,7 +120,11 @@ public:
     static void buildAirg(Airg* airg);
     [[nodiscard]] bool canEnterConnectWaypointMode() const;
 
+    [[nodiscard]] bool canEnterDisconnectWaypointMode() const;
+
     void handleConnectWaypointClicked();
+
+    void handleDisconnectWaypointClicked();
 
     std::optional<std::jthread> backgroundWorker;
 
@@ -148,8 +155,6 @@ private:
     static GLuint airgHitTestVbo;
 
     static int airgHitTestCount;
-
-    static bool airgHitTestDirty;
 
     static INT_PTR CALLBACK airgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 

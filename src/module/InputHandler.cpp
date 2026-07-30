@@ -239,6 +239,8 @@ void InputHandler::hitTest() const {
                 } else {
                     if (airg.connectWaypointModeEnabled) {
                         airg.connectWaypoints(airg.selectedWaypointIndex, hitTestResult.selectedIndex);
+                    } else if (airg.disconnectWaypointModeEnabled) {
+                        airg.disconnectWaypoints(airg.selectedWaypointIndex, hitTestResult.selectedIndex);
                     } else {
                         airg.setSelectedAirgWaypointIndex(hitTestResult.selectedIndex);
                     }

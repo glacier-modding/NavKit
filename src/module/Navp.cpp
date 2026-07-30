@@ -43,6 +43,7 @@ Navp::Navp()
       showPfExclusionBoxes(true),
       showPfSeedPoints(true),
       showRecastDebugInfo(false),
+      doZRenderOffset(false),
       doNavpHitTest(false),
       doNavpExclusionBoxHitTest(false),
       doNavpPfSeedPointHitTest(false),
@@ -99,7 +100,7 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
         } else {
             areaColor = selected ? glm::vec4(0.0, 0.9, 0.0, 1.0) : glm::vec4(0.0, 0.5, 0.0, 1.0);
         }
-        constexpr float zRenderOffset = 0.5f;
+        float zRenderOffset = getInstance().doZRenderOffset ? 0.5f : 0.0f;
         // Triangulate (Fan)
         if (edges.size() >= 3) {
             const auto& v0 = edges[0];
@@ -240,7 +241,7 @@ void Navp::updateHitTestBuffers(const NavPower::NavMesh* navMesh) {
         const glm::vec4 color(r, g, b, 1.0f);
 
         if (edges.size() >= 3) {
-            constexpr float zRenderOffset = 0.5f;
+            float zRenderOffset = getInstance().doZRenderOffset ? 0.5f : 0.0f;
             const auto& v0 = edges[0];
             const glm::vec3 p0(v0->m_pos.X, v0->m_pos.Z + zRenderOffset, -v0->m_pos.Y);
 
@@ -624,7 +625,7 @@ void Navp::renderNavMesh() {
         const Vec3 colorPink = {1.0f, .7f, 1.0f};
         if (showNavpIndices) {
             int areaIndex = 0;
-            constexpr float zRenderOffset = 0.5f;
+            float zRenderOffset = getInstance().doZRenderOffset ? 0.5f : 0.0f;
             for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
                 const auto& area = getAreaByIndex(navMesh, i);
                 const auto& edges = area.m_edges;
@@ -685,8 +686,7 @@ void Navp::renderKdTree() {
     }
 
     Renderer& renderer = Renderer::getInstance();
-    constexpr float zRenderOffset = 0.5f;
-
+    float zRenderOffset = getInstance().doZRenderOffset ? 0.5f : 0.0f;
     NavPower::Binary::Area* selectedAreaPtr = getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area;
 
     const CachedKdNode* selectedLeafNode = nullptr;
