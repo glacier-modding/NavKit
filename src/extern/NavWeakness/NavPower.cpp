@@ -591,11 +591,24 @@ namespace NavPower
             int nextI = (i + 1) % mappedPoints.size();
             sum += mappedPoints[i].X * mappedPoints[nextI].Y - mappedPoints[nextI].X * mappedPoints[i].Y;
         }
-        float area = sum / 2;
-        if (area < 0)
+
+        constexpr float areaEpsilon = 1e-9f;
+        if (std::abs(sum) < areaEpsilon * 2.0f)
         {
-            area *= -1;
+            Logger::log(
+                NK_WARN,
+                "CalculateCentroid: Polygon has near-zero area. Returning average of vertices.");
+
+            Vec3 averagePos(0.0f, 0.0f, 0.0f);
+            for (const auto& edge : m_edges)
+            {
+                averagePos = averagePos + edge->m_pos;
+            }
+
+            return averagePos / static_cast<float>(m_edges.size());
         }
+
+        float area = std::abs(sum / 2.0f);
 
         float sumX = 0;
         float sumY = 0;
@@ -611,8 +624,8 @@ namespace NavPower
             sumY += (y0 + y1) * doubleArea;
         }
 
-        float cu = sumX / (6.0 * area);
-        float cv = sumY / (6.0 * area);
+        float cu = sumX / (6.0f * area);
+        float cv = sumY / (6.0f * area);
 
         Vec3 cucv = Vec3(1, cu, cv);
         Vec3 xuv = Vec3(v0.X, u.X, v.X);
@@ -1360,10 +1373,10 @@ namespace NavPower
         end = static_cast<unsigned int>(s_startPointer + totalBytes);
         if (totalGraphSize != totalBytes)
         {
-            Logger::log(NK_ERROR, "NavGraph - What was read does not match the total bytes. Current memory address: %u, end memory address %u", ad, end);
+            Logger::log(NK_ERROR, "NavGraph - What was read does not match the total bytes. Current memory address: %u, end memory address: %u", ad, end);
             // throw std::runtime_error("Data offset after reading NavGraph does not match total bytes");
         }
-        Logger::log(NK_DEBUG, "Read NavGraph successfully. Current memory address: %u, end memory address %u", ad, end);
+        Logger::log(NK_DEBUG, "Read NavGraph successfully. Current memory address: %u, end memory address: %u", ad, end);
     }
 
     // This function was made by github.com/OrfeasZ aka NoFaTe
