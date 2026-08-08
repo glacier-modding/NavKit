@@ -721,13 +721,22 @@ namespace NavPower
     {
         std::map<Binary::Area*, uint32_t> s_AreaPointerToNavGraphOffsetMap;
         uint32_t s_headerSize = m_hdr->getSize();
-        uint32_t s_areaBytes = s_headerSize;
+        uint32_t s_areaOffset = s_headerSize;
+        uint32_t s_maxOffset = m_hdr->getSize() + m_hdr->m_areaBytes;
         for (auto& area : m_areas)
         {
-            s_AreaPointerToNavGraphOffsetMap.emplace(area.m_area, s_areaBytes);
-            s_areaBytes += sizeof(Binary::Area);
-            s_areaBytes += sizeof(Binary::Edge) * area.m_edges.size();
+            if (s_areaOffset > m_hdr->getSize() + m_hdr->m_areaBytes) {
+                Logger::log(NK_ERROR, "Offset of start of area is past max allowed offset, area offset: %u, max allowed offset: %u ", s_areaOffset, s_maxOffset);
+            }
+            if (s_areaOffset + sizeof(Binary::Area) + sizeof(Binary::Edge) * area.m_edges.size() > m_hdr->getSize() + m_hdr->m_areaBytes) {
+                Logger::log(NK_ERROR, "Area too large to fit in max allowed offset, area offset: %u, max allowed offset: %u ", s_areaOffset, s_maxOffset);
+            }
+            s_AreaPointerToNavGraphOffsetMap.emplace(area.m_area, s_areaOffset);
+            s_areaOffset += sizeof(Binary::Area);
+            s_areaOffset += sizeof(Binary::Edge) * area.m_edges.size();
         }
+        Logger::log(NK_DEBUG, "Header size: %u, Header area bytes: %u, Area offset after last area: %u, max allowed offset: %u", m_hdr->getSize(), m_hdr->m_areaBytes, s_areaOffset, s_maxOffset);
+
         return s_AreaPointerToNavGraphOffsetMap;
     }
 
@@ -1082,6 +1091,9 @@ namespace NavPower
                 leaf->m_data = 0x80000000;
                 leaf->SetIsLeaf(true);
                 leaf->SetPrimOffset(s_MapPosition->second);
+            } else {
+                Logger::log(NK_ERROR, "Area not found in area pointer to navgraph offset map, %d %d %d", p_area->m_pos.X, p_area->m_pos.Y, p_area->m_pos.Z);
+                // throw std::runtime_error("Area not found in area pointer to navgraph offset map.");
             }
             return sizeof(Binary::KDLeaf);
         }
@@ -1147,6 +1159,7 @@ namespace NavPower
             }
             area.m_area->m_radius = s_radius;
         }
+        m_hdr->m_areaBytes = s_areaBytes;
 
         for (auto area : m_areas)
         {
@@ -1180,7 +1193,6 @@ namespace NavPower
         generateKdTree(reinterpret_cast<uintptr_t>(m_rootKDNode), m_areas, s_AreaPointerToNavGraphOffsetMap);
 
         // Set size fields
-        m_hdr->m_areaBytes = s_areaBytes;
         m_hdr->m_kdTreeBytes = sizeof(Binary::KDTreeData) + m_kdTreeData->m_size;
         m_hdr->m_totalBytes = m_hdr->getSize() + m_hdr->m_areaBytes + m_hdr->m_kdTreeBytes;
     }
@@ -1281,10 +1293,17 @@ namespace NavPower
         {
             Binary::KDNode* s_KDNode = (Binary::KDNode*)p_data;
             Binary::KDLeaf* s_KDLeaf = (Binary::KDLeaf*)p_data;
-            bool nearEnd = false; //s_endPointer - p_data < 150;
+            bool nearEnd = s_endPointer - p_data < 150;
+            if (s_KDLeaf->m_data == 0xfdfdfdfd) {
+                Logger::log(NK_ERROR, "Invalid leaf / node, reading freed memory. Current address %u. Supposed end address %u", p_data, s_endPointer);
+                break;
+            }
             if (s_KDNode->IsLeaf()) {
                 d = s_KDLeaf->m_data;
-                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Leaf: Data: %u, Leaf Prim Offset %u", d, s_KDLeaf->GetPrimOffset());
+                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Leaf: Data: %u %x, Leaf Prim Offset %u", d, d, s_KDLeaf->GetPrimOffset());
+                if (s_KDLeaf->GetPrimOffset() > m_hdr->m_areaBytes) {
+                    Logger::log(NK_ERROR, "Leaf area offset is invalid! Data: %u %x, Leaf Prim Offset %u, Max allowed Prim Offset: %u", d, d, s_KDLeaf->GetPrimOffset(),m_hdr->m_areaBytes);
+                }
                 p_data += sizeof(Binary::KDLeaf);
                 s_leafCount++;
             } else {
@@ -1475,6 +1494,7 @@ namespace NavPower
             s_Section.read(p_data, m_isKnt);
             m_aSections.push_back(s_Section);
         }
+        unsigned int sp = s_startPointer;
         unsigned int totalRead = p_data - s_startPointer;
         unsigned int size = CalculateNavMeshSize(this);
         unsigned int filesize = p_filesize;
@@ -1483,6 +1503,7 @@ namespace NavPower
         if (totalRead != filesize) {
             // throw std::runtime_error("Data offset after reading from navp file does not match filesize");
             Logger::log(NK_ERROR, "Data offset after reading from navp file does not match filesize");
+            Logger::log(NK_ERROR, "Start memory address: %u, Current memory address: %u, Total size read: %u, Total calculated size: %u, Total file size: %u", sp, ad, totalRead, size, filesize);
         }
     }
 

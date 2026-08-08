@@ -16,6 +16,8 @@
 # Mono auto generated files
 mono_crash.*
 
+.junie
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -92,7 +94,6 @@ StyleCopReport.xml
 *.tmp
 *.tmp_proj
 *_wpftmp.csproj
-*.log
 *.tlog
 *.vspscc
 *.vssscc

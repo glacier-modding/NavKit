@@ -889,8 +889,8 @@ void Navp::buildNavp() {
             Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
             recastAdapter.findPfSeedPointAreas();
             recastAdapter.excludeNonReachableAreas();
-                const auto end = std::chrono::high_resolution_clock::now();
-                const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+            const auto end = std::chrono::high_resolution_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
             navpBuildDone.store(true);
             msg = "Finished building Navp in ";
             msg += std::to_string(duration.count());
