@@ -14,6 +14,7 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/util/ErrorHandler.h"
 class NavKitSettings;
 
 std::string Rpkg::gameVersion = "HM3";
@@ -26,195 +27,199 @@ std::map<std::string, HashListEntry> Rpkg::ioiStringToHashListEntryMap{};
 std::mutex Rpkg::hashMapsMutex;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
-void PrintExeVersion(const std::wstring& filePath) {
-    // 1. Get the size of the version information block
+std::string Rpkg::getExeVersion(const std::string& filePath) {
     DWORD handle = 0;
-    DWORD size = GetFileVersionInfoSizeW(filePath.c_str(), &handle);
+    std::wstring widePath = std::filesystem::path(filePath).wstring();
+
+    DWORD size = GetFileVersionInfoSizeW(widePath.c_str(), &handle);
 
     if (size == 0) {
-        std::wcerr << L"Failed to get version size for: " << filePath << std::endl;
-        return;
+        Logger::log(NK_ERROR, "Failed to get version size.");
+
+        return "Failed to get version size.";
     }
 
-    // 2. Allocate a buffer to store the version data
     std::vector<BYTE> buffer(size);
-    if (!GetFileVersionInfoW(filePath.c_str(), 0, size, buffer.data())) {
-        std::wcerr << L"Failed to retrieve version info." << std::endl;
-        return;
+    if (!GetFileVersionInfoW(widePath.c_str(), 0, size, buffer.data())) {
+        Logger::log(NK_ERROR, "Failed to retrieve version info.");
+
+        return "Failed to retrieve version info.";
     }
 
-    // 3. Query the fixed file information structure
     VS_FIXEDFILEINFO* fileInfo = nullptr;
     UINT len = 0;
     if (!VerQueryValueW(buffer.data(), L"\\", reinterpret_cast<LPVOID*>(&fileInfo), &len) || len == 0) {
-        std::wcerr << L"Failed to query root version value." << std::endl;
-        return;
+        Logger::log(NK_ERROR, "Failed to query root version value.");
+        return "Failed to query root version value.";
     }
 
-    // 4. Extract major, minor, build, and revision numbers
-    DWORD major = HIWORD(fileInfo->dwFileVersionMS);
-    DWORD minor = LOWORD(fileInfo->dwFileVersionMS);
-    DWORD build = HIWORD(fileInfo->dwFileVersionLS);
-    DWORD revision = LOWORD(fileInfo->dwFileVersionLS);
+    std::string major = std::to_string(HIWORD(fileInfo->dwFileVersionMS));
+    std::string minor = std::to_string(LOWORD(fileInfo->dwFileVersionMS));
+    std::string build = std::to_string(HIWORD(fileInfo->dwFileVersionLS));
 
-    // Output format matching your image (e.g., 3.270.1.0)
-    std::wcout << L"File Version: "
-               << major << L"."
-               << minor << L"."
-               << build << L"."
-               << revision << std::endl;
+    return major + "." + minor + "." + build;
 }
 
 void Rpkg::initExtractionData() {
-    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
-    Logger::log(NK_INFO, "Checking Hitman Platform.");
-    checkHitmanVersion();
-    if (unknownGameVersion) {
-        return;
+    CPPTRACE_TRY
+    {
+        const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+        const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
+        Logger::log(NK_INFO, "Checking Hitman Platform.");
+        checkHitmanVersion();
+        if (unknownGameVersion) {
+            return;
+        }
+        Logger::log(NK_INFO, "Scanning resource packages.");
+
+        std::jthread filteredHashListThread([]() {
+            Logger::log(NK_INFO, "Reading filtered hash list.");
+            if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
+                std::string line;
+                while (std::getline(file, line)) {
+                    if (line.find(".NAVP") != std::string::npos) {
+                        if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
+                            std::string hashPart = line.substr(0, commaPos);
+                            std::string ioiString = line.substr(commaPos + 1);
+                            if (!ioiString.empty() && ioiString.back() == '\r') {
+                                ioiString.pop_back();
+                            }
+                            const size_t dotPos = hashPart.find('.');
+                            const std::string navpHash =
+                                dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
+                            std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
+                            Navp::navpHashIoiStringMap[navpHash] = ioiString;
+                        }
+                    }
+                    if (line.find(".AIRG") != std::string::npos) {
+                        if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
+                            std::string hashPart = line.substr(0, commaPos);
+                            std::string ioiString = line.substr(commaPos + 1);
+                            if (!ioiString.empty() && ioiString.back() == '\r') {
+                                ioiString.pop_back();
+                            }
+                            const size_t dotPos = hashPart.find('.');
+                            const std::string airgHash =
+                                dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
+                            std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
+                            Airg::airgHashIoiStringMap[airgHash] = ioiString;
+                        }
+                    }
+                }
+            }
+            Logger::log(NK_INFO, "Done reading filtered hash list.");
+        });
+
+        partitionManager = scan_packages(retailFolder.c_str(), gameVersion.c_str(), Logger::rustLogCallback);
+        extractionDataInitComplete = true;
+        Logger::log(NK_INFO, "Done scanning resource packages.");
+
+        std::jthread navpThread([]() {
+            const auto navpFilesInRpkgsRustStringList = get_all_resources_hashes_by_type_from_rpkg_files(
+                partitionManager, "NAVP", Logger::rustLogCallback);
+            std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
+            std::set<std::string> navpFilesInRpkgs;
+
+            for (int i = 0; i < navpFilesInRpkgsRustStringList->length; i++) {
+                navpFilesInRpkgs.insert(std::string(get_string_from_list(navpFilesInRpkgsRustStringList, i)));
+            }
+            // Insert Navp files from RPKG into map
+            for (const auto& navpHash : navpFilesInRpkgs) {
+                if (!Navp::navpHashIoiStringMap.contains(navpHash)) {
+                    Navp::navpHashIoiStringMap[navpHash] = navpHash;
+                }
+            }
+            std::set<std::string> toErase;
+            // Remove Navp files not in RPKG from map
+            for (const auto& navpHash : Navp::navpHashIoiStringMap | std::views::keys) {
+                if (!navpFilesInRpkgs.contains(navpHash)) {
+                    toErase.insert(navpHash);
+                }
+            }
+            for (const auto& navpHash : toErase) {
+                Navp::navpHashIoiStringMap.erase(navpHash);
+            }
+        });
+
+        std::jthread airgThread([]() {
+            const auto airgFilesInRpkgsRustStringList = get_all_resources_hashes_by_type_from_rpkg_files(
+                partitionManager, "AIRG", Logger::rustLogCallback);
+            std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
+            std::set<std::string> airgFilesInRpkgs;
+
+            for (int i = 0; i < airgFilesInRpkgsRustStringList->length; i++) {
+                airgFilesInRpkgs.insert(std::string(get_string_from_list(airgFilesInRpkgsRustStringList, i)));
+            }
+            // Insert Airg files from RPKG into map
+            for (const auto& airgHash : airgFilesInRpkgs) {
+                if (!Airg::airgHashIoiStringMap.contains(airgHash)) {
+                    Airg::airgHashIoiStringMap[airgHash] = airgHash;
+                }
+            }
+            std::set<std::string> toErase;
+            // Remove Airg files not in RPKG from map
+            for (const auto& airgHash : Airg::airgHashIoiStringMap | std::views::keys) {
+                if (!airgFilesInRpkgs.contains(airgHash)) {
+                    toErase.insert(airgHash);
+                }
+            }
+            for (const auto& airgHash : toErase) {
+                Airg::airgHashIoiStringMap.erase(airgHash);
+            }
+        });
+
+        // Disabling for now since it's not actually used yet
+        // std::jthread hashListThread([]() {
+        //     Logger::log(NK_INFO, "Getting full hash list.");
+        //     getHashList();
+        // });
+
+        navpThread.join();
+        airgThread.join();
+        filteredHashListThread.join();
+        // hashListThread.join();
+
+        // Logger::log(NK_INFO, "Loading hash list into memory.");
+        // RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
+        // Logger::log(NK_INFO, "Total hash list entries: %d, adding entries...", hashListRustStringList->length);
+        //
+        // const int numThreads = std::thread::hardware_concurrency();
+        // const int entriesPerThread = (hashListRustStringList->length + numThreads - 1) / numThreads;
+        // std::vector<std::jthread> workers;
+        //
+        // for (int t = 0; t < numThreads; ++t) {
+        //     workers.emplace_back([t, entriesPerThread, hashListRustStringList]() {
+        //         const int start = t * entriesPerThread;
+        //         const int end = std::min(start + entriesPerThread, static_cast<int>(hashListRustStringList->length));
+        //         for (int i = start; i < end; i++) {
+        //             std::string hash = hashListRustStringList->entries[i];
+        //             const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
+        //             std::string path = pathCStr ? pathCStr : "";
+        //             const char* hintCStr = hash_list_get_hint_by_hash(hashList, hash.c_str());
+        //             std::string ioiString = hintCStr ? hintCStr : "";
+        //             auto typeInt = hash_list_get_resource_type_by_hash(hashList, hash.c_str());
+        //             char typeChars[4];
+        //             std::memcpy(typeChars, &typeInt, sizeof(typeInt));
+        //             std::string type(typeChars, sizeof(typeChars));
+        //
+        //             std::lock_guard lock(hashMapsMutex);
+        //             hashToHashListEntryMap.insert({hash, {hash, ioiString, type}});
+        //             ioiStringToHashListEntryMap.insert({ioiString, {hash, ioiString, type}});
+        //         }
+        //     });
+        // }
+        // workers.clear();
+        // Logger::log(NK_INFO, "Done getting full hash list.");
+        Menu::updateMenuState();
+        Logger::log(NK_INFO, "Done initializing.");
     }
-    Logger::log(NK_INFO, "Scanning resource packages.");
-
-    std::jthread filteredHashListThread([]() {
-        Logger::log(NK_INFO, "Reading filtered hash list.");
-        if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
-            std::string line;
-            while (std::getline(file, line)) {
-                if (line.find(".NAVP") != std::string::npos) {
-                    if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
-                        std::string hashPart = line.substr(0, commaPos);
-                        std::string ioiString = line.substr(commaPos + 1);
-                        if (!ioiString.empty() && ioiString.back() == '\r') {
-                            ioiString.pop_back();
-                        }
-                        const size_t dotPos = hashPart.find('.');
-                        const std::string navpHash =
-                            dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
-                        std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
-                        Navp::navpHashIoiStringMap[navpHash] = ioiString;
-                    }
-                }
-                if (line.find(".AIRG") != std::string::npos) {
-                    if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
-                        std::string hashPart = line.substr(0, commaPos);
-                        std::string ioiString = line.substr(commaPos + 1);
-                        if (!ioiString.empty() && ioiString.back() == '\r') {
-                            ioiString.pop_back();
-                        }
-                        const size_t dotPos = hashPart.find('.');
-                        const std::string airgHash =
-                            dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
-                        std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
-                        Airg::airgHashIoiStringMap[airgHash] = ioiString;
-                    }
-                }
-            }
-        }
-        Logger::log(NK_INFO, "Done reading filtered hash list.");
-    });
-
-    partitionManager = scan_packages(retailFolder.c_str(), gameVersion.c_str(), Logger::rustLogCallback);
-    extractionDataInitComplete = true;
-    Logger::log(NK_INFO, "Done scanning resource packages.");
-
-    std::jthread navpThread([]() {
-        const auto navpFilesInRpkgsRustStringList = get_all_resources_hashes_by_type_from_rpkg_files(
-            partitionManager, "NAVP", Logger::rustLogCallback);
-        std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
-        std::set<std::string> navpFilesInRpkgs;
-
-        for (int i = 0; i < navpFilesInRpkgsRustStringList->length; i++) {
-            navpFilesInRpkgs.insert(std::string(get_string_from_list(navpFilesInRpkgsRustStringList, i)));
-        }
-        // Insert Navp files from RPKG into map
-        for (const auto& navpHash : navpFilesInRpkgs) {
-            if (!Navp::navpHashIoiStringMap.contains(navpHash)) {
-                Navp::navpHashIoiStringMap[navpHash] = navpHash;
-            }
-        }
-        std::set<std::string> toErase;
-        // Remove Navp files not in RPKG from map
-        for (const auto& navpHash : Navp::navpHashIoiStringMap | std::views::keys) {
-            if (!navpFilesInRpkgs.contains(navpHash)) {
-                toErase.insert(navpHash);
-            }
-        }
-        for (const auto& navpHash : toErase) {
-            Navp::navpHashIoiStringMap.erase(navpHash);
-        }
-    });
-
-    std::jthread airgThread([]() {
-        const auto airgFilesInRpkgsRustStringList = get_all_resources_hashes_by_type_from_rpkg_files(
-            partitionManager, "AIRG", Logger::rustLogCallback);
-        std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
-        std::set<std::string> airgFilesInRpkgs;
-
-        for (int i = 0; i < airgFilesInRpkgsRustStringList->length; i++) {
-            airgFilesInRpkgs.insert(std::string(get_string_from_list(airgFilesInRpkgsRustStringList, i)));
-        }
-        // Insert Airg files from RPKG into map
-        for (const auto& airgHash : airgFilesInRpkgs) {
-            if (!Airg::airgHashIoiStringMap.contains(airgHash)) {
-                Airg::airgHashIoiStringMap[airgHash] = airgHash;
-            }
-        }
-        std::set<std::string> toErase;
-        // Remove Airg files not in RPKG from map
-        for (const auto& airgHash : Airg::airgHashIoiStringMap | std::views::keys) {
-            if (!airgFilesInRpkgs.contains(airgHash)) {
-                toErase.insert(airgHash);
-            }
-        }
-        for (const auto& airgHash : toErase) {
-            Airg::airgHashIoiStringMap.erase(airgHash);
-        }
-    });
-
-    // Disabling for now since it's not actually used yet
-    // std::jthread hashListThread([]() {
-    //     Logger::log(NK_INFO, "Getting full hash list.");
-    //     getHashList();
-    // });
-
-    navpThread.join();
-    airgThread.join();
-    filteredHashListThread.join();
-    // hashListThread.join();
-
-    // Logger::log(NK_INFO, "Loading hash list into memory.");
-    // RustStringList* hashListRustStringList = hash_list_get_all_hashes(hashList);
-    // Logger::log(NK_INFO, "Total hash list entries: %d, adding entries...", hashListRustStringList->length);
-    //
-    // const int numThreads = std::thread::hardware_concurrency();
-    // const int entriesPerThread = (hashListRustStringList->length + numThreads - 1) / numThreads;
-    // std::vector<std::jthread> workers;
-    //
-    // for (int t = 0; t < numThreads; ++t) {
-    //     workers.emplace_back([t, entriesPerThread, hashListRustStringList]() {
-    //         const int start = t * entriesPerThread;
-    //         const int end = std::min(start + entriesPerThread, static_cast<int>(hashListRustStringList->length));
-    //         for (int i = start; i < end; i++) {
-    //             std::string hash = hashListRustStringList->entries[i];
-    //             const char* pathCStr = hash_list_get_path_by_hash(hashList, hash.c_str());
-    //             std::string path = pathCStr ? pathCStr : "";
-    //             const char* hintCStr = hash_list_get_hint_by_hash(hashList, hash.c_str());
-    //             std::string ioiString = hintCStr ? hintCStr : "";
-    //             auto typeInt = hash_list_get_resource_type_by_hash(hashList, hash.c_str());
-    //             char typeChars[4];
-    //             std::memcpy(typeChars, &typeInt, sizeof(typeInt));
-    //             std::string type(typeChars, sizeof(typeChars));
-    //
-    //             std::lock_guard lock(hashMapsMutex);
-    //             hashToHashListEntryMap.insert({hash, {hash, ioiString, type}});
-    //             ioiStringToHashListEntryMap.insert({ioiString, {hash, ioiString, type}});
-    //         }
-    //     });
-    // }
-    // workers.clear();
-    // Logger::log(NK_INFO, "Done getting full hash list.");
-    Menu::updateMenuState();
-    Logger::log(NK_INFO, "Done initializing.");
+    CPPTRACE_CATCH(const std::exception& e) {
+        ErrorHandler::openErrorDialog("Could not update NavKit settings. Ensure the Hitman Directory setting points to a valid Hitman World of Assassination installation directory.\n\nError message: " + std::string(e.what()) + "\n\nStack Trace:\n" +
+            cpptrace::from_current_exception().to_string());
+    } catch (...) {
+        ErrorHandler::openErrorDialog("Could not update NavKit settings. Ensure the Hitman Directory setting points to a valid Hitman World of Assassination installation directory.\n\nStack Trace: \n" +
+            cpptrace::from_current_exception().to_string());
+    }
 }
 
 void Rpkg::checkHitmanVersion() {
@@ -228,15 +233,16 @@ void Rpkg::checkHitmanVersion() {
         std::pair("406865e7486cbc3b77a5f22fd73fbe00", "steam"), // ansel unlock
         std::pair("cfdf300263b03d625099226882eafe84", "microsoft")
     });
+    const std::string exePath = hitmanFolder + "\\Retail\\HITMAN3.exe";
+    const std::string exeVersion = getExeVersion(exePath);
 
-    if (!(std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") || std::filesystem::exists(
-        hitmanFolder + "\\Retail\\HITMAN3.exe"))) {
-        Logger::log(NK_ERROR, "HITMAN3.exe couldn't be located, please re-read the installation instructions!");
+    if (!(std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") || std::filesystem::exists(exePath))) {
+        Logger::log(NK_ERROR, "HITMAN3.exe couldn't be located.");
     }
 
     if (std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") && !std::filesystem::exists(
         hitmanFolder + "\\MicrosoftGame.Config")) {
-        Logger::log(NK_ERROR, "The game config couldn't be located, please re-read the installation instructions!");
+        Logger::log(NK_ERROR, "The game config couldn't be located.");
     }
     std::string platform;
     if (std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)")) {
@@ -253,7 +259,7 @@ void Rpkg::checkHitmanVersion() {
         );
         unknownGameVersion = true;
     } else {
-        Logger::log(NK_INFO, "Detected game platform: %s version %s", platform.c_str(), GAME_VERSION);
+        Logger::log(NK_INFO, "Detected game platform: %s version %s. Currently supported version: %s", platform.c_str(), exeVersion.c_str(), GAME_VERSION);
     }
 }
 

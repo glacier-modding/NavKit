@@ -141,8 +141,8 @@ NavKitSettings::NavKitSettings() : backgroundColor(0.30f),
                                    hitmanSet(false),
                                    outputSet(false),
                                    blenderSet(false),
-                                   blenderPath(R"("C:\Program Files\Blender Foundation\Blender 3.4\blender.exe")"),
-                                   showDebugLogs(false) {}
+                                   showDebugLogs(false),
+                                   shouldOpenSettingsDialog(false) {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
     if (hSettingsDialog) {
@@ -204,7 +204,8 @@ void NavKitSettings::setHitmanFolder(const std::string& folderName) {
             Rpkg::backgroundWorker.emplace(&Rpkg::initExtractionData);
         }
     } else {
-        Logger::log(NK_WARN, ("Could not find Hitman folder: " + hitmanFolder).c_str());
+        Logger::log(NK_WARN, ("Could not find Hitman folder: " + folderName).c_str());
+        shouldOpenSettingsDialog = true;
     }
 }
 
@@ -214,7 +215,8 @@ void NavKitSettings::setOutputFolder(const std::string& folderName) {
         outputFolder = folderName;
         Logger::log(NK_INFO, ("Setting output folder to: " + outputFolder).c_str());
     } else {
-        Logger::log(NK_WARN, ("Could not find output folder: " + outputFolder).c_str());
+        Logger::log(NK_WARN, ("Could not find output folder: " + folderName).c_str());
+        shouldOpenSettingsDialog = true;
     }
 }
 
@@ -224,6 +226,7 @@ void NavKitSettings::setBlenderFile(const std::string& fileName) {
         blenderPath = fileName;
         Logger::log(NK_INFO, ("Setting Blender exe path to: " + blenderPath).c_str());
     } else {
-        Logger::log(NK_WARN, ("Could not find Blender exe path: " + blenderPath).c_str());
+        Logger::log(NK_WARN, ("Could not find Blender exe path: " + fileName).c_str());
+        shouldOpenSettingsDialog = true;
     }
 }

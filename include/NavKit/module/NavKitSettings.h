@@ -32,6 +32,7 @@ public:
     std::string outputFolder;
     std::string blenderPath;
     bool showDebugLogs;
+    bool shouldOpenSettingsDialog;
     static HWND hSettingsDialog;
 
     void setHitmanFolder(const std::string& folderName);

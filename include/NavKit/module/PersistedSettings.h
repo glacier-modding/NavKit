@@ -15,11 +15,11 @@ public:
         return instance;
     }
 
-    const char* getValue(const std::string& folder, const std::string& key, const std::string& defaultValue) const;
+    [[nodiscard]] const char* getValue(const std::string& folder, const std::string& key, const std::string& defaultValue) const;
 
     void setValue(const std::string& folder, const std::string& key, const std::string& value);
 
-    void save() const;
+    bool save() const;
 
     void load();
 };

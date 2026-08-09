@@ -59,8 +59,8 @@ void UpdateChecker::performUpdateCheck() {
         const std::string currentVersionStr =
             std::string(NavKit_VERSION_MAJOR) + "." + std::string(NavKit_VERSION_MINOR) + "." +
             std::string(NavKit_VERSION_PATCH);
-        Logger::log(NK_INFO, ("Current version: " + currentVersionStr).c_str());
-        Logger::log(NK_INFO, ("Latest version: " + latestVersionStr).c_str());
+        Logger::log(NK_INFO, ("Current NavKit version: " + currentVersionStr).c_str());
+        Logger::log(NK_INFO, ("Latest NavKit version: " + latestVersionStr).c_str());
         const bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
         Logger::log(NK_INFO, std::string(updateAvailable ? "Update available." : "No update available.").c_str());
         if (updateAvailable) {

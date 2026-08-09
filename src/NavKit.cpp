@@ -37,6 +37,8 @@
 #include "../include/NavKit/util/UpdateChecker.h"
 #include <windows.h>
 
+#include "../include/NavKit/module/NavKitSettings.h"
+
 #undef main
 
 void runFrameIteration() {
@@ -97,6 +99,7 @@ int SDL_main(const int argc, char** argv) {
 
             Menu::updateMenuState();
             bool isRunning = true;
+            NavKitSettings::getInstance().showNavKitSettingsDialog();
             Logger::log(NK_INFO, "NavKit initialized.");
             while (isRunning) {
                 isRunning = mainLoopIteration();
