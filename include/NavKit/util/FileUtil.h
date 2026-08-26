@@ -10,4 +10,4 @@ namespace FileUtil {
     char* openNfdFolderDialog(char* defaultPath = nullptr);
 
     void initNdf();
-}
+} // namespace FileUtil

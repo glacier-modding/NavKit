@@ -22,17 +22,14 @@ CommandRunner::~CommandRunner() {
 }
 
 void CommandRunner::runCommand(const std::string& command, const std::string& logFileName,
-                               const std::function<void()>& callback,
-                               const std::function<void()>& errorCallback) {
+    const std::function<void()>& callback, const std::function<void()>& errorCallback) {
     int commandIndex = commandsRun;
     commandsRun++;
     handles.emplace(std::pair<int, std::vector<HANDLE>>(commandIndex, {}));
     SECURITY_ATTRIBUTES saAttr = {sizeof(saAttr), nullptr, TRUE};
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-        Logger::log(NK_ERROR,
-                    ("Error creating pipe to command: " + command + ".").
-                    c_str());
+        Logger::log(NK_ERROR, ("Error creating pipe to command: " + command + ".").c_str());
         errorCallback();
         return;
     }
@@ -51,9 +48,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
     char* commandLineChar = _strdup(command.c_str());
 
     if (!CreateProcess(nullptr, commandLineChar, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
-        Logger::log(NK_ERROR,
-                    ("Error creating process for command: " + command +
-                        ".").c_str());
+        Logger::log(NK_ERROR, ("Error creating process for command: " + command + ".").c_str());
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
         errorCallback();
@@ -79,7 +74,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
         output.insert(output.end(), buffer, buffer + bytesRead);
 
         // Check if the output size exceeds the threshold
-        //if (output.size() >= 1024) {
+        // if (output.size() >= 1024) {
         // Process and clear the output
         std::string outputString(output.begin(), output.end());
         size_t start = 0;
@@ -91,8 +86,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
             start = pos;
         }
         if (size_t found = outputString.find("panic"); found != std::string::npos) {
-            Logger::log(NK_ERROR,
-                        "Error extracting resources from Rpkg files. Please report this to AtomicForce.");
+            Logger::log(NK_ERROR, "Error extracting resources from Rpkg files. Please report this to AtomicForce.");
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(hReadPipe);
             CloseHandle(pi.hProcess);
@@ -104,9 +98,9 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
             return;
         }
         if (outputString.find("Error") != std::string::npos) {
-            Logger::log(
-                NK_ERROR,
-                "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.");
+            Logger::log(NK_ERROR,
+                "Error building obj or blend file. The blender python script threw an unhandled exception. Please "
+                "report this to AtomicForce.");
             errorCallback();
             WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(hReadPipe);
@@ -120,8 +114,8 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
                 errorMessage.append(lastOutput.begin(), lastOutput.end());
             }
             errorMessage += outputString;
-            errorMessage +=
-                "Error building obj or blend file. The blender python script threw an unhandled exception. Please report this to AtomicForce.";
+            errorMessage += "Error building obj or blend file. The blender python script threw an unhandled exception. "
+                            "Please report this to AtomicForce.";
             ErrorHandler::openErrorDialog(errorMessage);
             return;
         }

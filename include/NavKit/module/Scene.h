@@ -20,7 +20,7 @@ public:
     void setLastSaveFileName(char* file_name);
 
     void loadRoomsAndVolumes(const std::function<void()>& errorCallback,
-                             simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void saveScene(const std::string& fileName) const;
 
@@ -28,26 +28,25 @@ public:
 
     void handleSaveSceneClicked();
 
-    void loadScene(const std::string& fileName, const std::function<void()>& callback,
-                   const std::function<void()>& errorCallback);
+    void loadScene(
+        const std::string& fileName, const std::function<void()>& callback, const std::function<void()>& errorCallback);
 
-    void loadVersion(
-        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+    void loadVersion(simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void loadMeshes(const std::function<void()>& errorCallback,
-                    simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void loadPfBoxes(const std::function<void()>& errorCallback,
-                     simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void loadPfSeedPoints(const std::function<void()>& errorCallback,
-                          simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void loadMatis(const std::function<void()>& errorCallback,
-                   simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void loadPrimMatis(const std::function<void()>& errorCallback,
-                       simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
     void showSceneDialog();
 

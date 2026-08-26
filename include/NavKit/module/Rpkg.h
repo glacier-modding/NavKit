@@ -10,11 +10,7 @@
 struct PartitionManager;
 struct HashList;
 
-enum ResourceType {
-    NAVP,
-    AIRG,
-    TEXT
-};
+enum ResourceType { NAVP, AIRG, TEXT };
 
 class HashListEntry {
 public:

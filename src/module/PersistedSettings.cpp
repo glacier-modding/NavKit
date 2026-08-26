@@ -42,13 +42,7 @@ void PersistedSettings::load() {
                         if (const auto oldValue = oldIni.GetValue(section.pItem, key, "")) {
                             if (oldValue[0] != '\0') {
                                 ini.SetValue(section.pItem, key, oldValue);
-                                Logger::log(
-                                    NK_INFO,
-                                    "Transferred setting [%s] %s = %s",
-                                    section.pItem,
-                                    key,
-                                    oldValue
-                                );
+                                Logger::log(NK_INFO, "Transferred setting [%s] %s = %s", section.pItem, key, oldValue);
                             }
                         }
                     }
@@ -58,8 +52,7 @@ void PersistedSettings::load() {
             Logger::log(NK_INFO, "Settings merged. Saving updated NavKit.ini.");
             mergedSettingsSaved = save();
         } else {
-            Logger::log(
-                NK_ERROR, "Failed to load NavKit.ini.old for merging. Loading current settings if they exist.");
+            Logger::log(NK_ERROR, "Failed to load NavKit.ini.old for merging. Loading current settings if they exist.");
             ini.LoadFile(iniPath.c_str());
         }
 
@@ -71,11 +64,8 @@ void PersistedSettings::load() {
                 Logger::log(NK_ERROR, "Failed to delete NavKit.ini.old: %s", e.what());
             }
         } else {
-            Logger::log(
-                NK_ERROR,
-                "Merged settings were not saved successfully. Keeping NavKit.ini.old at %s.",
-                oldIniPath.c_str()
-            );
+            Logger::log(NK_ERROR, "Merged settings were not saved successfully. Keeping NavKit.ini.old at %s.",
+                oldIniPath.c_str());
         }
     } else {
         ini.LoadFile(iniPath.c_str());
@@ -102,8 +92,8 @@ bool PersistedSettings::save() const {
     return true;
 }
 
-const char* PersistedSettings::getValue(const std::string& folder, const std::string& key,
-                                        const std::string& defaultValue) const {
+const char* PersistedSettings::getValue(
+    const std::string& folder, const std::string& key, const std::string& defaultValue) const {
     return ini.GetValue(folder.c_str(), key.c_str(), defaultValue.c_str());
 }
 

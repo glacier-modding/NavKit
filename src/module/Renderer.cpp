@@ -43,8 +43,7 @@ Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     cameraEulers[0] = 45.0, cameraEulers[1] = 135.0;
     cameraPos[0] = 10, cameraPos[1] = 15, cameraPos[2] = 10;
     camr = 10000;
-    origCameraEulers[0] = 0,
-        origCameraEulers[1] = 0;
+    origCameraEulers[0] = 0, origCameraEulers[1] = 0;
     prevFrameTime = 0;
     font = new FTGLPolygonFont("DroidSans.ttf");
     font->FaceSize(72);
@@ -115,9 +114,8 @@ bool Renderer::initWindowAndRenderer() {
     SDL_GetCurrentDisplayMode(0, &displayMode);
     constexpr Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    if (const float
-            settingsWidth = atof(persistedSettings.getValue("Renderer", "windowWidth", "-1.0f")),
-            settingsHeight = atof(persistedSettings.getValue("Renderer", "windowHeight", "-1.0f"));
+    if (const float settingsWidth = atof(persistedSettings.getValue("Renderer", "windowWidth", "-1.0f")),
+        settingsHeight = atof(persistedSettings.getValue("Renderer", "windowHeight", "-1.0f"));
         settingsWidth == -1.0f || settingsHeight == -1) {
         constexpr float aspect = 16.0f / 9.0f;
         width = std::min(displayMode.w, static_cast<int>(static_cast<float>(displayMode.h) * aspect)) - 120;
@@ -158,11 +156,7 @@ bool Renderer::initWindowAndRenderer() {
     }
     initFrameBuffer(width, height);
 
-    constexpr std::string_view navKitVersion = NavKit_VERSION_MAJOR
-        "."
-        NavKit_VERSION_MINOR
-        "."
-        NavKit_VERSION_PATCH;
+    constexpr std::string_view navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
     std::string title = "NavKit ";
     title += navKitVersion;
     SDL_SetWindowTitle(window, title.data());
@@ -219,7 +213,8 @@ void Renderer::loadSettings() {
 
 void Renderer::handleMoved() {
     updateFrameRate();
-    if (const Uint32 windowFlags = SDL_GetWindowFlags(window); windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP || windowFlags & SDL_WINDOW_MAXIMIZED) {
+    if (const Uint32 windowFlags = SDL_GetWindowFlags(window);
+        windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP || windowFlags & SDL_WINDOW_MAXIMIZED) {
         return;
     }
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
@@ -238,7 +233,8 @@ void Renderer::handleFullscreen(const FullscreenMode mode) const {
     }
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     FullscreenMode currentMode = WINDOWED;
-    if (const char* modeStr = persistedSettings.getValue("Renderer", "fullscreen", "WINDOWED"); strcmp(modeStr, "BORDERLESS_FULLSCREEN") == 0) {
+    if (const char* modeStr = persistedSettings.getValue("Renderer", "fullscreen", "WINDOWED");
+        strcmp(modeStr, "BORDERLESS_FULLSCREEN") == 0) {
         currentMode = BORDERLESS_FULLSCREEN;
     } else if (strcmp(modeStr, "MAXIMIZED") == 0) {
         currentMode = MAXIMIZED;
@@ -249,28 +245,28 @@ void Renderer::handleFullscreen(const FullscreenMode mode) const {
 
     std::string modeStr = "WINDOWED";
     switch (mode) {
-        case BORDERLESS_FULLSCREEN:
-            SDL_SetWindowPosition(window, 0, 0);
-            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-            modeStr = "BORDERLESS_FULLSCREEN";
-            break;
-        case MAXIMIZED:
-            SDL_SetWindowFullscreen(window, 0);
-            SDL_MaximizeWindow(window);
-            modeStr = "MAXIMIZED";
-            break;
-        case WINDOWED:
+    case BORDERLESS_FULLSCREEN:
+        SDL_SetWindowPosition(window, 0, 0);
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        modeStr = "BORDERLESS_FULLSCREEN";
+        break;
+    case MAXIMIZED:
+        SDL_SetWindowFullscreen(window, 0);
+        SDL_MaximizeWindow(window);
+        modeStr = "MAXIMIZED";
+        break;
+    case WINDOWED:
     default:
-            const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
-                        y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
-            if (x == -1.0f || y == -1.0f) {
-                SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-            } else {
-                SDL_SetWindowPosition(window, static_cast<int>(x), static_cast<int>(y));
-            }
-            SDL_SetWindowFullscreen(window, 0);
-            SDL_RestoreWindow(window);
-            break;
+        const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
+                    y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
+        if (x == -1.0f || y == -1.0f) {
+            SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        } else {
+            SDL_SetWindowPosition(window, static_cast<int>(x), static_cast<int>(y));
+        }
+        SDL_SetWindowFullscreen(window, 0);
+        SDL_RestoreWindow(window);
+        break;
     }
 
     Logger::log(NK_INFO, (std::string("Setting fullscreen mode to: ") + modeStr).c_str());
@@ -286,8 +282,8 @@ void Renderer::initShaders() {
 void Renderer::handleResize() {
     width = SDL_GetWindowSurface(window)->w;
     height = SDL_GetWindowSurface(window)->h;
-    Logger::log(NK_INFO,
-                ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
+    Logger::log(
+        NK_INFO, ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     persistedSettings.setValue("Renderer", "windowWidth", std::to_string(width));
     persistedSettings.setValue("Renderer", "windowHeight", std::to_string(height));
@@ -308,14 +304,13 @@ void Renderer::renderFrame() {
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_DEPTH_TEST);
 
-    projection = glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 1.0f,
-                                  camr);
+    projection =
+        glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
     view = glm::lookAt(glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]),
-                       glm::vec3(
-                           cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
-                           cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
-                           cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
-                       glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::vec3(cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+            cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
+            cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
+        glm::vec3(0.0f, 1.0f, 0.0f));
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -326,10 +321,9 @@ void Renderer::renderFrame() {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(cameraPos[0], cameraPos[1], cameraPos[2],
-              cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
-              cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
-              cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
-              0.0, 1.0, 0.0);
+        cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+        cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
+        cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])), 0.0, 1.0, 0.0);
     glGetDoublev(GL_MODELVIEW_MATRIX, modelviewMatrix);
     const Uint32 time = SDL_GetTicks();
     const float dt = static_cast<float>(time - prevFrameTime) / 1000.0f;
@@ -404,9 +398,8 @@ void Renderer::renderFrame() {
         const float r = 0.5f;
         for (int i = 0; i < 20; ++i) {
             const float a = static_cast<float>(i) / 20.0f * std::numbers::pi * 2;
-            glVertex3f(recastAdapter.markerPosition[0] + cosf(a) * r,
-                       recastAdapter.markerPosition[1],
-                       static_cast<GLdouble>(recastAdapter.markerPosition[2]) + sinf(a) * r);
+            glVertex3f(recastAdapter.markerPosition[0] + cosf(a) * r, recastAdapter.markerPosition[1],
+                static_cast<GLdouble>(recastAdapter.markerPosition[2]) + sinf(a) * r);
         }
         glEnd();
         glLineWidth(1.0f);
@@ -432,7 +425,7 @@ void Renderer::finalizeFrame() const {
 }
 
 void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view, const glm::mat4& projection,
-              const Vec3 color = {-1, -1, -1}) {
+    const Vec3 color = {-1, -1, -1}) {
     static GLuint vao = 0, vbo = 0;
     if (vao == 0) {
         glGenVertexArrays(1, &vao);
@@ -444,10 +437,7 @@ void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view,
         glBindVertexArray(0);
     }
 
-    float vertices[] = {
-        s.X, s.Y, s.Z,
-        e.X, e.Y, e.Z
-    };
+    float vertices[] = {s.X, s.Y, s.Z, e.X, e.Y, e.Z};
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
@@ -555,20 +545,18 @@ void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 colo
 }
 
 void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled,
-                       const Vec3 fillColor, const bool outlined,
-                       const Vec3 outlineColor, const float alpha) const {
+    const Vec3 fillColor, const bool outlined, const Vec3 outlineColor, const float alpha) const {
     static GLuint filledVao = 0, filledVbo = 0;
     static GLuint outlineVao = 0, outlineVbo = 0;
 
     if (filledVao == 0) {
-        constexpr float unitCube[] = {
-            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f, -0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f,
-            -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
-            -0.5f,-0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f,-0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
-             0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f, 0.5f,  0.5f,-0.5f, 0.5f,
-            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
-            -0.5f, 0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f
-        };
+        constexpr float unitCube[] = {-0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f,
+            0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f,
+            -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f,
+            0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f,
+            0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, 0.5f, -0.5f,
+            -0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, -0.5f,
+            0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f};
         glGenVertexArrays(1, &filledVao);
         glGenBuffers(1, &filledVbo);
         glBindVertexArray(filledVao);
@@ -577,14 +565,11 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(nullptr));
 
-        constexpr float unitOutline[] = {
-            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f,
-             0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f,-0.5f,-0.5f,
-            -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f,
-             0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
-            -0.5f,-0.5f,-0.5f, -0.5f,-0.5f, 0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f,
-             0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f,-0.5f, -0.5f, 0.5f, 0.5f
-        };
+        constexpr float unitOutline[] = {-0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f,
+            0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, 0.5f,
+            -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+            -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+            0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f};
         glGenVertexArrays(1, &outlineVao);
         glGenBuffers(1, &outlineVbo);
         glBindVertexArray(outlineVao);

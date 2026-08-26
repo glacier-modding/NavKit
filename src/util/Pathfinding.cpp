@@ -29,10 +29,8 @@ namespace Pathfinding {
         return bbox;
     }
 
-    Vec3* GetClosestPosInArea2d_G2_EdgeIndex(dtNavMeshQuery* navQuery,
-                                             Vec3* navPowerResult,
-                                             const dtPolyRef polyRef, const Vec3* navPowerPos,
-                                             int* edgeIndex) {
+    Vec3* GetClosestPosInArea2d_G2_EdgeIndex(dtNavMeshQuery* navQuery, Vec3* navPowerResult, const dtPolyRef polyRef,
+        const Vec3* navPowerPos, int* edgeIndex) {
         *edgeIndex = -1;
         float closestDistance = std::numeric_limits<float>::max();
         int edgeIntersections = 0;
@@ -44,27 +42,24 @@ namespace Pathfinding {
         for (int i = 0; i < numEdges; ++i) {
             const int j = (i + 1) % numEdges;
             const Vec3 edgeNavPowerStart = RecastAdapter::convertFromRecastToNavPower(polyEdges[i]);
-            if (const Vec3 edgeNavPowerEnd = RecastAdapter::convertFromRecastToNavPower(polyEdges[j]); edgeNavPowerStart
-                .Y > navPowerPos->Y != edgeNavPowerEnd.Y > navPowerPos->Y &&
-                navPowerPos->X <
-                (edgeNavPowerEnd.X - edgeNavPowerStart.X)
-                * (navPowerPos->Y - edgeNavPowerStart.Y) / (
-                    edgeNavPowerEnd.Y - edgeNavPowerStart.Y)
-                + edgeNavPowerStart.X
-            ) {
+            if (const Vec3 edgeNavPowerEnd = RecastAdapter::convertFromRecastToNavPower(polyEdges[j]);
+                edgeNavPowerStart.Y > navPowerPos->Y != edgeNavPowerEnd.Y > navPowerPos->Y &&
+                navPowerPos->X < (edgeNavPowerEnd.X - edgeNavPowerStart.X) * (navPowerPos->Y - edgeNavPowerStart.Y) /
+                            (edgeNavPowerEnd.Y - edgeNavPowerStart.Y) +
+                        edgeNavPowerStart.X) {
                 edgeIntersections++;
             }
         }
         if (edgeIntersections % 2 == 1) {
-            const Vec3 normalNavPower = RecastAdapter::convertFromRecastToNavPower(
-                recastAirgAdapter.calculateNormal(navQuery, polyRef));
+            const Vec3 normalNavPower =
+                RecastAdapter::convertFromRecastToNavPower(recastAirgAdapter.calculateNormal(navQuery, polyRef));
             const Vec3 v1NavPower = RecastAdapter::convertFromRecastToNavPower(polyEdges[0]);
             navPowerResult->X = navPowerPos->X;
             navPowerResult->Y = navPowerPos->Y;
-            const float dNavPower = -(v1NavPower.X * normalNavPower.X + v1NavPower.Y * normalNavPower.Y + v1NavPower.Z *
-                normalNavPower.Z);
-            navPowerResult->Z = -(navPowerPos->X * normalNavPower.X + navPowerPos->Y * normalNavPower.Y + dNavPower) /
-                normalNavPower.Z;
+            const float dNavPower =
+                -(v1NavPower.X * normalNavPower.X + v1NavPower.Y * normalNavPower.Y + v1NavPower.Z * normalNavPower.Z);
+            navPowerResult->Z =
+                -(navPowerPos->X * normalNavPower.X + navPowerPos->Y * normalNavPower.Y + dNavPower) / normalNavPower.Z;
             return navPowerResult;
         }
         for (int i = 0; i < numEdges; ++i) {
@@ -74,8 +69,8 @@ namespace Pathfinding {
             const Vec3& v2NavPower = RecastAdapter::convertFromRecastToNavPower(polyEdges[j]);
             const Vec3 vNavPower{v2NavPower.X - v1NavPower.X, v2NavPower.Y - v1NavPower.Y, 0};
             const Vec3 wNavPower{navPowerPos->X - v1NavPower.X, navPowerPos->Y - v1NavPower.Y, 0};
-            const float t = (wNavPower.X * vNavPower.X + wNavPower.Y * vNavPower.Y) / (vNavPower.X * vNavPower.X +
-                vNavPower.Y * vNavPower.Y);
+            const float t = (wNavPower.X * vNavPower.X + wNavPower.Y * vNavPower.Y) /
+                (vNavPower.X * vNavPower.X + vNavPower.Y * vNavPower.Y);
             Vec3 projectionNavPower;
             if (t < 0) {
                 projectionNavPower = {v1NavPower.X, v1NavPower.Y, 0.0};
@@ -92,23 +87,20 @@ namespace Pathfinding {
                 *edgeIndex = i;
                 navPowerResult->X = projectionNavPower.X;
                 navPowerResult->Y = projectionNavPower.Y;
-                const Vec3 normalNavPower = RecastAdapter::convertFromRecastToNavPower(
-                    recastAirgAdapter.calculateNormal(navQuery, polyRef));
-                const float dNavPower = -(v1NavPower.X * normalNavPower.X + v1NavPower.Y * normalNavPower.Y + v1NavPower
-                    .Z * normalNavPower.Z);
-                navPowerResult->Z = -(projectionNavPower.X * normalNavPower.X + projectionNavPower.Y * normalNavPower.Y
-                    + dNavPower) / normalNavPower.Z;
+                const Vec3 normalNavPower =
+                    RecastAdapter::convertFromRecastToNavPower(recastAirgAdapter.calculateNormal(navQuery, polyRef));
+                const float dNavPower = -(v1NavPower.X * normalNavPower.X + v1NavPower.Y * normalNavPower.Y +
+                    v1NavPower.Z * normalNavPower.Z);
+                navPowerResult->Z =
+                    -(projectionNavPower.X * normalNavPower.X + projectionNavPower.Y * normalNavPower.Y + dNavPower) /
+                    normalNavPower.Z;
             }
         }
         return navPowerResult;
     }
 
-    Vec3* GetClosestPosInArea2d_G2_ClosestPos(
-        dtNavMeshQuery* navQuery,
-        Vec3* resultNavPower,
-        const dtPolyRef polyRef,
-        const Vec3* posWCoordNavPower,
-        ClosestPositionData* pDataOut) {
+    Vec3* GetClosestPosInArea2d_G2_ClosestPos(dtNavMeshQuery* navQuery, Vec3* resultNavPower, const dtPolyRef polyRef,
+        const Vec3* posWCoordNavPower, ClosestPositionData* pDataOut) {
         bool valid = false;
         valid = polyRef != 0;
         if (valid) {
@@ -142,16 +134,12 @@ namespace Pathfinding {
     }
 
     int GetNeighborCellIndex(int cellIndex, int direction, int gridWidth) {
-        const int dx = (direction == 1 || direction == 2 || direction == 3)
-                           ? 1
-                           : (direction == 5 || direction == 6 || direction == 7)
-                           ? -1
-                           : 0;
-        const int dy = (direction == 7 || direction == 0 || direction == 1)
-                           ? -1
-                           : (direction == 3 || direction == 4 || direction == 5)
-                           ? 1
-                           : 0;
+        const int dx = (direction == 1 || direction == 2 || direction == 3) ? 1
+            : (direction == 5 || direction == 6 || direction == 7)          ? -1
+                                                                            : 0;
+        const int dy = (direction == 7 || direction == 0 || direction == 1) ? -1
+            : (direction == 3 || direction == 4 || direction == 5)          ? 1
+                                                                            : 0;
         const int neighborX = cellIndex % gridWidth + dx;
         const int neighborY = cellIndex / gridWidth + dy;
 
@@ -162,12 +150,7 @@ namespace Pathfinding {
         return neighborY * gridWidth + neighborX;
     }
 
-    char LineLineIntersect2D_G2(
-        const Vec3* p0,
-        const Vec3* p1,
-        const Vec3* p2,
-        const Vec3* p3,
-        Vec3* i) {
+    char LineLineIntersect2D_G2(const Vec3* p0, const Vec3* p1, const Vec3* p2, const Vec3* p3, Vec3* i) {
         const Vec3 p0_2d(p0->X, p0->Y, 0.0f);
         const Vec3 p1_2d(p1->X, p1->Y, 0.0f);
         const Vec3 p2_2d(p2->X, p2->Y, 0.0f);
@@ -195,4 +178,4 @@ namespace Pathfinding {
 
         return 1;
     }
-}
+} // namespace Pathfinding

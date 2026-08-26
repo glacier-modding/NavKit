@@ -13,15 +13,9 @@
 #include "../../include/NavKit/render/Shader.h"
 #include "../model/Json.h"
 
-enum MeshType {
-    ALOC,
-    PRIM
-};
+enum MeshType { ALOC, PRIM };
 
-enum SceneMeshBuildType {
-    INSTANCE,
-    COPY
-};
+enum SceneMeshBuildType { INSTANCE, COPY };
 
 class SceneMesh {
     explicit SceneMesh();

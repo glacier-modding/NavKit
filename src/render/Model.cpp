@@ -60,8 +60,8 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
         texture.loaded = true;
         stbi_image_free(data);
     } else {
-        Logger::log(NK_ERROR, "Texture failed to load at path: %s. Reason: %s", filename.c_str(),
-                    stbi_failure_reason());
+        Logger::log(
+            NK_ERROR, "Texture failed to load at path: %s. Reason: %s", filename.c_str(), stbi_failure_reason());
     }
 
     return texture;
@@ -70,7 +70,7 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
 std::map<const Model*, SortContext> Model::sortContexts;
 
 Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScene* scene, const std::string& directory,
-                                 std::vector<Texture>& texturesLoaded) {
+    std::vector<Texture>& texturesLoaded) {
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
     std::vector<Texture> textures;
@@ -136,17 +136,17 @@ Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScen
 
     if (!batch.empty() && scene) {
         aiMaterial* material = scene->mMaterials[batch[0]->mMaterialIndex];
-        std::vector<Texture> diffuseMaps = loadMaterialTexturesStatic(material, aiTextureType_DIFFUSE,
-                                                                      "texture_diffuse", directory, texturesLoaded);
+        std::vector<Texture> diffuseMaps =
+            loadMaterialTexturesStatic(material, aiTextureType_DIFFUSE, "texture_diffuse", directory, texturesLoaded);
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-        std::vector<Texture> specularMaps = loadMaterialTexturesStatic(material, aiTextureType_SPECULAR,
-                                                                       "texture_specular", directory, texturesLoaded);
+        std::vector<Texture> specularMaps =
+            loadMaterialTexturesStatic(material, aiTextureType_SPECULAR, "texture_specular", directory, texturesLoaded);
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-        std::vector<Texture> normalMaps = loadMaterialTexturesStatic(material, aiTextureType_HEIGHT, "texture_normal",
-                                                                     directory, texturesLoaded);
+        std::vector<Texture> normalMaps =
+            loadMaterialTexturesStatic(material, aiTextureType_HEIGHT, "texture_normal", directory, texturesLoaded);
         textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-        std::vector<Texture> heightMaps = loadMaterialTexturesStatic(material, aiTextureType_AMBIENT, "texture_height",
-                                                                     directory, texturesLoaded);
+        std::vector<Texture> heightMaps =
+            loadMaterialTexturesStatic(material, aiTextureType_AMBIENT, "texture_height", directory, texturesLoaded);
         textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
     }
 
@@ -158,8 +158,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType 
 }
 
 std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextureType type, std::string typeName,
-                                                       const std::string& directory,
-                                                       std::vector<Texture>& texturesLoaded) {
+    const std::string& directory, std::vector<Texture>& texturesLoaded) {
     std::vector<Texture> textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); ++i) {
         aiString str;
@@ -249,7 +248,7 @@ void Model::initGl() {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
             glTexImage2D(GL_TEXTURE_2D, 0, texture.internalFormat, texture.width, texture.height, 0,
-                         texture.uploadFormat, GL_UNSIGNED_BYTE, texture.data.data());
+                texture.uploadFormat, GL_UNSIGNED_BYTE, texture.data.data());
             glGenerateMipmap(GL_TEXTURE_2D);
 
             texture.data.clear();
@@ -275,12 +274,10 @@ void Model::initGl() {
 void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
     std::array<glm::vec4, 6> planes;
     for (int i = 0; i < 6; ++i) {
-        planes[i] = glm::vec4(
-            viewProj[0][3] + (i % 2 == 0 ? 1 : -1) * viewProj[0][i / 2],
+        planes[i] = glm::vec4(viewProj[0][3] + (i % 2 == 0 ? 1 : -1) * viewProj[0][i / 2],
             viewProj[1][3] + (i % 2 == 0 ? 1 : -1) * viewProj[1][i / 2],
             viewProj[2][3] + (i % 2 == 0 ? 1 : -1) * viewProj[2][i / 2],
-            viewProj[3][3] + (i % 2 == 0 ? 1 : -1) * viewProj[3][i / 2]
-        );
+            viewProj[3][3] + (i % 2 == 0 ? 1 : -1) * viewProj[3][i / 2]);
         const float length = glm::length(glm::vec3(planes[i]));
         if (length > 0.0f) {
             planes[i] /= length;
@@ -307,14 +304,12 @@ void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
     }
 
     // Sort Opaque Front-to-Back (Optimizes overdraw)
-    std::sort(opaqueIndices.begin(), opaqueIndices.end(), [&](unsigned int a, unsigned int b) {
-        return distances[a] < distances[b];
-    });
+    std::sort(opaqueIndices.begin(), opaqueIndices.end(),
+        [&](unsigned int a, unsigned int b) { return distances[a] < distances[b]; });
 
     // Sort Transparent Back-to-Front (Required for correct blending)
-    std::sort(transparentIndices.begin(), transparentIndices.end(), [&](unsigned int a, unsigned int b) {
-        return distances[a] > distances[b];
-    });
+    std::sort(transparentIndices.begin(), transparentIndices.end(),
+        [&](unsigned int a, unsigned int b) { return distances[a] > distances[b]; });
 
     // Pass 1: Opaque meshes (including cutout transparency)
     for (const unsigned int i : opaqueIndices) {
@@ -324,8 +319,8 @@ void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
         const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;
         bool inside = true;
         for (const auto& plane : planes) {
-            const float r = extents.x * std::abs(plane.x) + extents.y * std::abs(plane.y) + extents.z *
-                std::abs(plane.z);
+            const float r =
+                extents.x * std::abs(plane.x) + extents.y * std::abs(plane.y) + extents.z * std::abs(plane.z);
             if (const float d = glm::dot(glm::vec3(plane), center) + plane.w; d < -r) {
                 inside = false;
                 break;
@@ -344,8 +339,8 @@ void Model::draw(const Shader& shader, const glm::mat4& viewProj) const {
         const glm::vec3 extents = (mesh.aabbMax - mesh.aabbMin) * 0.5f;
         bool inside = true;
         for (const auto& plane : planes) {
-            const float r = extents.x * std::abs(plane.x) + extents.y * std::abs(plane.y) + extents.z *
-                std::abs(plane.z);
+            const float r =
+                extents.x * std::abs(plane.x) + extents.y * std::abs(plane.y) + extents.z * std::abs(plane.z);
             if (const float d = glm::dot(glm::vec3(plane), center) + plane.w; d < -r) {
                 inside = false;
                 break;

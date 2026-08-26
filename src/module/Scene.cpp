@@ -13,13 +13,9 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
-Scene::Scene()
-    : sceneLoaded(false),
-      showBBox(true),
-      showAxes(true),
-      version(2),
-      loadSceneName("Load NavKit Scene"),
-      saveSceneName("Save NavKit Scene") {
+Scene::Scene() :
+    sceneLoaded(false), showBBox(true), showAxes(true), version(2), loadSceneName("Load NavKit Scene"),
+    saveSceneName("Save NavKit Scene") {
     resetBBoxDefaults();
 }
 
@@ -56,8 +52,8 @@ void Scene::setLastSaveFileName(char* fileName) {
     saveSceneName = saveSceneName.substr(saveSceneName.find_last_of("/\\") + 1);
 }
 
-void Scene::loadMeshes(const std::function<void()>& errorCallback,
-                       simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+void Scene::loadMeshes(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::Meshes newMeshes;
     try {
         Logger::log(NK_INFO, "Loading meshes.");
@@ -70,8 +66,8 @@ void Scene::loadMeshes(const std::function<void()>& errorCallback,
     meshes = newMeshes.meshes;
 }
 
-void Scene::loadPfBoxes(const std::function<void()>& errorCallback,
-                        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+void Scene::loadPfBoxes(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::PfBoxes pfBoxes;
     try {
         Logger::log(NK_INFO, "Loading Pathfinding boxes.");
@@ -106,8 +102,8 @@ void Scene::loadVersion(simdjson::simdjson_result<simdjson::ondemand::document>&
     }
 }
 
-void Scene::loadPfSeedPoints(const std::function<void()>& errorCallback,
-                             simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+void Scene::loadPfSeedPoints(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Json::PfSeedPoints newPfSeedPoints;
     try {
         Logger::log(NK_INFO, "Loading Pathfinding seed points.");
@@ -120,8 +116,8 @@ void Scene::loadPfSeedPoints(const std::function<void()>& errorCallback,
     pfSeedPoints = newPfSeedPoints.readPfSeedPoints();
 }
 
-void Scene::loadRoomsAndVolumes(const std::function<void()>& errorCallback,
-                                simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+void Scene::loadRoomsAndVolumes(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
         Logger::log(NK_INFO, "Loading Gates.");
         gates = Json::Gates(jsonDocument["gates"]).gates;
@@ -142,12 +138,11 @@ void Scene::loadRoomsAndVolumes(const std::function<void()>& errorCallback,
     }
 }
 
-void Scene::loadMatis(const std::function<void()>& errorCallback,
-                      simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+void Scene::loadMatis(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Logger::log(NK_INFO, "Loading Matis.");
     try {
-        for (const auto matiVec = Json::Matis(jsonDocument["matis"]).matis;
-             const auto& mati : matiVec) {
+        for (const auto matiVec = Json::Matis(jsonDocument["matis"]).matis; const auto& mati : matiVec) {
             matis[mati.hash] = mati;
         }
     } catch (const std::exception& e) {
@@ -157,8 +152,8 @@ void Scene::loadMatis(const std::function<void()>& errorCallback,
     }
 }
 
-void Scene::loadPrimMatis(const std::function<void()>& errorCallback,
-                          simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+void Scene::loadPrimMatis(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Logger::log(NK_INFO, "Loading Prim Matis.");
     try {
         for (const auto& primMati : Json::PrimMatis(jsonDocument["primMatis"]).primMatis) {
@@ -171,8 +166,8 @@ void Scene::loadPrimMatis(const std::function<void()>& errorCallback,
     }
 }
 
-void Scene::loadScene(const std::string& fileName, const std::function<void()>& callback,
-                      const std::function<void()>& errorCallback) {
+void Scene::loadScene(
+    const std::string& fileName, const std::function<void()>& callback, const std::function<void()>& errorCallback) {
     sceneLoaded = false;
     Menu::updateMenuState();
 
@@ -306,19 +301,13 @@ void Scene::handleOpenSceneClicked() {
         Logger::log(NK_INFO, msg.data());
         std::string fileNameToLoad = fileName;
         backgroundWorker.emplace(
-            &Scene::loadScene,
-            this,
-            fileNameToLoad,
+            &Scene::loadScene, this, fileNameToLoad,
             [fileNameToLoad]() {
                 getInstance().sceneLoaded = true;
                 Menu::updateMenuState();
-                Logger::log(
-                    NK_INFO,
-                    ("Done loading nav.json file: '" + fileNameToLoad + "'.").
-                    c_str());
-            }, []() {
-                Logger::log(NK_ERROR, "Error loading scene file.");
-            });
+                Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameToLoad + "'.").c_str());
+            },
+            []() { Logger::log(NK_ERROR, "Error loading scene file."); });
     }
 }
 
@@ -344,18 +333,12 @@ void Scene::setBBox(const float* pos, const float* scale) {
 
     const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     const float bBoxMin[3] = {
-        bBoxPos[0] - bBoxScale[0] / 2,
-        bBoxPos[1] - bBoxScale[1] / 2,
-        bBoxPos[2] - bBoxScale[2] / 2
-    };
+        bBoxPos[0] - bBoxScale[0] / 2, bBoxPos[1] - bBoxScale[1] / 2, bBoxPos[2] - bBoxScale[2] / 2};
     const float bBoxMax[3] = {
-        bBoxPos[0] + bBoxScale[0] / 2,
-        bBoxPos[1] + bBoxScale[1] / 2,
-        bBoxPos[2] + bBoxScale[2] / 2
-    };
+        bBoxPos[0] + bBoxScale[0] / 2, bBoxPos[1] + bBoxScale[1] / 2, bBoxPos[2] + bBoxScale[2] / 2};
     recastAdapter.setMeshBBox(bBoxMin, bBoxMax);
-    Logger::log(NK_INFO, "Setting bbox to (%.2f, %.2f, %.2f) (%.2f, %.2f, %.2f)",
-                pos[0], pos[1], pos[2], scale[0], scale[1], scale[2]);
+    Logger::log(NK_INFO, "Setting bbox to (%.2f, %.2f, %.2f) (%.2f, %.2f, %.2f)", pos[0], pos[1], pos[2], scale[0],
+        scale[1], scale[2]);
 }
 
 void Scene::resetBBoxDefaults() {
@@ -392,8 +375,8 @@ void Scene::updateSceneDialogControls(const HWND hDlg) const {
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
 }
 
-const Json::Mesh* Scene::findMeshByHashAndIdAndPos(const std::string& hash, const std::string& id,
-                                                   const float* pos) const {
+const Json::Mesh* Scene::findMeshByHashAndIdAndPos(
+    const std::string& hash, const std::string& id, const float* pos) const {
     std::vector<const Json::Mesh*> closestMeshes;
     for (const Json::Mesh& mesh : meshes) {
         if ((mesh.alocHash == hash || mesh.primHash == hash) && mesh.entity.id == id) {
@@ -470,7 +453,7 @@ INT_PTR CALLBACK Scene::sceneDialogProc(const HWND hDlg, const UINT message, con
     case WM_DESTROY:
         hSceneDialog = nullptr;
         return TRUE;
-    default: ;
+    default:;
     }
     return FALSE;
 }
@@ -484,8 +467,8 @@ void Scene::showSceneDialog() {
     const HINSTANCE hInstance = GetModuleHandle(nullptr);
     const HWND hParentWnd = Renderer::hwnd;
 
-    hSceneDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, sceneDialogProc,
-                                     reinterpret_cast<LPARAM>(this));
+    hSceneDialog = CreateDialogParam(
+        hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, sceneDialogProc, reinterpret_cast<LPARAM>(this));
 
     if (hSceneDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {

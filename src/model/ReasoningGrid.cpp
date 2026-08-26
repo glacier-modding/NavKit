@@ -226,15 +226,14 @@ void ReasoningGrid::readJson(const char* p_AirgPath) {
 std::vector<uint8_t> ReasoningGrid::getWaypointVisionData(int waypointIndex) {
     const Waypoint& waypoint = m_WaypointList[waypointIndex];
     const int nextWaypointOffset = (waypointIndex + 1) < m_WaypointList.size()
-                                 ? m_WaypointList[waypointIndex + 1].nVisionDataOffset
-                                 : m_pVisibilityData.size();
+        ? m_WaypointList[waypointIndex + 1].nVisionDataOffset
+        : m_pVisibilityData.size();
     int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
 
     const std::vector<uint8_t>::const_iterator first = m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
     const std::vector<uint8_t>::const_iterator last = (waypointIndex + 1) < m_WaypointList.size()
-                                                    ? m_pVisibilityData.begin() + m_WaypointList[waypointIndex + 1].
-                                                    nVisionDataOffset
-                                                    : m_pVisibilityData.end();
+        ? m_pVisibilityData.begin() + m_WaypointList[waypointIndex + 1].nVisionDataOffset
+        : m_pVisibilityData.end();
     std::vector<uint8_t> waypointVisibilityData(first, last);
     return waypointVisibilityData;
 }

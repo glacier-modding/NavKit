@@ -40,13 +40,8 @@ void Menu::handleCheckboxMenuItem(const UINT menuId, bool& stateVariable, const 
 }
 
 void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
-    const std::vector<UINT> menuGroupIds =
-    {
-        IDM_VIEW_AIRG_CELL_COLOR_OFF,
-        IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
-        IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA,
-        IDM_VIEW_AIRG_CELL_COLOR_LAYER
-    };
+    const std::vector<UINT> menuGroupIds = {IDM_VIEW_AIRG_CELL_COLOR_OFF, IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
+        IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, IDM_VIEW_AIRG_CELL_COLOR_LAYER};
     const HWND hwnd = Renderer::hwnd;
     const HMENU hMenu = GetMenu(hwnd);
     for (const UINT menuId : menuGroupIds) {
@@ -123,10 +118,10 @@ void Menu::updateMenuState() {
         isStairs = navp.stairsAreaSelected();
     }
     setMenuItemChecked(IDM_EDIT_NAVP_STAIRS, isStairs, "Stairs Area");
-    setMenuItemChecked(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled,
-                       "Connect Waypoint Mode Enabled");
-    setMenuItemChecked(IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled,
-                       "Disconnect Waypoint Mode Enabled");
+    setMenuItemChecked(
+        IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
+    setMenuItemChecked(
+        IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled, "Disconnect Waypoint Mode Enabled");
 }
 
 void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const char* itemName) {
@@ -226,64 +221,49 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_NAVP, Navp::getInstance().showNavp, "Show Navp");
                 break;
             case IDM_VIEW_NAVP_SHOW_INDICES:
-                handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_INDICES, Navp::getInstance().showNavpIndices,
-                                       "Show Navp Indices");
+                handleCheckboxMenuItem(
+                    IDM_VIEW_NAVP_SHOW_INDICES, Navp::getInstance().showNavpIndices, "Show Navp Indices");
                 break;
             case IDM_VIEW_NAVP_SHOW_KD_TREE:
-                handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_KD_TREE, Navp::getInstance().showKdTree,
-                                       "Show KD Tree");
+                handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_KD_TREE, Navp::getInstance().showKdTree, "Show KD Tree");
                 break;
             case IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, Navp::getInstance().showPfExclusionBoxes,
+                handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, Navp::getInstance().showPfExclusionBoxes,
                     "Show Exclusion Boxes");
                 break;
             case IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS:
                 handleCheckboxMenuItem(
-                    IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, Navp::getInstance().showPfSeedPoints,
-                    "Show Seed Points");
+                    IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, Navp::getInstance().showPfSeedPoints, "Show Seed Points");
                 break;
             case IDM_VIEW_NAVP_Z_RENDER_OFFSET:
                 handleCheckboxMenuItem(
-                    IDM_VIEW_NAVP_Z_RENDER_OFFSET, Navp::getInstance().doZRenderOffset,
-                    "Z Render Offset");
+                    IDM_VIEW_NAVP_Z_RENDER_OFFSET, Navp::getInstance().doZRenderOffset, "Z Render Offset");
                 Navp::navMeshDirty = true;
                 Navp::hitTestDirty = true;
                 break;
             case IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO, Navp::getInstance().showRecastDebugInfo,
+                handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO, Navp::getInstance().showRecastDebugInfo,
                     "Show Recast Debug Info");
                 break;
             case IDM_VIEW_OBJ_SHOW_OBJ:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_OBJ_SHOW_OBJ, SceneMesh::getInstance().showObj,
-                    "Show Obj");
+                handleCheckboxMenuItem(IDM_VIEW_OBJ_SHOW_OBJ, SceneMesh::getInstance().showObj, "Show Obj");
                 break;
             case IDM_VIEW_AIRG_SHOW_AIRG:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg,
-                    "Show Airg");
+                handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg, "Show Airg");
                 break;
             case IDM_VIEW_AIRG_SHOW_INDICES:
                 handleCheckboxMenuItem(
-                    IDM_VIEW_AIRG_SHOW_INDICES, Airg::getInstance().showAirgIndices,
-                    "Show Airg Indices");
+                    IDM_VIEW_AIRG_SHOW_INDICES, Airg::getInstance().showAirgIndices, "Show Airg Indices");
                 break;
             case IDM_VIEW_AIRG_SHOW_GRID:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_AIRG_SHOW_GRID, Grid::getInstance().showGrid,
-                    "Show Grid");
+                handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_GRID, Grid::getInstance().showGrid, "Show Grid");
                 break;
             case IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO, Airg::getInstance().showRecastDebugInfo,
+                handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO, Airg::getInstance().showRecastDebugInfo,
                     "Show Recast Debug Info");
                 break;
             case IDM_VIEW_LOG_SHOW_LOG:
-                handleCheckboxMenuItem(
-                    IDM_VIEW_LOG_SHOW_LOG, Gui::getInstance().showLog,
-                    "Show Log");
+                handleCheckboxMenuItem(IDM_VIEW_LOG_SHOW_LOG, Gui::getInstance().showLog, "Show Log");
                 break;
             case IDM_VIEW_AIRG_CELL_COLOR_OFF:
             case IDM_VIEW_AIRG_CELL_COLOR_BITMAP:
@@ -322,12 +302,10 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
                 break;
 
             case IDM_HELP_ABOUT: {
-                const std::string currentVersionStr =
-                    std::string(NavKit_VERSION_MAJOR) + "." +
-                    std::string(NavKit_VERSION_MINOR) + "." +
-                    std::string(NavKit_VERSION_PATCH);
-                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About",
-                                         ("NavKit version " + currentVersionStr).data(), nullptr);
+                const std::string currentVersionStr = std::string(NavKit_VERSION_MAJOR) + "." +
+                    std::string(NavKit_VERSION_MINOR) + "." + std::string(NavKit_VERSION_PATCH);
+                SDL_ShowSimpleMessageBox(
+                    SDL_MESSAGEBOX_INFORMATION, "About", ("NavKit version " + currentVersionStr).data(), nullptr);
                 break;
             }
 

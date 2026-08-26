@@ -23,7 +23,7 @@ namespace NavPower {
     }
 
     class NavMesh;
-}
+} // namespace NavPower
 
 class Navp {
 public:

@@ -17,7 +17,7 @@ struct ConvexVolume;
 namespace Json {
     class Vec3;
     class PfBox;
-}
+} // namespace Json
 
 class Sample;
 class BuildContext;
@@ -75,8 +75,8 @@ public:
 
     dtPolyRef getPoly(int tileIndex, int polyIndex) const;
 
-    dtStatus findNearestPoly(const float* recastPos, dtPolyRef* polyRef, float* nearestPt,
-                             bool includeExcludedAreas) const;
+    dtStatus findNearestPoly(
+        const float* recastPos, dtPolyRef* polyRef, float* nearestPt, bool includeExcludedAreas) const;
 
     void findPfSeedPointAreas();
 
@@ -114,7 +114,7 @@ public:
 
     static Vec3 convertFromRecastToNavPower(Vec3 pos);
 
-    static std::vector<Vec3> getEdges(const dtNavMeshQuery* navQuery, dtPolyRef polyRef) ;
+    static std::vector<Vec3> getEdges(const dtNavMeshQuery* navQuery, dtPolyRef polyRef);
 
     Vec3 calculateNormal(dtNavMeshQuery* navQuery, dtPolyRef polyRef) const;
 
@@ -125,8 +125,7 @@ public:
     std::vector<dtPolyRef> getClosestReachablePolys(
         dtNavMeshQuery* navQuery, Vec3 navpowerPos, dtPolyRef navpowerStart, int maxPolys) const;
 
-    std::vector<dtPolyRef> getClosestPolys(
-        dtNavMeshQuery* navQuery, Vec3 navPowerPos, int maxPolys) const;
+    std::vector<dtPolyRef> getClosestPolys(dtNavMeshQuery* navQuery, Vec3 navPowerPos, int maxPolys) const;
 
     Sample_TileMesh* sample;
     BuildContext* buildContext;

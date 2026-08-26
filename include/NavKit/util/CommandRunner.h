@@ -15,7 +15,7 @@ public:
     }
 
     void runCommand(const std::string& command, const std::string& logFileName, const std::function<void()>& callback,
-                    const std::function<void()>& errorCallback);
+        const std::function<void()>& errorCallback);
 
     bool closing;
     int commandsRun;

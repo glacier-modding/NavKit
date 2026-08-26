@@ -1,0 +1,28 @@
+name: Code Formatting Check
+
+on:
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - '**.cpp'
+      - '**.h'
+      - '**.hpp'
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install ClangFormat
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Verify Formatting
+        run: |
+          # Find files and run clang-format in dry-run mode. 
+          # --Werror forces a non-zero exit code if formatting violations are found.
+          find src/ include/ -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) | xargs clang-format --dry-run --Werror -style=file

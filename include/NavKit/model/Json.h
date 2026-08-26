@@ -48,7 +48,7 @@ namespace Json {
 
     class Vec3 {
     public:
-        Vec3() : x(0), y(0), z(0) {} ;
+        Vec3() : x(0), y(0), z(0) {};
 
         Vec3(const float x, const float y, const float z) : x(x), y(y), z(z) {}
 
@@ -63,9 +63,9 @@ namespace Json {
 
     class Rotation {
     public:
-        Rotation() : x(0), y(0), z(0), w(0) {} ;
+        Rotation() : x(0), y(0), z(0), w(0) {};
 
-        Rotation(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {} ;
+        Rotation(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {};
 
         float x;
         float y;
@@ -164,9 +164,8 @@ namespace Json {
     public:
         PfBox() = default;
 
-        PfBox(const std::string& id, const std::string& name, const Vec3 pos,
-              const Vec3 scale, const Rotation rotation, const PfBoxType& type) :
-            id(id), name(name), pos(pos), scale(scale), rotation(rotation), type(type) {}
+        PfBox(const std::string& id, const std::string& name, const Vec3 pos, const Vec3 scale, const Rotation rotation,
+            const PfBoxType& type) : id(id), name(name), pos(pos), scale(scale), rotation(rotation), type(type) {}
 
         std::string id{};
         std::string name{};
@@ -198,10 +197,10 @@ namespace Json {
     public:
         Gate() = default;
 
-        Gate(const std::string& id, const std::string& name, const Vec3 position,
-             Rotation rotation, const Vec3 bboxCenter, const Vec3 bboxHalfSize) : id(id), name(name),
-            position(position), rotation(rotation),
-            bboxCenter(bboxCenter), bboxHalfSize(bboxHalfSize) {}
+        Gate(const std::string& id, const std::string& name, const Vec3 position, Rotation rotation,
+            const Vec3 bboxCenter, const Vec3 bboxHalfSize) :
+            id(id), name(name), position(position), rotation(rotation), bboxCenter(bboxCenter),
+            bboxHalfSize(bboxHalfSize) {}
 
         std::string id;
         std::string name;
@@ -228,10 +227,10 @@ namespace Json {
     public:
         Room() = default;
 
-        Room(const std::string& id, const std::string& name, const Vec3 position,
-             Rotation rotation, const Vec3Wrapped& roomExtentMin,
-             const Vec3Wrapped& roomExtentMax) : id(id), name(name), position(position), rotation(rotation),
-                                                 roomExtentMin(roomExtentMin), roomExtentMax(roomExtentMax) {}
+        Room(const std::string& id, const std::string& name, const Vec3 position, Rotation rotation,
+            const Vec3Wrapped& roomExtentMin, const Vec3Wrapped& roomExtentMax) :
+            id(id), name(name), position(position), rotation(rotation), roomExtentMin(roomExtentMin),
+            roomExtentMax(roomExtentMax) {}
 
         std::string id;
         std::string name;
@@ -258,8 +257,8 @@ namespace Json {
     public:
         AiAreaWorld() = default;
 
-        AiAreaWorld(const std::string& id, const std::string& name,
-                    const Rotation rotation) : id(id), name(name), rotation(rotation) {}
+        AiAreaWorld(const std::string& id, const std::string& name, const Rotation rotation) :
+            id(id), name(name), rotation(rotation) {}
 
         std::string id;
         std::string name;
@@ -283,8 +282,8 @@ namespace Json {
     public:
         ParentData() = default;
 
-        ParentData(const std::string& id, const std::string& name, const std::string& source,
-                   const std::string& type) : id(id), name(name), source(source), type(type) {}
+        ParentData(const std::string& id, const std::string& name, const std::string& source, const std::string& type) :
+            id(id), name(name), source(source), type(type) {}
 
         std::string id;
         std::string name;
@@ -314,9 +313,8 @@ namespace Json {
     public:
         AiArea() = default;
 
-        AiArea(const std::string& id, const std::string& name,
-               const Rotation rotation, Parent parent) : id(id), name(name),
-                                                         rotation(rotation), parent(parent) {}
+        AiArea(const std::string& id, const std::string& name, const Rotation rotation, Parent parent) :
+            id(id), name(name), rotation(rotation), parent(parent) {}
 
         std::string id;
         std::string name;
@@ -366,9 +364,8 @@ namespace Json {
     public:
         VolumeSphere() = default;
 
-        VolumeSphere(const std::string& id, const std::string& name, const Vec3& position,
-                     const Rotation& rotation, const Radius& radius) : id(id), name(name), position(position),
-                                                                       rotation(rotation), radius(radius) {}
+        VolumeSphere(const std::string& id, const std::string& name, const Vec3& position, const Rotation& rotation,
+            const Radius& radius) : id(id), name(name), position(position), rotation(rotation), radius(radius) {}
 
         std::string id;
         std::string name;
@@ -394,8 +391,8 @@ namespace Json {
     public:
         PfSeedPoint() = default;
 
-        PfSeedPoint(const std::string& id, const std::string& name, const Vec3 pos,
-                    Rotation rotation) : id(id), name(name), pos(pos), rotation(rotation) {}
+        PfSeedPoint(const std::string& id, const std::string& name, const Vec3 pos, Rotation rotation) :
+            id(id), name(name), pos(pos), rotation(rotation) {}
 
         std::string id;
         std::string name;
@@ -461,4 +458,4 @@ namespace Json {
 
         std::vector<PrimMati> primMatis{};
     };
-}
+} // namespace Json

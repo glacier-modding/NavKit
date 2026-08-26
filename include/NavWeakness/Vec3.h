@@ -33,8 +33,7 @@ SOFTWARE.
 #include <cmath>
 #include <iostream>
 
-struct Vec3
-{
+struct Vec3 {
     Vec3() : X(0.f), Y(0.f), Z(0.f) {}
     Vec3(float p_X, float p_Y, float p_Z) : X(p_X), Y(p_Y), Z(p_Z) {}
 
@@ -42,8 +41,7 @@ struct Vec3
     float Y;
     float Z;
 
-    void writeJson(std::ostream& f)
-    {
+    void writeJson(std::ostream& f) {
         f << "{";
         f << "\"X\":" << X << ",";
         f << "\"Y\":" << Y << ",";
@@ -51,103 +49,85 @@ struct Vec3
         f << "}";
     }
 
-    void readJson(auto p_Json)
-    {
+    void readJson(auto p_Json) {
         X = double(p_Json["X"]);
         Y = double(p_Json["Y"]);
         Z = double(p_Json["Z"]);
     }
 
-    void writeBinary(std::ostream& f)
-    {
+    void writeBinary(std::ostream& f) {
         f.write((char*)&X, sizeof(X));
         f.write((char*)&Y, sizeof(Y));
         f.write((char*)&Z, sizeof(Z));
     }
 
-    void readBinary(std::istream& f)
-    {
+    void readBinary(std::istream& f) {
         f.read((char*)&X, sizeof(X));
         f.read((char*)&Y, sizeof(Y));
         f.read((char*)&Z, sizeof(Z));
     }
 
-    float DistanceSquaredTo(const Vec3& p_Other) const
-    {
+    float DistanceSquaredTo(const Vec3& p_Other) const {
         return powf(p_Other.X - X, 2.f) + powf(p_Other.Y - Y, 2.f) + powf(p_Other.Z - Z, 2.f);
     }
 
-    float DistanceTo(const Vec3& p_Other) const
-    {
+    float DistanceTo(const Vec3& p_Other) const {
         return sqrtf(DistanceSquaredTo(p_Other));
     }
 
-    Vec3 MidpointTo(const Vec3& p_Other) const
-    {
+    Vec3 MidpointTo(const Vec3& p_Other) const {
         return Vec3((p_Other.X + X) / 2.f, (p_Other.Y + Y) / 2.f, (p_Other.Z + Z) / 2.f);
     }
 
-    Vec3 operator+(const Vec3& p_Other) const
-    {
+    Vec3 operator+(const Vec3& p_Other) const {
         return Vec3(X + p_Other.X, Y + p_Other.Y, Z + p_Other.Z);
     }
 
-    Vec3 operator-(const Vec3& p_Other) const
-    {
+    Vec3 operator-(const Vec3& p_Other) const {
         return Vec3(X - p_Other.X, Y - p_Other.Y, Z - p_Other.Z);
     }
 
-    Vec3 operator*(float p_Value) const
-    {
+    Vec3 operator*(float p_Value) const {
         return Vec3(X * p_Value, Y * p_Value, Z * p_Value);
     }
 
-    Vec3 operator/(float p_Value) const
-    {
+    Vec3 operator/(float p_Value) const {
         return Vec3(X / p_Value, Y / p_Value, Z / p_Value);
     }
 
-    float& operator[](int p_Value)
-    {
+    float& operator[](int p_Value) {
         return *(&X + p_Value);
     }
 
-    bool operator==(const Vec3& p_Other) const
-    {
+    bool operator==(const Vec3& p_Other) const {
         return X == p_Other.X && Y == p_Other.Y && Z == p_Other.Z;
     }
 
     bool operator<(const Vec3& other) const {
-        if (X != other.X) return X < other.X;
-        if (Y != other.Y) return Y < other.Y;
+        if (X != other.X)
+            return X < other.X;
+        if (Y != other.Y)
+            return Y < other.Y;
         return Z < other.Z;
     }
 
-    float Dot(const Vec3& p_Other) const
-    {
+    float Dot(const Vec3& p_Other) const {
         return X * p_Other.X + Y * p_Other.Y + Z * p_Other.Z;
     }
 
-    Vec3 Cross(const Vec3& p_Other) const
-    {
-        return Vec3(
-            Y * p_Other.Z - Z * p_Other.Y,
-            Z * p_Other.X - X * p_Other.Z,
-            X * p_Other.Y - Y * p_Other.X);
+    Vec3 Cross(const Vec3& p_Other) const {
+        return Vec3(Y * p_Other.Z - Z * p_Other.Y, Z * p_Other.X - X * p_Other.Z, X * p_Other.Y - Y * p_Other.X);
     }
 
-    float GetMagnitudeSquared() const
-    {
+    float GetMagnitudeSquared() const {
         return Dot(*this);
     }
 
-    float GetMagnitude() const
-    {
+    float GetMagnitude() const {
         return sqrtf(GetMagnitudeSquared());
     }
 
-    Vec3 PerpendicularPointTo(Vec3 p_LineStart, Vec3 p_LineEnd) const
-    {
+    Vec3 PerpendicularPointTo(Vec3 p_LineStart, Vec3 p_LineEnd) const {
         const Vec3 s_LineDirection = (p_LineEnd - p_LineStart).GetUnitVec();
         const Vec3 s_PointToLineStart = (*this - p_LineStart);
         const float s_DistanceFromStartToPerpendicularPoint = s_PointToLineStart.Dot(s_LineDirection);
@@ -156,8 +136,7 @@ struct Vec3
         return s_PerpendicularPoint;
     }
 
-    Vec3 GetUnitVec() const
-    {
+    Vec3 GetUnitVec() const {
         float s_Magnitude = sqrtf(X * X + Y * Y + Z * Z);
 
         if (s_Magnitude <= 0.f)

@@ -13,9 +13,7 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
 
-UpdateChecker::UpdateChecker()
-    : updateCheckCompleted(false)
-      , isUpdateAvailable(false) {}
+UpdateChecker::UpdateChecker() : updateCheckCompleted(false), isUpdateAvailable(false) {}
 
 UpdateChecker::~UpdateChecker() {
     if (updateThread.joinable()) {
@@ -31,7 +29,7 @@ void UpdateChecker::startUpdateCheck() {
 }
 
 void UpdateChecker::performUpdateCheck() {
-    UpdateChecker & updateChecker = getInstance();
+    UpdateChecker& updateChecker = getInstance();
     Logger::log(NK_INFO, "Checking for updates.");
 
     httplib::Client cli("https://api.github.com");
@@ -56,9 +54,8 @@ void UpdateChecker::performUpdateCheck() {
         }
         const std::string latestVersionStr(latestVersionSV.substr(1));
 
-        const std::string currentVersionStr =
-            std::string(NavKit_VERSION_MAJOR) + "." + std::string(NavKit_VERSION_MINOR) + "." +
-            std::string(NavKit_VERSION_PATCH);
+        const std::string currentVersionStr = std::string(NavKit_VERSION_MAJOR) + "." +
+            std::string(NavKit_VERSION_MINOR) + "." + std::string(NavKit_VERSION_PATCH);
         Logger::log(NK_INFO, ("Current NavKit version: " + currentVersionStr).c_str());
         Logger::log(NK_INFO, ("Latest NavKit version: " + latestVersionStr).c_str());
         const bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
@@ -139,8 +136,8 @@ void UpdateChecker::performUpdate() const {
     const std::filesystem::path temp_updater_path = temp_updater_dir / "updater.exe";
 
     try {
-        std::filesystem::copy_file(original_updater_path, temp_updater_path,
-                                   std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(
+            original_updater_path, temp_updater_path, std::filesystem::copy_options::overwrite_existing);
         Logger::log(NK_INFO, ("Copied updater to " + temp_updater_path.string()).c_str());
     } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, ("NavKit: Failed to copy updater to temp directory: " + std::string(e.what())).c_str());
@@ -150,15 +147,15 @@ void UpdateChecker::performUpdate() const {
     if (std::filesystem::exists(original_settings_path)) {
         const std::filesystem::path temp_settings_path = temp_updater_dir / "NavKit.ini";
         try {
-            std::filesystem::copy_file(original_settings_path, temp_settings_path,
-                                       std::filesystem::copy_options::overwrite_existing);
+            std::filesystem::copy_file(
+                original_settings_path, temp_settings_path, std::filesystem::copy_options::overwrite_existing);
             Logger::log(
                 NK_INFO, ("Copied NavKit.ini to " + temp_settings_path.string() + " to preserve settings.").c_str());
         } catch (const std::filesystem::filesystem_error& e) {
-            Logger::log(
-                NK_ERROR,
+            Logger::log(NK_ERROR,
                 ("NavKit: Failed to copy NavKit.ini to temp directory, settings will not be preserved: " +
-                    std::string(e.what())).c_str());
+                    std::string(e.what()))
+                    .c_str());
         }
     }
 
@@ -182,21 +179,17 @@ void UpdateChecker::performUpdate() const {
             return;
         }
     } else {
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             ("Error: HTTP error occurred: " + (res ? std::to_string(res->status) : "Connection failure")).c_str());
         return;
     }
 
-    const std::string command = "\"" + local_msi_path.string() + "\" "
-        + std::to_string(GetCurrentProcessId()) + " "
-        + latestVersion + " "
-        + "\"" + install_dir.string() + "\"";
+    const std::string command = "\"" + local_msi_path.string() + "\" " + std::to_string(GetCurrentProcessId()) + " " +
+        latestVersion + " " + "\"" + install_dir.string() + "\"";
 
     Logger::log(NK_INFO, ("Launching updater with command: " + command).c_str());
-    if (reinterpret_cast<INT_PTR>(
-        ShellExecuteA(nullptr, "open", temp_updater_path.string().c_str(), command.c_str(),
-                      temp_updater_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
+    if (reinterpret_cast<INT_PTR>(ShellExecuteA(nullptr, "open", temp_updater_path.string().c_str(), command.c_str(),
+            temp_updater_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
         Logger::log(NK_ERROR, "NavKit: Failed to launch updater.exe from temp directory.");
         return;
     }
@@ -206,8 +199,8 @@ void UpdateChecker::performUpdate() const {
     exit(0);
 }
 
-INT_PTR CALLBACK UpdateChecker::updateDialogHandler(const HWND hwndDlg, const UINT uMsg, const WPARAM wParam,
-                                                    LPARAM lParam) {
+INT_PTR CALLBACK UpdateChecker::updateDialogHandler(
+    const HWND hwndDlg, const UINT uMsg, const WPARAM wParam, LPARAM lParam) {
     const UpdateChecker& updateChecker = getInstance();
     switch (uMsg) {
     case WM_INITDIALOG: {
@@ -243,8 +236,8 @@ void UpdateChecker::openUpdateDialog(const std::string& message) {
         pos += 2;
     }
     updateMessage = std::string(formattedMessage);
-    DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_UPDATE_DIALOG), Renderer::hwnd, updateDialogHandler,
-                    0);
+    DialogBoxParamA(
+        GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_UPDATE_DIALOG), Renderer::hwnd, updateDialogHandler, 0);
 }
 
 bool UpdateChecker::isVersionGreaterThan(const std::string& v1, const std::string& v2) {

@@ -20,19 +20,11 @@ namespace Math {
     }
 
     float4 crossProduct(const float4& a, const float4& b) {
-        return float4{
-            a.y * b.z - a.z * b.y,
-            a.z * b.x - a.x * b.z,
-            a.x * b.y - a.y * b.x, 0.0f
-        };
+        return float4{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x, 0.0f};
     }
 
     Vec3 crossProduct(const Vec3& a, const Vec3& b) {
-        return Vec3{
-            a.Y * b.Z - a.Z * b.Y,
-            a.Z * b.X - a.X * b.Z,
-            a.X * b.Y - a.Y * b.X
-        };
+        return Vec3{a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X};
     }
 
     float4 operator/(const float4& v, float scalar) {
@@ -85,17 +77,15 @@ namespace Math {
         return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
     }
 
-    bool rayAabbIntersect(float4* vIntersectionPoint, const float4* vMin, const float4* vMax,
-                          const float4* vStart,
-                          const float4* vDirection) {
+    bool rayAabbIntersect(float4* vIntersectionPoint, const float4* vMin, const float4* vMax, const float4* vStart,
+        const float4* vDirection) {
         // Early out if AABB is invalid
         if (vMax->x < vMin->x || vMax->y < vMin->y || vMax->z < vMin->z) {
             return false;
         }
 
         // Check if ray origin is inside AABB
-        if (vStart->x >= vMin->x && vStart->x <= vMax->x &&
-            vStart->y >= vMin->y && vStart->y <= vMax->y &&
+        if (vStart->x >= vMin->x && vStart->x <= vMax->x && vStart->y >= vMin->y && vStart->y <= vMax->y &&
             vStart->z >= vMin->z && vStart->z <= vMax->z) {
             *vIntersectionPoint = *vStart;
             return true;
@@ -171,9 +161,9 @@ namespace Math {
     // Rotate a point with a quaternion
     Vec3 rotatePoint(const Vec3& point, const Quaternion& quaternion) {
         const Quaternion pointQuat = {point.X, point.Y, point.Z, 0};
-        const Quaternion rotatedPointQuat = quaternionMultiply(
-            quaternion, quaternionMultiply(pointQuat, quaternionInverse(quaternion)));
+        const Quaternion rotatedPointQuat =
+            quaternionMultiply(quaternion, quaternionMultiply(pointQuat, quaternionInverse(quaternion)));
         const Vec3 rotatedPoint = {rotatedPointQuat.x, rotatedPointQuat.y, rotatedPointQuat.z};
         return rotatedPoint;
     }
-}
+} // namespace Math

@@ -1,0 +1,60 @@
+#!/bin/bash
+
+CMAKE_RESOLVED_FORMAT_PATH=$(git config --get local.clangFormatPath)
+#CMAKE_RESOLVED_TIDY_PATH=$(git config --get local.clangTidyPath)
+
+if [ -n "$CMAKE_RESOLVED_FORMAT_PATH" ]; then
+    CLANG_FORMAT_PATH="$CMAKE_RESOLVED_FORMAT_PATH"
+else
+    CLANG_FORMAT_PATH="clang-format"
+fi
+
+#if [ -n "$CMAKE_RESOLVED_TIDY_PATH" ]; then
+#    CLANG_TIDY_PATH="$CMAKE_RESOLVED_TIDY_PATH"
+#else
+#    CLANG_TIDY_PATH="clang-tidy"
+#fi
+
+if ! command -v "$CLANG_FORMAT_PATH" &> /dev/null && [ ! -f "$CLANG_FORMAT_PATH" ]; then
+    echo "Error: ClangFormat executable not found ($CLANG_FORMAT_PATH)."
+    echo "Please configure your IDE or build system to populate this tool."
+    exit 1
+fi
+
+#if ! command -v "$CLANG_TIDY_PATH" &> /dev/null && [ ! -f "$CLANG_TIDY_PATH" ]; then
+#    echo "Error: ClangTidy executable not found ($CLANG_TIDY_PATH)."
+#    echo "Please configure your IDE or build system to populate this tool."
+#    exit 1
+#fi
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h|hpp|cc|cxx)$')
+
+if [ -n "$STAGED_FILES" ]; then
+    BUILD_DIR="cmake-build-debug"
+
+#    echo "Running ClangTidy fixes on staged repository files..."
+#
+#    GIT_RESOLVED_DB_PATH=$(git config --get local.clangTidyDbPath)
+#
+#    if [ -n "$GIT_RESOLVED_DB_PATH" ]; then
+#        TIDY_DB_DIR="$GIT_RESOLVED_DB_PATH"
+#    else
+#        TIDY_DB_DIR="build/clang-tools-cache"
+#    fi
+#
+#    echo "$STAGED_FILES" | while read -r FILE; do
+#        if [ -f "$FILE" ]; then
+#            "$CLANG_TIDY_PATH" -p "$TIDY_DB_DIR" --extra-arg=--driver-mode=cl --fix "$FILE" 2>/dev/null
+#        fi
+#    done
+
+    echo "Running ClangFormat on staged repository files..."
+    echo "$STAGED_FILES" | while read -r FILE; do
+        if [ -f "$FILE" ]; then
+            "$CLANG_FORMAT_PATH" -i -style=file "$FILE"
+            git add "$FILE"
+        fi
+    done
+fi
+
+exit 0

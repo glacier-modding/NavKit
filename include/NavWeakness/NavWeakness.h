@@ -7,4 +7,4 @@ namespace NavWeakness {
     void OutputNavMesh_NAVP_Write(NavPower::NavMesh* p_NavMesh, const char* p_NavMeshOutputPath);
     NavPower::NavMesh LoadNavMeshFromJson(const char* p_NavMeshPath);
     NavPower::NavMesh LoadNavMeshFromBinary(const char* p_NavMeshPath);
-}
+} // namespace NavWeakness

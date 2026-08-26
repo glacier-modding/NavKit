@@ -38,15 +38,15 @@ bool SceneExtract::canExtractFromGame() const {
 bool SceneExtract::canExtractFromGameAndBuildObj() const {
     const SceneMesh& obj = SceneMesh::getInstance();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    return canExtractFromGame()
-        && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted && !obj.blenderSceneMeshGenerationDone;
+    return canExtractFromGame() && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted &&
+        !obj.blenderSceneMeshGenerationDone;
 }
 
 bool SceneExtract::canExtractFromGameAndBuildAll() const {
     const SceneMesh& obj = SceneMesh::getInstance();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    return canExtractFromGame()
-        && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted && !obj.blenderSceneMeshGenerationDone;
+    return canExtractFromGame() && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted &&
+        !obj.blenderSceneMeshGenerationDone;
 }
 
 void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
@@ -92,19 +92,22 @@ void SceneExtract::extractScene() {
     GameConnection& gameConnection = GameConnection::getInstance();
     extractingFromGame = true;
 
-    backgroundWorker.emplace(extractFromGame, [this] {
-        Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
-        extractingFromGame = false;
-        doneExtractingFromGame = true;
-        Menu::updateMenuState();
-    }, [this, &gameConnection] {
-        extractingFromGame = false;
-        doneExtractingFromGame = false;
-        Menu::updateMenuState();
-        if (gameConnection.closeConnection()) {
-            Logger::log(NK_ERROR, "Error closing connection to game.");
-        }
-    });
+    backgroundWorker.emplace(
+        extractFromGame,
+        [this] {
+            Logger::log(NK_INFO, "Finished extracting scene from game to nav.json file.");
+            extractingFromGame = false;
+            doneExtractingFromGame = true;
+            Menu::updateMenuState();
+        },
+        [this, &gameConnection] {
+            extractingFromGame = false;
+            doneExtractingFromGame = false;
+            Menu::updateMenuState();
+            if (gameConnection.closeConnection()) {
+                Logger::log(NK_ERROR, "Error closing connection to game.");
+            }
+        });
 }
 
 void SceneExtract::finalizeExtractScene() {
@@ -117,9 +120,7 @@ void SceneExtract::finalizeExtractScene() {
         Logger::log(NK_INFO, "Loading nav.json file: '%s'.", sceneFile.c_str());
 
         backgroundWorker.emplace(
-            &Scene::loadScene,
-            &scene,
-            sceneFile,
+            &Scene::loadScene, &scene, sceneFile,
             [sceneFile, this] {
                 Scene& sceneScoped = Scene::getInstance();
                 SceneMesh& obj = SceneMesh::getInstance();
@@ -131,7 +132,8 @@ void SceneExtract::finalizeExtractScene() {
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
                 Menu::updateMenuState();
-            }, [this] {
+            },
+            [this] {
                 SceneMesh& objScoped = SceneMesh::getInstance();
                 Logger::log(NK_ERROR, "Error loading scene file.");
                 objScoped.startedSceneMeshGeneration = false;

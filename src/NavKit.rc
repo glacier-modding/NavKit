@@ -49,7 +49,7 @@ BEGIN
         MENUITEM "Show &KD Tree",                            IDM_VIEW_NAVP_SHOW_KD_TREE
         MENUITEM "Show &Exclusion Boxes",                    IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, CHECKED
         MENUITEM "Show &Seed Points",                        IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, CHECKED
-        MENUITEM "&Z Render Offset",                         IDM_VIEW_NAVP_Z_RENDER_OFFSET, CHECKED
+        MENUITEM "&Z Render Offset",                         IDM_VIEW_NAVP_Z_RENDER_OFFSET
         MENUITEM "Show &Recast Debug Info",                  IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO
         MENUITEM SEPARATOR
         MENUITEM "Show &Airg",                               IDM_VIEW_AIRG_SHOW_AIRG, CHECKED

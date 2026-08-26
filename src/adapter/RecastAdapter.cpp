@@ -99,8 +99,7 @@ static void updateRecastDialogControls(const HWND hDlg) {
     }
 
     auto set_slider = [&](const int sliderId, const int textId, const float value, const float min_val,
-                          const float step, const int num_steps,
-                          const int precision) {
+                          const float step, const int num_steps, const int precision) {
         const int pos = static_cast<int>((value - min_val) / step);
         SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETRANGE, TRUE, MAKELONG(0, num_steps));
         SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETPOS, TRUE, pos);
@@ -117,44 +116,44 @@ static void updateRecastDialogControls(const HWND hDlg) {
     set_slider(IDC_SLIDER_AGENT_RADIUS, IDC_STATIC_AGENT_RADIUS_VAL, sample->m_agentRadius, 0.0f, 0.01f, 200, 2);
     // Range: 0.0 to 2.0
     set_slider(IDC_SLIDER_AGENT_MAX_CLIMB, IDC_STATIC_AGENT_MAX_CLIMB_VAL, sample->m_agentMaxClimb, 0.0f, 0.01f, 500,
-               2); // Range: 0.0 to 5.0
+        2); // Range: 0.0 to 5.0
     set_slider(IDC_SLIDER_AGENT_MAX_SLOPE, IDC_STATIC_AGENT_MAX_SLOPE_VAL, sample->m_agentMaxSlope, 0.0f, 1.0f, 90,
-               0); // Range: 0 to 90
+        0); // Range: 0 to 90
 
     set_slider(IDC_SLIDER_REGION_MIN_SIZE, IDC_STATIC_REGION_MIN_SIZE_VAL, sample->m_regionMinSize, 0.0f, 1.0f, 150,
-               0); // Range: 0 to 150
+        0); // Range: 0 to 150
     set_slider(IDC_SLIDER_REGION_MERGE_SIZE, IDC_STATIC_REGION_MERGE_SIZE_VAL, sample->m_regionMergeSize, 0.0f, 1.0f,
-               150, 0); // Range: 0 to 150
+        150, 0); // Range: 0 to 150
 
     set_slider(IDC_SLIDER_POLY_MAX_EDGE_LEN, IDC_STATIC_POLY_MAX_EDGE_LEN_VAL, sample->m_edgeMaxLen, 0.0f, 1.0f, 50,
-               1); // Range: 0.0 to 50.0
+        1); // Range: 0.0 to 50.0
     set_slider(IDC_SLIDER_POLY_MAX_EDGE_ERR, IDC_STATIC_POLY_MAX_EDGE_ERR_VAL, sample->m_edgeMaxError, 0.1f, 0.1f, 29,
-               2); // Range: 0.1 to 3.0
+        2); // Range: 0.1 to 3.0
     set_slider(IDC_SLIDER_POLY_VERTS_PER_POLY, IDC_STATIC_POLY_VERTS_PER_POLY_VAL, sample->m_vertsPerPoly, 3.0f, 1.0f,
-               9, 0); // Range: 3 to 12
+        9, 0); // Range: 3 to 12
 
     set_slider(IDC_SLIDER_DETAIL_SAMPLE_DIST, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, sample->m_detailSampleDist, 0.0f, 1.0f,
-               16, 1); // Range: 0.0 to 16.0
+        16, 1); // Range: 0.0 to 16.0
     set_slider(IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL, sample->m_detailSampleMaxError,
-               0.0f, 1.0f, 16, 1); // Range: 0.0 to 16.0
+        0.0f, 1.0f, 16, 1); // Range: 0.0 to 16.0
 
     set_slider(IDC_SLIDER_TILING_TILE_SIZE, IDC_STATIC_TILING_TILE_SIZE_VAL, sample->m_tileSize, 16.0f, 16.0f, 15,
-               0); // Range: 16 to 256
+        0); // Range: 16 to 256
 
     if (sample->m_partitionType == SAMPLE_PARTITION_WATERSHED) {
-        CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS,
-                         IDC_RADIO_PARTITION_WATERSHED);
+        CheckRadioButton(
+            hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_WATERSHED);
     } else if (sample->m_partitionType == SAMPLE_PARTITION_MONOTONE) {
         CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_MONOTONE);
     } else {
         CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_LAYERS);
     }
 
-    CheckDlgButton(hDlg, IDC_CHECK_FILTER_LOW_HANGING,
-                   sample->m_filterLowHangingObstacles ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(
+        hDlg, IDC_CHECK_FILTER_LOW_HANGING, sample->m_filterLowHangingObstacles ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_FILTER_LEDGE_SPANS, sample->m_filterLedgeSpans ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_FILTER_WALKABLE_LOW,
-                   sample->m_filterWalkableLowHeightSpans ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(
+        hDlg, IDC_CHECK_FILTER_WALKABLE_LOW, sample->m_filterWalkableLowHeightSpans ? BST_CHECKED : BST_UNCHECKED);
 
     if (sample->m_geom) {
         char text[64];
@@ -186,8 +185,8 @@ static void updateRecastDialogControls(const HWND hDlg) {
     }
 }
 
-INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
-                                                 const LPARAM lParam) {
+INT_PTR CALLBACK RecastAdapter::recastDialogProc(
+    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
     Sample_TileMesh* sample = getInstance().sample;
     if (!sample) {
         return FALSE;
@@ -240,8 +239,7 @@ INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT mes
         } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_DETAIL_SAMPLE_DIST)) {
             update_float_slider(sample->m_detailSampleDist, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, 1);
         } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR)) {
-            update_float_slider(sample->m_detailSampleMaxError, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL,
-                                1);
+            update_float_slider(sample->m_detailSampleMaxError, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL, 1);
         } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_TILING_TILE_SIZE)) {
             update_int_slider(sample->m_tileSize, 16, 16, IDC_STATIC_TILING_TILE_SIZE_VAL);
             needs_tiling_update = true;
@@ -285,7 +283,7 @@ INT_PTR CALLBACK RecastAdapter::recastDialogProc(const HWND hDlg, const UINT mes
     case WM_DESTROY:
         hRecastDialog = nullptr;
         return TRUE;
-    default: ;
+    default:;
     }
     return FALSE;
 }
@@ -297,8 +295,8 @@ void RecastAdapter::showRecastDialog() {
     }
     const HINSTANCE hInstance = GetModuleHandle(nullptr);
     const HWND hParentWnd = Renderer::hwnd;
-    hRecastDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, recastDialogProc,
-                                      reinterpret_cast<LPARAM>(this));
+    hRecastDialog = CreateDialogParam(
+        hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, recastDialogProc, reinterpret_cast<LPARAM>(this));
 
     if (hRecastDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
@@ -325,9 +323,8 @@ void RecastAdapter::showRecastDialog() {
 
 void RecastAdapter::drawInputGeom() const {
     duDebugDrawTriMesh(debugDraw, inputGeom->getMesh()->getVerts(), inputGeom->getMesh()->getVertCount(),
-                       inputGeom->getMesh()->getTris(), inputGeom->getMesh()->getNormals(),
-                       inputGeom->getMesh()->getTriCount(),
-                       nullptr, 1.0f);
+        inputGeom->getMesh()->getTris(), inputGeom->getMesh()->getNormals(), inputGeom->getMesh()->getTriCount(),
+        nullptr, 1.0f);
 }
 
 bool RecastAdapter::loadInputGeom(const std::string& fileName) const {
@@ -383,13 +380,9 @@ void RecastAdapter::setSceneBBoxToMesh() const {
     float meshBMin[3], meshBMax[3];
     rcCalcBounds(inputGeom->getMesh()->getVerts(), inputGeom->getMesh()->getVertCount(), meshBMin, meshBMax);
     const float pos[3] = {
-        (meshBMin[0] + meshBMax[0]) / 2, (meshBMin[1] + meshBMax[1]) / 2, (meshBMin[2] + meshBMax[2]) / 2
-    };
+        (meshBMin[0] + meshBMax[0]) / 2, (meshBMin[1] + meshBMax[1]) / 2, (meshBMin[2] + meshBMax[2]) / 2};
     const float scale[3] = {
-        (meshBMax[0] - meshBMin[0]) * 1.1f,
-        (meshBMax[1] - meshBMin[1]) * 1.1f,
-        (meshBMax[2] - meshBMin[2]) * 1.1f
-    };
+        (meshBMax[0] - meshBMin[0]) * 1.1f, (meshBMax[1] - meshBMin[1]) * 1.1f, (meshBMax[2] - meshBMin[2]) * 1.1f};
     Scene& scene = Scene::getInstance();
     scene.setBBox(pos, scale);
     setTileSettings(meshBMin, meshBMax);
@@ -483,7 +476,7 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
             glEnd();
             auto centroid = calculateCentroid(navQuery, polyRef);
             renderer.drawText("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex),
-                              {centroid.X, centroid.Y, centroid.Z}, color);
+                {centroid.X, centroid.Y, centroid.Z}, color);
         }
     }
 }
@@ -496,34 +489,33 @@ dtPolyRef RecastAdapter::getPoly(const int tileIndex, const int polyIndex) const
     }
 
     if (tileIndex < 0 || tileIndex >= mesh->getMaxTiles()) {
-        Logger::log(
-            NK_ERROR,
-            ("getPoly: Invalid tileIndex " + std::to_string(tileIndex) + ". Max tiles: " + std::to_string(
-                mesh->getMaxTiles())).c_str());
+        Logger::log(NK_ERROR,
+            ("getPoly: Invalid tileIndex " + std::to_string(tileIndex) +
+                ". Max tiles: " + std::to_string(mesh->getMaxTiles()))
+                .c_str());
         return 0;
     }
 
     const dtMeshTile* tile = mesh->getTile(tileIndex);
     if (!tile || !tile->header) {
-        Logger::log(
-            NK_WARN,
+        Logger::log(NK_WARN,
             ("getPoly: Tile at index " + std::to_string(tileIndex) + " is not valid or has no header.").c_str());
         return 0;
     }
 
     if (polyIndex < 0 || static_cast<unsigned int>(polyIndex) >= tile->header->polyCount) {
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             ("getPoly: Invalid polyIndex " + std::to_string(polyIndex) + " for tile " + std::to_string(tileIndex) +
-                ". Poly count: " + std::to_string(tile->header->polyCount)).c_str());
+                ". Poly count: " + std::to_string(tile->header->polyCount))
+                .c_str());
         return 0;
     }
 
     return mesh->encodePolyId(tile->salt, tileIndex, polyIndex);
 }
 
-dtStatus RecastAdapter::findNearestPoly(const float* recastPos, dtPolyRef* polyRef, float* nearestPt,
-                                        const bool includeExcludedAreas = false) const {
+dtStatus RecastAdapter::findNearestPoly(
+    const float* recastPos, dtPolyRef* polyRef, float* nearestPt, const bool includeExcludedAreas = false) const {
     const dtNavMesh* navMesh = sample->getNavMesh();
     const dtNavMeshQuery* navQuery = sample->getNavMeshQuery();
     if (!navMesh) {
@@ -531,9 +523,8 @@ dtStatus RecastAdapter::findNearestPoly(const float* recastPos, dtPolyRef* polyR
     }
     constexpr float halfExtents[3] = {2, 4, 2};
     if (navQuery) {
-        const dtStatus result = navQuery->findNearestPoly(recastPos, halfExtents,
-                                                          includeExcludedAreas ? filterWithExcluded : filter, polyRef,
-                                                          nearestPt);
+        const dtStatus result = navQuery->findNearestPoly(
+            recastPos, halfExtents, includeExcludedAreas ? filterWithExcluded : filter, polyRef, nearestPt);
         return result;
     }
     return DT_FAILURE;
@@ -543,24 +534,19 @@ void RecastAdapter::findPfSeedPointAreas() {
     pfSeedPointAreas.clear();
     for (const auto& pfSeedPoint : Scene::getInstance().pfSeedPoints) {
         dtPolyRef pfSeedPointRef;
-        const Vec3 recastPosVec3 = convertFromNavPowerToRecast(
-            {pfSeedPoint.pos.x, pfSeedPoint.pos.y, pfSeedPoint.pos.z});
+        const Vec3 recastPosVec3 =
+            convertFromNavPowerToRecast({pfSeedPoint.pos.x, pfSeedPoint.pos.y, pfSeedPoint.pos.z});
         const float recastPos[3] = {recastPosVec3.X, recastPosVec3.Y, recastPosVec3.Z};
         const dtStatus result = findNearestPoly(recastPos, &pfSeedPointRef, nullptr, true);
         if (result == DT_SUCCESS) {
             if (!pfSeedPointRef) {
-                Logger::log(
-                    NK_INFO,
-                    ("Polygon not found for PF Seed Point: " + pfSeedPoint.id).c_str());
+                Logger::log(NK_INFO, ("Polygon not found for PF Seed Point: " + pfSeedPoint.id).c_str());
                 continue;
             }
-            Logger::log(
-                NK_INFO,
-                ("Adding PF Seed Point poly ref: " + std::to_string(pfSeedPointRef)).c_str());
+            Logger::log(NK_INFO, ("Adding PF Seed Point poly ref: " + std::to_string(pfSeedPointRef)).c_str());
             pfSeedPointAreas.push_back(pfSeedPointRef);
         } else {
-            Logger::log(
-                NK_ERROR, ("Failed to find polygon for Seed point: " + std::to_string(pfSeedPointRef)).c_str());
+            Logger::log(NK_ERROR, ("Failed to find polygon for Seed point: " + std::to_string(pfSeedPointRef)).c_str());
         }
     }
 }
@@ -613,14 +599,14 @@ void RecastAdapter::excludeNonReachableAreas() const {
         const dtPoly& poly = tile->polys[polyIndex];
         validPathsFound++;
         if (validPathsFound % 100 == 0) {
-            Logger::log(
-                NK_INFO,
+            Logger::log(NK_INFO,
                 ("Found " + std::to_string(validPathsFound) +
-                    " areas with valid paths to PF Seed Point areas so far out of " +
-                    std::to_string(totalAreaCount) + " total areas.").c_str());
+                    " areas with valid paths to PF Seed Point areas so far out of " + std::to_string(totalAreaCount) +
+                    " total areas.")
+                    .c_str());
         }
         for (unsigned int linkIndex = poly.firstLink; linkIndex != DT_NULL_LINK;
-             linkIndex = tile->links[linkIndex].next) {
+            linkIndex = tile->links[linkIndex].next) {
             const dtLink& link = tile->links[linkIndex];
             const dtMeshTile* targetTile = nullptr;
             const dtPoly* targetPoly = nullptr;
@@ -642,8 +628,8 @@ void RecastAdapter::excludeNonReachableAreas() const {
                         }
                     }
                     if (targetPolyIndex != -1) {
-                        const dtPolyRef adjacentPolyRef = mesh->encodePolyId(
-                            targetTile->salt, targetTileIndex, targetPolyIndex);
+                        const dtPolyRef adjacentPolyRef =
+                            mesh->encodePolyId(targetTile->salt, targetTileIndex, targetPolyIndex);
                         if (!pathFoundForPoly.contains(adjacentPolyRef)) {
                             if (overrideExclude || poly.flags != SAMPLE_POLYFLAGS_DISABLED) {
                                 pathFoundForPoly[adjacentPolyRef] = true;
@@ -662,10 +648,9 @@ void RecastAdapter::excludeNonReachableAreas() const {
             }
         }
     }
-    Logger::log(
-        NK_INFO,
-        ("Found " + std::to_string(validPathsFound) + " areas with valid paths to PF Seed Point areas in total.").
-        c_str());
+    Logger::log(NK_INFO,
+        ("Found " + std::to_string(validPathsFound) + " areas with valid paths to PF Seed Point areas in total.")
+            .c_str());
 
     int areasPruned = 0;
     for (int tileIndex = 0; tileIndex < cmesh->getMaxTiles(); tileIndex++) {
@@ -683,9 +668,7 @@ void RecastAdapter::excludeNonReachableAreas() const {
         }
     }
     Logger::log(
-        NK_INFO,
-        ("Pruned " + std::to_string(areasPruned) + " areas with no path to any PF Seed Point.").
-        c_str());
+        NK_INFO, ("Pruned " + std::to_string(areasPruned) + " areas with no path to any PF Seed Point.").c_str());
 }
 
 void RecastAdapter::save(const std::string& data, bool isKnt) const {
@@ -715,30 +698,22 @@ void RecastAdapter::addConvexVolume(Json::PfBox& pfBox) const {
     verts[10] = pfBox.scale.y / 2;
     verts[11] = -pfBox.scale.z / 2;
     Vec3 rotated = Math::rotatePoint(
-        {verts[0], verts[1], verts[2]},
-        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
-    );
+        {verts[0], verts[1], verts[2]}, {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w});
     verts[0] = rotated.X;
     verts[1] = rotated.Y;
     verts[2] = rotated.Z;
     rotated = Math::rotatePoint(
-        {verts[3], verts[4], verts[5]},
-        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
-    );
+        {verts[3], verts[4], verts[5]}, {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w});
     verts[3] = rotated.X;
     verts[4] = rotated.Y;
     verts[5] = rotated.Z;
     rotated = Math::rotatePoint(
-        {verts[6], verts[7], verts[8]},
-        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
-    );
+        {verts[6], verts[7], verts[8]}, {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w});
     verts[6] = rotated.X;
     verts[7] = rotated.Y;
     verts[8] = rotated.Z;
     rotated = Math::rotatePoint(
-        {verts[9], verts[10], verts[11]},
-        {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w}
-    );
+        {verts[9], verts[10], verts[11]}, {pfBox.rotation.x, pfBox.rotation.y, pfBox.rotation.z, pfBox.rotation.w});
     verts[9] = rotated.X;
     verts[10] = rotated.Y;
     verts[11] = rotated.Z;
@@ -762,11 +737,8 @@ void RecastAdapter::addConvexVolume(Json::PfBox& pfBox) const {
         verts[i * 3 + 1] = recastY;
         verts[i * 3 + 2] = recastZ;
     }
-    inputGeom->addConvexVolume(verts,
-                               4,
-                               pfBox.pos.z - pfBox.scale.z / 2 - 0.5,
-                               pfBox.pos.z + pfBox.scale.z / 2,
-                               1); // areaType 1 is water
+    inputGeom->addConvexVolume(verts, 4, pfBox.pos.z - pfBox.scale.z / 2 - 0.5, pfBox.pos.z + pfBox.scale.z / 2,
+        1); // areaType 1 is water
 }
 
 const ConvexVolume* RecastAdapter::getConvexVolumes() const {
@@ -808,8 +780,7 @@ dtPolyRef RecastAdapter::getPolyRefForLink(const dtLink& link) const {
                 }
             }
             if (targetPolyIndex != -1) {
-                return mesh->encodePolyId(
-                    targetTile->salt, targetTileIndex, targetPolyIndex);
+                return mesh->encodePolyId(targetTile->salt, targetTileIndex, targetPolyIndex);
             }
         }
     }
@@ -830,10 +801,10 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
     const float recastStartPos[3] = {recastStart.X, recastStart.Y, recastStart.Z};
     dtStatus result = findNearestPoly(recastStartPos, &startRef, nullptr);
     if (result != DT_SUCCESS || startRef == 0) {
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             ("PFLineBlocked: Could not find area for start pos (" + std::to_string(recastStartPos[0]) + ", " +
-                std::to_string(recastStartPos[1]) + ", " + std::to_string(recastStartPos[2]) + ")").c_str());
+                std::to_string(recastStartPos[1]) + ", " + std::to_string(recastStartPos[2]) + ")")
+                .c_str());
         return true;
     }
 
@@ -841,10 +812,10 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
     const float recastEndPos[3] = {recastEnd.X, recastEnd.Y, recastEnd.Z};
     result = findNearestPoly(recastEndPos, &endRef, nullptr);
     if (result != DT_SUCCESS || endRef == 0) {
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             ("PFLineBlocked: Could not find area for end pos (" + std::to_string(recastEndPos[0]) + ", " +
-                std::to_string(recastEndPos[1]) + ", " + std::to_string(recastEndPos[2]) + ")").c_str());
+                std::to_string(recastEndPos[1]) + ", " + std::to_string(recastEndPos[2]) + ")")
+                .c_str());
         return true;
     }
 
@@ -852,9 +823,8 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
         return false;
     }
 
-    const Vec3 middle = {
-        (recastStart.X + recastEnd.X) / 2.0f, (recastStart.Y + recastEnd.Y) / 2.0f, (recastStart.Z + recastEnd.Z) / 2.0f
-    };
+    const Vec3 middle = {(recastStart.X + recastEnd.X) / 2.0f, (recastStart.Y + recastEnd.Y) / 2.0f,
+        (recastStart.Z + recastEnd.Z) / 2.0f};
     dtPolyRef middleRef;
     const float recastMiddlePos[3] = {middle.X, middle.Y, middle.Z};
     result = findNearestPoly(recastMiddlePos, &middleRef, nullptr);
@@ -871,8 +841,8 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
     int resultCount;
     constexpr int maxResult = 20;
 
-    navQuery->findPolysAroundCircle(startRef, middlePosRecast, radius, filter, resultRef, resultParent, resultCost,
-                                    &resultCount, maxResult);
+    navQuery->findPolysAroundCircle(
+        startRef, middlePosRecast, radius, filter, resultRef, resultParent, resultCost, &resultCount, maxResult);
     std::queue<dtPolyRef> polyQueue;
     std::map<dtPolyRef, bool> pathFoundForPoly;
     polyQueue.push(middleRef);
@@ -886,7 +856,7 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
         const dtMeshTile* tile = cmesh->getTile(tileIndex);
         const dtPoly& poly = tile->polys[polyIndex];
         for (unsigned int linkIndex = poly.firstLink; linkIndex != DT_NULL_LINK;
-             linkIndex = tile->links[linkIndex].next) {
+            linkIndex = tile->links[linkIndex].next) {
             const dtLink& link = tile->links[linkIndex];
             const dtMeshTile* targetTile = nullptr;
             const dtPoly* targetPoly = nullptr;
@@ -908,8 +878,8 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
                         }
                     }
                     if (targetPolyIndex != -1) {
-                        const dtPolyRef adjacentPolyRef = mesh->encodePolyId(
-                            targetTile->salt, targetTileIndex, targetPolyIndex);
+                        const dtPolyRef adjacentPolyRef =
+                            mesh->encodePolyId(targetTile->salt, targetTileIndex, targetPolyIndex);
                         if (!pathFoundForPoly.contains(adjacentPolyRef) && poly.flags != SAMPLE_POLYFLAGS_DISABLED) {
                             for (int i = 0; i < resultCount; i++) {
                                 if (resultRef[i] == adjacentPolyRef) {
@@ -926,8 +896,8 @@ bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd
             }
         }
     }
-    if (pathFoundForPoly.contains(startRef) && pathFoundForPoly.contains(endRef)
-        && pathFoundForPoly[startRef] && pathFoundForPoly[endRef]) {
+    if (pathFoundForPoly.contains(startRef) && pathFoundForPoly.contains(endRef) && pathFoundForPoly[startRef] &&
+        pathFoundForPoly[endRef]) {
         return false;
     }
     return true;
@@ -958,7 +928,7 @@ void RecastAdapter::setMarker(const SceneMeshHitTestResult& result) {
     markerPosition[0] = result.rayStart[0] + (result.rayEnd[0] - result.rayStart[0]) * result.hitTime;
     markerPosition[1] = result.rayStart[1] + (result.rayEnd[1] - result.rayStart[1]) * result.hitTime;
     markerPosition[2] = result.rayStart[2] + (result.rayEnd[2] - result.rayStart[2]) * result.hitTime;
-    for (auto [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
+    for (const auto& [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
         if (result.hitIndex >= vertexRange.first && result.hitIndex < vertexRange.second) {
             selectedObject = object;
             break;
@@ -968,17 +938,18 @@ void RecastAdapter::setMarker(const SceneMeshHitTestResult& result) {
     std::string roomString;
     if (Scene::getInstance().sceneLoaded) {
         if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
-            selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition); mesh != nullptr) {
+                selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition);
+            mesh != nullptr) {
             meshNameString = mesh->entity.name;
             roomString = " Room Folder: " + mesh->roomFolderName + " Room: " + mesh->roomName;
-            }
+        }
     }
-    Logger::log(
-        NK_INFO,
-        ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject + "' Obj vertex: " +
-            std::to_string(result.hitIndex) + roomString +
+    Logger::log(NK_INFO,
+        ("Selected Object: '" + meshNameString + "' Mesh: '" + selectedObject +
+            "' Obj vertex: " + std::to_string(result.hitIndex) + roomString +
             ". Setting marker position to: " + std::to_string(markerPosition[0]) + ", " +
-            std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2])).c_str());
+            std::to_string(markerPosition[1]) + ", " + std::to_string(markerPosition[2]))
+            .c_str());
 }
 
 SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
@@ -1023,33 +994,33 @@ void RecastAdapter::loadSettings() const {
     sample->m_agentMaxClimb = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentMaxClimb", "0.41f")));
     sample->m_agentMaxSlope = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentMaxSlope", "45.0f")));
     sample->m_regionMinSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "regionMinSize", "25f")));
-    sample->m_regionMergeSize = static_cast<float>(
-        atof(persistedSettings.getValue("Recast", "regionMergeSize", "30f")));
+    sample->m_regionMergeSize =
+        static_cast<float>(atof(persistedSettings.getValue("Recast", "regionMergeSize", "30f")));
     if (const char* partitionTypeStr(
-        persistedSettings.getValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED")); strcmp(partitionTypeStr,
-        "SAMPLE_PARTITION_MONOTONE") == 0) {
+            persistedSettings.getValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED"));
+        strcmp(partitionTypeStr, "SAMPLE_PARTITION_MONOTONE") == 0) {
         sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
     } else if (strcmp(partitionTypeStr, "SAMPLE_PARTITION_LAYERS") == 0) {
         sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
     } else {
         sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
     }
-    sample->m_filterLowHangingObstacles = static_cast<bool>(atoi(
-        persistedSettings.getValue("Recast", "filterLowHangingObstacles", "1f")));
-    sample->m_filterLedgeSpans = static_cast<bool>(
-        atoi(persistedSettings.getValue("Recast", "filterLedgeSpans", "1f")));
-    sample->m_filterWalkableLowHeightSpans = static_cast<bool>(atoi(
-        persistedSettings.getValue("Recast", "filterWalkableLowHeightSpans", "1f")));
-    sample->m_edgeMaxLen = static_cast<float>(atof(
-        persistedSettings.getValue("Recast", "polygonizationEdgeMaxLen", "5.0f")));
-    sample->m_edgeMaxError = static_cast<float>(atof(
-        persistedSettings.getValue("Recast", "polygonizationEdgeMaxError", "1.4f")));
-    sample->m_vertsPerPoly = static_cast<float>(atof(
-        persistedSettings.getValue("Recast", "polygonizationVertsPerPoly", "3")));
-    sample->m_detailSampleDist = static_cast<float>(atof(
-        persistedSettings.getValue("Recast", "detailSampleDist", "1.5f")));
-    sample->m_detailSampleMaxError = static_cast<float>(atof(
-        persistedSettings.getValue("Recast", "detailSampleMaxError", "1.4f")));
+    sample->m_filterLowHangingObstacles =
+        static_cast<bool>(atoi(persistedSettings.getValue("Recast", "filterLowHangingObstacles", "1f")));
+    sample->m_filterLedgeSpans =
+        static_cast<bool>(atoi(persistedSettings.getValue("Recast", "filterLedgeSpans", "1f")));
+    sample->m_filterWalkableLowHeightSpans =
+        static_cast<bool>(atoi(persistedSettings.getValue("Recast", "filterWalkableLowHeightSpans", "1f")));
+    sample->m_edgeMaxLen =
+        static_cast<float>(atof(persistedSettings.getValue("Recast", "polygonizationEdgeMaxLen", "5.0f")));
+    sample->m_edgeMaxError =
+        static_cast<float>(atof(persistedSettings.getValue("Recast", "polygonizationEdgeMaxError", "1.4f")));
+    sample->m_vertsPerPoly =
+        static_cast<float>(atof(persistedSettings.getValue("Recast", "polygonizationVertsPerPoly", "3")));
+    sample->m_detailSampleDist =
+        static_cast<float>(atof(persistedSettings.getValue("Recast", "detailSampleDist", "1.5f")));
+    sample->m_detailSampleMaxError =
+        static_cast<float>(atof(persistedSettings.getValue("Recast", "detailSampleMaxError", "1.4f")));
     sample->m_tileSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "tilingTileSize", "64f")));
 }
 
@@ -1063,11 +1034,11 @@ void RecastAdapter::saveSettings() const {
     persistedSettings.setValue("Recast", "agentMaxSlope", std::to_string(sample->m_agentMaxSlope));
     persistedSettings.setValue("Recast", "regionMinSize", std::to_string(sample->m_regionMinSize));
     persistedSettings.setValue("Recast", "regionMergeSize", std::to_string(sample->m_regionMergeSize));
-    persistedSettings.setValue("Recast", "filterLowHangingObstacles",
-                               std::to_string(sample->m_filterLowHangingObstacles));
+    persistedSettings.setValue(
+        "Recast", "filterLowHangingObstacles", std::to_string(sample->m_filterLowHangingObstacles));
     persistedSettings.setValue("Recast", "filterLedgeSpans", std::to_string(sample->m_filterLedgeSpans));
-    persistedSettings.setValue("Recast", "filterWalkableLowHeightSpans",
-                               std::to_string(sample->m_filterWalkableLowHeightSpans));
+    persistedSettings.setValue(
+        "Recast", "filterWalkableLowHeightSpans", std::to_string(sample->m_filterWalkableLowHeightSpans));
     persistedSettings.setValue("Recast", "polygonizationEdgeMaxLen", std::to_string(sample->m_edgeMaxLen));
     persistedSettings.setValue("Recast", "polygonizationEdgeMaxError", std::to_string(sample->m_edgeMaxError));
     persistedSettings.setValue("Recast", "polygonizationVertsPerPoly", std::to_string(sample->m_vertsPerPoly));
@@ -1117,10 +1088,7 @@ std::vector<Vec3> RecastAdapter::getEdges(const dtNavMeshQuery* navQuery, const 
     edges.reserve(poly.vertCount);
     for (int vi = 0; vi < poly.vertCount; vi++) {
         Vec3 recastPos = {
-            tile->verts[poly.verts[vi] * 3],
-            tile->verts[poly.verts[vi] * 3 + 1],
-            tile->verts[poly.verts[vi] * 3 + 2]
-        };
+            tile->verts[poly.verts[vi] * 3], tile->verts[poly.verts[vi] * 3 + 1], tile->verts[poly.verts[vi] * 3 + 2]};
         edges.push_back(recastPos);
     }
     return edges;
@@ -1183,10 +1151,10 @@ Vec3 RecastAdapter::calculateCentroid(dtNavMeshQuery* navQuery, const dtPolyRef 
     }
 
     if (constexpr float areaEpsilon = 1e-9f; std::abs(sum) < areaEpsilon * 2.0f) {
-        Logger::log(
-            NK_WARN,
+        Logger::log(NK_WARN,
             ("calculateCentroid: Polygon " + std::to_string(polyRef) + " has near-zero area (" +
-                std::to_string(sum / 2.0f) + "). Returning average of vertices.").c_str());
+                std::to_string(sum / 2.0f) + "). Returning average of vertices.")
+                .c_str());
         Vec3 averagePos(0.0f, 0.0f, 0.0f);
         if (edges.empty()) {
             return averagePos;
@@ -1215,17 +1183,15 @@ const dtNavMesh* RecastAdapter::getNavMesh() const {
 }
 
 /**
- * Find up to the maxPolys closest polys within the specified radius of the position which are reachable from the starting area.
+ * Find up to the maxPolys closest polys within the specified radius of the position which are reachable from the
+ * starting area.
  * @param navpowerPos
  * @param start
  * @param maxPolys
  * @return
  */
 std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
-    dtNavMeshQuery* navQuery,
-    const Vec3 navpowerPos,
-    const dtPolyRef start,
-    const int maxPolys) const {
+    dtNavMeshQuery* navQuery, const Vec3 navpowerPos, const dtPolyRef start, const int maxPolys) const {
     std::vector<dtPolyRef> polys;
     const dtNavMesh* navMesh = sample->getNavMesh();
     if (!navMesh || !navQuery || start == 0) {
@@ -1240,9 +1206,9 @@ std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
     int actualPolyCount = 0;
     constexpr float halfExtents[3] = {radius, radius, radius};
 
-    if (const dtStatus status = navQuery->queryPolygons(centerRecastPos, halfExtents, filter, tempPolys,
-                                                        &actualPolyCount,
-                                                        maxPolys); dtStatusFailed(status)) {
+    if (const dtStatus status =
+            navQuery->queryPolygons(centerRecastPos, halfExtents, filter, tempPolys, &actualPolyCount, maxPolys);
+        dtStatusFailed(status)) {
         Logger::log(NK_ERROR, "GetClosestReachableAreas failed to query polygons.");
         return polys;
     }
@@ -1269,9 +1235,8 @@ std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
         int pathCount = 0;
         dtPolyRef path[128];
 
-        if (const dtStatus pathStatus = navQuery->findPath(
-                start, endRef, startRecastPos, endRecastPos, filter, path,
-                &pathCount, 128);
+        if (const dtStatus pathStatus =
+                navQuery->findPath(start, endRef, startRecastPos, endRecastPos, filter, path, &pathCount, 128);
             dtStatusSucceed(pathStatus) && pathCount > 0 && path[pathCount - 1] == endRef) {
             polys.push_back(endRef);
         }
@@ -1286,8 +1251,8 @@ std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
  * @param maxPolys
  * @return
  */
-std::vector<dtPolyRef> RecastAdapter::getClosestPolys(dtNavMeshQuery* navQuery, const Vec3 navPowerPos,
-                                                      const int maxPolys) const {
+std::vector<dtPolyRef> RecastAdapter::getClosestPolys(
+    dtNavMeshQuery* navQuery, const Vec3 navPowerPos, const int maxPolys) const {
     std::vector<dtPolyRef> polys;
     const dtNavMesh* navMesh = sample->getNavMesh();
     if (!navMesh || !navQuery) {
@@ -1302,9 +1267,9 @@ std::vector<dtPolyRef> RecastAdapter::getClosestPolys(dtNavMeshQuery* navQuery, 
     int actualPolyCount = 0;
     constexpr float halfExtents[3] = {radius, radius, radius};
 
-    if (const dtStatus status = navQuery->queryPolygons(centerRecastPos, halfExtents, filter, tempPolys,
-                                                        &actualPolyCount,
-                                                        maxPolys); dtStatusFailed(status)) {
+    if (const dtStatus status =
+            navQuery->queryPolygons(centerRecastPos, halfExtents, filter, tempPolys, &actualPolyCount, maxPolys);
+        dtStatusFailed(status)) {
         Logger::log(NK_ERROR, "getClosestPolys failed to query polygons.");
         return polys;
     }

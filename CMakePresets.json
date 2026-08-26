@@ -42,6 +42,18 @@
         "BUILD_INSTALLER": "ON"
       },
       "inherits": [ "base" ]
+    },
+    {
+      "name": "generate-compile-commands",
+      "displayName": "Shadow Ninja Preset for Clang Tools",
+      "hidden": false,
+      "inherits": "base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/clang-tools-cache",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
+      }
     }
   ],
   "buildPresets": [

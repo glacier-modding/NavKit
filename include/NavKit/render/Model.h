@@ -18,7 +18,8 @@ public:
     std::vector<Texture> texturesLoaded;
     std::string directory;
 
-    static Mesh processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScene* scene, const std::string& directory, std::vector<Texture>& texturesLoaded);
+    static Mesh processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScene* scene,
+        const std::string& directory, std::vector<Texture>& texturesLoaded);
 
     void loadModelData(std::string const& path);
 
@@ -27,5 +28,6 @@ public:
 private:
     std::vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName);
 
-    static std::vector<Texture> loadMaterialTexturesStatic(aiMaterial* mat, aiTextureType type, std::string typeName, const std::string& directory, std::vector<Texture>& texturesLoaded);
+    static std::vector<Texture> loadMaterialTexturesStatic(aiMaterial* mat, aiTextureType type, std::string typeName,
+        const std::string& directory, std::vector<Texture>& texturesLoaded);
 };

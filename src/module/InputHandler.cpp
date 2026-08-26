@@ -137,18 +137,17 @@ int InputHandler::handleInput() {
         case SDL_SYSWMEVENT:
             if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
                 (NavKitSettings::hSettingsDialog &&
-                    IsDialogMessage(NavKitSettings::hSettingsDialog,
-                                    reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Airg::hAirgDialog && IsDialogMessage(Airg::hAirgDialog,
-                                                      reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Scene::hSceneDialog && IsDialogMessage(Scene::hSceneDialog,
-                                                        reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (SceneMesh::hSceneMeshDialog && IsDialogMessage(SceneMesh::hSceneMeshDialog,
-                                                    reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Navp::hNavpDialog && IsDialogMessage(Navp::hNavpDialog,
-                                                      reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (RecastAdapter::hRecastDialog && IsDialogMessage(RecastAdapter::hRecastDialog,
-                                                                 reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
+                    IsDialogMessage(NavKitSettings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                (Airg::hAirgDialog &&
+                    IsDialogMessage(Airg::hAirgDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                (Scene::hSceneDialog &&
+                    IsDialogMessage(Scene::hSceneDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                (SceneMesh::hSceneMeshDialog &&
+                    IsDialogMessage(SceneMesh::hSceneMeshDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                (Navp::hNavpDialog &&
+                    IsDialogMessage(Navp::hNavpDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
+                (RecastAdapter::hRecastDialog &&
+                    IsDialogMessage(RecastAdapter::hRecastDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
                 continue;
             }
             if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
@@ -233,7 +232,8 @@ void InputHandler::hitTest() const {
                 sceneMeshHitResult = recastAdapter.doHitTest(mousePos[0], mousePos[1]);
             }
 
-            if (const HitTestResult hitTestResult = renderer.hitTestRender(mousePos[0], mousePos[1]); hitTestResult.type == AIRG_WAYPOINT) {
+            if (const HitTestResult hitTestResult = renderer.hitTestRender(mousePos[0], mousePos[1]);
+                hitTestResult.type == AIRG_WAYPOINT) {
                 if (hitTestResult.selectedIndex == airg.selectedWaypointIndex) {
                     airg.setSelectedAirgWaypointIndex(-1);
                 } else {

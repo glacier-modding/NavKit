@@ -18,7 +18,7 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
-*/
+ */
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include <cpptrace/from_current.hpp>
@@ -80,41 +80,43 @@ static int SDLCALL eventFilter(void* userdata, SDL_Event* event) {
 }
 
 int SDL_main(const int argc, char** argv) {
-    CPPTRACE_TRY
-        {
-            std::thread logThread(Logger::logRunner);
-            logThread.detach();
+    CPPTRACE_TRY {
+        std::thread logThread(Logger::logRunner);
+        logThread.detach();
 
-            PersistedSettings::getInstance().load();
-            Renderer& renderer = Renderer::getInstance();
-            if (!renderer.initWindowAndRenderer()) {
-                return -1;
-            }
-            renderer.initShaders();
-            SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-            SDL_SetEventFilter(eventFilter, nullptr);
-
-            UpdateChecker& updateChecker = UpdateChecker::getInstance();
-            updateChecker.startUpdateCheck();
-
-            Menu::updateMenuState();
-            bool isRunning = true;
-            NavKitSettings::getInstance().showNavKitSettingsDialog();
-            Logger::log(NK_INFO, "NavKit initialized.");
-            while (isRunning) {
-                isRunning = mainLoopIteration();
-            }
-
-            NFD_Quit();
-            renderer.closeWindow();
-            return 0;
+        PersistedSettings::getInstance().load();
+        Renderer& renderer = Renderer::getInstance();
+        if (!renderer.initWindowAndRenderer()) {
+            return -1;
         }
+        renderer.initShaders();
+        SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
+        SDL_SetEventFilter(eventFilter, nullptr);
+
+        UpdateChecker& updateChecker = UpdateChecker::getInstance();
+        updateChecker.startUpdateCheck();
+
+        Menu::updateMenuState();
+        bool isRunning = true;
+        if (NavKitSettings& navKitSettings = NavKitSettings::getInstance(); navKitSettings.shouldOpenSettingsDialog) {
+            navKitSettings.showNavKitSettingsDialog();
+        }
+        Logger::log(NK_INFO, "NavKit initialized.");
+        while (isRunning) {
+            isRunning = mainLoopIteration();
+        }
+
+        NFD_Quit();
+        renderer.closeWindow();
+        return 0;
+    }
     CPPTRACE_CATCH(const std::exception& e) {
         ErrorHandler::openErrorDialog("An unexpected error occurred: " + std::string(e.what()) + "\n\nStack Trace:\n" +
             cpptrace::from_current_exception().to_string());
-    } catch (...) {
-        ErrorHandler::openErrorDialog("An unexpected error occurred:\n\nStack Trace: \n" +
-            cpptrace::from_current_exception().to_string());
+    }
+    catch (...) {
+        ErrorHandler::openErrorDialog(
+            "An unexpected error occurred:\n\nStack Trace: \n" + cpptrace::from_current_exception().to_string());
     }
     return 0;
 }

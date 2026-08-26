@@ -39,9 +39,8 @@ namespace Math {
 
     float length(const float4& vector);
 
-    bool rayAabbIntersect(float4* vIntersectionPoint, const float4* vMin, const float4* vMax,
-                          const float4* vStart,
-                          const float4* vDirection);
+    bool rayAabbIntersect(float4* vIntersectionPoint, const float4* vMin, const float4* vMax, const float4* vStart,
+        const float4* vDirection);
 
     class Quaternion {
     public:
@@ -53,4 +52,4 @@ namespace Math {
     };
 
     Vec3 rotatePoint(const Vec3& point, const Quaternion& quaternion);
-}
+} // namespace Math

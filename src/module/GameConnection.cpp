@@ -53,11 +53,7 @@ int GameConnection::closeConnection() const {
     const auto start_time = clock::now();
     const auto timeout = std::chrono::seconds(2);
 
-    while (ws&& ws
-    ->
-    getReadyState() != WebSocket::CLOSED
-    )
-    {
+    while (ws && ws->getReadyState() != WebSocket::CLOSED) {
         if (clock::now() - start_time > timeout) {
             Logger::log(NK_WARN, "GameConnection: Timeout waiting for socket to close.");
             break;
@@ -69,19 +65,13 @@ int GameConnection::closeConnection() const {
         });
     }
 
-    if (ws&& ws
-    ->
-    getReadyState() == WebSocket::CLOSED
-    )
-    {
+    if (ws && ws->getReadyState() == WebSocket::CLOSED) {
         Logger::log(NK_INFO, "GameConnection: Editor connection closed.");
-    }
-    else
-    if (!ws) {
+    } else if (!ws) {
         Logger::log(NK_WARN, "GameConnection: Editor connection became invalid during close polling.");
     } else {
         Logger::log(NK_WARN, "GameConnection: Socket state is still '%d' after close attempt.",
-                    static_cast<int>(ws->getReadyState()));
+            static_cast<int>(ws->getReadyState()));
     }
 
     return 0;
@@ -127,7 +117,7 @@ int GameConnection::listNavKitSceneEntities() const {
         std::ofstream f(outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME, std::ios::app);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
-                        (outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME).c_str());
+                (outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME).c_str());
             return;
         }
 
@@ -181,8 +171,7 @@ int GameConnection::listNavKitSceneEntities() const {
                 return;
             }
             if (message.find("Unknown editor message type: listAlocPfBoxAndSeedPointEntities") != -1) {
-                Logger::log(NK_ERROR,
-                            "Failed to get entities from game. Is ZHMModSDK up to date?");
+                Logger::log(NK_ERROR, "Failed to get entities from game. Is ZHMModSDK up to date?");
                 done = true;
                 return;
             }

@@ -29,25 +29,13 @@
 #include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
-Airg::Airg()
-    : airgName("Load Airg")
-      , lastLoadAirgFile(airgName)
-      , saveAirgName("Save Airg")
-      , lastSaveAirgFile(saveAirgName)
-      , airgLoaded(false)
-      , airgLoading(false)
-      , airgBuilding(false)
-      , connectWaypointModeEnabled(false)
-      , showAirg(true)
-      , showAirgIndices(false)
-      , showRecastDebugInfo(false)
-      , cellColorSource(OFF)
-      , airgResourceConverter(HM3_GetConverterForResource("AIRG"))
-      , airgResourceGenerator(HM3_GetGeneratorForResource("AIRG"))
-      , reasoningGrid(new ReasoningGrid())
-      , selectedWaypointIndex(-1)
-      , doAirgHitTest(false)
-      , buildingVisionAndDeadEndData(false) {}
+Airg::Airg() :
+    airgName("Load Airg"), lastLoadAirgFile(airgName), saveAirgName("Save Airg"), lastSaveAirgFile(saveAirgName),
+    airgLoaded(false), airgLoading(false), airgBuilding(false), connectWaypointModeEnabled(false), showAirg(true),
+    showAirgIndices(false), showRecastDebugInfo(false), cellColorSource(OFF),
+    airgResourceConverter(HM3_GetConverterForResource("AIRG")),
+    airgResourceGenerator(HM3_GetGeneratorForResource("AIRG")), reasoningGrid(new ReasoningGrid()),
+    selectedWaypointIndex(-1), doAirgHitTest(false), buildingVisionAndDeadEndData(false) {}
 
 Airg::~Airg() = default;
 
@@ -127,7 +115,7 @@ INT_PTR CALLBACK Airg::airgDialogProc(const HWND hDlg, const UINT message, const
     case WM_DESTROY:
         hAirgDialog = nullptr;
         return TRUE;
-    default: ;
+    default:;
     }
     return FALSE;
 }
@@ -142,12 +130,7 @@ void Airg::showAirgDialog() {
     const HWND hParentWnd = Renderer::hwnd;
 
     hAirgDialog = CreateDialogParam(
-        hInstance,
-        MAKEINTRESOURCE(IDD_AIRG_MENU),
-        hParentWnd,
-        airgDialogProc,
-        reinterpret_cast<LPARAM>(this)
-    );
+        hInstance, MAKEINTRESOURCE(IDD_AIRG_MENU), hParentWnd, airgDialogProc, reinterpret_cast<LPARAM>(this));
 
     if (hAirgDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
@@ -284,8 +267,7 @@ bool Airg::canBuildAirg() const {
 
 void Airg::handleBuildAirgClicked() {
     if (const Navp& navp = Navp::getInstance(); Navp::getTotalAreaCount(navp.navMesh) > 65535) {
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             "Loaded NAVP has too many areas. Ensure the scene has PF Seed Points and has a fully contained boundary.");
     }
     airgLoaded = false;
@@ -375,8 +357,8 @@ void Airg::connectWaypoints(const int startWaypointIndex, const int endWaypointI
     startWaypoint.nNeighbors[bestDirection] = endWaypointIndex;
     endWaypoint.nNeighbors[(bestDirection + 4) % 8] = startWaypointIndex;
     Logger::log(NK_INFO,
-                ("Connected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(
-                    endWaypointIndex)).c_str());
+        ("Connected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(endWaypointIndex))
+            .c_str());
     airgDirty = true;
     Logger::log(NK_INFO, "Exiting Connect Waypoint mode.");
 }
@@ -408,8 +390,8 @@ void Airg::disconnectWaypoints(const int startWaypointIndex, const int endWaypoi
         return;
     }
     Logger::log(NK_INFO,
-                ("Disconnected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(
-                    endWaypointIndex)).c_str());
+        ("Disconnected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(endWaypointIndex))
+            .c_str());
     airgDirty = true;
     Logger::log(NK_INFO, "Exiting Disconnect Waypoint mode.");
 }
@@ -425,8 +407,7 @@ char* Airg::openSaveAirgFileDialog(char* lastAirgFolder) {
 }
 
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
-                               const Waypoint& waypoint, const bool selected, const glm::vec4& color,
-                               const bool forceFan) {
+    const Waypoint& waypoint, const bool selected, const glm::vec4& color, const bool forceFan) {
     constexpr float r = 0.1f;
     constexpr float zRenderOffset = 0.53f;
     const float z = waypoint.vPos.z + zRenderOffset;
@@ -443,8 +424,8 @@ void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<Ai
             const glm::vec3 p2(waypoint.vPos.x + cosf(a2) * r, z, -(waypoint.vPos.y + sinf(a2) * r));
 
             triVerts.push_back({center, normal, color});
-            triVerts.push_back({p2,     normal, color});
-            triVerts.push_back({p1,     normal, color});
+            triVerts.push_back({p2, normal, color});
+            triVerts.push_back({p1, normal, color});
         }
     } else {
         // Line Loop
@@ -493,9 +474,7 @@ void Airg::renderAirg() {
     static float lastYOffset = -1.0f;
 
     if (Grid& grid = Grid::getInstance(); selectedWaypointIndex != lastSelectedWaypoint ||
-        cellColorSource != lastCellColorSource ||
-        grid.spacing != lastSpacing ||
-        grid.xOffset != lastXOffset ||
+        cellColorSource != lastCellColorSource || grid.spacing != lastSpacing || grid.xOffset != lastXOffset ||
         grid.yOffset != lastYOffset) {
         airgDirty = true;
         lastSelectedWaypoint = selectedWaypointIndex;
@@ -517,22 +496,22 @@ void Airg::renderAirg() {
             if (cellColorSource != OFF) {
                 float minX = reasoningGrid->m_Properties.vMin.x;
                 float minY = reasoningGrid->m_Properties.vMin.y;
-                float x = waypoint.xi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.
-                    fGridSpacing / 2 + minX;
-                float y = waypoint.yi * reasoningGrid->m_Properties.fGridSpacing + reasoningGrid->m_Properties.
-                    fGridSpacing / 2 + minY;
+                float x = waypoint.xi * reasoningGrid->m_Properties.fGridSpacing +
+                    reasoningGrid->m_Properties.fGridSpacing / 2 + minX;
+                float y = waypoint.yi * reasoningGrid->m_Properties.fGridSpacing +
+                    reasoningGrid->m_Properties.fGridSpacing / 2 + minY;
                 float z = waypoint.vPos.z + 0.01f;
 
                 // Boundary
                 glm::vec4 boundaryColor(0.8, 0.8, 0.8, 0.6);
                 glm::vec3 p1(x - reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
-                             -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
+                    -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
                 glm::vec3 p2(x - reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
-                             -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
+                    -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
                 glm::vec3 p3(x + reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
-                             -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
+                    -(y + reasoningGrid->m_Properties.fGridSpacing / 2));
                 glm::vec3 p4(x + reasoningGrid->m_Properties.fGridSpacing / 2, z + zRenderOffset,
-                             -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
+                    -(y - reasoningGrid->m_Properties.fGridSpacing / 2));
 
                 lineVerts.push_back({p1, glm::vec3(0, 1, 0), boundaryColor});
                 lineVerts.push_back({p2, glm::vec3(0, 1, 0), boundaryColor});
@@ -576,14 +555,13 @@ void Airg::renderAirg() {
                         for (int bxi = 0; bxi < numBoxesPerSide; bxi++) {
                             float bx = x - reasoningGrid->m_Properties.fGridSpacing / 2 + bxi * bw;
                             float byRaw = (cellColorSource == AIRG_BITMAP)
-                                              ? -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw)
-                                              : -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
+                                ? -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw)
+                                : -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
 
                             uint8_t val = data[numBoxesPerSide * byi + bxi];
                             float c = val / 255.0f;
-                            glm::vec4 cellColor = (cellColorSource == AIRG_BITMAP)
-                                                      ? glm::vec4(c, c, c, 0.3)
-                                                      : glm::vec4(0.0, c, 0.0, 0.3);
+                            glm::vec4 cellColor = (cellColorSource == AIRG_BITMAP) ? glm::vec4(c, c, c, 0.3)
+                                                                                   : glm::vec4(0.0, c, 0.0, 0.3);
 
                             float zChange = selected ? 0.001 : 0.01;
                             float zc = waypoint.vPos.z + zChange;
@@ -610,11 +588,11 @@ void Airg::renderAirg() {
 
             // Neighbors
             for (int neighborIndex = 0; neighborIndex < waypoint.nNeighbors.size(); neighborIndex++) {
-                if (waypoint.nNeighbors[neighborIndex] != 65535 && waypoint.nNeighbors[neighborIndex] < reasoningGrid->
-                    m_WaypointList.size()) {
+                if (waypoint.nNeighbors[neighborIndex] != 65535 &&
+                    waypoint.nNeighbors[neighborIndex] < reasoningGrid->m_WaypointList.size()) {
                     const Waypoint& neighbor = reasoningGrid->m_WaypointList[waypoint.nNeighbors[neighborIndex]];
-                    glm::vec3 pStart(waypoint.vPos.x, waypoint.vPos.z  + zRenderOffset + 0.01f, -waypoint.vPos.y);
-                    glm::vec3 pEnd(neighbor.vPos.x, neighbor.vPos.z  + zRenderOffset + 0.01f, -neighbor.vPos.y);
+                    glm::vec3 pStart(waypoint.vPos.x, waypoint.vPos.z + zRenderOffset + 0.01f, -waypoint.vPos.y);
+                    glm::vec3 pEnd(neighbor.vPos.x, neighbor.vPos.z + zRenderOffset + 0.01f, -neighbor.vPos.y);
                     lineVerts.push_back({pStart, glm::vec3(0, 1, 0), wpColor});
                     lineVerts.push_back({pEnd, glm::vec3(0, 1, 0), wpColor});
                 }
@@ -682,8 +660,8 @@ void Airg::renderAirg() {
         int numWaypoints = reasoningGrid->m_WaypointList.size();
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
-            renderer.drawText(std::to_string(i), {waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y},
-                              {1, .7f, .7f}, 20);
+            renderer.drawText(
+                std::to_string(i), {waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y}, {1, .7f, .7f}, 20);
         }
     }
 }
@@ -757,15 +735,15 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
         }
         Logger::log(NK_INFO, msg.c_str());
         Logger::log(NK_INFO,
-                    ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + " Y: " +
-                        std::to_string(waypoint.vPos.y) + " Z: " + std::to_string(waypoint.vPos.z) + "   XI: " +
-                        std::to_string(waypoint.xi) + " YI: " + std::to_string(waypoint.yi) + " ZI: " + std::to_string(
-                            waypoint.zi)).c_str());
+            ("Waypoint position: X: " + std::to_string(waypoint.vPos.x) + " Y: " + std::to_string(waypoint.vPos.y) +
+                " Z: " + std::to_string(waypoint.vPos.z) + "   XI: " + std::to_string(waypoint.xi) +
+                " YI: " + std::to_string(waypoint.yi) + " ZI: " + std::to_string(waypoint.zi))
+                .c_str());
         msg = "  Vision Data Offset: " + std::to_string(waypoint.nVisionDataOffset);
         msg += "  Layer Index: " + std::to_string(waypoint.nLayerIndex);
         const int nextWaypointOffset = (index + 1) < reasoningGrid->m_WaypointList.size()
-                                           ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset
-                                           : reasoningGrid->m_pVisibilityData.size();
+            ? reasoningGrid->m_WaypointList[index + 1].nVisionDataOffset
+            : reasoningGrid->m_pVisibilityData.size();
         const int visibilityDataSize = nextWaypointOffset - waypoint.nVisionDataOffset;
         msg += "  Visibility Data size: " + std::to_string(visibilityDataSize);
 
@@ -789,12 +767,12 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
                     waypointVisibilityDataString += " ";
                 }
                 if ((count - 1) % 96 == 0) {
-                    //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+                    // Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
                     waypointVisibilityDataString = "";
                 }
             }
         }
-        //Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
+        // Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
         const unsigned int colorRgb = (waypoint.nLayerIndex << 6) | 0xC0000000;
         const std::string hexColor = std::format("{:x}", colorRgb);
         Logger::log(NK_INFO, ("Layer Index RGB " + hexColor).c_str());
@@ -823,8 +801,8 @@ void Airg::saveAirg(Airg* airg, const std::string& fileName, const bool isJson) 
     fileOutputStream.close();
 
     if (!isJson) {
-        airg->airgResourceGenerator->FromJsonFileToResourceFile(tempJsonFile.data(), std::string{fileName}.c_str(),
-                                                                false);
+        airg->airgResourceGenerator->FromJsonFileToResourceFile(
+            tempJsonFile.data(), std::string{fileName}.c_str(), false);
         std::filesystem::remove(tempJsonFile);
     }
     const auto end = std::chrono::high_resolution_clock::now();
@@ -871,10 +849,10 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
         if (lastVisionDataSize != visionDataSize) {
             lastVisionDataSize = visionDataSize;
             Logger::log(NK_INFO,
-                        ("Vision Data Offset[" + std::to_string(i - 1) + "]: " +
-                            std::to_string(w1.nVisionDataOffset) + " Vision Data Offset[" + std::to_string(i) + "]: "
-                            + std::to_string(w2.nVisionDataOffset) + " Difference : " +
-                            std::to_string(lastVisionDataSize) + " Count: " + std::to_string(count)).c_str());
+                ("Vision Data Offset[" + std::to_string(i - 1) + "]: " + std::to_string(w1.nVisionDataOffset) +
+                    " Vision Data Offset[" + std::to_string(i) + "]: " + std::to_string(w2.nVisionDataOffset) +
+                    " Difference : " + std::to_string(lastVisionDataSize) + " Count: " + std::to_string(count))
+                    .c_str());
             if (visionDataOffsetCounts.contains(visionDataSize)) {
                 const int cur = visionDataOffsetCounts[visionDataSize];
                 visionDataOffsetCounts[visionDataSize] = cur + 1;
@@ -886,25 +864,27 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
             count++;
         }
     }
-    const int finalVisionDataSize = airg->reasoningGrid->m_pVisibilityData.size() - airg->reasoningGrid->m_WaypointList[
-        airg->reasoningGrid->m_WaypointList.size() - 1].nVisionDataOffset;
+    const int finalVisionDataSize = airg->reasoningGrid->m_pVisibilityData.size() -
+        airg->reasoningGrid->m_WaypointList[airg->reasoningGrid->m_WaypointList.size() - 1].nVisionDataOffset;
     Logger::log(NK_DEBUG,
-                ("Vision Data Offset[" + std::to_string(airg->reasoningGrid->m_WaypointList.size() - 1) + "]: " +
-                    std::to_string(
-                        airg->reasoningGrid->m_WaypointList[airg->reasoningGrid->m_WaypointList.size() - 1].
-                        nVisionDataOffset) + " Max Visibility: " + std::to_string(
-                        airg->reasoningGrid->m_pVisibilityData.size()) + " Difference : " + std::to_string(
-                        finalVisionDataSize)).c_str());
+        ("Vision Data Offset[" + std::to_string(airg->reasoningGrid->m_WaypointList.size() - 1) + "]: " +
+            std::to_string(
+                airg->reasoningGrid->m_WaypointList[airg->reasoningGrid->m_WaypointList.size() - 1].nVisionDataOffset) +
+            " Max Visibility: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) +
+            " Difference : " + std::to_string(finalVisionDataSize))
+            .c_str());
     total += finalVisionDataSize;
     Logger::log(NK_DEBUG,
-                ("Total: " + std::to_string(total) + " Max Visibility: " + std::to_string(
-                    airg->reasoningGrid->m_pVisibilityData.size())).c_str());
+        ("Total: " + std::to_string(total) +
+            " Max Visibility: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()))
+            .c_str());
     Logger::log(NK_DEBUG, "Visibility data offset map:");
     for (const auto& pair : visionDataOffsetCounts) {
         VisionData visionData = VisionData::GetVisionDataType(pair.first);
         Logger::log(NK_DEBUG,
-                    ("Offset difference: " + std::to_string(pair.first) + " Color: " + visionData.getName() +
-                        " Count: " + std::to_string(pair.second)).c_str());
+            ("Offset difference: " + std::to_string(pair.first) + " Color: " + visionData.getName() +
+                " Count: " + std::to_string(pair.second))
+                .c_str());
     }
 
     const auto end = std::chrono::high_resolution_clock::now();
@@ -914,11 +894,11 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
     msg += " seconds";
     Logger::log(NK_INFO, msg.data());
     Logger::log(NK_INFO,
-                ("Waypoint count: " + std::to_string(airg->reasoningGrid->m_WaypointList.size()) +
-                    ", Visibility Data size: " + std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) +
-                    ", Visibility Data points per waypoint: " + std::to_string(
-                        static_cast<double>(airg->reasoningGrid->m_pVisibilityData.size()) / static_cast<double>(airg
-                            ->reasoningGrid->m_WaypointList.size()))).c_str());
+        ("Waypoint count: " + std::to_string(airg->reasoningGrid->m_WaypointList.size()) + ", Visibility Data size: " +
+            std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) + ", Visibility Data points per waypoint: " +
+            std::to_string(static_cast<double>(airg->reasoningGrid->m_pVisibilityData.size()) /
+                static_cast<double>(airg->reasoningGrid->m_WaypointList.size())))
+            .c_str());
     airg->airgLoading = false;
     airg->airgLoaded = true;
     airgDirty = true;
@@ -935,7 +915,7 @@ void Airg::updateAirgDialogControls(const HWND hwnd) {
         std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(
             airgHashIoiStringMap.begin(), airgHashIoiStringMap.end());
         auto comparator = [](const std::pair<std::string, std::string>& a,
-                             const std::pair<std::string, std::string>& b) {
+                              const std::pair<std::string, std::string>& b) {
             if (a.second != b.second) {
                 return a.second < b.second;
             }
@@ -966,8 +946,8 @@ void Airg::extractAirgFromRpkgs(const std::string& hash) {
     }
 }
 
-INT_PTR CALLBACK Airg::extractAirgDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
-                                             const LPARAM lParam) {
+INT_PTR CALLBACK Airg::extractAirgDialogProc(
+    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
     Airg* pAirg = nullptr;
     if (message == WM_INITDIALOG) {
         pAirg = reinterpret_cast<Airg*>(lParam);
@@ -988,8 +968,7 @@ INT_PTR CALLBACK Airg::extractAirgDialogProc(const HWND hDlg, const UINT message
     case WM_COMMAND:
 
         if (HIWORD(wParam) == CBN_SELCHANGE) {
-            const int ItemIndex = SendMessage(reinterpret_cast<HWND>(lParam), CB_GETCURSEL,
-                                              0, 0);
+            const int ItemIndex = SendMessage(reinterpret_cast<HWND>(lParam), CB_GETCURSEL, 0, 0);
             char ListItem[256];
             SendMessage(reinterpret_cast<HWND>(lParam), CB_GETLBTEXT, static_cast<WPARAM>(ItemIndex), (LPARAM)ListItem);
             selectedRpkgAirg = ListItem;
@@ -1022,7 +1001,7 @@ INT_PTR CALLBACK Airg::extractAirgDialogProc(const HWND hDlg, const UINT message
     case WM_DESTROY:
         hAirgDialog = nullptr;
         return TRUE;
-    default: ;
+    default:;
     }
     return FALSE;
 }
@@ -1035,7 +1014,7 @@ void Airg::showExtractAirgDialog() {
 
     HINSTANCE hInstance = nullptr;
     if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                           (LPCSTR)&Airg::extractAirgDialogProc, &hInstance)) {
+            (LPCSTR)&Airg::extractAirgDialogProc, &hInstance)) {
         Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
         return;
     }
@@ -1043,8 +1022,7 @@ void Airg::showExtractAirgDialog() {
     const HWND hParentWnd = Renderer::hwnd;
 
     hAirgDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_AIRG_DIALOG), hParentWnd,
-                                    extractAirgDialogProc,
-                                    reinterpret_cast<LPARAM>(this));
+        extractAirgDialogProc, reinterpret_cast<LPARAM>(this));
 
     if (hAirgDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
@@ -1064,8 +1042,7 @@ void Airg::showExtractAirgDialog() {
         ShowWindow(hAirgDialog, SW_SHOW);
     } else {
         const DWORD error = GetLastError();
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_AIRG_DIALOG in the DLL.",
             error);
     }

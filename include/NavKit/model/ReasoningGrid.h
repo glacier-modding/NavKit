@@ -41,9 +41,9 @@ public:
 
 class Waypoint {
 public:
-    Waypoint() : nNeighbors{65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535}, vPos({}), nVisionDataOffset(0),
-                 nLayerIndex(0), cellBitmap{false}, xi(-1), yi(-1),
-                 zi(-1) {}
+    Waypoint() :
+        nNeighbors{65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535}, vPos({}), nVisionDataOffset(0),
+        nLayerIndex(0), cellBitmap{false}, xi(-1), yi(-1), zi(-1) {}
 
     std::vector<uint16_t> nNeighbors;
     Vec4 vPos;
@@ -95,6 +95,6 @@ public:
 
     std::vector<uint8_t> getWaypointVisionData(int waypointIndex);
 
-    static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, float spacing, float zSpacing,
-                      float tolerance, float zTolerance);
+    static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, float spacing, float zSpacing, float tolerance,
+        float zTolerance);
 };

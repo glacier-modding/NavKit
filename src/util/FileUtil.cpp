@@ -51,4 +51,4 @@ namespace FileUtil {
         }
         return nullptr;
     }
-}
+} // namespace FileUtil

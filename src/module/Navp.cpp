@@ -31,29 +31,13 @@
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/InputGeom.h"
 
-Navp::Navp()
-    : navMesh(new NavPower::NavMesh()),
-      selectedNavpAreaIndex(-1),
-      selectedPfSeedPointIndex(-1),
-      selectedExclusionBoxIndex(-1),
-      navpLoaded(false),
-      showNavp(true),
-      showKdTree(false),
-      showNavpIndices(false),
-      showPfExclusionBoxes(true),
-      showPfSeedPoints(true),
-      showRecastDebugInfo(false),
-      doZRenderOffset(false),
-      doNavpHitTest(false),
-      doNavpExclusionBoxHitTest(false),
-      doNavpPfSeedPointHitTest(false),
-      loading(false),
-      stairsCheckboxValue(false),
-      building(false),
-      loadNavpName("Load Navp"),
-      lastLoadNavpFile(loadNavpName),
-      saveNavpName("Save Navp"),
-      lastSaveNavpFile(saveNavpName) {}
+Navp::Navp() :
+    navMesh(new NavPower::NavMesh()), selectedNavpAreaIndex(-1), selectedPfSeedPointIndex(-1),
+    selectedExclusionBoxIndex(-1), navpLoaded(false), showNavp(true), showKdTree(false), showNavpIndices(false),
+    showPfExclusionBoxes(true), showPfSeedPoints(true), showRecastDebugInfo(false), doZRenderOffset(false),
+    doNavpHitTest(false), doNavpExclusionBoxHitTest(false), doNavpPfSeedPointHitTest(false), loading(false),
+    stairsCheckboxValue(false), building(false), loadNavpName("Load Navp"), lastLoadNavpFile(loadNavpName),
+    saveNavpName("Save Navp"), lastSaveNavpFile(saveNavpName) {}
 
 Navp::~Navp() = default;
 
@@ -148,8 +132,10 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
                     float a1 = static_cast<float>(k) / 8.0f * std::numbers::pi * 2;
                     float a2 = static_cast<float>(k + 1) / 8.0f * std::numbers::pi * 2;
 
-                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1) * r, vertex->m_pos.Z + zRenderOffset, -(vertex->m_pos.Y + sinf(a1) * r));
-                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2) * r, vertex->m_pos.Z + zRenderOffset, -(vertex->m_pos.Y + sinf(a2) * r));
+                    glm::vec3 glP1(vertex->m_pos.X + cosf(a1) * r, vertex->m_pos.Z + zRenderOffset,
+                        -(vertex->m_pos.Y + sinf(a1) * r));
+                    glm::vec3 glP2(vertex->m_pos.X + cosf(a2) * r, vertex->m_pos.Z + zRenderOffset,
+                        -(vertex->m_pos.Y + sinf(a2) * r));
 
                     lineVertices.push_back({glP1, glm::vec3(0, 1, 0), circleColor});
                     lineVertices.push_back({glP2, glm::vec3(0, 1, 0), circleColor});
@@ -291,45 +277,27 @@ void Navp::renderPfSeedPoints() const {
                 fill = {0, 0, 0.8};
                 outline = {0, 0, 1.0};
             }
-            renderer.drawBox(
-                {seedPoint.pos.x, seedPoint.pos.z + 0.5f, -seedPoint.pos.y},
-                {0.25, 0.5, 0.25},
-                {0, 0, 0, 1},
-                true,
-                fill,
-                true,
-                outline,
-                1.0);
+            renderer.drawBox({seedPoint.pos.x, seedPoint.pos.z + 0.5f, -seedPoint.pos.y}, {0.25, 0.5, 0.25},
+                {0, 0, 0, 1}, true, fill, true, outline, 1.0);
             i++;
         }
     }
 }
 
 void Navp::renderPfSeedPointsForHitTest() const {
-    if (showPfSeedPoints&& Scene::getInstance()
-    .
-    sceneLoaded
-    )
-    {
+    if (showPfSeedPoints && Scene::getInstance().sceneLoaded) {
         Renderer& renderer = Renderer::getInstance();
         int i = 0;
         for (const Json::PfSeedPoint& seedPoint : Scene::getInstance().pfSeedPoints) {
             const int highByte = (i >> 8) & 0xFF;
             const int lowByte = i & 0xFF;
-            renderer.drawBox(
-                {seedPoint.pos.x, seedPoint.pos.z + 0.5f, -seedPoint.pos.y},
-                {0.25, 0.5, 0.25},
-                {0, 0, 0, 1},
+            renderer.drawBox({seedPoint.pos.x, seedPoint.pos.z + 0.5f, -seedPoint.pos.y}, {0.25, 0.5, 0.25},
+                {0, 0, 0, 1}, true,
+                {static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f},
                 true,
-                {
-                    static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.0f
-                },
-                true,
-                {
-                    static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.0f
-                },
+                {static_cast<float>(PF_SEED_POINT) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f},
                 1.0);
             i++;
         }
@@ -347,45 +315,31 @@ void Navp::renderExclusionBoxes() const {
                 fill = {0.8, 0, 0};
                 outline = {1.0, 0, 0};
             }
-            renderer.drawBox(
-                {exclusionBox.pos.x, exclusionBox.pos.z, -exclusionBox.pos.y},
+            renderer.drawBox({exclusionBox.pos.x, exclusionBox.pos.z, -exclusionBox.pos.y},
                 {exclusionBox.scale.x, exclusionBox.scale.z, -exclusionBox.scale.y},
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
-                true,
-                fill,
-                true,
-                outline,
-                1.0);
+                true, fill, true, outline, 1.0);
             i++;
         }
     }
 }
 
 void Navp::renderExclusionBoxesForHitTest() const {
-    if (showPfExclusionBoxes&& Scene::getInstance()
-    .
-    sceneLoaded
-    )
-    {
+    if (showPfExclusionBoxes && Scene::getInstance().sceneLoaded) {
         Renderer& renderer = Renderer::getInstance();
         int i = 0;
         for (const Json::PfBox& exclusionBox : Scene::getInstance().exclusionBoxes) {
             const int highByte = (i >> 8) & 0xFF;
             const int lowByte = i & 0xFF;
-            renderer.drawBox(
-                {exclusionBox.pos.x, exclusionBox.pos.z, -exclusionBox.pos.y},
+            renderer.drawBox({exclusionBox.pos.x, exclusionBox.pos.z, -exclusionBox.pos.y},
                 {exclusionBox.scale.x, exclusionBox.scale.z, -exclusionBox.scale.y},
                 {exclusionBox.rotation.x, exclusionBox.rotation.z, -exclusionBox.rotation.y, exclusionBox.rotation.w},
                 true,
-                {
-                    static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.0f
-                },
+                {static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f},
                 true,
-                {
-                    static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
-                    static_cast<float>(lowByte) / 255.0f
-                },
+                {static_cast<float>(PF_EXCLUSION_BOX) / 255.0f, static_cast<float>(highByte) / 255.0f,
+                    static_cast<float>(lowByte) / 255.0f},
                 1.0);
             i++;
         }
@@ -497,7 +451,7 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
 
         if (leafNode) {
             std::vector<const CachedKdNode*> path;
-            for (const CachedKdNode* curr = leafNode; curr != nullptr; ) {
+            for (const CachedKdNode* curr = leafNode; curr != nullptr;) {
                 path.emplace_back(curr);
                 curr = (curr->parentIndex != -1) ? &kdTreeNodes[curr->parentIndex] : nullptr;
             }
@@ -510,16 +464,32 @@ void Navp::setSelectedNavpAreaIndex(const int index) {
                     kdLog += "[Leaf Depth " + std::to_string(curr->depth) + "]";
                 } else {
                     const auto* next = path[i + 1];
-                    char axis = 'X'; float val = 0.0f;
+                    char axis = 'X';
+                    float val = 0.0f;
                     std::string axisString = NavPower::AxisToString(curr->axis).substr(0, 1);
-                    if (std::abs(curr->bbox.m_min.X - next->bbox.m_min.X) > 0.001f) { axis = 'X'; val = next->bbox.m_min.X; }
-                    else if (std::abs(curr->bbox.m_max.X - next->bbox.m_max.X) > 0.001f) { axis = 'X'; val = next->bbox.m_max.X; }
-                    else if (std::abs(curr->bbox.m_min.Y - next->bbox.m_min.Y) > 0.001f) { axis = 'Y'; val = next->bbox.m_min.Y; }
-                    else if (std::abs(curr->bbox.m_max.Y - next->bbox.m_max.Y) > 0.001f) { axis = 'Y'; val = next->bbox.m_max.Y; }
-                    else if (std::abs(curr->bbox.m_min.Z - next->bbox.m_min.Z) > 0.001f) { axis = 'Z'; val = next->bbox.m_min.Z; }
-                    else { axis = 'Z'; val = next->bbox.m_max.Z; }
-                    kdLog += "D" + std::to_string(curr->depth) + "(" + axisString + ":" + std::to_string(val).substr(0, std::to_string(val).find('.') + 3) + ") ";
-                    kdLog += "Left: " + std::to_string(curr->node->m_dLeft) + " Right: " + std::to_string(curr->node->m_dRight) + " -> ";
+                    if (std::abs(curr->bbox.m_min.X - next->bbox.m_min.X) > 0.001f) {
+                        axis = 'X';
+                        val = next->bbox.m_min.X;
+                    } else if (std::abs(curr->bbox.m_max.X - next->bbox.m_max.X) > 0.001f) {
+                        axis = 'X';
+                        val = next->bbox.m_max.X;
+                    } else if (std::abs(curr->bbox.m_min.Y - next->bbox.m_min.Y) > 0.001f) {
+                        axis = 'Y';
+                        val = next->bbox.m_min.Y;
+                    } else if (std::abs(curr->bbox.m_max.Y - next->bbox.m_max.Y) > 0.001f) {
+                        axis = 'Y';
+                        val = next->bbox.m_max.Y;
+                    } else if (std::abs(curr->bbox.m_min.Z - next->bbox.m_min.Z) > 0.001f) {
+                        axis = 'Z';
+                        val = next->bbox.m_min.Z;
+                    } else {
+                        axis = 'Z';
+                        val = next->bbox.m_max.Z;
+                    }
+                    kdLog += "D" + std::to_string(curr->depth) + "(" + axisString + ":" +
+                        std::to_string(val).substr(0, std::to_string(val).find('.') + 3) + ") ";
+                    kdLog += "Left: " + std::to_string(curr->node->m_dLeft) +
+                        " Right: " + std::to_string(curr->node->m_dRight) + " -> ";
                 }
             }
             Logger::log(NK_INFO, kdLog.c_str());
@@ -533,23 +503,21 @@ void Navp::setSelectedPfSeedPointIndex(const int index) {
 
     if (index == -1 && selectedPfSeedPointIndex != -1) {
         auto& selectedPFSeedPoint = scene.pfSeedPoints[selectedPfSeedPointIndex];
-        Logger::log(
-            NK_INFO,
-            ("Deselected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").
-            c_str());
+        Logger::log(NK_INFO,
+            ("Deselected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'")
+                .c_str());
     }
     selectedPfSeedPointIndex = index;
     if (index != -1 && index < scene.pfSeedPoints.size()) {
         auto& selectedPFSeedPoint = scene.pfSeedPoints[index];
-        Logger::log(
-            NK_INFO,
-            ("Selected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'").
-            c_str());
+        Logger::log(NK_INFO,
+            ("Selected PF Seed point: name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "'")
+                .c_str());
         const Vec3 pos = {selectedPFSeedPoint.pos.x, selectedPFSeedPoint.pos.y, selectedPFSeedPoint.pos.z};
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
-        std::string msg = "PF Seed point name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id +
-            "' pos: (";
+        std::string msg =
+            "PF Seed point name: '" + selectedPFSeedPoint.name + "' id: '" + selectedPFSeedPoint.id + "' pos: (";
         msg += std::string{v};
         snprintf(v, sizeof(v), "%.2f", pos.Y);
         msg += ", " + std::string{v};
@@ -564,19 +532,17 @@ void Navp::setSelectedExclusionBoxIndex(const int index) {
 
     if (index == -1 && selectedExclusionBoxIndex != -1) {
         const auto& selectedExclusionBox = scene.exclusionBoxes[selectedExclusionBoxIndex];
-        Logger::log(
-            NK_INFO,
+        Logger::log(NK_INFO,
             ("Deselected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'")
-            .c_str());
+                .c_str());
     }
     selectedExclusionBoxIndex = index;
     if (index != -1 && index < scene.exclusionBoxes.size()) {
         const auto& selectedExclusionBox = scene.exclusionBoxes[index];
 
-        Logger::log(
-            NK_INFO,
-            ("Selected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'").
-            c_str());
+        Logger::log(NK_INFO,
+            ("Selected Exclusion Box: name '" + selectedExclusionBox.name + "' id: '" + selectedExclusionBox.id + "'")
+                .c_str());
         const Vec3 pos = {selectedExclusionBox.pos.x, selectedExclusionBox.pos.y, selectedExclusionBox.pos.z};
         char v[16];
         snprintf(v, sizeof(v), "%.2f", pos.X);
@@ -630,24 +596,20 @@ void Navp::renderNavMesh() {
                 const auto& area = getAreaByIndex(navMesh, i);
                 const auto& edges = area.m_edges;
                 const Vec3 pos = area.m_area->m_pos;
-                renderer.drawText(std::to_string(areaIndex + 1), {
-                                      pos.X, pos.Z + 0.1f + zRenderOffset, -pos.Y
-                                  }, colorBlue, 20);
+                renderer.drawText(
+                    std::to_string(areaIndex + 1), {pos.X, pos.Z + 0.1f + zRenderOffset, -pos.Y}, colorBlue, 20);
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
                     for (const auto vertex : edges) {
                         renderer.drawText(std::to_string(edgeIndex + 1),
-                                          {vertex->m_pos.X, vertex->m_pos.Z + 0.1f + zRenderOffset, -vertex->m_pos.Y},
-                                          vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL
-                                              ? colorRed
-                                              : colorGreen, 20);
+                            {vertex->m_pos.X, vertex->m_pos.Z + 0.1f + zRenderOffset, -vertex->m_pos.Y},
+                            vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL ? colorRed : colorGreen, 20);
                         if (vertex->m_pAdjArea != nullptr) {
                             const auto nextVertex = edges[(edgeIndex + 1) % edges.size()];
                             Vec3 midpoint = (vertex->m_pos + nextVertex->m_pos) / 2.0f;
                             const int neighborAreaIndex = binaryAreaToAreaIndexMap[vertex->m_pAdjArea];
                             renderer.drawText(std::to_string(neighborAreaIndex),
-                                              {midpoint.X, midpoint.Z + 0.1f + zRenderOffset, -midpoint.Y},
-                                              colorPink, 20);
+                                {midpoint.X, midpoint.Z + 0.1f + zRenderOffset, -midpoint.Y}, colorPink, 20);
                         }
                         edgeIndex++;
                     }
@@ -694,11 +656,12 @@ void Navp::renderKdTree() {
         selectedLeafNode = it->second;
     }
 
-    if (!selectedLeafNode) return;
+    if (!selectedLeafNode)
+        return;
 
     // Structural ancestor lookup: follow the parentIndex chain
     std::set<const CachedKdNode*> pathNodes;
-    for (const CachedKdNode* curr = selectedLeafNode; curr != nullptr; ) {
+    for (const CachedKdNode* curr = selectedLeafNode; curr != nullptr;) {
         pathNodes.insert(curr);
         if (curr->parentIndex != -1) {
             curr = &kdTreeNodes[curr->parentIndex];
@@ -718,12 +681,24 @@ void Navp::renderKdTree() {
 
         glm::vec3 color; // Base level color
         switch (depth % 6) {
-            case 0: color = {1.0f, 0.3f, 0.3f}; break; // Soft Red
-            case 1: color = {0.3f, 1.0f, 0.3f}; break; // Soft Green
-            case 2: color = {0.3f, 0.3f, 1.0f}; break; // Soft Blue
-            case 3: color = {1.0f, 1.0f, 0.3f}; break; // Yellow
-            case 4: color = {1.0f, 0.3f, 1.0f}; break; // Magenta
-            case 5: color = {0.3f, 1.0f, 1.0f}; break; // Cyan
+        case 0:
+            color = {1.0f, 0.3f, 0.3f};
+            break; // Soft Red
+        case 1:
+            color = {0.3f, 1.0f, 0.3f};
+            break; // Soft Green
+        case 2:
+            color = {0.3f, 0.3f, 1.0f};
+            break; // Soft Blue
+        case 3:
+            color = {1.0f, 1.0f, 0.3f};
+            break; // Yellow
+        case 4:
+            color = {1.0f, 0.3f, 1.0f};
+            break; // Magenta
+        case 5:
+            color = {0.3f, 1.0f, 1.0f};
+            break; // Cyan
         }
         // switch (node.axis) {
         //     case NavPower::Axis::X: color = {1.0f, 0.0f, 0.0f}; break; // X Red
@@ -733,12 +708,11 @@ void Navp::renderKdTree() {
         //     break;
         // }
 
-
         Vec3 outlineColor = isSelectedLeaf ? Vec3{1.0f, 1.0f, 1.0f} : Vec3{color.r, color.g, color.b};
-        Vec3 dimmedColor = { outlineColor.X * 0.33f, outlineColor.Y * 0.33f, outlineColor.Z * 0.33f };
+        Vec3 dimmedColor = {outlineColor.X * 0.33f, outlineColor.Y * 0.33f, outlineColor.Z * 0.33f};
 
         Vec3 center = (bbox.m_min + bbox.m_max) * 0.5f;
-        float inset = 0.0f; //static_cast<float>(depth) * 0.05f;
+        float inset = 0.0f; // static_cast<float>(depth) * 0.05f;
 
         auto drawPart = [&](const NavPower::BBox& partBbox, bool dimmed, bool isLeaf) {
             if (dimmed) {
@@ -751,19 +725,11 @@ void Navp::renderKdTree() {
             float szY = (std::max)(0.01f, partSize.Y - (isLeaf ? 0.0f : inset));
             float szZ = (std::max)(0.01f, partSize.Z - (isLeaf ? 0.0f : inset));
 
-            Vec3 pCenter = { partCenter.X, partCenter.Z + zRenderOffset, -partCenter.Y };
-            Vec3 pSize = { szX, szZ, -szY };
+            Vec3 pCenter = {partCenter.X, partCenter.Z + zRenderOffset, -partCenter.Y};
+            Vec3 pSize = {szX, szZ, -szY};
 
             renderer.drawBox(
-                pCenter,
-                pSize,
-                { 0, 0, 0, 1 },
-                false,
-                { 0, 0, 0 },
-                true,
-                dimmed ? dimmedColor : outlineColor,
-                1.0f
-            );
+                pCenter, pSize, {0, 0, 0, 1}, false, {0, 0, 0}, true, dimmed ? dimmedColor : outlineColor, 1.0f);
         };
 
         if (node.isLeaf) {
@@ -773,9 +739,18 @@ void Navp::renderKdTree() {
             float bboxSplitMin = 0.0f;
             float bboxSplitMax = 0.0f;
             switch (node.axis) {
-                case NavPower::Axis::X: bboxSplitMin = selectedLeafNode->bbox.m_min.X; bboxSplitMax = selectedLeafNode->bbox.m_max.X; break;
-                case NavPower::Axis::Y: bboxSplitMin = selectedLeafNode->bbox.m_min.Y; bboxSplitMax = selectedLeafNode->bbox.m_max.Y; break;
-                case NavPower::Axis::Z: bboxSplitMin = selectedLeafNode->bbox.m_min.Z; bboxSplitMax = selectedLeafNode->bbox.m_max.Z; break;
+            case NavPower::Axis::X:
+                bboxSplitMin = selectedLeafNode->bbox.m_min.X;
+                bboxSplitMax = selectedLeafNode->bbox.m_max.X;
+                break;
+            case NavPower::Axis::Y:
+                bboxSplitMin = selectedLeafNode->bbox.m_min.Y;
+                bboxSplitMax = selectedLeafNode->bbox.m_max.Y;
+                break;
+            case NavPower::Axis::Z:
+                bboxSplitMin = selectedLeafNode->bbox.m_min.Z;
+                bboxSplitMax = selectedLeafNode->bbox.m_max.Z;
+                break;
             case NavPower::UNDEF:
                 break;
             }
@@ -796,44 +771,39 @@ void Navp::renderKdTree() {
                 center = (rightBbox.m_min + rightBbox.m_max) * 0.5f;
             }
         }
-        std::string text = std::to_string(depth) + " " + (depth == 1 ? "Root" : (isSelectedLeaf ? "Leaf" : NavPower::AxisToString(node.axis)));
-        renderer.drawText(
-            text,
-            {center.X, center.Z + zRenderOffset + static_cast<float>(depth) / 5.0f, -center.Y},
-            outlineColor,
-            20.0
-        );
+        std::string text = std::to_string(depth) + " " +
+            (depth == 1 ? "Root" : (isSelectedLeaf ? "Leaf" : NavPower::AxisToString(node.axis)));
+        renderer.drawText(text, {center.X, center.Z + zRenderOffset + static_cast<float>(depth) / 5.0f, -center.Y},
+            outlineColor, 20.0);
     }
 }
 
-void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const bool isFromBuildingNavp, const bool isFromBuildingAirg) {
+void Navp::loadNavMesh(
+    const std::string& fileName, const bool isFromJson, const bool isFromBuildingNavp, const bool isFromBuildingAirg) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Loading Navp from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.c_str());
     const auto start = std::chrono::high_resolution_clock::now();
     loading = true;
-    CPPTRACE_TRY
-    {
-        NavPower::NavMesh newNavMesh = isFromJson
-                                               ? NavWeakness::LoadNavMeshFromJson(fileName.c_str())
-                                               : NavWeakness::LoadNavMeshFromBinary(fileName.c_str());
+    CPPTRACE_TRY {
+        NavPower::NavMesh newNavMesh = isFromJson ? NavWeakness::LoadNavMeshFromJson(fileName.c_str())
+                                                  : NavWeakness::LoadNavMeshFromBinary(fileName.c_str());
         std::swap(*navMesh, newNavMesh);
-        const NavKitSettings & navKitSettings = NavKitSettings::getInstance();
+        const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         if (isFromBuildingNavp || isFromBuildingAirg) {
             setStairsFlags();
-            outputNavpFilename = navKitSettings.outputFolder + (isFromBuildingNavp
-                                                                    ? "\\output.navp"
-                                                                    : "\\outputForAirg.navp");
+            outputNavpFilename =
+                navKitSettings.outputFolder + (isFromBuildingNavp ? "\\output.navp" : "\\outputForAirg.navp");
             NavWeakness::OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
-                NavPower::NavMesh reloadedNavMesh = NavWeakness::LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
+            NavPower::NavMesh reloadedNavMesh =
+                NavWeakness::LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
             std::swap(*navMesh, reloadedNavMesh);
         }
     }
-    CPPTRACE_CATCH(const std::exception & e)
-    {
-        ErrorHandler::openErrorDialog("Error loading Navp file '" + std::string(fileName) + "': " + std::string(e.what()) + "\n\nStack Trace:\n" +
-            cpptrace::from_current_exception().to_string());
+    CPPTRACE_CATCH(const std::exception& e) {
+        ErrorHandler::openErrorDialog("Error loading Navp file '" + std::string(fileName) +
+            "': " + std::string(e.what()) + "\n\nStack Trace:\n" + cpptrace::from_current_exception().to_string());
         msg = "Error loading Navp file '";
         msg += fileName;
         msg += "': ";
@@ -843,9 +813,7 @@ void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const
         Logger::log(NK_ERROR, msg.c_str());
         return;
     }
-    catch
-    (...)
-    {
+    catch (...) {
         msg = "Invalid Navp file: '";
         msg += fileName;
         msg += "'...";
@@ -872,14 +840,13 @@ void Navp::loadNavMesh(const std::string& fileName, const bool isFromJson, const
 }
 
 void Navp::buildNavp() {
-    CPPTRACE_TRY
-    {
-            const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-            std::string msg = "Building Navp at ";
+    CPPTRACE_TRY {
+        const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::string msg = "Building Navp at ";
         msg += std::ctime(&start_time);
         Logger::log(NK_INFO, msg.data());
-            const auto start = std::chrono::high_resolution_clock::now();
-        RecastAdapter & recastAdapter = RecastAdapter::getInstance();
+        const auto start = std::chrono::high_resolution_clock::now();
+        RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         updateExclusionBoxConvexVolumes();
         building = true;
         Menu::updateMenuState();
@@ -905,17 +872,14 @@ void Navp::buildNavp() {
             Menu::updateMenuState();
         }
     }
-    CPPTRACE_CATCH(const std::exception & e)
-    {
+    CPPTRACE_CATCH(const std::exception& e) {
         std::string msg = "Error building Navp: ";
         msg += e.what();
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
     }
-    catch
-    (...)
-    {
+    catch (...) {
         Logger::log(NK_ERROR, "Error building Navp.");
     }
 }
@@ -1010,19 +974,18 @@ void Navp::handleSaveNavpClicked() {
 }
 
 bool Navp::stairsAreaSelected() const {
-    return selectedNavpAreaIndex == -1
-               ? false
-               : selectedNavpAreaIndex < getTotalAreaCount(navMesh)
-               ? areaIsStairs(getAreaByIndex(navMesh, selectedNavpAreaIndex))
-               : false;
+    return selectedNavpAreaIndex == -1 ? false
+        : selectedNavpAreaIndex < getTotalAreaCount(navMesh)
+        ? areaIsStairs(getAreaByIndex(navMesh, selectedNavpAreaIndex))
+        : false;
 }
 
 bool Navp::canBuildNavp() const {
     const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     const SceneMesh& obj = SceneMesh::getInstance();
     const Scene& scene = Scene::getInstance();
-    return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded && !
-        Airg::getInstance().airgBuilding && scene.sceneLoaded;
+    return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded &&
+        !Airg::getInstance().airgBuilding && scene.sceneLoaded;
 }
 
 bool Navp::canSave() const {
@@ -1032,13 +995,13 @@ bool Navp::canSave() const {
 void Navp::handleEditStairsClicked() const {
     if (selectedNavpAreaIndex != -1) {
         const NavPower::AreaUsageFlags newType = (getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags ==
-                                               NavPower::AreaUsageFlags::AREA_STEPS)
-                                               ? NavPower::AreaUsageFlags::AREA_FLAT
-                                               : NavPower::AreaUsageFlags::AREA_STEPS;
+                                                     NavPower::AreaUsageFlags::AREA_STEPS)
+            ? NavPower::AreaUsageFlags::AREA_FLAT
+            : NavPower::AreaUsageFlags::AREA_STEPS;
         const std::string newTypeString = (getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags ==
-                                        NavPower::AreaUsageFlags::AREA_STEPS)
-                                        ? "AREA_FLAT"
-                                        : "AREA_STEPS";
+                                              NavPower::AreaUsageFlags::AREA_STEPS)
+            ? "AREA_FLAT"
+            : "AREA_STEPS";
         Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
         getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags = newType;
         navMeshDirty = true;
@@ -1057,7 +1020,8 @@ void Navp::buildAreaMaps() {
     kdTreeNodes.clear();
     cachedKdNodes.clear();
 
-    if (!navMesh) return;
+    if (!navMesh)
+        return;
 
     kdTreeNodes.reserve(getTotalAreaCount(navMesh) * 2);
 
@@ -1072,7 +1036,8 @@ void Navp::buildAreaMaps() {
 
             // Build a temporary map for leaf area resolution
             std::map<uint32_t, NavPower::Binary::Area*> offsetToAreaMap;
-            for (auto const& [ptr, offset] : const_cast<NavPower::NavGraph&>(navGraph).AreaPointerToNavGraphOffsetMap()) {
+            for (auto const& [ptr, offset] :
+                const_cast<NavPower::NavGraph&>(navGraph).AreaPointerToNavGraphOffsetMap()) {
                 offsetToAreaMap[offset] = ptr;
             }
 
@@ -1085,7 +1050,7 @@ void Navp::buildAreaMaps() {
             };
 
             std::vector<TraversalState> stack;
-            stack.push_back({ navGraph.m_rootKDNode, navGraph.m_kdTreeData->m_bbox, 1, -1 });
+            stack.push_back({navGraph.m_rootKDNode, navGraph.m_kdTreeData->m_bbox, 1, -1});
 
             while (!stack.empty()) {
                 TraversalState current = stack.back();
@@ -1097,21 +1062,23 @@ void Navp::buildAreaMaps() {
 
                 if (isLeaf) {
                     uint32_t offset = ((NavPower::Binary::KDLeaf*)current.node)->GetPrimOffset();
-                    if (offsetToAreaMap.count(offset)) pArea = offsetToAreaMap[offset];
+                    if (offsetToAreaMap.count(offset))
+                        pArea = offsetToAreaMap[offset];
                 }
 
                 int currentIdx = static_cast<int>(kdTreeNodes.size());
-                kdTreeNodes.push_back({ current.depth, current.bbox, pArea, isLeaf, axis, current.node, current.parentIdx });
+                kdTreeNodes.push_back(
+                    {current.depth, current.bbox, pArea, isLeaf, axis, current.node, current.parentIdx});
 
                 if (!isLeaf) {
                     NavPower::Axis splitAxis = current.node->GetSplitAxis();
                     NavPower::BBox rightBbox = current.bbox;
                     rightBbox.m_min[splitAxis] = current.node->m_dRight;
-                    stack.push_back({ current.node->GetRight(), rightBbox, current.depth + 1, currentIdx });
+                    stack.push_back({current.node->GetRight(), rightBbox, current.depth + 1, currentIdx});
 
                     NavPower::BBox leftBbox = current.bbox;
                     leftBbox.m_max[splitAxis] = current.node->m_dLeft;
-                    stack.push_back({ current.node->GetLeft(), leftBbox, current.depth + 1, currentIdx });
+                    stack.push_back({current.node->GetLeft(), leftBbox, current.depth + 1, currentIdx});
                 }
             }
         }
@@ -1159,7 +1126,7 @@ void Navp::updateNavpDialogControls(const HWND hwnd) {
         std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(
             navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
         auto comparator = [](const std::pair<std::string, std::string>& a,
-                             const std::pair<std::string, std::string>& b) {
+                              const std::pair<std::string, std::string>& b) {
             if (a.second != b.second) {
                 return a.second < b.second;
             }
@@ -1190,8 +1157,9 @@ void Navp::extractNavpFromRpkgs(const std::string& hash) {
     }
 }
 
-INT_PTR CALLBACK Navp::extractNavpDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-    Navp * pNavp = nullptr;
+INT_PTR CALLBACK Navp::extractNavpDialogProc(
+    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+    Navp* pNavp = nullptr;
     if (message == WM_INITDIALOG) {
         pNavp = reinterpret_cast<Navp*>(lParam);
         SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pNavp));
@@ -1211,8 +1179,7 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(const HWND hDlg, const UINT message
     case WM_COMMAND:
 
         if (HIWORD(wParam) == CBN_SELCHANGE) {
-            const int ItemIndex = SendMessage((HWND)lParam, CB_GETCURSEL,
-                                              0, 0);
+            const int ItemIndex = SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
             char ListItem[256];
             SendMessage((HWND)lParam, CB_GETLBTEXT, static_cast<WPARAM>(ItemIndex), (LPARAM)ListItem);
             selectedRpkgNavp = ListItem;
@@ -1245,7 +1212,7 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(const HWND hDlg, const UINT message
     case WM_DESTROY:
         hNavpDialog = nullptr;
         return TRUE;
-    default: ;
+    default:;
     }
     return FALSE;
 }
@@ -1258,7 +1225,7 @@ void Navp::showExtractNavpDialog() {
 
     HINSTANCE hInstance = nullptr;
     if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                           (LPCSTR) & Navp::extractNavpDialogProc, &hInstance)) {
+            (LPCSTR)&Navp::extractNavpDialogProc, &hInstance)) {
         Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
         return;
     }
@@ -1266,8 +1233,7 @@ void Navp::showExtractNavpDialog() {
     const HWND hParentWnd = Renderer::hwnd;
 
     hNavpDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_NAVP_DIALOG), hParentWnd,
-                                    extractNavpDialogProc,
-                                    reinterpret_cast<LPARAM>(this));
+        extractNavpDialogProc, reinterpret_cast<LPARAM>(this));
 
     if (hNavpDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
@@ -1287,8 +1253,7 @@ void Navp::showExtractNavpDialog() {
         ShowWindow(hNavpDialog, SW_SHOW);
     } else {
         const DWORD error = GetLastError();
-        Logger::log(
-            NK_ERROR,
+        Logger::log(NK_ERROR,
             "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.",
             error);
     }

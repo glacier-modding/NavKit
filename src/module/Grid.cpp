@@ -62,11 +62,8 @@ void Grid::renderGrid() const {
         zOffset = reasoningGrid->m_Properties.vMin.z;
     }
 
-    const bool dirty = (gridVAO == 0) ||
-        (xMin != lastXMin) || (xMax != lastXMax) ||
-        (yMin != lastYMin) || (yMax != lastYMax) ||
-        (spacing != lastSpacing) ||
-        (xOffset != lastXOffset) || (yOffset != lastYOffset);
+    const bool dirty = (gridVAO == 0) || (xMin != lastXMin) || (xMax != lastXMax) || (yMin != lastYMin) ||
+        (yMax != lastYMax) || (spacing != lastSpacing) || (xOffset != lastXOffset) || (yOffset != lastYOffset);
 
     if (dirty) {
         lastXMin = xMin;

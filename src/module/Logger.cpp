@@ -7,10 +7,9 @@
 
 #include "../../include/NavKit/module/NavKitSettings.h"
 
-Logger::Logger()
-    : messageCount(0),
-      textPoolSize(0),
-      logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()) {
+Logger::Logger() :
+    messageCount(0), textPoolSize(0),
+    logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()) {
     memset(messages, 0, sizeof(char*) * MAX_MESSAGES);
     logFile.open("NavKit.log", std::ios::out | std::ios::trunc);
 }
@@ -39,8 +38,8 @@ std::deque<std::string>& Logger::getLogBuffer() {
 [[noreturn]] void Logger::logRunner() {
     Logger& logger = getInstance();
     while (true) {
-        if (std::optional<std::pair<LogCategory, std::string>> message = logger.logQueue->try_pop(); message.
-            has_value()) {
+        if (std::optional<std::pair<LogCategory, std::string>> message = logger.logQueue->try_pop();
+            message.has_value()) {
             std::string msg;
             switch (message.value().first) {
             case NK_ERROR:

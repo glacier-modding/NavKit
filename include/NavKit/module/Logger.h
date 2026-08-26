@@ -3,12 +3,7 @@
 #include "../../include/ConcurrentQueue/ConcurrentQueue.h"
 #include <fstream>
 
-enum LogCategory {
-    NK_INFO = 1,
-    NK_WARN,
-    NK_ERROR,
-    NK_DEBUG
-};
+enum LogCategory { NK_INFO = 1, NK_WARN, NK_ERROR, NK_DEBUG };
 
 class Logger {
     static const int MAX_MESSAGES = 250;

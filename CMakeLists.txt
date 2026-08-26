@@ -43,6 +43,71 @@ if (BUILD_TESTING)
     add_subdirectory(tests)
 endif ()
 
+find_program(CLANG_FORMAT_EXE NAMES clang-format)
+find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+
+if(CLANG_FORMAT_EXE OR CLANG_TIDY_EXE)
+    execute_process(
+            COMMAND git config core.hooksPath "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            RESULT_VARIABLE GIT_HOOKS_CONFIG_RESULT
+    )
+    if(GIT_HOOKS_CONFIG_RESULT EQUAL 0)
+        if(CLANG_FORMAT_EXE)
+            execute_process(COMMAND git config local.clangFormatPath "${CLANG_FORMAT_EXE}" WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+        endif()
+        if(CLANG_TIDY_EXE)
+            execute_process(COMMAND git config local.clangTidyPath "${CLANG_TIDY_EXE}" WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+        endif()
+    endif()
+endif()
+
+if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE QUALITY_SOURCES CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+    )
+    list(FILTER QUALITY_SOURCES EXCLUDE REGEX ".*(vcpkg_cached_data|build|vcpkg|extern|simdjson|swfmill|stb_truetype|ConcurrentQueue|easywsclient|QuickDigest|ResourceLib_HM3|RecastDemo).*")
+
+    add_custom_target(format
+            COMMAND ${CLANG_FORMAT_EXE} -i -style=file ${QUALITY_SOURCES}
+            COMMENT "Formatting source files with ClangFormat..."
+    )
+endif()
+
+if(CLANG_TIDY_EXE)
+    set(SHADOW_TIDY_DB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/clang-tools-cache")
+
+    execute_process(
+            COMMAND git config local.clangTidyDbPath "${SHADOW_TIDY_DB_DIR}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    get_filename_component(CLANG_BIN_DIR "${CLANG_TIDY_EXE}" DIRECTORY)
+    set(CLANG_RESOURCE_DIR "${CLANG_BIN_DIR}/../lib/clang/18")
+    if(NOT EXISTS "${CLANG_RESOURCE_DIR}")
+        set(CLANG_RESOURCE_DIR "${CLANG_BIN_DIR}/../lib/clang/19")
+    endif()
+
+    # CRITICAL CHANGE: We explicitly add -checks='-*...'.
+    # This disables the 60,000 un-actionable structural header alerts, focusing
+    # only on your redundant semicolons, declarations, and modernization fixes.
+    add_custom_target(tidy
+            COMMAND ${CMAKE_COMMAND} --preset generate-compile-commands -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
+            COMMAND powershell -NoProfile -Command
+            "$json = Get-Content '${SHADOW_TIDY_DB_DIR}/compile_commands.json' -Raw | ConvertFrom-Json;"
+            "$files = $json.file | Where-Object { $_ -match 'src|include' } | Where-Object { $_ -notmatch 'vcpkg_cached_data|build|vcpkg|extern|simdjson|swfmill|stb_truetype|ConcurrentQueue|easywsclient|QuickDigest|ResourceLib_HM3|RecastDemo' } | Select-Object -Unique;"
+            "if ($files) { & '${CLANG_TIDY_EXE}' -p '${SHADOW_TIDY_DB_DIR}' -checks='-*,readability-redundant-declaration,modernize-use-equals-default,readability-redundant-member-init,modernize-concat-nested-namespaces,performance-*' --system-headers=0 --header-filter='^(?!.*(vcpkg_cached_data^|build^|vcpkg^|extern^|simdjson^|swfmill^|stb_truetype^|ConcurrentQueue^|easywsclient^|QuickDigest^|ResourceLib_HM3^|RecastDemo)).*' --extra-arg=--driver-mode=cl --extra-arg=-D_ALLOW_RTCc_IN_STL --extra-arg=-resource-dir='${CLANG_RESOURCE_DIR}' --fix $files }"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT "Generating database and running isolated ClangTidy fixes..."
+    )
+endif()
+
+
 set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:GLEW::glew>"
         "$<TARGET_FILE:SDL2::SDL2>"

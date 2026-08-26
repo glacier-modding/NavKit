@@ -41,7 +41,7 @@ public:
     bool isBlended = false;
 
     Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices,
-         const std::vector<Texture>& textures);
+        const std::vector<Texture>& textures);
 
     void draw(const Shader& shader) const;
 

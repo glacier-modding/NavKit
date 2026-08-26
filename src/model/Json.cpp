@@ -37,16 +37,16 @@ template <typename t, typename> Json::JsonValueProxy::operator t() {
                 } else if constexpr (std::is_floating_point_v<t>) {
                     val = static_cast<simdT>(std::stod(std::string(strVal)));
                 }
-                Logger::log(NK_DEBUG, "Field: %s value (from string conversion): %s", field.c_str(),
-                            toString(val).c_str());
+                Logger::log(
+                    NK_DEBUG, "Field: %s value (from string conversion): %s", field.c_str(), toString(val).c_str());
                 return static_cast<t>(val);
             } catch (const std::exception& e) {
                 Logger::log(NK_ERROR, "Error converting string '%s' to numeric type for field: %s. Exception: %s",
-                            std::string(strVal).c_str(), field.c_str(), e.what());
+                    std::string(strVal).c_str(), field.c_str(), e.what());
             }
         } else {
-            Logger::log(
-                NK_ERROR, "Error getting value for field: %s. Not a direct numeric or string value. Simdjson error: %s",
+            Logger::log(NK_ERROR,
+                "Error getting value for field: %s. Not a direct numeric or string value. Simdjson error: %s",
                 field.c_str(), simdjson::error_message(err));
         }
     }
@@ -95,9 +95,8 @@ void Json::Vec3Wrapped::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Vec3Wrapped::writeJson(std::ostream& f, std::string propertyName) const {
-    f << R"(")" << propertyName << R"(":{"type":")" << type << R"(","data":{"x":)" << data.x << R"(,"y":)" << data.y <<
-        R"(,"z":)" << data.z <<
-        "}}";
+    f << R"(")" << propertyName << R"(":{"type":")" << type << R"(","data":{"x":)" << data.x << R"(,"y":)" << data.y
+      << R"(,"z":)" << data.z << "}}";
 }
 
 void Json::Entity::readJson(simdjson::ondemand::object json) {
@@ -118,8 +117,7 @@ void Json::Entity::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Entity::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -143,12 +141,9 @@ void Json::Mesh::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Mesh::writeJson(std::ostream& f) const {
-    f << R"({"alocHash":")" << alocHash <<
-        R"(","primHash":")" << primHash <<
-        R"(","roomName":")" << roomName <<
-        R"(","roomFolderName":")" << roomFolderName <<
-        R"(","entity":{"id":")" << entity.id <<
-        R"(","name":")" << entity.name << R"(",)";
+    f << R"({"alocHash":")" << alocHash << R"(","primHash":")" << primHash << R"(","roomName":")" << roomName
+      << R"(","roomFolderName":")" << roomFolderName << R"(","entity":{"id":")" << entity.id << R"(","name":")"
+      << entity.name << R"(",)";
     entity.position.writeJson(f);
     f << ",";
     entity.rotation.writeJson(f);
@@ -166,8 +161,7 @@ Json::Meshes::Meshes(simdjson::ondemand::array meshesJson) {
 }
 
 void Json::PfBox::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     pos.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -253,8 +247,7 @@ Json::Gates::Gates(simdjson::ondemand::array gatesJson) {
 }
 
 void Json::Room::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -289,8 +282,7 @@ Json::Rooms::Rooms(simdjson::ondemand::array roomsJson) {
 }
 
 void Json::Gate::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -317,8 +309,7 @@ void Json::Gate::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::AiAreaWorld::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name;
+    f << R"({"id":")" << id << R"(","name":")" << name;
     f << R"(",)";
     rotation.writeJson(f);
     f << "}";
@@ -340,10 +331,8 @@ Json::AiAreaWorlds::AiAreaWorlds(simdjson::ondemand::array aiAreaWorldsJson) {
 }
 
 void Json::ParentData::writeJson(std::ostream& f) const {
-    f << R"("data":{"id":")" << id <<
-        R"(","name":")" << name <<
-        R"(","source":")" << source <<
-        R"(","type":")" << type << R"("})";
+    f << R"("data":{"id":")" << id << R"(","name":")" << name << R"(","source":")" << source << R"(","type":")" << type
+      << R"("})";
 }
 
 void Json::ParentData::readJson(simdjson::ondemand::object json) {
@@ -354,8 +343,7 @@ void Json::ParentData::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Parent::writeJson(std::ostream& f) const {
-    f << R"("parent":{"type":")" << type <<
-        R"(",)";
+    f << R"("parent":{"type":")" << type << R"(",)";
     data.writeJson(f);
     f << "}";
 }
@@ -367,8 +355,7 @@ void Json::Parent::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::AiArea::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     rotation.writeJson(f);
     f << R"(,"logicalParent":[)";
     auto separator = "";
@@ -396,12 +383,12 @@ void Json::AiArea::readJson(simdjson::ondemand::object json) {
     rotation.readJson(rotationJson);
     logicalParents.clear();
     for (simdjson::ondemand::array logicalParentsJson = json["logicalParent"];
-         auto logicalParentJson : logicalParentsJson) {
+        auto logicalParentJson : logicalParentsJson) {
         logicalParents.push_back(std::string{std::string_view(logicalParentJson)});
     }
     areaVolumeNames.clear();
     for (simdjson::ondemand::array areaVolumeNamesJson = json["areaVolumeNames"];
-         auto areaVolumeNameJson : areaVolumeNamesJson) {
+        auto areaVolumeNameJson : areaVolumeNamesJson) {
         areaVolumeNames.push_back(std::string{std::string_view(areaVolumeNameJson)});
     }
     const simdjson::ondemand::object parentJson = json["parent"];
@@ -425,8 +412,7 @@ Json::VolumeBoxes::VolumeBoxes(simdjson::ondemand::array volumeBoxesJson) {
 }
 
 void Json::Radius::writeJson(std::ostream& f) const {
-    f << R"("radius":{"type":")" << type <<
-        R"(","data":")" << data << R"("})";
+    f << R"("radius":{"type":")" << type << R"(","data":")" << data << R"("})";
 }
 
 void Json::Radius::readJson(simdjson::ondemand::object json) {
@@ -435,8 +421,7 @@ void Json::Radius::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::VolumeSphere::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     position.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -464,8 +449,7 @@ Json::VolumeSpheres::VolumeSpheres(simdjson::ondemand::array volumeSpheresJson) 
 }
 
 void Json::PfSeedPoint::writeJson(std::ostream& f) const {
-    f << R"({"id":")" << id <<
-        R"(","name":")" << name << R"(",)";
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(",)";
     pos.writeJson(f);
     f << ",";
     rotation.writeJson(f);
@@ -522,10 +506,8 @@ void Json::Mati::readJsonFromScene(simdjson::ondemand::object json) {
 }
 
 void Json::Mati::writeJson(std::ostream& f) const {
-    f << R"({"hash":")" << hash <<
-        R"(","diffuse":")" << diffuse <<
-        R"(","normal":")" << normal <<
-        R"(","specular":")" << specular;
+    f << R"({"hash":")" << hash << R"(","diffuse":")" << diffuse << R"(","normal":")" << normal << R"(","specular":")"
+      << specular;
     f << R"("})";
 }
 

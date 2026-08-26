@@ -38,8 +38,7 @@ public:
     void GenerateLayerIndices();
 
     static Pathfinding::ZPFLocation* MapLocation_Internal(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation* result,
-                                                          const float4* vPosNavPower, float fAcceptance,
-                                                          dtPolyRef startPolyRef);
+        const float4* vPosNavPower, float fAcceptance, dtPolyRef startPolyRef);
 
     static bool MapLocation(dtNavMeshQuery* navQuery, const float4* vNavPowerPos, Pathfinding::ZPFLocation* lMapped);
 
@@ -48,7 +47,7 @@ public:
     static bool IsInside(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation* location);
 
     static bool NearestOuterEdge(dtNavMeshQuery* navQuery, Pathfinding::ZPFLocation& lFrom, float fRadius,
-                                 float4* edgeNavPowerResult, float4* edgeNavPowerNormal);
+        float4* edgeNavPowerResult, float4* edgeNavPowerNormal);
 
     static void buildVisionAndDeadEndData();
 

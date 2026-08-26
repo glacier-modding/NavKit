@@ -11,13 +11,7 @@ class FTPolygonFont;
 typedef double GLdouble;
 typedef int GLint;
 
-enum HitTestType {
-    NONE = 0,
-    NAVMESH_AREA = 240,
-    AIRG_WAYPOINT = 241,
-    PF_SEED_POINT = 242,
-    PF_EXCLUSION_BOX = 243
-};
+enum HitTestType { NONE = 0, NAVMESH_AREA = 240, AIRG_WAYPOINT = 241, PF_SEED_POINT = 242, PF_EXCLUSION_BOX = 243 };
 
 class HitTestResult {
 public:
@@ -42,11 +36,7 @@ public:
 
 class Renderer {
 public:
-    enum FullscreenMode {
-        WINDOWED,
-        MAXIMIZED,
-        BORDERLESS_FULLSCREEN
-    };
+    enum FullscreenMode { WINDOWED, MAXIMIZED, BORDERLESS_FULLSCREEN };
 
     Renderer();
 
@@ -66,7 +56,7 @@ public:
     void drawText(const std::string& text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0) const;
 
     void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
-                        Vec3 outlineColor, float alpha) const;
+        Vec3 outlineColor, float alpha) const;
 
     bool initWindowAndRenderer();
 

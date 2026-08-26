@@ -17,9 +17,7 @@ struct ResourceConverter;
 struct ResourceGenerator;
 class ReasoningGrid;
 
-enum CellColorDataSource {
-    OFF, AIRG_BITMAP, VISION_DATA, LAYER
-};
+enum CellColorDataSource { OFF, AIRG_BITMAP, VISION_DATA, LAYER };
 
 struct AirgVertex {
     glm::vec3 pos;
@@ -72,8 +70,7 @@ public:
     static int visibilityDataSize(const ReasoningGrid* reasoningGrid, int waypointIndex);
 
     static void addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
-                                    const Waypoint& waypoint, bool selected, const glm::vec4& color,
-                                    bool forceFan = false);
+        const Waypoint& waypoint, bool selected, const glm::vec4& color, bool forceFan = false);
 
     void renderLayerIndices(int waypointIndex) const;
 

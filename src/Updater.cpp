@@ -11,11 +11,11 @@ HWND g_hMainWnd = nullptr;
 HWND g_hEditLog = nullptr;
 HWND g_hCloseButton = nullptr;
 
-#define WM_APP_LOG_MESSAGE      (WM_APP + 1)
-#define WM_APP_UPDATE_COMPLETE  (WM_APP + 2)
+#define WM_APP_LOG_MESSAGE (WM_APP + 1)
+#define WM_APP_UPDATE_COMPLETE (WM_APP + 2)
 
-#define IDC_EDIT_LOG            101
-#define IDC_CLOSE_BUTTON        102
+#define IDC_EDIT_LOG 101
+#define IDC_CLOSE_BUTTON 102
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -37,9 +37,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     int argc;
     LPWSTR* argvW = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argvW == nullptr || argc < 5) {
-        MessageBoxW(
-            nullptr,
-            L"Updater: Invalid arguments.\n\nUsage: updater.exe <path_to_msi> <parent_process_id> <new_version> <install_dir>",
+        MessageBoxW(nullptr,
+            L"Updater: Invalid arguments.\n\nUsage: updater.exe <path_to_msi> <parent_process_id> <new_version> "
+            L"<install_dir>",
             L"Argument Error", MB_OK | MB_ICONERROR);
         if (argvW) {
             LocalFree(argvW);
@@ -73,11 +73,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     wc.hbrBackground = reinterpret_cast<HBRUSH>((COLOR_WINDOW + 1));
     RegisterClassW(&wc);
 
-    g_hMainWnd = CreateWindowExW(
-        0, CLASS_NAME, L"NavKit Updater",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 500, 300,
-        nullptr, nullptr, hInstance, nullptr);
+    g_hMainWnd =
+        CreateWindowExW(0, CLASS_NAME, L"NavKit Updater", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+            CW_USEDEFAULT, CW_USEDEFAULT, 500, 300, nullptr, nullptr, hInstance, nullptr);
 
     if (g_hMainWnd == nullptr) {
         return 0;
@@ -104,15 +102,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_CREATE: {
-        g_hEditLog = CreateWindowExW(
-            WS_EX_CLIENTEDGE, L"EDIT", L"",
-            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-            10, 10, 465, 200, hwnd, reinterpret_cast<HMENU>(IDC_EDIT_LOG), GetModuleHandle(nullptr), nullptr);
+        g_hEditLog = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY, 10, 10, 465, 200, hwnd,
+            reinterpret_cast<HMENU>(IDC_EDIT_LOG), GetModuleHandle(nullptr), nullptr);
 
-        g_hCloseButton = CreateWindowExW(
-            0, L"BUTTON", L"Close",
-            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_DISABLED,
-            385, 220, 90, 25, hwnd, reinterpret_cast<HMENU>(IDC_CLOSE_BUTTON), GetModuleHandle(nullptr), nullptr);
+        g_hCloseButton =
+            CreateWindowExW(0, L"BUTTON", L"Close", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_DISABLED,
+                385, 220, 90, 25, hwnd, reinterpret_cast<HMENU>(IDC_CLOSE_BUTTON), GetModuleHandle(nullptr), nullptr);
 
         auto hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
         SendMessage(g_hEditLog, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
@@ -146,7 +142,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
-    default: ;
+    default:;
     }
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
@@ -178,8 +174,7 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
         CloseHandle(parent_handle);
         LogMessage("Updater: NavKit closed.");
     } else {
-        LogMessage(
-            "Updater: Could not open parent process handle (PID: " + std::to_string(args->parent_pid) +
+        LogMessage("Updater: Could not open parent process handle (PID: " + std::to_string(args->parent_pid) +
             "). Continuing anyway.");
     }
 
@@ -220,8 +215,8 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
         LogMessage("Updater: Previous settings source: " + temp_settings_path.string());
         LogMessage("Updater: Previous settings destination: " + old_settings_destination_path.string());
         try {
-            std::filesystem::copy_file(temp_settings_path, old_settings_destination_path,
-                                       std::filesystem::copy_options::overwrite_existing);
+            std::filesystem::copy_file(
+                temp_settings_path, old_settings_destination_path, std::filesystem::copy_options::overwrite_existing);
             LogMessage("Updater: Copied old settings to " + old_settings_destination_path.string());
         } catch (const std::exception& e) {
             LogMessage("Updater: Failed to stage old settings for merging. Error: " + std::string(e.what()));
@@ -237,8 +232,8 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
         LogMessage("Updater: MSI installation failed with exit code: " + std::to_string(msi_exit_code));
         LogMessage("Updater: Check log for details: " + log_path.string());
         LogMessage("Updater: Attempting to relaunch the previous version of NavKit...");
-        ShellExecuteA(nullptr, "open", navkit_path.string().c_str(),
-                      nullptr, install_dir.string().c_str(), SW_SHOWNORMAL);
+        ShellExecuteA(
+            nullptr, "open", navkit_path.string().c_str(), nullptr, install_dir.string().c_str(), SW_SHOWNORMAL);
     } else {
         LogMessage("Updater: MSI installation completed successfully.");
         if (std::error_code ec; std::filesystem::remove(args->msi_path, ec)) {
@@ -249,19 +244,20 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
 
         LogMessage("Updater: Relaunching NavKit from: " + navkit_path.string());
         if (reinterpret_cast<INT_PTR>(ShellExecuteA(nullptr, "open", navkit_path.string().c_str(), nullptr,
-                                                    install_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
+                install_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
             LogMessage("Updater: Failed to relaunch NavKit. Error: " + std::to_string(GetLastError()));
         } else {
             LogMessage("Updater: Scheduling self-deletion of temporary files.");
             std::string temp_updater_path_str = args->updater_exe_path.string();
             std::string temp_dir_path_str = args->updater_exe_path.parent_path().string();
-            std::string self_delete_cmd = "cmd.exe /C start /B \"\" cmd /C \"ping 127.0.0.1 -n 4 > nul && del /Q /F \""
-                + temp_updater_path_str + "\" && rmdir \"" + temp_dir_path_str + "\"\"";
+            std::string self_delete_cmd =
+                "cmd.exe /C start /B \"\" cmd /C \"ping 127.0.0.1 -n 4 > nul && del /Q /F \"" + temp_updater_path_str +
+                "\" && rmdir \"" + temp_dir_path_str + "\"\"";
 
             STARTUPINFOA si_del = {sizeof(STARTUPINFOA)};
             PROCESS_INFORMATION pi_del = {};
             if (CreateProcessA(nullptr, &self_delete_cmd[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                               nullptr, &si_del, &pi_del)) {
+                    nullptr, &si_del, &pi_del)) {
                 CloseHandle(pi_del.hProcess);
                 CloseHandle(pi_del.hThread);
             } else {

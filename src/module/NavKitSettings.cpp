@@ -34,8 +34,8 @@ void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings& temp
     CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS, tempSettings.showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
 }
 
-INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam,
-                                                    const LPARAM lParam) {
+INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(
+    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
     auto navKitSettings = reinterpret_cast<NavKitSettings*>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
 
     switch (message) {
@@ -68,14 +68,12 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT 
         const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER));
 
         if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_BROWSE_HITMAN) {
-            if (const char* folderName =
-                SceneExtract::openHitmanFolderDialog(navKitSettings->hitmanFolder.data())) {
+            if (const char* folderName = SceneExtract::openHitmanFolderDialog(navKitSettings->hitmanFolder.data())) {
                 tempSettings->hitmanFolder = folderName;
                 SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings->hitmanFolder.c_str());
             }
         } else if (commandId == IDC_BUTTON_BROWSE_OUTPUT) {
-            if (const char* folderName =
-                SceneExtract::openOutputFolderDialog(navKitSettings->outputFolder.data())) {
+            if (const char* folderName = SceneExtract::openOutputFolderDialog(navKitSettings->outputFolder.data())) {
                 tempSettings->outputFolder = folderName;
                 SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
             }
@@ -87,8 +85,7 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT 
         } else if (commandId == IDC_CHECK_SHOW_DEBUG_LOGS) {
             tempSettings->showDebugLogs = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS);
             Logger::log(NK_INFO, "Show Debug logs set to %s.", tempSettings->showDebugLogs ? "true" : "false");
-            CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS,
-                           tempSettings->showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
+            CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS, tempSettings->showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
             return TRUE;
         } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
             navKitSettings->resetDefaults(*tempSettings);
@@ -102,8 +99,8 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT 
                 navKitSettings->showDebugLogs = tempSettings->showDebugLogs;
 
                 PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-                persistedSettings.setValue("NavKit", "backgroundColor",
-                                           std::to_string(navKitSettings->backgroundColor));
+                persistedSettings.setValue(
+                    "NavKit", "backgroundColor", std::to_string(navKitSettings->backgroundColor));
                 persistedSettings.setValue("NavKit", "hitman", tempSettings->hitmanFolder);
                 persistedSettings.setValue("NavKit", "output", tempSettings->outputFolder);
                 persistedSettings.setValue("NavKit", "blender", tempSettings->blenderPath);
@@ -132,17 +129,14 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(const HWND hDlg, const UINT 
         hSettingsDialog = nullptr;
         return TRUE;
     }
-    default: ;
+    default:;
     }
     return FALSE;
 }
 
-NavKitSettings::NavKitSettings() : backgroundColor(0.30f),
-                                   hitmanSet(false),
-                                   outputSet(false),
-                                   blenderSet(false),
-                                   showDebugLogs(false),
-                                   shouldOpenSettingsDialog(false) {}
+NavKitSettings::NavKitSettings() :
+    backgroundColor(0.30f), hitmanSet(false), outputSet(false), blenderSet(false), showDebugLogs(false),
+    shouldOpenSettingsDialog(false) {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
     if (hSettingsDialog) {
@@ -151,13 +145,8 @@ void NavKitSettings::showNavKitSettingsDialog() {
     }
     const HINSTANCE hInstance = GetModuleHandle(nullptr);
     const HWND hParentWnd = Renderer::hwnd;
-    hSettingsDialog = CreateDialogParam(
-        hInstance,
-        MAKEINTRESOURCE(IDD_NAVKIT_SETTINGS),
-        hParentWnd,
-        SettingsDialogProc,
-        reinterpret_cast<LPARAM>(this)
-    );
+    hSettingsDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_NAVKIT_SETTINGS), hParentWnd, SettingsDialogProc,
+        reinterpret_cast<LPARAM>(this));
 
     if (hSettingsDialog) {
         if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
