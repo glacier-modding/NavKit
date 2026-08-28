@@ -231,11 +231,11 @@ void Rpkg::checkHitmanVersion() {
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
     static constexpr const char* GAME_VERSION = "3.270.1";
     static std::map<std::string, std::string> gameHashes(
-        {std::pair("b894cfa2f11b6db52db587a21de688b2", "epic"), // base game
-            std::pair("6ce4ebfdd9e22e179206281d818850f5", "epic"), // ansel unlock
-            std::pair("4f1b7753a40359bde5d4aa013257c5f1", "steam"), // base game
-            std::pair("406865e7486cbc3b77a5f22fd73fbe00", "steam"), // ansel unlock
-            std::pair("cfdf300263b03d625099226882eafe84", "microsoft")});
+        {std::pair("9b85211686e6b95bfc5f48c961992a0b", "epic"), // base game
+            std::pair("bf6b2e2c34bf76e4a9b7e23a3c519f9b", "epic"), // ansel unlock
+            std::pair("9a17c533634f4b4bdbfa2e03cc72cfaf", "steam"), // base game
+            std::pair("82484078c5a1a78e2f84e9f0ad67760f", "steam"), // ansel unlock
+            std::pair("7814483cb24ba31e9d3cc5d8c0977920", "microsoft")});
     const std::string exePath = hitmanFolder + "\\Retail\\HITMAN3.exe";
     const std::string exeVersion = getExeVersion(exePath);
 
