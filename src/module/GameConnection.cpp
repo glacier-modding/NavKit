@@ -12,6 +12,7 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 // 46735 is a phoneword for HMSDK
@@ -101,7 +102,8 @@ int GameConnection::rebuildEntityTree() const {
 
 int GameConnection::listNavKitSceneEntities() const {
     std::stringstream m;
-    m << R"({"type":"listAlocPfBoxAndSeedPointEntities"})";
+    std::string onlyCollidableStr = SceneMesh::getInstance().onlyCollidable ? "true" : "false";
+    m << R"({"type":"listAlocPfBoxAndSeedPointEntities","onlyCollidable":)" << onlyCollidableStr << R"(})";
     const std::string msg = m.str();
     ws->send(msg);
     if (!ws) {

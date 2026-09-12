@@ -58,6 +58,7 @@ public:
     bool doObjHitTest;
     MeshType meshTypeForBuild;
     SceneMeshBuildType sceneMeshBuildType;
+    bool onlyCollidable = true;
     bool primLods[8];
     bool blendFileBuilt;
     bool extractTextures;

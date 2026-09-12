@@ -33,10 +33,11 @@ SceneMesh::SceneMesh() :
     loadObjName("Load Obj"), saveObjName("Save Obj"), lastObjFileName("Load Obj"), lastSaveObjFileName("Save Obj"),
     objLoaded(false), showObj(true), loadObj(false), startedSceneMeshGeneration(false),
     blenderSceneMeshBuildStarted(false), blenderSceneMeshGenerationDone(false), blendFileOnlyBuild(false),
-    blendFileAndObjBuild(false), filterToIncludeBox(true), errorBuilding(false), skipExtractingAlocsOrPrims(false),
-    errorExtracting(false), extractingResources(false), doneExtractingAlocsOrPrims(false), doObjHitTest(false),
-    meshTypeForBuild(ALOC), sceneMeshBuildType(COPY), primLods{true, true, true, true, true, true, true, true},
-    blendFileBuilt(false), extractTextures(false), applyTextures(false) {}
+    blendFileAndObjBuild(false), filterToIncludeBox(true), onlyCollidable(true), errorBuilding(false),
+    skipExtractingAlocsOrPrims(false), errorExtracting(false), extractingResources(false),
+    doneExtractingAlocsOrPrims(false), doObjHitTest(false), meshTypeForBuild(ALOC), sceneMeshBuildType(COPY),
+    primLods{true, true, true, true, true, true, true, true}, blendFileBuilt(false), extractTextures(false),
+    applyTextures(false) {}
 
 HWND SceneMesh::hSceneMeshDialog = nullptr;
 
@@ -90,6 +91,7 @@ void SceneMesh::updateObjDialogControls(const HWND hDlg) {
 
     CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX, obj.filterToIncludeBox ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_CHECK_ONLY_COLLIDABLE, obj.onlyCollidable ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES, obj.extractTextures ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
 }
@@ -124,16 +126,23 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(
         }
 
         case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
-            sceneMesh.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX) ? COPY : INSTANCE;
+            sceneMesh.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX);
             sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Filter to include box set to %s.", sceneMesh.filterToIncludeBox ? "true" : "false");
             updateObjDialogControls(hDlg);
             return TRUE;
         }
 
+        case IDC_CHECK_ONLY_COLLIDABLE: {
+            sceneMesh.onlyCollidable = IsDlgButtonChecked(hDlg, IDC_CHECK_ONLY_COLLIDABLE);
+            sceneMesh.saveSceneMeshSettings();
+            Logger::log(NK_INFO, "Only collidable meshes set to %s.", sceneMesh.onlyCollidable ? "true" : "false");
+            updateObjDialogControls(hDlg);
+            return TRUE;
+        }
+
         case IDC_CHECK_SKIP_RPKG_EXTRACT: {
-            sceneMesh.skipExtractingAlocsOrPrims =
-                IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT) ? COPY : INSTANCE;
+            sceneMesh.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT);
             sceneMesh.saveSceneMeshSettings();
             Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.",
                 sceneMesh.skipExtractingAlocsOrPrims ? "true" : "false");
@@ -796,6 +805,9 @@ void SceneMesh::saveSceneMeshSettings() const {
     const char* filterEnabled = filterToIncludeBox ? "true" : "false";
     persistedSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
 
+    const char* onlyCollidableEnabled = onlyCollidable ? "true" : "false";
+    persistedSettings.setValue("Obj", "onlyCollidable", onlyCollidableEnabled);
+
     const char* extractTexturesEnabled = extractTextures ? "true" : "false";
     persistedSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
 
@@ -813,6 +825,7 @@ void SceneMesh::resetDefaults() {
     sceneMeshBuildType = COPY;
     skipExtractingAlocsOrPrims = false;
     filterToIncludeBox = true;
+    onlyCollidable = true;
 }
 
 void SceneMesh::showSceneMeshDialog() {
