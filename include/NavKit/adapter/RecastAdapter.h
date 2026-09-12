@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include "../util/Platform.h"
 
 #include "../../RecastDemo/Sample_TileMesh.h"
 

@@ -36,12 +36,7 @@ SOFTWARE.
 #include <stdlib.h>
 #include <limits>
 
-#if _WIN32
-#define SIMD_PATH "..\\..\\extern\\simdjson\\simdjson.h"
-#else
-#define SIMD_PATH "../Src/External/simdjson.h"
-#endif
-#include SIMD_PATH
+#include "../../extern/simdjson/simdjson.h"
 
 #include "Vec3.h"
 

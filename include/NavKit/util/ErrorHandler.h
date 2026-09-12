@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL_syswm.h>
+#include "Platform.h"
 #include <string>
 
 class ErrorHandler {

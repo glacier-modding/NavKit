@@ -1,10 +1,12 @@
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
 
 std::string* ErrorHandler::errorMessage = nullptr;
 
 INT_PTR CALLBACK ErrorHandler::ErrorDialogHandler(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+#ifdef _WIN32
     switch (uMsg) {
     case WM_INITDIALOG: {
         const HWND hStatic = GetDlgItem(hwndDlg, IDC_ERROR_TEXT);
@@ -39,9 +41,13 @@ INT_PTR CALLBACK ErrorHandler::ErrorDialogHandler(HWND hwndDlg, UINT uMsg, WPARA
     default:
         return FALSE;
     }
+#else
+    return 0;
+#endif
 }
 
 void ErrorHandler::openErrorDialog(const std::string& message) {
+#ifdef _WIN32
     std::string formattedMessage = message;
 
     size_t pos = 0;
@@ -51,4 +57,7 @@ void ErrorHandler::openErrorDialog(const std::string& message) {
     }
     errorMessage = new std::string(formattedMessage);
     DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, ErrorDialogHandler, 0);
+#else
+    Logger::log(NK_ERROR, "%s", message.c_str());
+#endif
 }

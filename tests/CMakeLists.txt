@@ -8,10 +8,13 @@ target_link_libraries(NavKitTests PRIVATE
         NavKitLib
 )
 
-set(TEST_DLLS
-        "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/ResourceLib_HM3.dll"
-        "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/nfd.dll"
-)
+set(TEST_DLLS)
+if (WIN32)
+    set(TEST_DLLS
+            "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/ResourceLib_HM3.dll"
+            "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/nfd.dll"
+    )
+endif ()
 set(TEST_RESOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/resources/rectangles.navp"
         "${CMAKE_CURRENT_SOURCE_DIR}/resources/rectangles.obj"

@@ -1,5 +1,7 @@
 #include "../../include/NavKit/util/UpdateChecker.h"
+#ifdef _WIN32
 #include <shellapi.h>
+#endif
 #include <sstream>
 #include <string>
 #include <thread>
@@ -40,7 +42,7 @@ void UpdateChecker::performUpdateCheck() {
             return;
         }
         if (res->status != 200) {
-            Logger::log(NK_ERROR, "GitHub API request failed with status: %s", std::to_string(res->status));
+            Logger::log(NK_ERROR, "GitHub API request failed with status: %s", std::to_string(res->status).c_str());
             return;
         }
         updateChecker.responseBody = res->body;
@@ -110,6 +112,7 @@ void splitUrl(const std::string& url, std::string& domain, std::string& path) {
 }
 
 void UpdateChecker::performUpdate() const {
+#ifdef _WIN32
     Logger::log(NK_INFO, "Preparing update...");
 
     if (msiUrl.empty()) {
@@ -197,10 +200,14 @@ void UpdateChecker::performUpdate() const {
 
     Sleep(1000);
     exit(0);
+#else
+    Logger::log(NK_WARN, "Automatic updates are only supported on Windows.");
+#endif
 }
 
 INT_PTR CALLBACK UpdateChecker::updateDialogHandler(
     const HWND hwndDlg, const UINT uMsg, const WPARAM wParam, LPARAM lParam) {
+#ifdef _WIN32
     const UpdateChecker& updateChecker = getInstance();
     switch (uMsg) {
     case WM_INITDIALOG: {
@@ -225,9 +232,13 @@ INT_PTR CALLBACK UpdateChecker::updateDialogHandler(
     default:
         return FALSE;
     }
+#else
+    return 0;
+#endif
 }
 
 void UpdateChecker::openUpdateDialog(const std::string& message) {
+#ifdef _WIN32
     std::string formattedMessage = message;
 
     size_t pos = 0;
@@ -238,6 +249,9 @@ void UpdateChecker::openUpdateDialog(const std::string& message) {
     updateMessage = std::string(formattedMessage);
     DialogBoxParamA(
         GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_UPDATE_DIALOG), Renderer::hwnd, updateDialogHandler, 0);
+#else
+    Logger::log(NK_INFO, "%s", message.c_str());
+#endif
 }
 
 bool UpdateChecker::isVersionGreaterThan(const std::string& v1, const std::string& v2) {

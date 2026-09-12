@@ -6,9 +6,9 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "..\ZHM\ZHMSerializer.h"
-#include "..\ZHM\ZHMPtr.h"
-#include "..\Util\PortableIntrinsics.h"
+#include "../ZHM/ZHMSerializer.h"
+#include "../ZHM/ZHMPtr.h"
+#include "../Util/PortableIntrinsics.h"
 
 #pragma pack(push, 1)
 

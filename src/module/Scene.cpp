@@ -1,5 +1,7 @@
 #include "../../include/NavKit/module/Scene.h"
+#ifdef _WIN32
 #include <CommCtrl.h>
+#endif
 #include <fstream>
 #include <functional>
 #include <iomanip>
@@ -288,7 +290,7 @@ void Scene::saveScene(const std::string& fileName) const {
         f.close();
         Logger::log(NK_INFO, "Done saving Scene.");
     } else {
-        Logger::log(NK_ERROR, "Failed to open file for saving scene: %s", fileName);
+        Logger::log(NK_ERROR, "Failed to open file for saving scene: %s", fileName.c_str());
     }
 }
 
@@ -348,6 +350,7 @@ void Scene::resetBBoxDefaults() {
 }
 
 void Scene::updateSceneDialogControls(const HWND hDlg) const {
+#ifdef _WIN32
     // Position Sliders (-500 to 500)
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[0] + 500.0f));
@@ -373,6 +376,7 @@ void Scene::updateSceneDialogControls(const HWND hDlg) const {
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
     SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[2]));
     SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
+#endif
 }
 
 const Json::Mesh* Scene::findMeshByHashAndIdAndPos(
@@ -396,6 +400,7 @@ const Json::Mesh* Scene::findMeshByHashAndIdAndPos(
 }
 
 INT_PTR CALLBACK Scene::sceneDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+#ifdef _WIN32
     Scene& scene = getInstance();
 
     switch (message) {
@@ -456,9 +461,13 @@ INT_PTR CALLBACK Scene::sceneDialogProc(const HWND hDlg, const UINT message, con
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 void Scene::showSceneDialog() {
+#ifdef _WIN32
     if (hSceneDialog) {
         SetForegroundWindow(hSceneDialog);
         return;
@@ -487,4 +496,7 @@ void Scene::showSceneDialog() {
         SetWindowPos(hSceneDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         ShowWindow(hSceneDialog, SW_SHOW);
     }
+#else
+    Logger::log(NK_WARN, "The Scene settings dialog is only available on Windows.");
+#endif
 }

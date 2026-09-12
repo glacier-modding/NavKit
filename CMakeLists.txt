@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.30)
 cmake_policy(SET CMP0141 NEW)
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<CONFIG:Debug>,EditAndContinue,ProgramDatabase>" CACHE STRING "MSVC debug information format")
+
+# Use the bundled vcpkg toolchain when the caller did not pass one. Must be set before the first project call
+if (NOT DEFINED CMAKE_TOOLCHAIN_FILE AND NOT DEFINED ENV{CMAKE_TOOLCHAIN_FILE}
+        AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/vcpkg/scripts/buildsystems/vcpkg.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/extern/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            CACHE FILEPATH "Toolchain file (defaults to the vcpkg submodule)")
+    message(STATUS "Using vcpkg toolchain from extern/vcpkg")
+endif ()
+
 project(
         NavKit
         VERSION 3.5.1
@@ -12,7 +21,28 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_TESTING "Build the tests" OFF)
 find_package(BZip2 REQUIRED)
-find_package(FTGL CONFIG REQUIRED)
+
+if (WIN32)
+    find_package(FTGL CONFIG REQUIRED)
+else ()
+    # vcpkg's ftgl port installs its CMake config one level too deep on non-Windows (share/ftgl/FTGL/), which also breaks the import prefix inside it.
+    # So we'll prefer the config when it is usable and otherwise import the static library directly.
+    find_package(FTGL CONFIG QUIET)
+    if (NOT TARGET ftgl)
+        find_library(FTGL_LIBRARY_RELEASE NAMES ftgl REQUIRED)
+        find_library(FTGL_LIBRARY_DEBUG NAMES ftgld ftgl REQUIRED)
+        find_path(FTGL_INCLUDE_DIR NAMES FTGL/ftgl.h REQUIRED)
+        add_library(ftgl UNKNOWN IMPORTED)
+        set_target_properties(ftgl PROPERTIES
+                IMPORTED_LOCATION "${FTGL_LIBRARY_RELEASE}"
+                IMPORTED_LOCATION_DEBUG "${FTGL_LIBRARY_DEBUG}"
+                INTERFACE_INCLUDE_DIRECTORIES "${FTGL_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES "Freetype::Freetype;OpenGL::GL"
+        )
+        message(STATUS "FTGL: imported ${FTGL_LIBRARY_RELEASE} directly (vcpkg config not usable)")
+    endif ()
+endif ()
+
 find_package(Freetype REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)

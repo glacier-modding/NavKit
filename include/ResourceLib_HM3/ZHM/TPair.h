@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include "..\..\..\extern\simdjson\simdjson.h"
+#include "../../../extern/simdjson/simdjson.h"
 
 #pragma pack(push, 1)
 

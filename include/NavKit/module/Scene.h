@@ -2,7 +2,8 @@
 #include <functional>
 #define WIN32_LEAN_AND_MEAN
 #include <map>
-#include <windows.h>
+#include <thread>
+#include "../util/Platform.h"
 #include "../model/Json.h"
 
 class Scene {
