@@ -15,7 +15,7 @@ from bpy.types import (
     Context,
 )
 
-glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "DEBUG", "INFO", "WARNING", "ERROR"
+glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "TRACE", "DEBUG", "INFO", "WARNING", "ERROR"
 
 
 # General
@@ -23,7 +23,11 @@ glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are 
 
 def log(level, msg, filter_field):
     if level in glacier2obj_enabled_log_levels:  # and filter_field == "007573591BE1BE69":
-        print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
+        # print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
+        if level != "INFO":
+            print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
+        else:
+            print(str(msg), flush=True)
         try:
             sys.stdout.flush()
             os.fsync(sys.stdout.fileno())
@@ -1375,7 +1379,7 @@ def load_prim(filepath, lod_mask):
     """Imports a mesh from the given path"""
 
     prim_name = bpy.path.display_name_from_filepath(filepath)
-    log("INFO", "Started reading PRIM: " + str(prim_name), "load_prim")
+    log("DEBUG", "Started reading PRIM: " + str(prim_name), "load_prim")
 
     fp = os.fsencode(filepath)
     file = open(fp, "rb")
@@ -1571,32 +1575,32 @@ def read_convex_mesh(br, aloc_name):
     #  sizeof variable data (with grb) = 16 + 24 + 120 + 24 + 24 + 24 + 96 = 328 = 0x148
     #  Total size (no grb) = 103 + 232 = 0x67 + 0xE8 = 335 = 0x14F
     #  Total size (with grb) = 103 + 328 = 0x67 + 0x148 = 431 = 0x1AF
-    log("DEBUG", "Starting to read variable convex mesh hull data. Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Starting to read variable convex mesh hull data. Current offset: " + str(br.tell()), aloc_name)
     convex_mesh.vertex_count = br.readUInt()
-    log("DEBUG", "Num vertices " + str(convex_mesh.vertex_count), aloc_name)
+    log("TRACE", "Num vertices " + str(convex_mesh.vertex_count), aloc_name)
 
     grb_flag_and_edge_count = br.readUInt()
     convex_mesh.has_grb_data = 0x8000 & grb_flag_and_edge_count
-    log("DEBUG", "Has_grb_data " + str(convex_mesh.has_grb_data), aloc_name)
+    log("TRACE", "Has_grb_data " + str(convex_mesh.has_grb_data), aloc_name)
 
     convex_mesh.edge_count = 0x7FFF & grb_flag_and_edge_count
-    log("DEBUG", "edge_count " + str(convex_mesh.edge_count), aloc_name)
+    log("TRACE", "edge_count " + str(convex_mesh.edge_count), aloc_name)
     convex_mesh.polygon_count = br.readUInt()
-    log("DEBUG", "polygon_count " + str(convex_mesh.polygon_count), aloc_name)
+    log("TRACE", "polygon_count " + str(convex_mesh.polygon_count), aloc_name)
     convex_mesh.polygons_vertex_count = br.readUInt()
-    log("DEBUG", "polygons_vertex_count " + str(convex_mesh.polygons_vertex_count), aloc_name)
+    log("TRACE", "polygons_vertex_count " + str(convex_mesh.polygons_vertex_count), aloc_name)
     vertices = []
     for _vertex_index in range(convex_mesh.vertex_count):
         vertices.append(br.readFloatVec(3))
     convex_mesh.vertices = vertices
-    log("DEBUG", "Finished reading vertices and metadata. Reading convex main hull data", aloc_name)
+    log("TRACE", "Finished reading vertices and metadata. Reading convex main hull data", aloc_name)
 
     # Unused because Blender can build the convex hull
     hull_polygon_data = 0
     for _polygon_index in range(convex_mesh.polygon_count):
-        log("DEBUG", "Reading 20 characters of HullPolygonData. Current offset: " + str(br.tell()), aloc_name)
+        log("TRACE", "Reading 20 characters of HullPolygonData. Current offset: " + str(br.tell()), aloc_name)
         hull_polygon_data = br.readUByteVec(20)  # HullPolygonData
-        log("DEBUG", len(hull_polygon_data), aloc_name)
+        log("TRACE", len(hull_polygon_data), aloc_name)
         # TODO: <------------------ Read past EOF Here on second convex mesh!
         if len(hull_polygon_data) < 20:
             break
@@ -1604,27 +1608,27 @@ def read_convex_mesh(br, aloc_name):
         return
     _mHullDataVertexData8 = br.readUByteVec(
         convex_mesh.polygons_vertex_count)  # mHullDataVertexData8 for each polygon's vertices
-    log("DEBUG", "mHullDataVertexData8 " + str(_mHullDataVertexData8), aloc_name)
+    log("TRACE", "mHullDataVertexData8 " + str(_mHullDataVertexData8), aloc_name)
     _mHullDataFacesByEdges8 = br.readUByteVec(convex_mesh.edge_count * 2)  # mHullDataFacesByEdges8
-    log("DEBUG", "mHullDataFacesByEdges8 " + str(_mHullDataVertexData8), aloc_name)
+    log("TRACE", "mHullDataFacesByEdges8 " + str(_mHullDataVertexData8), aloc_name)
     _mHullDataFacesByVertices8 = br.readUByteVec(convex_mesh.vertex_count * 3)  # mHullDataFacesByVertices8
-    log("DEBUG", "mHullDataFacesByVertices8 " + str(_mHullDataVertexData8), aloc_name)
+    log("TRACE", "mHullDataFacesByVertices8 " + str(_mHullDataVertexData8), aloc_name)
     if convex_mesh.has_grb_data == 1:
-        log("DEBUG", "has_grb_data true. Reading edges. Current offset: " + str(br.tell()), aloc_name)
+        log("TRACE", "has_grb_data true. Reading edges. Current offset: " + str(br.tell()), aloc_name)
         _mEdges = br.readUByteVec(4 * 2 * convex_mesh.edge_count)  # mEdges
     else:
-        log("DEBUG", "has_grb_data false. No edges to read. Current offset: " + str(br.tell()), aloc_name)
-    log("DEBUG",
+        log("TRACE", "has_grb_data false. No edges to read. Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE",
         "Finished reading main convex hull data. Reading remaining convex hull data. Current offset: " + str(br.tell()),
         aloc_name)
     # ---- End of Variable data for each Convex Mesh Hull
 
     # Remaining convex hull data
     zero = br.readFloat()  # 0
-    log("DEBUG", "This should be zero: " + str(zero) + " Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "This should be zero: " + str(zero) + " Current offset: " + str(br.tell()), aloc_name)
     # Local bounds
     bbox_min_x = br.readFloat()  # mHullData.mAABB.getMin(0)
-    log("DEBUG", "Bbox min x: " + str(bbox_min_x) + " Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Bbox min x: " + str(bbox_min_x) + " Current offset: " + str(br.tell()), aloc_name)
     _bbox_min_y = br.readFloat()  # mHullData.mAABB.getMin(1)
     _bbox_min_z = br.readFloat()  # mHullData.mAABB.getMin(2)
     _bbox_max_x = br.readFloat()  # mHullData.mAABB.getMax(0)
@@ -1632,48 +1636,48 @@ def read_convex_mesh(br, aloc_name):
     _bbox_max_z = br.readFloat()  # mHullData.mAABB.getMax(2)
     # Mass Info
     mass = br.readFloat()  # mMass
-    log("DEBUG", "Mass: " + str(mass) + " Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Mass: " + str(mass) + " Current offset: " + str(br.tell()), aloc_name)
     br.readFloatVec(9)  # mInertia
     br.readFloatVec(3)  # mCenterOfMass.x
     gauss_map_flag = br.readFloat()
-    log("DEBUG", "Gauss Flag: " + str(gauss_map_flag), aloc_name)
+    log("TRACE", "Gauss Flag: " + str(gauss_map_flag), aloc_name)
 
     if gauss_map_flag == 1.0:
-        log("DEBUG", "Gauss Flag is 1.0, reading Gauss Data", aloc_name)
+        log("TRACE", "Gauss Flag is 1.0, reading Gauss Data", aloc_name)
         br.readUByteVec(24)  # ICE.SUPM....ICE.GAUS....
         m_subdiv = br.readInt()  # mSVM->mData.m_subdiv
-        log("DEBUG", "m_subdiv: " + str(m_subdiv), aloc_name)
+        log("TRACE", "m_subdiv: " + str(m_subdiv), aloc_name)
 
         num_samples = br.readInt()  # mSVM->mData.mNbSamples
-        log("DEBUG", "num_samples: " + str(num_samples), aloc_name)
+        log("TRACE", "num_samples: " + str(num_samples), aloc_name)
         br.readUByteVec(num_samples * 2)
         br.readUByteVec(4)  # ICE.
-        log("DEBUG", "Reading VALE: Current offset: " + str(br.tell()), aloc_name)
+        log("TRACE", "Reading VALE: Current offset: " + str(br.tell()), aloc_name)
         vale = br.readString(4)  # VALE
-        log("DEBUG", "Should say VALE: " + str(vale), aloc_name)
+        log("TRACE", "Should say VALE: " + str(vale), aloc_name)
         br.readUByteVec(4)  # ....
         num_svm_verts = br.readInt()  # mSVM->mData.mNbVerts
-        log("DEBUG", "num_svm_verts: " + str(num_svm_verts), aloc_name)
+        log("TRACE", "num_svm_verts: " + str(num_svm_verts), aloc_name)
         num_svm_adj_verts = br.readInt()  # mSVM->mData.mNbAdjVerts
-        log("DEBUG", "num_svm_adj_verts: " + str(num_svm_adj_verts), aloc_name)
+        log("TRACE", "num_svm_adj_verts: " + str(num_svm_adj_verts), aloc_name)
         svm_max_index = br.readInt()  # maxIndex
-        log("DEBUG", "svm_max_index: " + str(svm_max_index), aloc_name)
+        log("TRACE", "svm_max_index: " + str(svm_max_index), aloc_name)
         if svm_max_index <= 0xff:
-            log("DEBUG", "svm_max_index <= 0xff. File offset: " + str(br.tell()), aloc_name)
+            log("TRACE", "svm_max_index <= 0xff. File offset: " + str(br.tell()), aloc_name)
             br.readUByteVec(num_svm_verts)
         else:
-            log("DEBUG", "svm_max_index > 0xff. File offset: " + str(br.tell()), aloc_name)
+            log("TRACE", "svm_max_index > 0xff. File offset: " + str(br.tell()), aloc_name)
             br.readUByteVec(num_svm_verts * 2)
         br.readUByteVec(num_svm_adj_verts)
-        log("DEBUG", "Finished Gauss Data. File offset: " + str(br.tell()), aloc_name)
+        log("TRACE", "Finished Gauss Data. File offset: " + str(br.tell()), aloc_name)
     else:
-        log("DEBUG", "Gauss Flag is " + str(gauss_map_flag) + " No Gauss Data. File offset: " + str(br.tell()),
+        log("TRACE", "Gauss Flag is " + str(gauss_map_flag) + " No Gauss Data. File offset: " + str(br.tell()),
             aloc_name)
     _mRadius = br.readFloat()
     _mExtents_0 = br.readFloat()
     _mExtents_1 = br.readFloat()
     _mExtents_2 = br.readFloat()
-    log("DEBUG", "Finished reading Convex mesh. File offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Finished reading Convex mesh. File offset: " + str(br.tell()), aloc_name)
     return convex_mesh
 
 
@@ -1684,7 +1688,7 @@ def read_triangle_mesh(aloc_name, br):
     br.readUByteVec(16)  # \0\0\0\0NXS.MESH....\u{15}\0\0\0
     # Offset: 47
     br.readUByteVec(4)  # midPhaseId
-    log("DEBUG", "Reading serial_flags. Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Reading serial_flags. Current offset: " + str(br.tell()), aloc_name)
 
     triangle_mesh.serial_flags = br.readInt()
     # Example Serial Flag: 6 = 00000110: IMSF_FACE_REMAP | IMSF_8BIT_INDICES
@@ -1694,77 +1698,77 @@ def read_triangle_mesh(aloc_name, br):
     # IMSF_16BIT_INDICES   =    (1 << 3), // ! < if set, the cooked mesh file contains 16bit indices (topology)
     # IMSF_ADJACENCIES     =    (1 << 4), // ! < if set, the cooked mesh file contains adjacency structures
     # IMSF_GRB_DATA        =    (1 << 5)  // ! < if set, the cooked mesh file contains GRB data structures
-    log("DEBUG", "Reading Vertex_count: Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Reading Vertex_count: Current offset: " + str(br.tell()), aloc_name)
     triangle_mesh.vertex_count = br.readUInt()
-    log("DEBUG", "vertex_count: " + str(triangle_mesh.vertex_count), aloc_name)
+    log("TRACE", "vertex_count: " + str(triangle_mesh.vertex_count), aloc_name)
     triangle_mesh.triangle_count = br.readUInt()
-    log("DEBUG", "triangle_count: " + str(triangle_mesh.triangle_count), aloc_name)
+    log("TRACE", "triangle_count: " + str(triangle_mesh.triangle_count), aloc_name)
     vertices = []
     for vertex_index in range(triangle_mesh.vertex_count):
         vertex = br.readFloatVec(3)
-        log("DEBUG", "vertex " + str(vertex_index) + ": " + str(vertex), aloc_name)
+        log("TRACE", "vertex " + str(vertex_index) + ": " + str(vertex), aloc_name)
         vertices.append(vertex)
     triangle_mesh.vertices = vertices
     # Check serial flag
     triangle_data = []
-    log("DEBUG", "serial Flags: " + str(triangle_mesh.serial_flags), aloc_name)
+    log("TRACE", "serial Flags: " + str(triangle_mesh.serial_flags), aloc_name)
     is_8bit = (triangle_mesh.serial_flags >> 2) & 1 == 1
-    log("DEBUG", "is_8bit: " + str(is_8bit), aloc_name)
+    log("TRACE", "is_8bit: " + str(is_8bit), aloc_name)
     is_16bit = (triangle_mesh.serial_flags >> 3) & 1 == 1
-    log("DEBUG", "is_16bit: " + str(is_16bit), aloc_name)
+    log("TRACE", "is_16bit: " + str(is_16bit), aloc_name)
     if is_8bit:
-        log("DEBUG", "is_8bit. Reading triangle bytes", aloc_name)
+        log("TRACE", "is_8bit. Reading triangle bytes", aloc_name)
         for triangle_index in range(triangle_mesh.triangle_count * 3):
             triangle_byte = br.readUByte()
-            log("DEBUG", "Triangle_byte: " + str(triangle_byte), aloc_name)
+            log("TRACE", "Triangle_byte: " + str(triangle_byte), aloc_name)
             triangle_data.append(triangle_byte)
     elif is_16bit:
-        log("DEBUG", "is_16bit. Reading triangle shorts", aloc_name)
+        log("TRACE", "is_16bit. Reading triangle shorts", aloc_name)
         for triangle_index in range(triangle_mesh.triangle_count * 3):
             triangle_short = br.readUShort()
-            log("DEBUG", "Triangle_short: " + str(triangle_short), aloc_name)
+            log("TRACE", "Triangle_short: " + str(triangle_short), aloc_name)
             triangle_data.append(triangle_short)
     else:
-        log("DEBUG", "Not 8 or 16 bit. Reading triangle ints", aloc_name)
+        log("TRACE", "Not 8 or 16 bit. Reading triangle ints", aloc_name)
         for triangle_index in range(triangle_mesh.triangle_count * 3):
             triangle_int = br.readInt()
-            log("DEBUG", "Triangle_Int: " + str(triangle_int), aloc_name)
+            log("TRACE", "Triangle_Int: " + str(triangle_int), aloc_name)
             triangle_data.append(triangle_int)
     triangle_mesh.triangle_data = triangle_data
     material_indices = (triangle_mesh.serial_flags >> 0) & 1 == 1
-    log("DEBUG", "material_indices: " + str(material_indices), aloc_name)
+    log("TRACE", "material_indices: " + str(material_indices), aloc_name)
 
     if material_indices:
         br.readUByteVec(2 * triangle_mesh.triangle_count)  # material_indices
     face_remap = (triangle_mesh.serial_flags >> 1) & 1 == 1
-    log("DEBUG", "face_remap: " + str(face_remap), aloc_name)
+    log("TRACE", "face_remap: " + str(face_remap), aloc_name)
 
     if face_remap:
         max_id = br.readInt()
-        log("DEBUG", "max_id: " + str(max_id), aloc_name)
+        log("TRACE", "max_id: " + str(max_id), aloc_name)
         if max_id <= 0xff:
             face_remap_val = br.readUByteVec(triangle_mesh.triangle_count)
-            log("DEBUG", "face_remap_val 8bit: " + str(face_remap_val), aloc_name)
+            log("TRACE", "face_remap_val 8bit: " + str(face_remap_val), aloc_name)
 
         elif max_id <= 0xffff:
             face_remap_val = br.readUByteVec(triangle_mesh.triangle_count * 2)
-            log("DEBUG", "face_remap_val 16bit: " + str(face_remap_val), aloc_name)
+            log("TRACE", "face_remap_val 16bit: " + str(face_remap_val), aloc_name)
         else:
             for triangle_index in range(triangle_mesh.triangle_count):
                 face_remap_val = br.readInt()
-                log("DEBUG", "face_remap_val int: " + str(face_remap_val), aloc_name)
+                log("TRACE", "face_remap_val int: " + str(face_remap_val), aloc_name)
     adjacencies = (triangle_mesh.serial_flags >> 4) & 1 == 1
-    log("DEBUG", "adjacencies: " + str(adjacencies), aloc_name)
+    log("TRACE", "adjacencies: " + str(adjacencies), aloc_name)
     if adjacencies:
         for triangle_index in range(triangle_mesh.triangle_count * 3):
             br.readInt()
     # Write midPhaseStructure. Is it BV4? -> BV4TriangleMeshBuilder::saveMidPhaseStructure
-    log("DEBUG", "Reading BV4: Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Reading BV4: Current offset: " + str(br.tell()), aloc_name)
     bv4 = br.readString(3)  # "BV4."
     br.readUByte()
-    log("DEBUG", "Should say BV4: " + str(bv4), aloc_name)
+    log("TRACE", "Should say BV4: " + str(bv4), aloc_name)
     bv4_version = br.readIntBigEndian()  # Bv4 Structure Version. Is always 1, so the midPhaseStructure will be bigEndian
-    log("DEBUG", "BV4 version. Should be 1: " + str(bv4_version), aloc_name)
+    log("TRACE", "BV4 version. Should be 1: " + str(bv4_version), aloc_name)
     if bv4_version != 1:
         log("ERROR", "[ERROR] Error reading triangle mesh: Unexpected BV4 version.", aloc_name)
         # raise ValueError("[ERROR] Error reading triangle mesh " + aloc_name + ": Unexpected BV4 version. File offset: " + str(br.tell()))
@@ -1782,9 +1786,9 @@ def read_triangle_mesh(aloc_name, br):
     br.readFloat()  # mData.mBV4Tree.mExtentsOrMaxCoeff.y
     br.readFloat()  # mData.mBV4Tree.mExtentsOrMaxCoeff.z
     # endif
-    log("DEBUG", "Reading mNbNodes: Current offset: " + str(br.tell()), aloc_name)
+    log("TRACE", "Reading mNbNodes: Current offset: " + str(br.tell()), aloc_name)
     m_nb_nodes = br.readIntBigEndian()  # mData.mBV4Tree.mNbNodes
-    log("DEBUG", "mNbNodes: " + str(m_nb_nodes), aloc_name)
+    log("TRACE", "mNbNodes: " + str(m_nb_nodes), aloc_name)
 
     for _mNbNodesIndex in range(m_nb_nodes):
         # #ifdef GU_BV4_QUANTIZED_TREE
@@ -1797,17 +1801,17 @@ def read_triangle_mesh(aloc_name, br):
 
     br.readFloat()  # mMeshData.mGeomEpsilon
     bbox_min_x = br.readFloat()  # mMeshData.mAABB.minimum.x
-    log("DEBUG", "mMeshData.mAABB.minimum.x: " + str(bbox_min_x), aloc_name)
+    log("TRACE", "mMeshData.mAABB.minimum.x: " + str(bbox_min_x), aloc_name)
     br.readFloat()  # mMeshData.mAABB.minimum.y
     br.readFloat()  # mMeshData.mAABB.minimum.z
     br.readFloat()  # mMeshData.mAABB.maximum.x
     br.readFloat()  # mMeshData.mAABB.maximum.y
     bbox_min_z = br.readFloat()  # mMeshData.mAABB.maximum.z
-    log("DEBUG", "mMeshData.mAABB.maximum.z: " + str(bbox_min_z), aloc_name)
+    log("TRACE", "mMeshData.mAABB.maximum.z: " + str(bbox_min_z), aloc_name)
 
     # if(mMeshData.mExtraTrigData)
     m_nbv_triangles = br.readInt()  # mMeshData.mNbTriangles
-    log("DEBUG", "m_nbv_triangles: " + str(m_nbv_triangles), aloc_name)
+    log("TRACE", "m_nbv_triangles: " + str(m_nbv_triangles), aloc_name)
 
     br.readUByteVec(m_nbv_triangles)
     # else
@@ -1816,7 +1820,7 @@ def read_triangle_mesh(aloc_name, br):
 
     # GRB Write
     has_grb = (triangle_mesh.serial_flags >> 5) & 1 == 1
-    log("DEBUG", "has_grb: " + str(has_grb), aloc_name)
+    log("TRACE", "has_grb: " + str(has_grb), aloc_name)
 
     if has_grb:
         for _triangle_index in range(triangle_mesh.triangle_count * 3):
@@ -1830,7 +1834,7 @@ def read_triangle_mesh(aloc_name, br):
         br.readUIntVec(triangle_mesh.triangle_count)  # mMeshData.mGRB_faceRemap
         # Write midPhaseStructure BV3 -> BV32TriangleMeshBuilder::saveMidPhaseStructure
         bv32 = br.readString(4)  # "BV32"
-        log("DEBUG", "Reading BV32: " + str(bv32) + " File Offset: " + str(br.tell()), aloc_name)
+        log("TRACE", "Reading BV32: " + str(bv32) + " File Offset: " + str(br.tell()), aloc_name)
         br.readUByteVec(4)  # Bv32 Structure Version. If 1, the midPhaseStructure will be bigEndian
         br.readFloat()  # mData.mBV4Tree.mLocalBounds.mCenter.x
         br.readFloat()  # mData.mBV4Tree.mLocalBounds.mCenter.y
@@ -1838,14 +1842,14 @@ def read_triangle_mesh(aloc_name, br):
         br.readFloat()  # mData.mBV4Tree.mLocalBounds.mCenter.mExtentsMagnitude
         br.readUByteVec(4)  # mData.mBV4Tree.mInitData
         m_nb_packed_nodes = br.readInt()  # mData.mBV4Tree.m_nb_packed_nodes
-        log("DEBUG", "m_nb_packed_nodes: " + str(m_nb_packed_nodes), aloc_name)
+        log("TRACE", "m_nb_packed_nodes: " + str(m_nb_packed_nodes), aloc_name)
         m_nb_packed_nodes_be = br.readIntBigEndian()  # mData.mBV4Tree.m_nb_packed_nodes
-        log("DEBUG", "m_nb_packed_nodes_be: " + str(m_nb_packed_nodes_be), aloc_name)
+        log("TRACE", "m_nb_packed_nodes_be: " + str(m_nb_packed_nodes_be), aloc_name)
         for _mNbNodesIndex in range(m_nb_packed_nodes):
             m_nb_nodes = br.readInt(4)  # node.mNbNodes
-            log("DEBUG", "mNbNodes: " + str(m_nb_nodes), aloc_name)
+            log("TRACE", "mNbNodes: " + str(m_nb_nodes), aloc_name)
             m_nb_nodes_be = br.readIntBigEndian(4)  # node.mNbNodes
-            log("DEBUG", "m_nb_nodes_be: " + str(m_nb_nodes_be), aloc_name)
+            log("TRACE", "m_nb_nodes_be: " + str(m_nb_nodes_be), aloc_name)
             br.readUByteVec(4 * m_nb_nodes)  # node.mData
             br.readFloatVec(4 * m_nb_nodes)  # node.mCenter[0].x
             br.readFloatVec(4 * m_nb_nodes)  # node.mExtents[0].x
@@ -1883,11 +1887,11 @@ class Physics:
     def read_primitive_mesh(self, br, primitive_count, aloc_name):
         for primitive_index in range(primitive_count):  # size of box = 52
             primitive_type = br.readString(3).decode("utf-8")
-            log("DEBUG", "Loading primitive " + str(primitive_index + 1) + " / " + str(
+            log("TRACE", "Loading primitive " + str(primitive_index + 1) + " / " + str(
                 primitive_count) + " with type: " + primitive_type, aloc_name)
             br.readUByteVec(1)
             if primitive_type == "BOX":
-                log("DEBUG", "Loading Primitive Box", aloc_name)
+                log("TRACE", "Loading Primitive Box", aloc_name)
                 primitive_box = PrimitiveBox()
                 # 31
                 primitive_box.half_extents = br.readFloatVec(3)
@@ -1898,15 +1902,15 @@ class Physics:
                 # 63
                 primitive_box.rotation = br.readFloatVec(4)
                 # 79
-                log("DEBUG",
+                log("TRACE",
                     "Primitive Box: Pos: " + str(primitive_box.position[0]) + str(primitive_box.position[1]) + str(
                         primitive_box.position[2]), aloc_name)
-                log("DEBUG", "Primitive Box: half_extents: " + str(primitive_box.half_extents[0]) + str(
+                log("TRACE", "Primitive Box: half_extents: " + str(primitive_box.half_extents[0]) + str(
                     primitive_box.half_extents[1]) + str(primitive_box.half_extents[2]), aloc_name)
-                log("DEBUG",
+                log("TRACE",
                     "Primitive Box: rotation: " + str(primitive_box.rotation[0]) + str(primitive_box.rotation[1]) + str(
                         primitive_box.rotation[2]) + str(primitive_box.rotation[3]), aloc_name)
-                log("DEBUG", "Primitive Box: collision_layer: " + str(primitive_box.collision_layer), aloc_name)
+                log("TRACE", "Primitive Box: collision_layer: " + str(primitive_box.collision_layer), aloc_name)
                 self.primitive_boxes_count += 1
                 self.primitive_boxes.append(primitive_box)
 
@@ -1931,10 +1935,10 @@ class Physics:
     def read(self, filepath):
         aloc_name = bpy.path.display_name_from_filepath(filepath)
 
-        log("DEBUG", "Loading aloc file " + aloc_name, aloc_name)
+        log("TRACE", "Loading aloc file " + aloc_name, aloc_name)
         file_size = os.path.getsize(filepath)
         if file_size == 19:
-            log("DEBUG", "Skipping header only ALOC: " + aloc_name, aloc_name)
+            log("TRACE", "Skipping header only ALOC: " + aloc_name, aloc_name)
             return -1
 
         fp = os.fsencode(filepath)
@@ -1945,8 +1949,8 @@ class Physics:
         self.collision_type = br.readUInt()
         br.readUByteVec(11)  # "ID\0\0\0\u{5}PhysX"
         mesh_type = br.readString(3).decode("utf-8")  # Mesh Type ("CVX", "TRI", "ICP", "BCP")
-        log("DEBUG", "Data type: " + str(PhysicsDataType(self.data_type)), aloc_name)
-        log("DEBUG", "Current Mesh type: " + mesh_type, aloc_name)
+        log("TRACE", "Data type: " + str(PhysicsDataType(self.data_type)), aloc_name)
+        log("TRACE", "Current Mesh type: " + mesh_type, aloc_name)
         try:
             br.readUByte()  # .
         except struct.error as err:
@@ -1959,15 +1963,15 @@ class Physics:
         if self.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
             self.convex_mesh_count = br.readUInt()
             for convex_mesh_index in range(self.convex_mesh_count):
-                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
+                log("TRACE", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
                     aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
             mesh_type = br.readString(3).decode("utf-8")  # Mesh Type ("TRI")
             br.readUByte()  # .
-            log("DEBUG", "Current Mesh type: " + mesh_type, aloc_name)
+            log("TRACE", "Current Mesh type: " + mesh_type, aloc_name)
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
-                log("DEBUG",
+                log("TRACE",
                     "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count),
                     aloc_name)
                 mesh = read_triangle_mesh(aloc_name, br)
@@ -1982,32 +1986,32 @@ class Physics:
             br.close()
             return 0
         elif self.data_type == PhysicsDataType.CONVEX_MESH_AND_PRIMITIVE:
-            log("DEBUG", "Loading Convex Mesh and Primitives for ALOC: " + aloc_name, aloc_name)
+            log("TRACE", "Loading Convex Mesh and Primitives for ALOC: " + aloc_name, aloc_name)
             self.convex_mesh_count = br.readUInt()
             for convex_mesh_index in range(self.convex_mesh_count):
-                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
+                log("TRACE", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
                     aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
             br.readString(3).decode("utf-8")  # Mesh Type ("ICP")
             br.readUByte()  # .
-            log("DEBUG", "Done loading convex meshes. Reading primitive meshes. File offset: " + str(br.tell()),
+            log("TRACE", "Done loading convex meshes. Reading primitive meshes. File offset: " + str(br.tell()),
                 aloc_name)
             self.primitive_count = br.readUInt()
-            log("DEBUG", "Loading Primitive mesh", aloc_name)
+            log("TRACE", "Loading Primitive mesh", aloc_name)
             self.read_primitive_mesh(br, self.primitive_count, aloc_name)
             br.close()
             return 0
         elif self.data_type == PhysicsDataType.TRIANGLE_MESH_AND_PRIMITIVE:
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
-                log("DEBUG",
+                log("TRACE",
                     "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count),
                     aloc_name)
                 self.triangle_meshes.append(read_triangle_mesh(aloc_name, br))
             br.readString(3).decode("utf-8")  # Mesh Type ("ICP")
             br.readUByte()  # .
             self.primitive_count = br.readUInt()
-            log("DEBUG", "Loading Primitive mesh", aloc_name)
+            log("TRACE", "Loading Primitive mesh", aloc_name)
             self.read_primitive_mesh(br, self.primitive_count, aloc_name)
             br.close()
             return 0
@@ -2021,7 +2025,7 @@ class Physics:
                     self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
             self.convex_mesh_count = br.readUInt()
             for convex_mesh_index in range(self.convex_mesh_count):
-                log("DEBUG", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
+                log("TRACE", "Loading Convex mesh " + str(convex_mesh_index + 1) + " of " + str(self.convex_mesh_count),
                     aloc_name)
                 self.convex_meshes.append(read_convex_mesh(br, aloc_name))
             br.close()
@@ -2032,7 +2036,7 @@ class Physics:
                     self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
             self.triangle_mesh_count = br.readUInt()
             for triangle_mesh_index in range(self.triangle_mesh_count):
-                log("DEBUG",
+                log("TRACE",
                     "Loading Triangle mesh " + str(triangle_mesh_index + 1) + " of " + str(self.triangle_mesh_count),
                     aloc_name)
                 mesh = read_triangle_mesh(aloc_name, br)
@@ -2050,12 +2054,12 @@ class Physics:
             if self.data_type != PhysicsDataType.PRIMITIVE:
                 log("WARNING", "data_type " + str(PhysicsDataType(
                     self.data_type)) + " does not match magic string " + mesh_type + " for " + aloc_name, aloc_name)
-            log("DEBUG", "Found primitive", aloc_name)
+            log("TRACE", "Found primitive", aloc_name)
             primitive_count = br.readUInt()
             # 27
             self.read_primitive_mesh(br, primitive_count, aloc_name)
             self.primitive_count = self.primitive_capsules_count + self.primitive_boxes_count + self.primitive_spheres_count
-            log("DEBUG", "mesh_type == ICP ALOC: " + aloc_name, aloc_name)
+            log("TRACE", "mesh_type == ICP ALOC: " + aloc_name, aloc_name)
             # raise(Exception("mesh_type == ICP")) # TODO: Verify that ICP meshes work properly
             br.close()
             return 0
@@ -2119,7 +2123,7 @@ def read_aloc(filepath):
     if return_val == -1:
         log("ERROR", "Failed to read ALOC from file: " + filepath + ".", "read_aloc")
         return -1
-    log("DEBUG", "Finished reading ALOC from file: " + filepath + ".", "read_aloc")
+    log("TRACE", "Finished reading ALOC from file: " + filepath + ".", "read_aloc")
 
     return aloc
 
@@ -2135,12 +2139,12 @@ def finalize_aloc_mesh(bm, obj):
 
 
 def create_new_object(name, collision_type, data_type):
-    log("DEBUG", "Creating new object for ALOC: " + name + " with collision type: "
+    log("TRACE", "Creating new object for ALOC: " + name + " with collision type: "
         + str(collision_type) + " and data type: " + str(data_type), "create_new_object")
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
-    log("DEBUG", "Finished Creating new object for ALOC: " + name, "create_new_object")
+    log("TRACE", "Finished Creating new object for ALOC: " + name, "create_new_object")
     return obj
 
 
@@ -2149,25 +2153,25 @@ def load_triangle_mesh_objects(aloc, aloc_name, bm):
         m = aloc.triangle_meshes[mesh_index]
         bmv = []
         if collidable_layer(m.collision_layer):
-            log("DEBUG", "Adding vertices to TriangleMesh", "load_aloc")
+            log("TRACE", "Adding vertices to TriangleMesh", "load_aloc")
             for v in m.vertices:
                 bmv.append(bm.verts.new(v))
             d = m.triangle_data
-            log("DEBUG", "Adding faces to TriangleMesh", "load_aloc")
+            log("TRACE", "Adding faces to TriangleMesh", "load_aloc")
             for i in range(0, len(d), 3):
                 face = (bmv[d[i]], bmv[d[i + 1]], bmv[d[i + 2]])
                 try:
                     bm.faces.new(face)
                 except ValueError as err:
-                    log("DEBUG", "[ERROR] Could not add face to TriangleMesh: " + str(err), "load_aloc")
+                    log("TRACE", "[ERROR] Could not add face to TriangleMesh: " + str(err), "load_aloc")
         else:
-            log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+            log("TRACE", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(m.collision_layer), "load_aloc")
 
 
 def load_convex_mesh_objects(aloc, aloc_name, bm):
     for mesh_index in range(aloc.convex_mesh_count):
-        log("DEBUG", " " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count),
+        log("TRACE", " " + aloc_name + " convex mesh " + str(mesh_index) + " / " + str(aloc.convex_mesh_count),
             "load_aloc")
         m = aloc.convex_meshes[mesh_index]
         if collidable_layer(m.collision_layer):
@@ -2179,19 +2183,19 @@ def load_convex_mesh_objects(aloc, aloc_name, bm):
             if 'geom_unused' in res:
                 bmesh.ops.delete(bm, geom=res['geom_unused'], context='VERTS')
         else:
-            log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+            log("TRACE", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(m.collision_layer), "load_aloc")
 
 
 def load_primitive_mesh_objects(aloc, aloc_name, bm):
-    log("DEBUG", "Primitive Type", "load_aloc")
-    log("DEBUG", "Primitive count: " + str(aloc.primitive_count), "load_aloc")
-    log("DEBUG", "Primitive Box count: " + str(aloc.primitive_boxes_count), "load_aloc")
-    log("DEBUG", "Primitive Spheres count: " + str(aloc.primitive_spheres_count), "load_aloc")
-    log("DEBUG", "Primitive Capsules count: " + str(aloc.primitive_capsules_count), "load_aloc")
+    log("TRACE", "Primitive Type", "load_aloc")
+    log("TRACE", "Primitive count: " + str(aloc.primitive_count), "load_aloc")
+    log("TRACE", "Primitive Box count: " + str(aloc.primitive_boxes_count), "load_aloc")
+    log("TRACE", "Primitive Spheres count: " + str(aloc.primitive_spheres_count), "load_aloc")
+    log("TRACE", "Primitive Capsules count: " + str(aloc.primitive_capsules_count), "load_aloc")
     for mesh_index, box in enumerate(aloc.primitive_boxes):
         if collidable_layer(box.collision_layer):
-            log("DEBUG", "Primitive Box", "load_aloc")
+            log("TRACE", "Primitive Box", "load_aloc")
 
             loc = mathutils.Vector((box.position[0], box.position[1], box.position[2]))
             if len(box.rotation) == 4:
@@ -2228,11 +2232,11 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
             bm.faces.new((bmv[0], bmv[3], bmv[7], bmv[4]))
             bm.faces.new((bmv[1], bmv[2], bmv[6], bmv[5]))
         else:
-            log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+            log("TRACE", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(box.collision_layer), "load_aloc")
     for mesh_index, sphere in enumerate(aloc.primitive_spheres):
         if collidable_layer(sphere.collision_layer):
-            log("DEBUG", "Primitive Sphere", "load_aloc")
+            log("TRACE", "Primitive Sphere", "load_aloc")
 
             loc = mathutils.Vector((sphere.position[0], sphere.position[1], sphere.position[2]))
             rot = mathutils.Euler((sphere.rotation[0], sphere.rotation[1], sphere.rotation[2])).to_quaternion()
@@ -2240,11 +2244,11 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
 
             bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=sphere.radius, matrix=mat)
         else:
-            log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+            log("TRACE", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(sphere.collision_layer), "load_aloc")
     for mesh_index, capsule in enumerate(aloc.primitive_capsules):
         if collidable_layer(capsule.collision_layer):
-            log("DEBUG", "Primitive Capsule", "load_aloc")
+            log("TRACE", "Primitive Capsule", "load_aloc")
 
             loc = mathutils.Vector((capsule.position[0], capsule.position[1], capsule.position[2]))
             if len(capsule.rotation) == 4:
@@ -2271,7 +2275,7 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
             bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=capsule.radius,
                                       matrix=mat @ mathutils.Matrix.Translation((0, 0, -z_offset)))
         else:
-            log("DEBUG", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
+            log("TRACE", "Skipping Non-collidable ALOC mesh: " + aloc_name + " with mesh index: " + str(
                 mesh_index) + " and collision layer type: " + str(capsule.collision_layer), "load_aloc")
 
 
@@ -2286,31 +2290,31 @@ def load_aloc(filepath):
     if aloc.collision_type == PhysicsCollisionType.RIGIDBODY:
         return aloc, []
 
-    log("DEBUG", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
+    log("TRACE", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
     aloc_obj = create_new_object(aloc_name + "_original_" + str(aloc.collision_type) + "_" + str(aloc.data_type),
                                  aloc.collision_type, aloc.data_type)
     bm = bmesh.new()
 
     if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
-        log("DEBUG", "Converting Convex Mesh and Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("TRACE", "Converting Convex Mesh and Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         load_convex_mesh_objects(aloc, aloc_name, bm)
         load_triangle_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.CONVEX_MESH:
-        log("DEBUG", "Converting Convex Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("TRACE", "Converting Convex Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         load_convex_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.TRIANGLE_MESH:
-        log("DEBUG", "Converting Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("TRACE", "Converting Triangle Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         load_triangle_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.PRIMITIVE:
-        log("DEBUG", "Converting Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("TRACE", "Converting Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         load_primitive_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_PRIMITIVE:
-        log("DEBUG", "Converting Convex Mesh and Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("TRACE", "Converting Convex Mesh and Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         load_convex_mesh_objects(aloc, aloc_name, bm)
         load_primitive_mesh_objects(aloc, aloc_name, bm)
     elif aloc.data_type == PhysicsDataType.TRIANGLE_MESH_AND_PRIMITIVE:
-        log("DEBUG", "Converting Vertex Mesh and Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
+        log("TRACE", "Converting Vertex Mesh and Primitive Mesh ALOC " + aloc_name + " to blender mesh", "load_aloc")
         load_triangle_mesh_objects(aloc, aloc_name, bm)
         load_primitive_mesh_objects(aloc, aloc_name, bm)
     else:
@@ -2318,7 +2322,7 @@ def load_aloc(filepath):
         return -1, []
 
     finalize_aloc_mesh(bm, aloc_obj)
-    log("DEBUG", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
+    log("TRACE", "Finished converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
     return aloc, [aloc_obj]
 
 
@@ -2333,15 +2337,15 @@ def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, spec
         log("ERROR", "Cannot add texture, Diffuse texture file not found at: " + str(diffuse_tga_path), "add_textures")
         return
     if not os.path.exists(normal_tga_path):
-        log("DEBUG", "Normal texture file not found at: " + str(normal_tga_path), "add_textures")
+        log("TRACE", "Normal texture file not found at: " + str(normal_tga_path), "add_textures")
     else:
         normal_tga_path = os.path.abspath(normal_tga_path)
     if not os.path.exists(specular_tga_path):
-        log("DEBUG", "Specular texture file not found at: " + str(specular_tga_path), "add_textures")
+        log("TRACE", "Specular texture file not found at: " + str(specular_tga_path), "add_textures")
     else:
         specular_tga_path = os.path.abspath(specular_tga_path)
     diffuse_tga_path = os.path.abspath(diffuse_tga_path)
-    log("DEBUG", "Diffuse TGA filepath: " + diffuse_tga_path, "add_textures")
+    log("TRACE", "Diffuse TGA filepath: " + diffuse_tga_path, "add_textures")
 
     if mati_hash in texture_to_material_map:
         mat = texture_to_material_map[mati_hash]
@@ -2449,7 +2453,7 @@ def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, spec
     else:
         obj.data.materials.append(mat)
 
-    log("DEBUG", "Texture " + mati_hash + " applied to " + obj.name, "add_textures")
+    log("TRACE", "Texture " + mati_hash + " applied to " + obj.name, "add_textures")
 
 
 def get_local_space_bbox_center(obj):
@@ -2552,7 +2556,7 @@ def load_volume_boxes(json_data, volume_types):
                         try:
                             scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
                         except TypeError:
-                            log("INFO",
+                            log("WARNING",
                                 "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"],
                                 "load_volume_boxes")
                             scale = mathutils.Vector([1, 1, 1])
@@ -2562,11 +2566,11 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box,
+def glacier2obj(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box,
                   apply_textures, output_to_blend):
     start = timer()
-    log("INFO", "Loading scenario.", "load_scenario")
-    log("INFO", "Nav.Json file: " + path_to_nav_json, "load_scenario")
+    log("INFO", "Loading scenario.", "glacier2obj")
+    log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2obj")
     f = open(path_to_nav_json, "r")
     data = json.loads(f.read())
     f.close()
@@ -2609,13 +2613,13 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
     if build_type == "instance":
         # link the geonode
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
-        log("INFO", "Loading geometry node from the resource blend file: " + filepath, "load_scenario")
+        log("DEBUG", "Loading geometry node from the resource blend file: " + filepath, "glacier2obj")
         with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
             if geo_node_name in data_from.node_groups:
                 data_to.node_groups.append(geo_node_name)
             else:
                 log("ERROR", "=========================== Error Loading the resource blend file ================",
-                    "load_scenario")
+                    "glacier2obj")
                 assert 0
     matis = {}
     prim_matis = {}
@@ -2630,12 +2634,12 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-            log("INFO", "Loading shading material from the resource blend file: " + filepath, "load_scenario")
+            log("DEBUG", "Loading shading material from the resource blend file: " + filepath, "glacier2obj")
             if shading_mat_name in data_from.materials:
                 data_to.materials.append(shading_mat_name)
             else:
-                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "load_scenario")
-        log("INFO", "Adding light", "load_scenario")
+                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "glacier2obj")
+        log("DEBUG", "Adding light", "glacier2obj")
 
         light_data = bpy.data.lights.new(name="Sun", type='SUN')
         light_object = bpy.data.objects.new(name="Sun", object_data=light_data)
@@ -2657,7 +2661,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             bpy.context.scene.collection.children.link(coll)
             coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
             room_folder_color_index += 1
-            log("INFO", "Adding new collection for room folder name: " + room_folder_name, "load_scenario")
+            log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2obj")
 
         room_folder_coll = bpy.data.collections.get(room_folder_name)
 
@@ -2667,7 +2671,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             room_folder_coll.children.link(coll)
             coll.color_tag = "COLOR_0" + str(room_color_index % 8 + 1)
             room_color_index += 1
-            log("INFO", "Adding new collection for room name: " + room_name, "load_scenario")
+            log("DEBUG", "Adding new collection for room name: " + room_name, "glacier2obj")
 
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
@@ -2680,7 +2684,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         room_names[mesh_hash].append(room_name)
     output_dir = os.path.abspath(os.path.dirname(path_to_output_obj_file))
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
-    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "load_scenario")
+    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2obj")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
     aloc_or_prim_list = [item for item in file_list if item.lower().endswith('.' + mesh_type.lower())]
 
@@ -2708,6 +2712,9 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
     mesh_i = 0
     current_mesh_in_scene_index = 0
     error_alocs = []
+    log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2obj")
+    log("INFO", "Mesh count: " + str(mesh_count), "glacier2obj")
+    log_threshold = round(meshes_in_scenario_count / 10, -2)
     for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
         aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
         mesh_hash = aloc_or_prim_filename[:-5]
@@ -2715,12 +2722,14 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             continue
         current_mesh_in_scene_index += 1
         if mesh_hash in excluded_mesh_hashes:
-            log("INFO", "Skipping " + mesh_type + " file " + mesh_hash, mesh_hash)
+            log("DEBUG", "Skipping " + mesh_type + " file " + mesh_hash, mesh_hash)
             mesh_i += len(transforms[mesh_hash])
             continue
         aloc_or_prim_path = os.path.join(path_to_aloc_or_prim_dir, aloc_or_prim_filename)
 
-        log("INFO", "Loading " + mesh_type + ": " + mesh_hash, "load_scenario")
+        log("DEBUG", "Loading " + mesh_type + ": " + mesh_hash, "glacier2obj")
+        if current_mesh_in_scene_index % log_threshold == 0:
+            log("INFO", "Loaded " + str(current_mesh_in_scene_index) + " " + mesh_type + "s...", "glacier2obj")
         collision_type = None
         material_indices = []
         try:
@@ -2728,7 +2737,7 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 aloc, submeshes = load_aloc(aloc_or_prim_path)
                 if aloc == -1:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                        mesh_hash) + " ================", "load_scenario")
+                        mesh_hash) + " ================", "glacier2obj")
                     error_alocs.append(mesh_hash)
                     continue
                 collision_type = aloc.collision_type
@@ -2737,30 +2746,30 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
         except struct.error as err:
             error_alocs.append("Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err))
             log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                mesh_hash) + " Exception: " + str(err) + " ================", "load_scenario")
+                mesh_hash) + " Exception: " + str(err) + " ================", "glacier2obj")
             continue
         mesh_transforms = transforms[mesh_hash]
         mesh_instance_count = len(mesh_transforms)
         if collision_type == PhysicsCollisionType.RIGIDBODY:
             for mesh_index in range(0, mesh_instance_count):
-                log("INFO", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
+                log("DEBUG", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "]", "load_scenario")
+                    mesh_i + 1) + "/" + str(mesh_count) + "]", "glacier2obj")
                 mesh_i += 1
             continue
         if len(submeshes) == 0:
-            log("DEBUG", "No submeshes for " + str(mesh_hash), "load_scenario")
+            log("TRACE", "No submeshes for " + str(mesh_hash), "glacier2obj")
             mesh_i += len(transforms[mesh_hash])
             continue
         if not submeshes:
-            log("INFO", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------",
-                "load_scenario")
+            log("WARNING", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------",
+                "glacier2obj")
             mesh_i += len(transforms[mesh_hash])
             continue
         if collision_type in excluded_collision_types:
-            log("DEBUG",
+            log("TRACE",
                 "Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(
-                    collision_type), "load_scenario")
+                    collision_type), "glacier2obj")
             mesh_i += len(transforms[mesh_hash])
             continue
         if build_type == "instance":
@@ -2816,11 +2825,11 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                 modifier["Socket_3"] = "rotation"
                 modifier["Socket_4"] = "scale"
                 if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
-                    log("DEBUG", "Adding texture", "load_scenario")
+                    log("TRACE", "Adding texture", "glacier2obj")
                     try:
                         add_textures(submesh, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_indices[submesh_i])
                     except struct.error as err:
-                        log("ERROR", "Error adding texture " + str(err), "load_scenario")
+                        log("ERROR", "Error adding texture " + str(err), "glacier2obj")
         else:
             current_submesh = None
             mesh_positions = [mathutils.Vector(
@@ -2859,11 +2868,11 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
             for mesh_index in range(mesh_instance_count):
                 room_name = room_names[mesh_hash][mesh_index]
                 mesh_instance_id = transforms[mesh_hash][mesh_index]["id"]
-                log("INFO", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
+                log("DEBUG", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "load_scenario")
+                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "glacier2obj")
                 mesh_i += 1
-                log("DEBUG", "Total submeshes: " + str(submesh_count), "load_scenario")
+                log("TRACE", "Total submeshes: " + str(submesh_count), "glacier2obj")
                 for submesh_instance_index in range(submesh_count):
                     submesh = submeshes[submesh_instance_index]
                     if not unlinked[submesh_instance_index]:
@@ -2894,41 +2903,41 @@ def load_scenario(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask
                         try:
                             add_textures(current_submesh, matis, mesh_hash, output_dir, prim_matis, submesh_instance_index, material_indices[submesh_instance_index])
                         except struct.error as err:
-                            log("ERROR", "Error adding texture " + str(err), "load_scenario")
+                            log("ERROR", "Error adding texture " + str(err), "glacier2obj")
                     if current_submesh:
                         current_submesh.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
     if len(missing_mesh_hashes) > 0:
         for missing_mesh_hash in missing_mesh_hashes:
-            log("ERROR", "Missing one or more Meshes. Missing Mesh hashes:", "load_scenario")
-            log("ERROR", "Missing Mesh: " + missing_mesh_hash, "load_scenario")
+            log("ERROR", "Missing one or more Meshes. Missing Mesh hashes:", "glacier2obj")
+            log("ERROR", "Missing Mesh: " + missing_mesh_hash, "glacier2obj")
 
     end = timer()
     if len(error_alocs) > 0:
-        log("ERROR", "Problem loading one or more ALOCs. ALOC hashes with problems:", "load_scenario")
+        log("ERROR", "Problem loading one or more ALOCs. ALOC hashes with problems:", "glacier2obj")
         for error_aloc in error_alocs:
-            log("ERROR", "Problem loading ALOC: " + error_aloc, "load_scenario")
-    log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "load_scenario")
+            log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2obj")
+    log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2obj")
     return 0
 
 
 def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_i):
-    log("DEBUG", "Adding texture to prim hash: " + mesh_hash, "add_textures")
-    log("DEBUG", "Prim Mati: " + str(prim_matis[mesh_hash]), "add_textures")
-    log("DEBUG", "Mati hashes: " + str(prim_matis[mesh_hash]["matiHashes"]), "add_textures")
-    log("DEBUG", "Prim Submesh index: " + str(submesh_i), "add_texturess")
-    log("DEBUG", "Material index: " + str(material_i), "add_texturess")
+    log("TRACE", "Adding texture to prim hash: " + mesh_hash, "add_textures")
+    log("TRACE", "Prim Mati: " + str(prim_matis[mesh_hash]), "add_textures")
+    log("TRACE", "Mati hashes: " + str(prim_matis[mesh_hash]["matiHashes"]), "add_textures")
+    log("TRACE", "Prim Submesh index: " + str(submesh_i), "add_texturess")
+    log("TRACE", "Material index: " + str(material_i), "add_texturess")
     if material_i >= len(prim_matis[mesh_hash]["matiHashes"]):
         log("ERROR", "Prim index out of range: " + str(material_i), "add_textures")
         return
-    log("DEBUG", "Mati hash: " + str(prim_matis[mesh_hash]["matiHashes"][material_i]), "add_texturess")
+    log("TRACE", "Mati hash: " + str(prim_matis[mesh_hash]["matiHashes"][material_i]), "add_texturess")
     mati_hash = prim_matis[mesh_hash]["matiHashes"][material_i]
     if mati_hash not in matis:
         log("ERROR", "Mati hash not found in matis: " + mati_hash, "add_textures")
         return
     mati = matis[mati_hash]
-    log("DEBUG", "Diffuse hash: " + mati["diffuse"], "add_textures")
+    log("TRACE", "Diffuse hash: " + mati["diffuse"], "add_textures")
     diffuse_hash = mati["diffuse"]
     normal_hash = mati["normal"]
     specular_hash = mati["specular"]
@@ -2937,7 +2946,7 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
 
 
 def main():
-    log("DEBUG",
+    log("TRACE",
         "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textyres (true | false)> <debug logs enabled (true | false)>",
         "main")
     argv = sys.argv
@@ -2952,7 +2961,8 @@ def main():
     apply_textures = argv[6] == "true"
     if len(argv) > 7 and argv[7] == "true":
         log("INFO", "Enabling debug logs", "main"),
-        glacier2obj_enabled_log_levels.append("DEBUG")
+        glacier2obj_enabled_log_levels.append("TRACE")
+        glacier2obj_enabled_log_levels.append("TRACE")
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
@@ -2961,7 +2971,7 @@ def main():
     # In 4.2+, EEVEE Next is 'BLENDER_EEVEE_NEXT'
     bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
     output_to_blend = output_path[-4:] == 'both' or output_path[-5:] == 'blend'
-    scenario = load_scenario(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
+    scenario = glacier2obj(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
                              apply_textures, output_to_blend)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path, "main")
