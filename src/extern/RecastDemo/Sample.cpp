@@ -20,14 +20,14 @@
 
 #include <math.h>
 #include <stdio.h>
-#include "..\..\include\RecastDemo\Sample.h"
-#include "..\..\include\RecastDemo\InputGeom.h"
+#include "../../include/RecastDemo/Sample.h"
+#include "../../include/RecastDemo/InputGeom.h"
 #include "Recast.h"
 #include "RecastDebugDraw.h"
 #include "DetourDebugDraw.h"
 #include "DetourNavMesh.h"
 #include "DetourNavMeshQuery.h"
-#include "..\..\include\RecastDemo\imgui.h"
+#include "../../include/RecastDemo/imgui.h"
 #include "SDL.h"
 #include "SDL_opengl.h"
 #include <fstream>

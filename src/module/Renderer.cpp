@@ -18,7 +18,11 @@
 #include <SDL.h>
 
 #include <GL/glew.h>
+#ifdef __APPLE__
+#include <OpenGL/glu.h>
+#else
 #include <GL/glu.h>
+#endif
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
@@ -184,6 +188,7 @@ bool Renderer::initWindowAndRenderer() {
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
     prevFrameTime = SDL_GetTicks();
 
+#ifdef _WIN32
     SDL_SysWMinfo wmInfo;
     SDL_VERSION(&wmInfo.version);
     if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
@@ -198,6 +203,7 @@ bool Renderer::initWindowAndRenderer() {
     } else {
         Logger::log(NK_ERROR, "Failed to load menu resource.");
     }
+#endif
 
     return true;
 }

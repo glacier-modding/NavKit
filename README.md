@@ -124,6 +124,10 @@ in this working directory:
 
 # 🛠️ Building instructions (Rider)
 See [Rider Instructions](docs/rider_instructions.md)
+
+# Building on macOS (experimental)
+NavKit configures, compiles and links on macOS (Apple Silicon, using the same vcpkg manifest), but it is not usable there yet.
+
 # Credits
 2kpr  
 Anthony Fuller  

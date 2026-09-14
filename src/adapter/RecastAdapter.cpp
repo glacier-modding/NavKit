@@ -14,13 +14,19 @@
 #include "../../include/NavKit/util/Math.h"
 #include "../../include/RecastDemo/InputGeom.h"
 
+#ifdef _WIN32
 #include <CommCtrl.h>
+#endif
 #include <iomanip>
 #include <queue>
 #include <SDL_keyboard.h>
 #include <sstream>
 
+#ifdef __APPLE__
+#include <OpenGL/glu.h>
+#else
 #include <GL/glu.h>
+#endif
 
 #include "../../include/NavKit/module/PersistedSettings.h"
 
@@ -91,6 +97,7 @@ inline unsigned int nextPow2(unsigned int v) {
     return v;
 }
 
+#ifdef _WIN32
 static void updateRecastDialogControls(const HWND hDlg) {
     const RecastAdapter& adapter = RecastAdapter::getInstance();
     Sample_TileMesh* sample = adapter.sample;
@@ -184,9 +191,11 @@ static void updateRecastDialogControls(const HWND hDlg) {
         SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_POLYS, "Max Polys: N/A");
     }
 }
+#endif
 
 INT_PTR CALLBACK RecastAdapter::recastDialogProc(
     const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+#ifdef _WIN32
     Sample_TileMesh* sample = getInstance().sample;
     if (!sample) {
         return FALSE;
@@ -286,9 +295,13 @@ INT_PTR CALLBACK RecastAdapter::recastDialogProc(
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 void RecastAdapter::showRecastDialog() {
+#ifdef _WIN32
     if (hRecastDialog) {
         SetForegroundWindow(hRecastDialog);
         return;
@@ -319,6 +332,9 @@ void RecastAdapter::showRecastDialog() {
 
         ShowWindow(hRecastDialog, SW_SHOW);
     }
+#else
+    Logger::log(NK_WARN, "The Recast settings dialog is only available on Windows.");
+#endif
 }
 
 void RecastAdapter::drawInputGeom() const {

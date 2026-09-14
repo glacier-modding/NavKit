@@ -28,10 +28,10 @@
 #else
 #	include <GL/glu.h>
 #endif
-#include "..\..\include\RecastDemo\imgui.h"
-#include "..\..\include\RecastDemo\InputGeom.h"
-#include "..\..\include\RecastDemo\Sample.h"
-#include "..\..\include\RecastDemo\Sample_TileMesh.h"
+#include "../../include/RecastDemo/imgui.h"
+#include "../../include/RecastDemo/InputGeom.h"
+#include "../../include/RecastDemo/Sample.h"
+#include "../../include/RecastDemo/Sample_TileMesh.h"
 #include "Recast.h"
 #include "RecastDebugDraw.h"
 #include "DetourNavMesh.h"

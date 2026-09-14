@@ -18,6 +18,7 @@
 #include "../../include/NavKit/module/SceneExtract.h"
 
 void Menu::setMenuItemEnabled(const UINT menuId, const bool isEnabled) {
+#ifdef _WIN32
     const HWND hwnd = Renderer::hwnd;
     if (!hwnd) {
         return;
@@ -28,20 +29,24 @@ void Menu::setMenuItemEnabled(const UINT menuId, const bool isEnabled) {
     }
     const UINT flags = MF_BYCOMMAND | (isEnabled ? MF_ENABLED : MF_GRAYED);
     EnableMenuItem(hMenu, menuId, flags);
+#endif
 }
 
 void Menu::handleCheckboxMenuItem(const UINT menuId, bool& stateVariable, const char* itemName) {
+    stateVariable = !stateVariable;
+#ifdef _WIN32
     const HWND hwnd = Renderer::hwnd;
     const HMENU hMenu = GetMenu(hwnd);
-    stateVariable = !stateVariable;
     const UINT checkState = stateVariable ? MF_CHECKED : MF_UNCHECKED;
     CheckMenuItem(hMenu, menuId, MF_BYCOMMAND | checkState);
+#endif
     Logger::log(NK_DEBUG, ("Toggled " + std::string(itemName) + " " + (stateVariable ? "ON" : "OFF")).data());
 }
 
 void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
     const std::vector<UINT> menuGroupIds = {IDM_VIEW_AIRG_CELL_COLOR_OFF, IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
         IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, IDM_VIEW_AIRG_CELL_COLOR_LAYER};
+#ifdef _WIN32
     const HWND hwnd = Renderer::hwnd;
     const HMENU hMenu = GetMenu(hwnd);
     for (const UINT menuId : menuGroupIds) {
@@ -51,6 +56,7 @@ void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
             CheckMenuItem(hMenu, menuId, MF_BYCOMMAND | MF_UNCHECKED);
         }
     }
+#endif
     std::string itemName;
     CellColorDataSource selectedCellColorDataSource;
     switch (selectedMenuId) {
@@ -125,6 +131,7 @@ void Menu::updateMenuState() {
 }
 
 void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const char* itemName) {
+#ifdef _WIN32
     const HWND hwnd = Renderer::hwnd;
     if (!hwnd) {
         return;
@@ -135,9 +142,11 @@ void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const cha
     }
     const UINT checkState = isChecked ? MF_CHECKED : MF_UNCHECKED;
     CheckMenuItem(hMenu, menuId, MF_BYCOMMAND | checkState);
+#endif
 }
 
 int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
+#ifdef _WIN32
     Navp& navp = Navp::getInstance();
     SceneMesh& obj = SceneMesh::getInstance();
     Airg& airg = Airg::getInstance();
@@ -335,5 +344,6 @@ int Menu::handleMenuClicked(const SDL_SysWMmsg* wmMsg) {
             }
         }
     }
+#endif
     return 0;
 }

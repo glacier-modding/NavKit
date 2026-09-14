@@ -64,24 +64,36 @@ add_library(NavKitLib STATIC
         ${UTIL_SOURCES}
 )
 target_compile_definitions(NavKitLib PRIVATE NOMINMAX)
+
+if (APPLE)
+    # The fixed-function OpenGL calls used by the renderer are deprecated (but present) on macOS. We do not care.
+    target_compile_definitions(NavKitLib PUBLIC GL_SILENCE_DEPRECATION)
+endif ()
+
 set_property(TARGET NavKitLib PROPERTY CXX_STANDARD 20)
 
-add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
-        include/navkit-rpkg-lib/navkit-rpkg-lib.h)
-set_target_properties(navkit-rpkg-lib PROPERTIES
-        IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll.lib"
-        IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll.lib"
-        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll"
-        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll"
-)
+if (WIN32)
+    add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
+            include/navkit-rpkg-lib/navkit-rpkg-lib.h)
+    set_target_properties(navkit-rpkg-lib PROPERTIES
+            IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll.lib"
+            IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll.lib"
+            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll"
+            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll"
+    )
 
-add_library(ResourceLib_HM3 SHARED IMPORTED GLOBAL)
-set_target_properties(ResourceLib_HM3 PROPERTIES
-        IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
-        IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.lib"
-        IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
-        IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.dll"
-)
+    add_library(ResourceLib_HM3 SHARED IMPORTED GLOBAL)
+    set_target_properties(ResourceLib_HM3 PROPERTIES
+            IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
+            IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.lib"
+            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
+            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.dll"
+    )
+else ()
+    # TODO: replace shims with real things
+    add_library(navkit-rpkg-lib STATIC platform/NavKitRpkgLibStub.cpp)
+    add_library(ResourceLib_HM3 STATIC platform/ResourceLibHM3Stub.cpp)
+endif ()
 target_include_directories(NavKitLib
         PUBLIC
         "${PROJECT_BINARY_DIR}"
@@ -114,9 +126,13 @@ target_link_libraries(NavKitLib PUBLIC
         simpleini
 )
 
+set(NAVKIT_PLATFORM_SOURCES)
+if (WIN32)
+    list(APPEND NAVKIT_PLATFORM_SOURCES NavKit.rc)
+endif ()
 add_executable(NavKit
         NavKit.cpp
-        NavKit.rc
+        ${NAVKIT_PLATFORM_SOURCES}
 )
 target_compile_definitions(NavKit PRIVATE NOMINMAX)
 target_link_libraries(NavKit PRIVATE NavKitLib)
@@ -139,22 +155,26 @@ set(RUNTIME_FILE_DEPENDENCIES
 set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES} PARENT_SCOPE)
 
 set(STAGED_DLL_PATHS "")
-foreach(dep ${RUNTIME_TARGET_DEPENDENCIES})
-    list(APPEND STAGED_DLL_PATHS "$<TARGET_FILE:${dep}>")
-endforeach()
+if (WIN32)
+    foreach(dep ${RUNTIME_TARGET_DEPENDENCIES})
+        list(APPEND STAGED_DLL_PATHS "$<TARGET_FILE:${dep}>")
+    endforeach()
+endif ()
 set(STAGED_DLL_PATHS ${STAGED_DLL_PATHS} PARENT_SCOPE)
 
-add_executable(updater
-        WIN32
-        updater.cpp
-)
-target_link_libraries(updater PRIVATE shell32)
+if (WIN32)
+    add_executable(updater
+            WIN32
+            updater.cpp
+    )
+    target_link_libraries(updater PRIVATE shell32)
 
-set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES}
-        "$<TARGET_FILE:updater>"
-        PARENT_SCOPE
-)
-add_dependencies(NavKit updater)
+    set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES}
+            "$<TARGET_FILE:updater>"
+            PARENT_SCOPE
+    )
+    add_dependencies(NavKit updater)
+endif ()
 add_custom_command(TARGET NavKit POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:NavKit>

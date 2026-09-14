@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 #include "ZString.h"
-#include "..\..\..\extern\simdjson\simdjson.h"
+#include "../../../extern/simdjson/simdjson.h"
 
 #include "ZHMPrimitives.h"
 

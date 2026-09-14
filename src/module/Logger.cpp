@@ -2,7 +2,9 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/InputHandler.h"
 
+#include <chrono>
 #include <cstdarg>
+#include <thread>
 #include <vector>
 
 #include "../../include/NavKit/module/NavKitSettings.h"

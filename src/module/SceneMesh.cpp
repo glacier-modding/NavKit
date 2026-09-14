@@ -1,6 +1,9 @@
 #include "../../include/NavKit/module/SceneMesh.h"
 
+#ifdef _WIN32
 #include <direct.h>
+#endif
+#include <sys/stat.h>
 #include <SDL.h>
 #include <GL/glew.h>
 #include <filesystem>
@@ -72,6 +75,7 @@ void SceneMesh::loadTileTexture() {
 }
 
 void SceneMesh::updateObjDialogControls(const HWND hDlg) {
+#ifdef _WIN32
     const SceneMesh& obj = getInstance();
     CheckRadioButton(hDlg, IDC_RADIO_MESH_TYPE_ALOC, IDC_RADIO_MESH_TYPE_PRIM,
         obj.meshTypeForBuild == ALOC ? IDC_RADIO_MESH_TYPE_ALOC : IDC_RADIO_MESH_TYPE_PRIM);
@@ -94,10 +98,12 @@ void SceneMesh::updateObjDialogControls(const HWND hDlg) {
     CheckDlgButton(hDlg, IDC_CHECK_ONLY_COLLIDABLE, obj.onlyCollidable ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES, obj.extractTextures ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
+#endif
 }
 
 INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(
     const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
+#ifdef _WIN32
     SceneMesh& sceneMesh = getInstance();
     switch (message) {
     case WM_INITDIALOG: {
@@ -214,6 +220,9 @@ INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
@@ -344,7 +353,12 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
     struct stat folderExists{};
     if (const int statRC = stat(alocOrPrimFolder.data(), &folderExists); statRC != 0) {
         if (errno == ENOENT) {
-            if (const int status = _mkdir(alocOrPrimFolder.c_str()); status != 0) {
+#ifdef _WIN32
+            const int status = _mkdir(alocOrPrimFolder.c_str());
+#else
+            const int status = mkdir(alocOrPrimFolder.c_str(), 0755);
+#endif
+            if (status != 0) {
                 Logger::log(NK_ERROR, "Error creating %s folder", meshFileType.c_str());
                 errorExtracting = true;
                 return;
@@ -829,6 +843,7 @@ void SceneMesh::resetDefaults() {
 }
 
 void SceneMesh::showSceneMeshDialog() {
+#ifdef _WIN32
     if (hSceneMeshDialog) {
         SetForegroundWindow(hSceneMeshDialog);
         return;
@@ -859,4 +874,7 @@ void SceneMesh::showSceneMeshDialog() {
 
         ShowWindow(hSceneMeshDialog, SW_SHOW);
     }
+#else
+    Logger::log(NK_WARN, "The Scene Mesh settings dialog is only available on Windows.");
+#endif
 }

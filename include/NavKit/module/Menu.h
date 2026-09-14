@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL_events.h>
 #include <SDL_syswm.h>
+#include "../util/Platform.h"
 
 class Menu {
 public:

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL_syswm.h>
+#include "../util/Platform.h"
 #include "../../NavWeakness/Vec3.h"
 #include "../util/Math.h"
 #include "../render/Shader.h"

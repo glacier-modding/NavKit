@@ -4,7 +4,9 @@
 #include <fstream>
 #include <numbers>
 
+#ifdef _WIN32
 #include <CommCtrl.h>
+#endif
 #include <iomanip>
 #include <SDL.h>
 #include <sstream>
@@ -63,6 +65,7 @@ static std::string formatFloat(const float val) {
 }
 
 INT_PTR CALLBACK Airg::airgDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+#ifdef _WIN32
     Grid& grid = Grid::getInstance();
 
     switch (message) {
@@ -118,9 +121,13 @@ INT_PTR CALLBACK Airg::airgDialogProc(const HWND hDlg, const UINT message, const
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 void Airg::showAirgDialog() {
+#ifdef _WIN32
     if (hAirgDialog) {
         SetForegroundWindow(hAirgDialog);
         return;
@@ -153,9 +160,13 @@ void Airg::showAirgDialog() {
 
         ShowWindow(hAirgDialog, SW_SHOW);
     }
+#else
+    Logger::log(NK_WARN, "The Airg settings dialog is only available on Windows.");
+#endif
 }
 
 void Airg::UpdateDialogControls(const HWND hDlg) {
+#ifdef _WIN32
     const Grid& grid = Grid::getInstance();
 
     const HWND hSliderSpacing = GetDlgItem(hDlg, IDC_SLIDER_SPACING);
@@ -182,6 +193,7 @@ void Airg::UpdateDialogControls(const HWND hDlg) {
     const int zPos = static_cast<int>((grid.yOffset + grid.spacing) / 0.05f);
     SendMessage(hSliderZ, TBM_SETPOS, TRUE, zPos);
     SetDlgItemText(hDlg, IDC_STATIC_ZOFFSET_VAL, formatFloat(grid.yOffset).c_str());
+#endif
 }
 
 void Airg::resetDefaults() {
@@ -908,6 +920,7 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
 }
 
 void Airg::updateAirgDialogControls(const HWND hwnd) {
+#ifdef _WIN32
     const auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_AIRG);
     SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
 
@@ -936,6 +949,7 @@ void Airg::updateAirgDialogControls(const HWND hwnd) {
         }
         SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);
     }
+#endif
 }
 
 void Airg::extractAirgFromRpkgs(const std::string& hash) {
@@ -948,6 +962,7 @@ void Airg::extractAirgFromRpkgs(const std::string& hash) {
 
 INT_PTR CALLBACK Airg::extractAirgDialogProc(
     const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+#ifdef _WIN32
     Airg* pAirg = nullptr;
     if (message == WM_INITDIALOG) {
         pAirg = reinterpret_cast<Airg*>(lParam);
@@ -1004,9 +1019,13 @@ INT_PTR CALLBACK Airg::extractAirgDialogProc(
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 void Airg::showExtractAirgDialog() {
+#ifdef _WIN32
     if (hAirgDialog) {
         SetForegroundWindow(hAirgDialog);
         return;
@@ -1046,4 +1065,7 @@ void Airg::showExtractAirgDialog() {
             "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_AIRG_DIALOG in the DLL.",
             error);
     }
+#else
+    Logger::log(NK_WARN, "The Extract Airg dialog is only available on Windows.");
+#endif
 }

@@ -35,7 +35,7 @@
 #include "../include/NavKit/util/ErrorHandler.h"
 #include "../include/NavKit/util/FileUtil.h"
 #include "../include/NavKit/util/UpdateChecker.h"
-#include <windows.h>
+#include "../include/NavKit/util/Platform.h"
 
 #include "../include/NavKit/module/NavKitSettings.h"
 
@@ -64,6 +64,7 @@ bool mainLoopIteration() {
 }
 
 static int SDLCALL eventFilter(void* userdata, SDL_Event* event) {
+#ifdef _WIN32
     if (event->type == SDL_SYSWMEVENT) {
         const SDL_SysWMmsg* wmMsg = event->syswm.msg;
         if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
@@ -76,6 +77,7 @@ static int SDLCALL eventFilter(void* userdata, SDL_Event* event) {
             }
         }
     }
+#endif
     return 1;
 }
 
@@ -120,3 +122,10 @@ int SDL_main(const int argc, char** argv) {
     }
     return 0;
 }
+
+#ifndef _WIN32
+// SDL2main only supplies main() on platforms that need it (Windows, iOS, Android...).
+int main(const int argc, char** argv) {
+    return SDL_main(argc, argv);
+}
+#endif

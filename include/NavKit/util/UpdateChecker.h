@@ -1,7 +1,9 @@
 #pragma once
 #include <mutex>
 #include <SDL_syswm.h>
+#include "Platform.h"
 #include <string>
+#include <thread>
 
 class UpdateChecker {
 public:

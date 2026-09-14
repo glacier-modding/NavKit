@@ -1,7 +1,9 @@
 #include "../../include/NavKit/module/Rpkg.h"
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #pragma comment(lib, "Version.lib")
+#endif
 #include <mutex>
 #include <fstream>
 
@@ -28,6 +30,7 @@ std::mutex Rpkg::hashMapsMutex;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
 std::string Rpkg::getExeVersion(const std::string& filePath) {
+#ifdef _WIN32
     DWORD handle = 0;
     std::wstring widePath = std::filesystem::path(filePath).wstring();
 
@@ -58,6 +61,10 @@ std::string Rpkg::getExeVersion(const std::string& filePath) {
     std::string build = std::to_string(HIWORD(fileInfo->dwFileVersionLS));
 
     return major + "." + minor + "." + build;
+#else
+    Logger::log(NK_WARN, "Reading executable version info is only supported on Windows.");
+    return "Failed to retrieve version info.";
+#endif
 }
 
 void Rpkg::initExtractionData() {

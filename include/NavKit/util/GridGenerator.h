@@ -3,6 +3,8 @@
 #include "../model/ReasoningGrid.h"
 #include "../util/Pathfinding.h"
 #include <DetourNavMesh.h>
+#include <optional>
+#include <thread>
 #include <unordered_map>
 
 class Properties;

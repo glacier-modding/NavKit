@@ -1,6 +1,8 @@
 #include "../../include/NavKit/module/Navp.h"
 #include <numbers>
+#ifdef _WIN32
 #include <CommCtrl.h>
+#endif
 #include <fstream>
 #include <functional>
 #include <algorithm>
@@ -1119,6 +1121,7 @@ void Navp::finalizeBuild() {
 }
 
 void Navp::updateNavpDialogControls(const HWND hwnd) {
+#ifdef _WIN32
     const auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
     SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
 
@@ -1147,6 +1150,7 @@ void Navp::updateNavpDialogControls(const HWND hwnd) {
         }
         SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);
     }
+#endif
 }
 
 void Navp::extractNavpFromRpkgs(const std::string& hash) {
@@ -1159,6 +1163,7 @@ void Navp::extractNavpFromRpkgs(const std::string& hash) {
 
 INT_PTR CALLBACK Navp::extractNavpDialogProc(
     const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+#ifdef _WIN32
     Navp* pNavp = nullptr;
     if (message == WM_INITDIALOG) {
         pNavp = reinterpret_cast<Navp*>(lParam);
@@ -1215,9 +1220,13 @@ INT_PTR CALLBACK Navp::extractNavpDialogProc(
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 void Navp::showExtractNavpDialog() {
+#ifdef _WIN32
     if (hNavpDialog) {
         SetForegroundWindow(hNavpDialog);
         return;
@@ -1257,4 +1266,7 @@ void Navp::showExtractNavpDialog() {
             "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.",
             error);
     }
+#else
+    Logger::log(NK_WARN, "The Extract Navp dialog is only available on Windows.");
+#endif
 }

@@ -6,7 +6,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include "..\..\..\extern\simdjson\simdjson.h"
+#include "../../../extern/simdjson/simdjson.h"
 
 #include "ZHMInt.h"
 #include "ZHMPtr.h"

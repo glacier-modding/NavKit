@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
+#include "../../ConcurrentQueue/ConcurrentQueue.h"
 #include <fstream>
 
 enum LogCategory { NK_INFO = 1, NK_WARN, NK_ERROR, NK_DEBUG };

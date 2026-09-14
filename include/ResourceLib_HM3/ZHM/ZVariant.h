@@ -2,7 +2,7 @@
 
 #include <ostream>
 
-#include "..\..\..\extern\simdjson\simdjson.h"
+#include "../../../extern/simdjson/simdjson.h"
 
 #include "ZHMInt.h"
 #include "ZHMPtr.h"

@@ -10,7 +10,11 @@
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include <SDL.h>
 #include <GL/glew.h>
+#ifdef __APPLE__
+#include <OpenGL/glu.h>
+#else
 #include <GL/glu.h>
+#endif
 
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/RecastDemo/imgui.h"
