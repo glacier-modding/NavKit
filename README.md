@@ -96,15 +96,25 @@ NavKit performs the following series of steps to be able to generate Navp files.
 * Faster Scene generation
 * Linux and macOS support
 * More planned features are on the Issues tab
-# Building instructions (CLion or Visual Studio)
-1. Clone this repository with the '--recurse-submodules' option
+# 🛠️ Building instructions (CLion or Visual Studio)
+1. Clone this repository with the `--recurse-submodules` option
 1. Open in Visual Studio or CLion
 1. Cmake should load
 1. In the x64 command prompt make a build folder, cd into it, and run:  
 `cmake -B . -S ..`
 1. Then change back to the main directory and run  
 `cmake --preset x64-debug`
-# MSI Building instructions
+# 🛠️ Pre-commit Hooks
+
+This repository uses local pre-commit hooks located in the `scripts/` directory. To activate them, run the following command in your terminal from the project root:
+
+```bat
+git config core.hooksPath scripts
+```
+
+Once run, Git will automatically execute the `scripts/pre-commit` script every time you make a local commit.
+
+# 🛠️ MSI Building instructions
 You shouldn't need to build the MSI yourself, but here are the instructions:
 1. Install WiX 6.0 and add its bin/x64 folder to your PATH
 1. Run the installer target. For CLion there is an included run configuration that should automatically be added called Build MSI that runs this command:  
@@ -112,7 +122,7 @@ You shouldn't need to build the MSI yourself, but here are the instructions:
 in this working directory:  
 `build\x64-release`
 
-# Building instructions (Rider)
+# 🛠️ Building instructions (Rider)
 See [Rider Instructions](docs/rider_instructions.md)
 # Credits
 2kpr  
