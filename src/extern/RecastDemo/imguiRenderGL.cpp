@@ -417,13 +417,13 @@ static void drawText(float x, float y, const char* text, int align, unsigned int
             stbtt_aligned_quad q;
             getBakedQuad(g_cdata, 512, 512, c - 32, &x, &y, &q);
 
-            textVertices.push_back(makeUiVertex(q.x0, q.y0, color, q.s0, q.t1));
-            textVertices.push_back(makeUiVertex(q.x1, q.y1, color, q.s1, q.t0));
-            textVertices.push_back(makeUiVertex(q.x1, q.y0, color, q.s1, q.t1));
+            textVertices.push_back(makeUiVertex(q.x0, q.y0, color, q.s0, q.t0));
+            textVertices.push_back(makeUiVertex(q.x1, q.y1, color, q.s1, q.t1));
+            textVertices.push_back(makeUiVertex(q.x1, q.y0, color, q.s1, q.t0));
 
-            textVertices.push_back(makeUiVertex(q.x0, q.y0, color, q.s0, q.t1));
-            textVertices.push_back(makeUiVertex(q.x0, q.y1, color, q.s0, q.t0));
-            textVertices.push_back(makeUiVertex(q.x1, q.y1, color, q.s1, q.t0));
+            textVertices.push_back(makeUiVertex(q.x0, q.y0, color, q.s0, q.t0));
+            textVertices.push_back(makeUiVertex(q.x0, q.y1, color, q.s0, q.t1));
+            textVertices.push_back(makeUiVertex(q.x1, q.y1, color, q.s1, q.t1));
         }
         ++text;
     }
