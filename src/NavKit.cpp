@@ -83,8 +83,7 @@ static int SDLCALL eventFilter(void* userdata, SDL_Event* event) {
 
 int SDL_main(const int argc, char** argv) {
     CPPTRACE_TRY {
-        std::thread logThread(Logger::logRunner);
-        logThread.detach();
+        Logger::getInstance().start();
 
         PersistedSettings::getInstance().load();
         Renderer& renderer = Renderer::getInstance();
@@ -110,6 +109,7 @@ int SDL_main(const int argc, char** argv) {
 
         NFD_Quit();
         renderer.closeWindow();
+        Logger::getInstance().stop();
         return 0;
     }
     CPPTRACE_CATCH(const std::exception& e) {

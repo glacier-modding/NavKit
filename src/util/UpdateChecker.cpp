@@ -199,6 +199,7 @@ void UpdateChecker::performUpdate() const {
     Logger::log(NK_INFO, "Closing NavKit to allow update to proceed.");
 
     Sleep(1000);
+    Logger::getInstance().stop();
     exit(0);
 #else
     Logger::log(NK_WARN, "Automatic updates are only supported on Windows.");
