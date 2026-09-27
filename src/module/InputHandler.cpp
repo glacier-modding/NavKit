@@ -11,7 +11,6 @@
 
 #include <algorithm>
 #include <SDL.h>
-#include <SDL_opengl.h>
 
 #include "../../include/NavKit/module/NavKitSettings.h"
 

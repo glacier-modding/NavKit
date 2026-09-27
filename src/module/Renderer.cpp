@@ -1,4 +1,3 @@
-#include <FTGL/ftgl.h>
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/module/Airg.h"
@@ -8,6 +7,7 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/render/CoreProfileDraw.h"
 
 #include <numbers>
 #include <array>
@@ -18,12 +18,6 @@
 #include <SDL.h>
 
 #include <GL/glew.h>
-#ifdef __APPLE__
-#include <OpenGL/glu.h>
-#else
-#include <GL/glu.h>
-#endif
-
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
@@ -49,12 +43,9 @@ Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     camr = 10000;
     origCameraEulers[0] = 0, origCameraEulers[1] = 0;
     prevFrameTime = 0;
-    font = new FTGLPolygonFont("DroidSans.ttf");
-    font->FaceSize(72);
 }
 
 Renderer::~Renderer() {
-    delete font;
     imguiRenderGLDestroy();
     SDL_Quit();
 }
@@ -105,6 +96,9 @@ bool Renderer::initWindowAndRenderer() {
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 2);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 2);
@@ -173,13 +167,6 @@ bool Renderer::initWindowAndRenderer() {
 
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const float backgroundColor = navKitSettings.backgroundColor;
-    const float fogColor[4] = {backgroundColor, backgroundColor, backgroundColor, 1.0f};
-    glEnable(GL_FOG);
-    glFogi(GL_FOG_MODE, GL_LINEAR);
-    glFogf(GL_FOG_START, camr * 0.1f);
-    glFogf(GL_FOG_END, camr * 1.25f);
-    glFogfv(GL_FOG_COLOR, fogColor);
-
     glDepthFunc(GL_LEQUAL);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_POLYGON_OFFSET_FILL);
@@ -298,6 +285,7 @@ void Renderer::handleResize() {
 }
 
 void Renderer::renderFrame() {
+    setCoreProfileFogEnabled(true);
     glViewport(0, 0, width, height);
     glGetIntegerv(GL_VIEWPORT, viewport);
 
@@ -307,7 +295,6 @@ void Renderer::renderFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_TEXTURE_2D);
     glEnable(GL_DEPTH_TEST);
 
     projection =
@@ -318,19 +305,12 @@ void Renderer::renderFrame() {
             cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
         glm::vec3(0.0f, 1.0f, 0.0f));
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(50.0f, static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
-
-    glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    gluLookAt(cameraPos[0], cameraPos[1], cameraPos[2],
-        cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
-        cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
-        cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])), 0.0, 1.0, 0.0);
-    glGetDoublev(GL_MODELVIEW_MATRIX, modelviewMatrix);
+    const float* projectionValues = glm::value_ptr(projection);
+    const float* viewValues = glm::value_ptr(view);
+    for (int i = 0; i < 16; ++i) {
+        projectionMatrix[i] = projectionValues[i];
+        modelviewMatrix[i] = viewValues[i];
+    }
     const Uint32 time = SDL_GetTicks();
     const float dt = static_cast<float>(time - prevFrameTime) / 1000.0f;
     prevFrameTime = time;
@@ -353,18 +333,21 @@ void Renderer::renderFrame() {
     shader.setBool("useFlatColor", false);
     shader.setBool("useVertexColor", false);
     shader.setBool("useTexture", false);
+    shader.setBool("useUiTexture", false);
+    shader.setBool("useAlphaTexture", false);
+    shader.setBool("useFog", true);
+    shader.setVec4("fogColor", glm::vec4(backgroundColor, backgroundColor, backgroundColor, 1.0f));
+    shader.setFloat("fogStart", camr * 0.1f);
+    shader.setFloat("fogEnd", camr * 1.25f);
     glUseProgram(0);
 
     if (const SceneMesh& obj = SceneMesh::getInstance(); obj.objLoaded && obj.showObj) {
         GLboolean blendEnabled;
         glGetBooleanv(GL_BLEND, &blendEnabled);
-        glEnable(GL_TEXTURE_2D);
-
         glPolygonOffset(-1.0f, -1.0f);
         obj.renderObj();
         glPolygonOffset(0.0f, 0.0f);
 
-        glDisable(GL_TEXTURE_2D);
         glUseProgram(0);
         glDisable(GL_CULL_FACE);
     }
@@ -398,17 +381,17 @@ void Renderer::renderFrame() {
         grid.renderGrid();
     }
     if (recastAdapter.markerPositionSet) {
-        glLineWidth(5.0f);
-        glColor4f(240, 220, 0, 196);
-        glBegin(GL_LINE_LOOP);
+        const Vec3 markerColor = {1.0f, 1.0f, 0.0f};
         const float r = 0.5f;
         for (int i = 0; i < 20; ++i) {
             const float a = static_cast<float>(i) / 20.0f * std::numbers::pi * 2;
-            glVertex3f(recastAdapter.markerPosition[0] + cosf(a) * r, recastAdapter.markerPosition[1],
-                static_cast<GLdouble>(recastAdapter.markerPosition[2]) + sinf(a) * r);
+            const float nextA = static_cast<float>(i + 1) / 20.0f * std::numbers::pi * 2;
+            drawLine({recastAdapter.markerPosition[0] + cosf(a) * r, recastAdapter.markerPosition[1],
+                         recastAdapter.markerPosition[2] + sinf(a) * r},
+                {recastAdapter.markerPosition[0] + cosf(nextA) * r, recastAdapter.markerPosition[1],
+                    recastAdapter.markerPosition[2] + sinf(nextA) * r},
+                shader, view, projection, markerColor);
         }
-        glEnd();
-        glLineWidth(1.0f);
     }
     if (grid.showGrid) {
         grid.renderGridText();
@@ -431,7 +414,7 @@ void Renderer::finalizeFrame() const {
 }
 
 void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view, const glm::mat4& projection,
-    const Vec3 color = {-1, -1, -1}) {
+    const Vec3 color, const float alpha) {
     static GLuint vao = 0, vbo = 0;
     if (vao == 0) {
         glGenVertexArrays(1, &vao);
@@ -451,7 +434,9 @@ void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view,
     shader.use();
     shader.setBool("useFlatColor", true);
     shader.setBool("useVertexColor", false);
-    glm::vec4 c = (color.X == -1) ? glm::vec4(1.0f) : glm::vec4(color.X, color.Y, color.Z, 1.0f);
+    shader.setBool("useUiTexture", false);
+    shader.setBool("useAlphaTexture", false);
+    glm::vec4 c = (color.X == -1) ? glm::vec4(1.0f) : glm::vec4(color.X, color.Y, color.Z, alpha);
     shader.setVec4("flatColor", c);
     shader.setMat4("projection", projection);
     shader.setMat4("view", view);
@@ -523,31 +508,7 @@ void Renderer::drawAxes() {
 }
 
 void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 color, const double size) const {
-    if (font->Error()) {
-        return;
-    }
-
-    glUseProgram(0);
-
-    glPushMatrix();
-    glTranslatef(pos.X, pos.Y, pos.Z);
-
-    float modelview[16];
-    glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            modelview[i * 4 + j] = (i == j ? 1.0f : 0.0f);
-        }
-    }
-    glLoadMatrixf(modelview);
-
-    const float scale = static_cast<float>(size) * 0.0002f;
-    glScalef(scale, scale, scale);
-
-    glColor3f(color.X, color.Y, color.Z);
-    font->Render(text.c_str());
-
-    glPopMatrix();
+    imguiRenderGLDrawWorldText(text.c_str(), pos.X, pos.Y, pos.Z, color.X, color.Y, color.Z, static_cast<float>(size));
 }
 
 void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion rotation, const bool filled,
@@ -594,6 +555,8 @@ void Renderer::drawBox(const Vec3 pos, const Vec3 size, const Math::Quaternion r
     shader.use();
     shader.setBool("useFlatColor", true);
     shader.setBool("useVertexColor", false);
+    shader.setBool("useUiTexture", false);
+    shader.setBool("useAlphaTexture", false);
     shader.setMat4("projection", projection);
     shader.setMat4("view", view);
     shader.setMat4("model", model);
@@ -633,6 +596,12 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
         printf("FB error, status: 0x%x\n", status);
         return {NONE, -1};
     }
+    shader.use();
+    shader.setBool("useUiTexture", false);
+    shader.setBool("useAlphaTexture", false);
+    shader.setBool("useFog", false);
+    shader.setBool("useFlatColor", true);
+    shader.setBool("useTexture", false);
     Navp::getInstance().renderNavMeshForHitTest();
     Navp::getInstance().renderPfSeedPointsForHitTest();
     Navp::getInstance().renderExclusionBoxesForHitTest();

@@ -22,12 +22,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "SDL.h"
-#include "SDL_opengl.h"
-#ifdef __APPLE__
-#include <OpenGL/glu.h>
-#else
-#include <GL/glu.h>
-#endif
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/InputGeom.h"
 #include "../../include/RecastDemo/Sample.h"
@@ -37,6 +31,8 @@
 #include "DetourNavMesh.h"
 #include "DetourNavMeshBuilder.h"
 #include "DetourDebugDraw.h"
+#include "../../include/NavKit/render/CoreProfileDraw.h"
+#include <glm/gtc/matrix_transform.hpp>
 #include "../../include/NavKit/module/Logger.h"
 
 #ifdef WIN32
@@ -334,14 +330,14 @@ void Sample_TileMesh::handleRender() {
     if (m_chf && m_drawMode == DRAWMODE_COMPACT_REGIONS)
         duDebugDrawCompactHeightfieldRegions(&m_dd, *m_chf);
     if (m_solid && m_drawMode == DRAWMODE_VOXELS) {
-        glEnable(GL_FOG);
+        setCoreProfileFogEnabled(true);
         duDebugDrawHeightfieldSolid(&m_dd, *m_solid);
-        glDisable(GL_FOG);
+        setCoreProfileFogEnabled(false);
     }
     if (m_solid && m_drawMode == DRAWMODE_VOXELS_WALKABLE) {
-        glEnable(GL_FOG);
+        setCoreProfileFogEnabled(true);
         duDebugDrawHeightfieldWalkable(&m_dd, *m_solid);
-        glDisable(GL_FOG);
+        setCoreProfileFogEnabled(false);
     }
 
     if (m_cset && m_drawMode == DRAWMODE_RAW_CONTOURS) {
@@ -389,16 +385,23 @@ void Sample_TileMesh::handleRender() {
 }
 
 void Sample_TileMesh::handleRenderOverlay(double* proj, double* model, int* view) {
-    GLdouble x, y, z;
-
     // Draw start and end point labels
-    if (m_tileBuildTime > 0.0f &&
-        gluProject((GLdouble)(m_lastBuiltTileBmin[0] + m_lastBuiltTileBmax[0]) / 2,
-            (GLdouble)(m_lastBuiltTileBmin[1] + m_lastBuiltTileBmax[1]) / 2,
-            (GLdouble)(m_lastBuiltTileBmin[2] + m_lastBuiltTileBmax[2]) / 2, model, proj, view, &x, &y, &z)) {
+    if (m_tileBuildTime > 0.0f) {
+        glm::mat4 projection;
+        glm::mat4 modelView;
+        for (int i = 0; i < 16; ++i) {
+            projection[i / 4][i % 4] = static_cast<float>(proj[i]);
+            modelView[i / 4][i % 4] = static_cast<float>(model[i]);
+        }
+        const glm::vec4 viewport(view[0], view[1], view[2], view[3]);
+        const glm::vec3 screen = glm::project(glm::vec3((m_lastBuiltTileBmin[0] + m_lastBuiltTileBmax[0]) / 2,
+                                                  (m_lastBuiltTileBmin[1] + m_lastBuiltTileBmax[1]) / 2,
+                                                  (m_lastBuiltTileBmin[2] + m_lastBuiltTileBmax[2]) / 2),
+            modelView, projection, viewport);
         char text[32];
         snprintf(text, 32, "%.3fms / %dTris / %.1fkB", m_tileBuildTime, m_tileTriCount, m_tileMemUsage);
-        imguiDrawText((int)x, (int)y - 25, IMGUI_ALIGN_CENTER, text, imguiRGBA(0, 0, 0, 220));
+        imguiDrawText(static_cast<int>(screen.x), static_cast<int>(screen.y) - 25, IMGUI_ALIGN_CENTER, text,
+            imguiRGBA(0, 0, 0, 220));
     }
 
     if (m_tool)

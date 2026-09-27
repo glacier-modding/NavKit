@@ -38,6 +38,7 @@ set(MODULE_SOURCES
         module/SceneMesh.cpp
 )
 set(RENDER_SOURCES
+        render/CoreProfileDraw.cpp
         render/Mesh.cpp
         render/Model.cpp
         render/Shader.cpp
@@ -66,7 +67,7 @@ add_library(NavKitLib STATIC
 target_compile_definitions(NavKitLib PRIVATE NOMINMAX)
 
 if (APPLE)
-    # The fixed-function OpenGL calls used by the renderer are deprecated (but present) on macOS. We do not care.
+    # Silence platform deprecation notices for OpenGL calls exposed by system headers.
     target_compile_definitions(NavKitLib PUBLIC GL_SILENCE_DEPRECATION)
 endif ()
 

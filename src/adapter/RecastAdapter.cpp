@@ -22,13 +22,8 @@
 #include <SDL_keyboard.h>
 #include <sstream>
 
-#ifdef __APPLE__
-#include <OpenGL/glu.h>
-#else
-#include <GL/glu.h>
-#endif
-
 #include "../../include/NavKit/module/PersistedSettings.h"
+#include <glm/gtc/matrix_transform.hpp>
 
 RecastAdapter::RecastAdapter() {
     buildContext = new BuildContext();
@@ -462,7 +457,6 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
         const Vec3 color = isAirgInstance ? redColor : purpleColor;
         const Vec3 min{tile->header->bmin[0], tile->header->bmin[1], tile->header->bmin[2]};
         const Vec3 max{tile->header->bmax[0], tile->header->bmax[1], tile->header->bmax[2]};
-        glColor4f(color.X, color.Y, color.Z, 0.6);
         Renderer& renderer = Renderer::getInstance();
         Vec3 camPos{renderer.cameraPos[0], renderer.cameraPos[1], renderer.cameraPos[2]};
 
@@ -470,26 +464,22 @@ void RecastAdapter::renderRecastNavmesh(const bool isAirgInstance) const {
         if (distance > 100) {
             continue;
         }
-        glBegin(GL_LINE_LOOP);
-        glVertex3f(min.X, 0, min.Z);
-        glVertex3f(max.X, 0, min.Z);
-        glVertex3f(max.X, 0, max.Z);
-        glVertex3f(min.X, 0, max.Z);
-        glEnd();
+        const Vec3 tileCorners[] = {{min.X, 0, min.Z}, {max.X, 0, min.Z}, {max.X, 0, max.Z}, {min.X, 0, max.Z}};
+        for (int i = 0; i < 4; ++i) {
+            drawLine(tileCorners[i], tileCorners[(i + 1) % 4], renderer.shader, renderer.view, renderer.projection,
+                color, 0.6f);
+        }
         renderer.drawText(std::to_string(tileIndex + 1), {min.X, 0, min.Z}, color);
         const Vec3 tealColor = {0.8, 0.0, 0.0};
         const Vec3 greyColor = {0.8, 0.8, 0.8};
         const Vec3 polyColor = isAirgInstance ? tealColor : greyColor;
-        glColor4f(polyColor.X, polyColor.Y, polyColor.Z, 0.6);
-
         for (int polyIndex = 0; polyIndex < tile->header->polyCount; polyIndex++) {
             const dtPolyRef polyRef = getPoly(tileIndex, polyIndex);
             auto edges = getEdges(navQuery, polyRef);
-            glBegin(GL_LINE_LOOP);
-            glVertex3f(edges[0].X, edges[0].Y, edges[0].Z);
-            glVertex3f(edges[1].X, edges[1].Y, edges[1].Z);
-            glVertex3f(edges[2].X, edges[2].Y, edges[2].Z);
-            glEnd();
+            for (int edgeIndex = 0; edgeIndex < 3; ++edgeIndex) {
+                drawLine(edges[edgeIndex], edges[(edgeIndex + 1) % 3], renderer.shader, renderer.view,
+                    renderer.projection, polyColor, 0.6f);
+            }
             auto centroid = calculateCentroid(navQuery, polyRef);
             renderer.drawText("ref: " + std::to_string(polyRef) + " idx: " + std::to_string(polyIndex),
                 {centroid.X, centroid.Y, centroid.Z}, color);
@@ -972,16 +962,18 @@ SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
     float rayStart[3];
     float rayEnd[3];
     float hitTime;
-    GLdouble x, y, z;
     const Renderer& renderer = Renderer::getInstance();
-    gluUnProject(mx, my, 0.0f, renderer.modelviewMatrix, renderer.projectionMatrix, renderer.viewport, &x, &y, &z);
-    rayStart[0] = (float)x;
-    rayStart[1] = (float)y;
-    rayStart[2] = (float)z;
-    gluUnProject(mx, my, 1.0f, renderer.modelviewMatrix, renderer.projectionMatrix, renderer.viewport, &x, &y, &z);
-    rayEnd[0] = (float)x;
-    rayEnd[1] = (float)y;
-    rayEnd[2] = (float)z;
+    const glm::vec4 viewport(renderer.viewport[0], renderer.viewport[1], renderer.viewport[2], renderer.viewport[3]);
+    const glm::vec3 start = glm::unProject(
+        {static_cast<float>(mx), static_cast<float>(my), 0.0f}, renderer.view, renderer.projection, viewport);
+    const glm::vec3 end = glm::unProject(
+        {static_cast<float>(mx), static_cast<float>(my), 1.0f}, renderer.view, renderer.projection, viewport);
+    rayStart[0] = start.x;
+    rayStart[1] = start.y;
+    rayStart[2] = start.z;
+    rayEnd[0] = end.x;
+    rayEnd[1] = end.y;
+    rayEnd[2] = end.z;
     SceneMeshHitTestResult result;
     if (const int hitIndex = inputGeom->raycastMesh(rayStart, rayEnd, hitTime); hitIndex != -1) {
         result.hitIndex = hitIndex;

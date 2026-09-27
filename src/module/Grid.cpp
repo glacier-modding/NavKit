@@ -183,7 +183,6 @@ void Grid::renderGridText() const {
     const float gridSpacing = spacing;
     const float z = 0.02 - zOffset;
     int xi = -1;
-    glColor4f(color.X, color.Y, color.Z, 0.6);
     Renderer& renderer = Renderer::getInstance();
     const Vec3 camPos{renderer.cameraPos[0], -renderer.cameraPos[2], renderer.cameraPos[1]};
     for (float x = minX; x < xMax; x += gridSpacing) {

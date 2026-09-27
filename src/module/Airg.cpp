@@ -24,6 +24,7 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/RecastDemo/imguiRenderGL.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/GridGenerator.h"
 #include "../../include/ResourceLib_HM3/ResourceConverter.h"
@@ -508,10 +509,11 @@ void Airg::renderAirg() {
             if (cellColorSource != OFF) {
                 float minX = reasoningGrid->m_Properties.vMin.x;
                 float minY = reasoningGrid->m_Properties.vMin.y;
-                float x = waypoint.xi * reasoningGrid->m_Properties.fGridSpacing +
-                    reasoningGrid->m_Properties.fGridSpacing / 2 + minX;
-                float y = waypoint.yi * reasoningGrid->m_Properties.fGridSpacing +
-                    reasoningGrid->m_Properties.fGridSpacing / 2 + minY;
+                const float cellSpacing = reasoningGrid->m_Properties.fGridSpacing;
+                const int cellX = static_cast<int>(std::floor((waypoint.vPos.x - minX) / cellSpacing));
+                const int cellY = static_cast<int>(std::floor((waypoint.vPos.y - minY) / cellSpacing));
+                float x = cellX * cellSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 + minX;
+                float y = cellY * cellSpacing + reasoningGrid->m_Properties.fGridSpacing / 2 + minY;
                 float z = waypoint.vPos.z + 0.01f;
 
                 // Boundary
@@ -669,12 +671,17 @@ void Airg::renderAirg() {
     renderer.shader.setBool("useVertexColor", false);
 
     if (showAirgIndices) {
-        int numWaypoints = reasoningGrid->m_WaypointList.size();
+        std::vector<WorldTextLabel> labels;
+        const size_t numWaypoints = reasoningGrid->m_WaypointList.size();
+        labels.reserve(numWaypoints);
         for (size_t i = 0; i < numWaypoints; i++) {
             const Waypoint& waypoint = reasoningGrid->m_WaypointList[i];
-            renderer.drawText(
-                std::to_string(i), {waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y}, {1, .7f, .7f}, 20);
+            const glm::vec3 position(waypoint.vPos.x, waypoint.vPos.z + 0.1f, -waypoint.vPos.y);
+            if (imguiRenderGLIsWorldTextInRange(position)) {
+                labels.push_back({std::to_string(i), position, {1.0f, 0.7f, 0.7f}, 20.0f});
+            }
         }
+        imguiRenderGLDrawWorldTextBatch(labels);
     }
 }
 

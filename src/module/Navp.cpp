@@ -32,6 +32,7 @@
 #include "../../include/NavWeakness/NavPower.h"
 #include "../../include/NavWeakness/NavWeakness.h"
 #include "../../include/RecastDemo/InputGeom.h"
+#include "../../include/RecastDemo/imguiRenderGL.h"
 
 Navp::Navp() :
     navMesh(new NavPower::NavMesh()), selectedNavpAreaIndex(-1), selectedPfSeedPointIndex(-1),
@@ -592,32 +593,48 @@ void Navp::renderNavMesh() {
         const Vec3 colorBlue = {.7f, .7f, 1.0f};
         const Vec3 colorPink = {1.0f, .7f, 1.0f};
         if (showNavpIndices) {
+            std::vector<WorldTextLabel> labels;
+            const int totalAreaCount = getTotalAreaCount(navMesh);
+            labels.reserve(totalAreaCount);
             int areaIndex = 0;
             float zRenderOffset = getInstance().doZRenderOffset ? 0.5f : 0.0f;
-            for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
+            for (int i = 0; i < totalAreaCount; ++i) {
                 const auto& area = getAreaByIndex(navMesh, i);
                 const auto& edges = area.m_edges;
                 const Vec3 pos = area.m_area->m_pos;
-                renderer.drawText(
-                    std::to_string(areaIndex + 1), {pos.X, pos.Z + 0.1f + zRenderOffset, -pos.Y}, colorBlue, 20);
+                const glm::vec3 labelPosition(pos.X, pos.Z + 0.1f + zRenderOffset, -pos.Y);
+                if (imguiRenderGLIsWorldTextInRange(labelPosition)) {
+                    labels.push_back(
+                        {std::to_string(areaIndex + 1), labelPosition, {colorBlue.X, colorBlue.Y, colorBlue.Z}, 20.0f});
+                }
                 if (selectedNavpAreaIndex == areaIndex) {
                     int edgeIndex = 0;
                     for (const auto vertex : edges) {
-                        renderer.drawText(std::to_string(edgeIndex + 1),
-                            {vertex->m_pos.X, vertex->m_pos.Z + 0.1f + zRenderOffset, -vertex->m_pos.Y},
-                            vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL ? colorRed : colorGreen, 20);
+                        const Vec3 edgeColor =
+                            vertex->GetType() == NavPower::EdgeType::EDGE_PORTAL ? colorRed : colorGreen;
+                        const glm::vec3 edgePosition(
+                            vertex->m_pos.X, vertex->m_pos.Z + 0.1f + zRenderOffset, -vertex->m_pos.Y);
+                        if (imguiRenderGLIsWorldTextInRange(edgePosition)) {
+                            labels.push_back({std::to_string(edgeIndex + 1), edgePosition,
+                                {edgeColor.X, edgeColor.Y, edgeColor.Z}, 20.0f});
+                        }
                         if (vertex->m_pAdjArea != nullptr) {
                             const auto nextVertex = edges[(edgeIndex + 1) % edges.size()];
                             Vec3 midpoint = (vertex->m_pos + nextVertex->m_pos) / 2.0f;
                             const int neighborAreaIndex = binaryAreaToAreaIndexMap[vertex->m_pAdjArea];
-                            renderer.drawText(std::to_string(neighborAreaIndex),
-                                {midpoint.X, midpoint.Z + 0.1f + zRenderOffset, -midpoint.Y}, colorPink, 20);
+                            const glm::vec3 neighborPosition(
+                                midpoint.X, midpoint.Z + 0.1f + zRenderOffset, -midpoint.Y);
+                            if (imguiRenderGLIsWorldTextInRange(neighborPosition)) {
+                                labels.push_back({std::to_string(neighborAreaIndex), neighborPosition,
+                                    {colorPink.X, colorPink.Y, colorPink.Z}, 20.0f});
+                            }
                         }
                         edgeIndex++;
                     }
                 }
                 areaIndex++;
             }
+            imguiRenderGLDrawWorldTextBatch(labels);
         }
     }
 }

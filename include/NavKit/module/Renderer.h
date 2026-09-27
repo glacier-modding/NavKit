@@ -7,8 +7,6 @@
 #include "../render/Shader.h"
 #include <glm/mat4x4.hpp>
 
-class FTPolygonFont;
-
 typedef double GLdouble;
 typedef int GLint;
 
@@ -86,7 +84,6 @@ public:
     unsigned int framebuffer;
     unsigned int color_rb;
     unsigned int depth_rb;
-    FTPolygonFont* font;
     int width;
     int height;
     float frameRate;
@@ -106,3 +103,6 @@ public:
     static HWND hwnd;
     Uint32 prevFrameTime;
 };
+
+void drawLine(const Vec3 start, const Vec3 end, Shader& shader, const glm::mat4& view, const glm::mat4& projection,
+    const Vec3 color = {-1, -1, -1}, float alpha = 1.0f);

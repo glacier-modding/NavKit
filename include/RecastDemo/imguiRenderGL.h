@@ -19,9 +19,22 @@
 #ifndef IMGUI_RENDER_GL_H
 #define IMGUI_RENDER_GL_H
 
+#include <glm/vec3.hpp>
+#include <string>
+#include <vector>
+
+struct WorldTextLabel {
+    std::string text;
+    glm::vec3 position;
+    glm::vec3 color;
+    float size;
+};
+
 bool imguiRenderGLInit(const char* fontpath);
 void imguiRenderGLDestroy();
 void imguiRenderGLDraw();
+bool imguiRenderGLIsWorldTextInRange(const glm::vec3& position);
+void imguiRenderGLDrawWorldText(const char* text, float x, float y, float z, float r, float g, float b, float size);
+void imguiRenderGLDrawWorldTextBatch(const std::vector<WorldTextLabel>& labels);
 
 #endif // IMGUI_RENDER_GL_H
-

@@ -29,7 +29,6 @@
 #include "DetourNavMeshQuery.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "SDL.h"
-#include "SDL_opengl.h"
 #include <fstream>
 #include <vector>
 

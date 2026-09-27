@@ -8,6 +8,7 @@ out vec3 Normal;
 out vec3 FragPos;
 out vec4 VertexColor;
 out vec2 TexCoords;
+out float FogDistance;
 
 // Uniforms for transformation matrices
 uniform mat4 model;
@@ -21,6 +22,7 @@ void main()
     gl_Position = projection * view * model * vec4(aPos, 1.0);
     Normal = normalMatrix * aNormal;
     FragPos = vec3(model * vec4(aPos, 1.0));
+    FogDistance = abs((view * model * vec4(aPos, 1.0)).z);
     VertexColor = aColor;
     TexCoords = aTexCoords;
 }
