@@ -400,14 +400,15 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
                 }
                 auto diffuseHash = scene.matis[matiHash].diffuse;
                 Logger::log(
-                    NK_INFO, "Found diffuse texture %s for mesh %s.", diffuseHash.c_str(), mesh.primHash.c_str());
+                    NK_DEBUG, "Found diffuse texture %s for mesh %s.", diffuseHash.c_str(), mesh.primHash.c_str());
                 neededTextHashes.insert(diffuseHash);
                 auto normalHash = scene.matis[matiHash].normal;
-                Logger::log(NK_INFO, "Found normal texture %s for mesh %s.", normalHash.c_str(), mesh.primHash.c_str());
+                Logger::log(
+                    NK_DEBUG, "Found normal texture %s for mesh %s.", normalHash.c_str(), mesh.primHash.c_str());
                 neededTextHashes.insert(normalHash);
                 auto specularHash = scene.matis[matiHash].specular;
                 Logger::log(
-                    NK_INFO, "Found specular texture %s for mesh %s.", specularHash.c_str(), mesh.primHash.c_str());
+                    NK_DEBUG, "Found specular texture %s for mesh %s.", specularHash.c_str(), mesh.primHash.c_str());
                 neededTextHashes.insert(specularHash);
             }
         }

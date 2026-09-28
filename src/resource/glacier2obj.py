@@ -21,7 +21,7 @@ glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are 
 # General
 
 
-def log(level, msg, filter_field):
+def log(level: str, msg: str, filter_field: str):
     if level in glacier2obj_enabled_log_levels:  # and filter_field == "007573591BE1BE69":
         # print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
         if level != "INFO":
@@ -2566,8 +2566,8 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def glacier2obj(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, build_type, filter_to_include_box,
-                  apply_textures, output_to_blend):
+def glacier2obj(path_to_nav_json: str, path_to_output_obj_file: str, mesh_type: str, lod_mask: str, build_type: str,
+                filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool):
     start = timer()
     log("INFO", "Loading scenario.", "glacier2obj")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2obj")
@@ -2714,7 +2714,7 @@ def glacier2obj(path_to_nav_json, path_to_output_obj_file, mesh_type, lod_mask, 
     error_alocs = []
     log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2obj")
     log("INFO", "Mesh count: " + str(mesh_count), "glacier2obj")
-    log_threshold = round(meshes_in_scenario_count / 10, -2)
+    log_threshold = max(1, round(meshes_in_scenario_count / 10, -2))
     for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
         aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
         mesh_hash = aloc_or_prim_filename[:-5]
@@ -2993,7 +2993,7 @@ def main():
     return None
 
 
-def save_obj_file(output_path):
+def save_obj_file(output_path: str):
     log("INFO", "Attempting to save obj file to :" + output_path, "main")
     if bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2:
         bpy.ops.wm.obj_export(
@@ -3015,7 +3015,7 @@ def save_obj_file(output_path):
         )
 
 
-def save_blend_file(output_path):
+def save_blend_file(output_path: str):
     log("INFO", "Attempting to save blender file to :" + output_path, "main")
     bpy.ops.wm.save_as_mainfile(filepath=output_path, relative_remap=False)
 

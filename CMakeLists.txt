@@ -137,6 +137,12 @@ if(CLANG_TIDY_EXE)
     )
 endif()
 
+# This creates an isolated, non-compiled group solely for CLion's indexer
+file(GLOB_RECURSE IDE_RESOURCES "src/resource/*")
+
+add_custom_target(clion_indexer_helper
+        SOURCES ${IDE_RESOURCES}
+)
 
 set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:GLEW::glew>"
