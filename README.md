@@ -153,4 +153,4 @@ Rdil
 Recast team  
 Someone Else  
 Voodoo Hillbilly  
-And everyone at the Glacier 2 discord!
+And everyone at the [Glacier 2 discord](https://discord.gg/86c3DP3WR)!
