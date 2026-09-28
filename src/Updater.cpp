@@ -25,6 +25,68 @@ void LogMessage(const std::string& msg);
 
 std::string ConvertWideToUTF8(const wchar_t* wstr);
 
+struct MainWindowSearch {
+    DWORD process_id;
+    HWND window;
+};
+
+BOOL CALLBACK FindMainWindow(HWND hwnd, LPARAM lParam) {
+    auto* search = reinterpret_cast<MainWindowSearch*>(lParam);
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(hwnd, &process_id);
+    if (process_id == search->process_id && IsWindowVisible(hwnd) && GetWindow(hwnd, GW_OWNER) == nullptr) {
+        search->window = hwnd;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+bool LaunchNavKit(const std::filesystem::path& navkit_path, const std::filesystem::path& install_dir) {
+    const std::string executable = navkit_path.string();
+    const std::string working_directory = install_dir.string();
+    SHELLEXECUTEINFOA execute_info = {};
+    execute_info.cbSize = sizeof(execute_info);
+    execute_info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    execute_info.lpVerb = "open";
+    execute_info.lpFile = executable.c_str();
+    execute_info.lpDirectory = working_directory.c_str();
+    execute_info.nShow = SW_SHOWNORMAL;
+
+    if (!ShellExecuteExA(&execute_info)) {
+        LogMessage("Updater: Failed to relaunch NavKit. Error: " + std::to_string(GetLastError()));
+        return false;
+    }
+    if (execute_info.hProcess == nullptr) {
+        LogMessage("Updater: NavKit started without a process handle; its window cannot be activated.");
+        return true;
+    }
+
+    const DWORD process_id = GetProcessId(execute_info.hProcess);
+    AllowSetForegroundWindow(process_id);
+
+    MainWindowSearch search = {process_id, nullptr};
+    for (int attempt = 0; attempt < 100 && search.window == nullptr; ++attempt) {
+        EnumWindows(FindMainWindow, reinterpret_cast<LPARAM>(&search));
+        if (search.window == nullptr && WaitForSingleObject(execute_info.hProcess, 0) == WAIT_TIMEOUT) {
+            Sleep(100);
+        } else {
+            break;
+        }
+    }
+
+    bool activated = false;
+    if (search.window != nullptr) {
+        ShowWindow(search.window, SW_SHOW);
+        activated = SetForegroundWindow(search.window) != FALSE;
+    }
+    CloseHandle(execute_info.hProcess);
+
+    if (!activated) {
+        LogMessage("Updater: NavKit started, but its window could not be brought to the foreground.");
+    }
+    return true;
+}
+
 struct UpdaterThreadArgs {
     std::filesystem::path msi_path;
     DWORD parent_pid;
@@ -232,8 +294,7 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
         LogMessage("Updater: MSI installation failed with exit code: " + std::to_string(msi_exit_code));
         LogMessage("Updater: Check log for details: " + log_path.string());
         LogMessage("Updater: Attempting to relaunch the previous version of NavKit...");
-        ShellExecuteA(
-            nullptr, "open", navkit_path.string().c_str(), nullptr, install_dir.string().c_str(), SW_SHOWNORMAL);
+        LaunchNavKit(navkit_path, install_dir);
     } else {
         LogMessage("Updater: MSI installation completed successfully.");
         if (std::error_code ec; std::filesystem::remove(args->msi_path, ec)) {
@@ -243,10 +304,7 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
         }
 
         LogMessage("Updater: Relaunching NavKit from: " + navkit_path.string());
-        if (reinterpret_cast<INT_PTR>(ShellExecuteA(nullptr, "open", navkit_path.string().c_str(), nullptr,
-                install_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
-            LogMessage("Updater: Failed to relaunch NavKit. Error: " + std::to_string(GetLastError()));
-        } else {
+        if (LaunchNavKit(navkit_path, install_dir)) {
             LogMessage("Updater: Scheduling self-deletion of temporary files.");
             std::string temp_updater_path_str = args->updater_exe_path.string();
             std::string temp_dir_path_str = args->updater_exe_path.parent_path().string();
