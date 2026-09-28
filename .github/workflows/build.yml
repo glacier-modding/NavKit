@@ -4,13 +4,153 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
+  create_versioned_release:
+    name: Create Versioned Release
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      (startsWith(github.event.head_commit.message, 'feat!:') ||
+      startsWith(github.event.head_commit.message, 'feat:') ||
+      startsWith(github.event.head_commit.message, 'fix:'))
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update version and prepare release notes
+        id: release
+        env:
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import subprocess
+          import tempfile
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          tags = git("tag", "--list", "v[0-9]*.*.*", "--sort=-version:refname").splitlines()
+          if not tags:
+              raise SystemExit("No previous version tag found; cannot calculate the next version.")
+
+          previous_tag = tags[0]
+          match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", previous_tag)
+          if not match:
+              raise SystemExit(f"Latest tag is not a supported semantic version: {previous_tag}")
+          major, minor, patch = map(int, match.groups())
+
+          subject = os.environ["COMMIT_SUBJECT"]
+          if subject.startswith("feat!:"):
+              major, minor, patch = major + 1, 0, 0
+          elif subject.startswith("feat:"):
+              minor, patch = minor + 1, 0
+          elif subject.startswith("fix:"):
+              patch += 1
+          else:
+              raise SystemExit(f"Unsupported release commit: {subject}")
+
+          tag = f"v{major}.{minor}.{patch}"
+          cmake_path = "CMakeLists.txt"
+          cmake = open(cmake_path, encoding="utf-8").read()
+          cmake, count = re.subn(
+              r"(VERSION\s+)\d+\.\d+\.\d+",
+              rf"\g<1>{major}.{minor}.{patch}",
+              cmake,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not find the project version in CMakeLists.txt.")
+          open(cmake_path, "w", encoding="utf-8", newline="").write(cmake)
+
+          config_path = "include/NavKit/NavKitConfig.h"
+          config = open(config_path, encoding="utf-8").read()
+          for component, value in (
+              ("MAJOR", major),
+              ("MINOR", minor),
+              ("PATCH", patch),
+          ):
+              config, count = re.subn(
+                  rf'(#define NavKit_VERSION_{component} ")[^"]+(")',
+                  rf"\g<1>{value}\g<2>",
+                  config,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit(f"Could not update {component} in {config_path}.")
+          open(config_path, "w", encoding="utf-8", newline="").write(config)
+
+          subjects = git("log", "--format=%s", f"{previous_tag}..HEAD").splitlines()
+          enhancements = []
+          fixes = []
+          other = []
+          conventional = re.compile(r"^(feat|fix)(?:\([^)]*\))?!?:\s*(.+)$")
+          for message in subjects:
+              parsed = conventional.match(message)
+              if parsed:
+                  entry = parsed.group(2)
+                  (fixes if parsed.group(1) == "fix" else enhancements).append(entry)
+              else:
+                  other.append(message)
+
+          notes = [f"# NavKit {tag}", "", "## Enhancements"]
+          notes.extend(f"- {entry}" for entry in enhancements)
+          notes.extend(["", "## Fixes"])
+          notes.extend(f"- {entry}" for entry in fixes)
+          if other:
+              notes.extend(["", "## Other Changes"])
+              notes.extend(f"- {entry}" for entry in other)
+          notes.extend([
+              "",
+              f"Full Changelog: https://github.com/glacier-modding/NavKit/compare/{previous_tag}...{tag}",
+              "",
+              "_Note: As of the time of this release you will need to use at least this version of the ZHMModSDK:_",
+              "https://github.com/OrfeasZ/ZHMModSDK/actions/runs/34685865082",
+              "",
+          ])
+
+          notes_path = os.path.join(tempfile.gettempdir(), "release-notes.md")
+          with open(notes_path, "w", encoding="utf-8", newline="\n") as release_notes:
+              release_notes.write("\n".join(notes))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"tag={tag}\n")
+              output.write(f"previous_tag={previous_tag}\n")
+              output.write(f"notes_path={notes_path}\n")
+          PY
+
+      - name: Commit version, tag, and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt include/NavKit/NavKitConfig.h
+          git commit -m "chore: release ${{ steps.release.outputs.tag }}"
+          git tag "${{ steps.release.outputs.tag }}"
+          git push origin "HEAD:${GITHUB_REF_NAME}" "${{ steps.release.outputs.tag }}"
+          gh release create "${{ steps.release.outputs.tag }}" \
+            --title "NavKit ${{ steps.release.outputs.tag }}" \
+            --notes-file "${{ steps.release.outputs.notes_path }}"
+          gh workflow run build.yml --ref "${{ steps.release.outputs.tag }}"
+
   validate_build:
     name: Validate Build
     runs-on: windows-2022
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     env:
       VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg_cache,readwrite"
       VCPKG_CACHE_DIR: ${{ github.workspace }}\vcpkg_cache
