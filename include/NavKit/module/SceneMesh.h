@@ -6,11 +6,11 @@
 #include <vector>
 #define WIN32_LEAN_AND_MEAN
 #include <set>
-#include <windows.h>
+#include "../util/Platform.h"
 #include <GL/glew.h>
 
-#include "../../include/NavKit/render/Model.h"
-#include "../../include/NavKit/render/Shader.h"
+#include "../render/Model.h"
+#include "../render/Shader.h"
 #include "../model/Json.h"
 
 enum MeshType { ALOC, PRIM };

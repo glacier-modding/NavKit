@@ -24,14 +24,18 @@ using easywsclient::WebSocket;
 GameConnection::GameConnection() {}
 
 GameConnection::~GameConnection() {
+#ifdef _WIN32
     WSACleanup();
+#endif
 }
 
 int GameConnection::connectToGame() {
+#ifdef _WIN32
     if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
         Logger::log(NK_ERROR, "GameConnection: WSAStartup Failed.");
         return 1;
     }
+#endif
     ws.reset(WebSocket::from_url("ws://localhost:46735/socket"));
     if (!ws) {
         Logger::log(NK_ERROR, "GameConnection: Could not connect to game. Is the game running?");

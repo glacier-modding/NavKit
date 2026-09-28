@@ -1,5 +1,3 @@
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include <filesystem>
 
@@ -8,11 +6,10 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/util/FileUtil.h"
 
 PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {
-    char buffer[MAX_PATH];
-    GetModuleFileNameA(NULL, buffer, MAX_PATH);
-    std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
+    std::filesystem::path exeDir = std::filesystem::path(FileUtil::getExecutablePath()).parent_path();
 
     iniPath = (exeDir / "NavKit.ini").string();
     oldIniPath = (exeDir / "NavKit.ini.old").string();

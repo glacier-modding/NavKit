@@ -11,7 +11,6 @@
 
 #include <algorithm>
 #include <SDL.h>
-#include <SDL_opengl.h>
 
 #include "../../include/NavKit/module/NavKitSettings.h"
 
@@ -135,6 +134,7 @@ int InputHandler::handleInput() {
             done = true;
             break;
         case SDL_SYSWMEVENT:
+#ifdef _WIN32
             if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
                 (NavKitSettings::hSettingsDialog &&
                     IsDialogMessage(NavKitSettings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
@@ -153,6 +153,7 @@ int InputHandler::handleInput() {
             if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
                 done = true;
             }
+#endif
             break;
         default:
             break;

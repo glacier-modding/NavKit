@@ -1,4 +1,12 @@
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/util/Platform.h"
+#include <vector>
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#elif !defined(_WIN32)
+#include <filesystem>
+#endif
 
 namespace FileUtil {
     char* openNfdLoadDialog(nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
@@ -50,5 +58,25 @@ namespace FileUtil {
             return nullptr;
         }
         return nullptr;
+    }
+
+    std::string getExecutablePath() {
+#ifdef _WIN32
+        char buffer[MAX_PATH];
+        GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+        return buffer;
+#elif defined(__APPLE__)
+        uint32_t size = 0;
+        _NSGetExecutablePath(nullptr, &size);
+        std::vector buffer(size + 1, '\0');
+        if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+            return "";
+        }
+        return buffer.data();
+#else
+        std::error_code error;
+        const std::filesystem::path path = std::filesystem::read_symlink("/proc/self/exe", error);
+        return error ? "" : path.string();
+#endif
     }
 } // namespace FileUtil

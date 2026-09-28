@@ -48,7 +48,7 @@ namespace Json {
 
     class Vec3 {
     public:
-        Vec3() : x(0), y(0), z(0) {};
+        Vec3() : x(0), y(0), z(0) {}
 
         Vec3(const float x, const float y, const float z) : x(x), y(y), z(z) {}
 
@@ -63,9 +63,9 @@ namespace Json {
 
     class Rotation {
     public:
-        Rotation() : x(0), y(0), z(0), w(0) {};
+        Rotation() : x(0), y(0), z(0), w(0) {}
 
-        Rotation(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {};
+        Rotation(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 
         float x;
         float y;
@@ -79,7 +79,7 @@ namespace Json {
 
     class PfBoxType {
     public:
-        PfBoxType() : type(""), data("") {};
+        PfBoxType() : type(""), data("") {}
 
         std::string type{};
         std::string data{};
@@ -91,9 +91,9 @@ namespace Json {
 
     class Vec3Wrapped {
     public:
-        Vec3Wrapped() {};
+        Vec3Wrapped() {}
 
-        Vec3Wrapped(const std::string& type, const Vec3 data) : type(type), data(data) {};
+        Vec3Wrapped(const std::string& type, const Vec3 data) : type(type), data(data) {}
 
         std::string type{};
         Vec3 data{};

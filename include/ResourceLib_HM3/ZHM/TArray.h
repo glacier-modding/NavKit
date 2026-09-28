@@ -6,305 +6,261 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "..\ZHM\ZHMSerializer.h"
-#include "..\ZHM\ZHMPtr.h"
-#include "..\Util\PortableIntrinsics.h"
+#include "../ZHM/ZHMSerializer.h"
+#include "../ZHM/ZHMPtr.h"
+#include "../Util/PortableIntrinsics.h"
 
 #pragma pack(push, 1)
 
-template <class T>
-class TIterator
-{
+template <class T> class TIterator {
 protected:
-	TIterator(T* p_Current) : m_pCurrent(p_Current) {}
-	
+    TIterator(T* p_Current) : m_pCurrent(p_Current) {}
+
 public:
-	T* m_pCurrent;
+    T* m_pCurrent;
 };
 
-template <class T>
-class TArray
-{
+template <class T> class TArray {
 public:
-	TArray()
-	{
-	}
+    TArray() {}
 
-	TArray(const TArray<T>& p_Other)
-	{
-		*this = p_Other;
-	}
+    TArray(const TArray<T>& p_Other) {
+        *this = p_Other;
+    }
 
-	TArray(size_t p_Size)
-	{
-		resize(p_Size);
-	}
+    TArray(size_t p_Size) {
+        resize(p_Size);
+    }
 
-	~TArray()
-	{
-		for (size_t i = 0; i < size(); ++i)
-			operator[](i).~T();
+    ~TArray() {
+        for (size_t i = 0; i < size(); ++i)
+            operator[](i).~T();
 
-		if (m_pBegin.IsNull() || m_pBegin.GetArenaId() != ZHMHeapArenaId)
-			return;
+        if (m_pBegin.IsNull() || m_pBegin.GetArenaId() != ZHMHeapArenaId)
+            return;
 
-		auto* s_Arena = ZHMArenas::GetHeapArena();
-		s_Arena->Free(m_pBegin.GetPtrOffset());
+        auto* s_Arena = ZHMArenas::GetHeapArena();
+        s_Arena->Free(m_pBegin.GetPtrOffset());
 
-		m_pBegin.SetNull();
-		m_pEnd.SetNull();
-		m_pAllocationEnd.SetNull();
-	}
+        m_pBegin.SetNull();
+        m_pEnd.SetNull();
+        m_pAllocationEnd.SetNull();
+    }
 
-	TArray<T>& operator=(const TArray<T>& p_Other)
-	{
-		resize(p_Other.size());
+    TArray<T>& operator=(const TArray<T>& p_Other) {
+        resize(p_Other.size());
 
-		for (size_t i = 0; i < p_Other.size(); ++i)
-			operator[](i) = p_Other[i];
+        for (size_t i = 0; i < p_Other.size(); ++i)
+            operator[](i) = p_Other[i];
 
-		return *this;
-	}
+        return *this;
+    }
 
-	void resize(size_t p_Size)
-	{
-		if (capacity() == p_Size)
-			return;
+    void resize(size_t p_Size) {
+        if (capacity() == p_Size)
+            return;
 
-		assert(p_Size > 0);
+        assert(p_Size > 0);
 
-		// We only support resizing once.
-		assert(capacity() == 0);
+        // We only support resizing once.
+        assert(capacity() == 0);
 
-		const auto s_AllocationSize = sizeof(T) * p_Size;
-		auto* s_Arena = ZHMArenas::GetHeapArena();
-		
-		const auto s_AllocationOffset = s_Arena->Allocate(s_AllocationSize);
-		auto* s_ArrayData = s_Arena->GetObjectAtOffset<void>(s_AllocationOffset);
+        const auto s_AllocationSize = sizeof(T) * p_Size;
+        auto* s_Arena = ZHMArenas::GetHeapArena();
 
-		memset(s_ArrayData, 0xFF, s_AllocationSize);
+        const auto s_AllocationOffset = s_Arena->Allocate(s_AllocationSize);
+        auto* s_ArrayData = s_Arena->GetObjectAtOffset<void>(s_AllocationOffset);
 
-		m_pBegin.SetArenaIdAndPtrOffset(s_Arena->m_Id, s_AllocationOffset);
-		m_pEnd.SetArenaIdAndPtrOffset(s_Arena->m_Id, s_AllocationOffset + s_AllocationSize);
-		m_pAllocationEnd = m_pEnd;
+        memset(s_ArrayData, 0xFF, s_AllocationSize);
 
-		// Initialize all values to defaults.
-		for (size_t i = 0; i < p_Size; ++i)
-		{
-			T s_Value {};
-			operator[](i) = s_Value;
-		}
-	}
-	
-	inline size_t size() const
-	{
-		return (m_pEnd.GetPtrOffset() - m_pBegin.GetPtrOffset()) / sizeof(T);
-	}
+        m_pBegin.SetArenaIdAndPtrOffset(s_Arena->m_Id, s_AllocationOffset);
+        m_pEnd.SetArenaIdAndPtrOffset(s_Arena->m_Id, s_AllocationOffset + s_AllocationSize);
+        m_pAllocationEnd = m_pEnd;
 
-	inline size_t capacity() const
-	{
-		return (m_pAllocationEnd.GetPtrOffset() - m_pBegin.GetPtrOffset()) / sizeof(T);
-	}
+        // Initialize all values to defaults.
+        for (size_t i = 0; i < p_Size; ++i) {
+            T s_Value{};
+            operator[](i) = s_Value;
+        }
+    }
 
-	inline T& operator[](size_t p_Index) const
-	{
-		return begin()[p_Index];
-	}
+    inline size_t size() const {
+        return (m_pEnd.GetPtrOffset() - m_pBegin.GetPtrOffset()) / sizeof(T);
+    }
 
-	inline T* begin()
-	{
-		return m_pBegin.GetPtr();
-	}
+    inline size_t capacity() const {
+        return (m_pAllocationEnd.GetPtrOffset() - m_pBegin.GetPtrOffset()) / sizeof(T);
+    }
 
-	inline T* end()
-	{
-		return m_pEnd.GetPtr();
-	}
+    inline T& operator[](size_t p_Index) const {
+        return begin()[p_Index];
+    }
 
-	inline T* begin() const
-	{
-		return m_pBegin.GetPtr();
-	}
+    inline T* begin() {
+        return m_pBegin.GetPtr();
+    }
 
-	inline T* end() const
-	{
-		return m_pEnd.GetPtr();
-	}
+    inline T* end() {
+        return m_pEnd.GetPtr();
+    }
 
-	static void Serialize(void* p_Object, ZHMSerializer& p_Serializer, uintptr_t p_OwnOffset)
-	{
-		auto* s_Object = reinterpret_cast<TArray<T>*>(p_Object);
+    inline T* begin() const {
+        return m_pBegin.GetPtr();
+    }
 
-		if (s_Object->size() == 0)
-		{
-			p_Serializer.PatchNullPtr(p_OwnOffset + offsetof(TArray<T>, m_pBegin));
-			p_Serializer.PatchNullPtr(p_OwnOffset + offsetof(TArray<T>, m_pEnd));
-			p_Serializer.PatchNullPtr(p_OwnOffset + offsetof(TArray<T>, m_pAllocationEnd));
-		}
-		else
-		{
-			if (p_Serializer.InCompatibilityMode())
-			{
-				// Prefix the array data with a 32-bit count of elements. This isn't used by the game but
-				// we're adding it for compatibility with other tools.
-				// We do some weird alignment shit here to make sure that the count is always at data - 4.
-				constexpr auto s_SizePrefixBufSize = c_get_aligned(sizeof(uint32_t), sizeof(zhmptr_t));
-				auto s_SizePrefixBuf = c_aligned_alloc(s_SizePrefixBufSize, sizeof(zhmptr_t));
-				memset(s_SizePrefixBuf, 0x00, s_SizePrefixBufSize);
+    inline T* end() const {
+        return m_pEnd.GetPtr();
+    }
 
-				*reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(s_SizePrefixBuf) + (s_SizePrefixBufSize - sizeof(uint32_t))) = s_Object->size();
-				p_Serializer.WriteMemory(s_SizePrefixBuf, s_SizePrefixBufSize, sizeof(zhmptr_t));
-				c_aligned_free(s_SizePrefixBuf);
-			}
-			
-			// And now write the array data.
-			auto s_ElementsPtr = p_Serializer.WriteMemory(s_Object->m_pBegin.GetPtr(), sizeof(T) * s_Object->size(), sizeof(zhmptr_t));
+    static void Serialize(void* p_Object, ZHMSerializer& p_Serializer, uintptr_t p_OwnOffset) {
+        auto* s_Object = reinterpret_cast<TArray<T>*>(p_Object);
 
-			for (size_t i = 0; i < s_Object->size(); ++i)
-			{
-				auto& s_Item = s_Object->begin()[i];
+        if (s_Object->size() == 0) {
+            p_Serializer.PatchNullPtr(p_OwnOffset + offsetof(TArray<T>, m_pBegin));
+            p_Serializer.PatchNullPtr(p_OwnOffset + offsetof(TArray<T>, m_pEnd));
+            p_Serializer.PatchNullPtr(p_OwnOffset + offsetof(TArray<T>, m_pAllocationEnd));
+        } else {
+            if (p_Serializer.InCompatibilityMode()) {
+                // Prefix the array data with a 32-bit count of elements. This isn't used by the game but
+                // we're adding it for compatibility with other tools.
+                // We do some weird alignment shit here to make sure that the count is always at data - 4.
+                constexpr auto s_SizePrefixBufSize = c_get_aligned(sizeof(uint32_t), sizeof(zhmptr_t));
+                auto s_SizePrefixBuf = c_aligned_alloc(s_SizePrefixBufSize, sizeof(zhmptr_t));
+                memset(s_SizePrefixBuf, 0x00, s_SizePrefixBufSize);
 
-				if constexpr(!std::is_fundamental_v<T> && !std::is_enum_v<T>)
-				{
-					uintptr_t s_Offset = s_ElementsPtr + sizeof(T) * i;
-					T::Serialize(&s_Item, p_Serializer, s_Offset);
-				}
-			}
+                *reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(s_SizePrefixBuf) +
+                    (s_SizePrefixBufSize - sizeof(uint32_t))) = s_Object->size();
+                p_Serializer.WriteMemory(s_SizePrefixBuf, s_SizePrefixBufSize, sizeof(zhmptr_t));
+                c_aligned_free(s_SizePrefixBuf);
+            }
 
-			p_Serializer.PatchPtr(p_OwnOffset + offsetof(TArray<T>, m_pBegin), s_ElementsPtr);
-			p_Serializer.PatchPtr(p_OwnOffset + offsetof(TArray<T>, m_pEnd), s_ElementsPtr + sizeof(T) * s_Object->size());
-			p_Serializer.PatchPtr(p_OwnOffset + offsetof(TArray<T>, m_pAllocationEnd), s_ElementsPtr + sizeof(T) * s_Object->size());
-		}
-	}
+            // And now write the array data.
+            auto s_ElementsPtr =
+                p_Serializer.WriteMemory(s_Object->m_pBegin.GetPtr(), sizeof(T) * s_Object->size(), sizeof(zhmptr_t));
 
-	bool operator==(const TArray<T>& p_Other) const
-	{
-		// Empty arrays are not equal.
-		if (size() == 0)
-			return false;
+            for (size_t i = 0; i < s_Object->size(); ++i) {
+                auto& s_Item = s_Object->begin()[i];
 
-		if (size() != p_Other.size())
-			return false;
+                if constexpr (!std::is_fundamental_v<T> && !std::is_enum_v<T>) {
+                    uintptr_t s_Offset = s_ElementsPtr + sizeof(T) * i;
+                    T::Serialize(&s_Item, p_Serializer, s_Offset);
+                }
+            }
 
-		for (size_t i = 0; i < size(); ++i)
-		{
-			if (begin()[i] != p_Other[i])
-				return false;
-		}
+            p_Serializer.PatchPtr(p_OwnOffset + offsetof(TArray<T>, m_pBegin), s_ElementsPtr);
+            p_Serializer.PatchPtr(
+                p_OwnOffset + offsetof(TArray<T>, m_pEnd), s_ElementsPtr + sizeof(T) * s_Object->size());
+            p_Serializer.PatchPtr(
+                p_OwnOffset + offsetof(TArray<T>, m_pAllocationEnd), s_ElementsPtr + sizeof(T) * s_Object->size());
+        }
+    }
 
-		return true;
-	}
+    bool operator==(const TArray<T>& p_Other) const {
+        // Empty arrays are not equal.
+        if (size() == 0)
+            return false;
 
-	bool operator!=(const TArray<T>& p_Other) const
-	{
-		return !(*this == p_Other);
-	}
+        if (size() != p_Other.size())
+            return false;
+
+        for (size_t i = 0; i < size(); ++i) {
+            if (begin()[i] != p_Other[i])
+                return false;
+        }
+
+        return true;
+    }
+
+    bool operator!=(const TArray<T>& p_Other) const {
+        return !(*this == p_Other);
+    }
 
 public:
-	ZHMPtr<T> m_pBegin;
-	ZHMPtr<T> m_pEnd;
-	ZHMPtr<T> m_pAllocationEnd;
+    ZHMPtr<T> m_pBegin;
+    ZHMPtr<T> m_pEnd;
+    ZHMPtr<T> m_pAllocationEnd;
 };
 
-template<typename T, size_t N>
-class TFixedArray
-{
+template <typename T, size_t N> class TFixedArray {
 public:
-	TFixedArray()
-	{
-	}
+    TFixedArray() {}
 
-	inline size_t size() const
-	{
-		return N;
-	}
+    inline size_t size() const {
+        return N;
+    }
 
-	inline size_t capacity() const
-	{
-		return N;
-	}
+    inline size_t capacity() const {
+        return N;
+    }
 
-	inline T& operator[](size_t p_Index) const
-	{
-		return begin()[p_Index];
-	}
+    inline T& operator[](size_t p_Index) const {
+        return begin()[p_Index];
+    }
 
-	inline T* begin()
-	{
-		return &m_Elements[0];
-	}
+    inline T* begin() {
+        return &m_Elements[0];
+    }
 
-	inline T* end()
-	{
-		return begin() + size();
-	}
+    inline T* end() {
+        return begin() + size();
+    }
 
-	inline T* begin() const
-	{
-		return const_cast<T*>(&m_Elements[0]);
-	}
+    inline T* begin() const {
+        return const_cast<T*>(&m_Elements[0]);
+    }
 
-	inline T* end() const
-	{
-		return begin() + size();
-	}
+    inline T* end() const {
+        return begin() + size();
+    }
 
-	inline T* find(const T& p_Value) const
-	{
-		T* s_Current = begin();
+    inline T* find(const T& p_Value) const {
+        T* s_Current = begin();
 
-		while (s_Current != end())
-		{
-			if (*s_Current == p_Value)
-				return s_Current;
+        while (s_Current != end()) {
+            if (*s_Current == p_Value)
+                return s_Current;
 
-			++s_Current;
-		}
+            ++s_Current;
+        }
 
-		return end();
-	}
+        return end();
+    }
 
-	static void Serialize(void* p_Object, ZHMSerializer& p_Serializer, uintptr_t p_OwnOffset)
-	{
-		auto* s_Object = reinterpret_cast<TFixedArray<T, N>*>(p_Object);
+    static void Serialize(void* p_Object, ZHMSerializer& p_Serializer, uintptr_t p_OwnOffset) {
+        auto* s_Object = reinterpret_cast<TFixedArray<T, N>*>(p_Object);
 
-		for (size_t i = 0; i < s_Object->size(); ++i)
-		{
-			auto& s_Item = s_Object->begin()[i];
+        for (size_t i = 0; i < s_Object->size(); ++i) {
+            auto& s_Item = s_Object->begin()[i];
 
-			if constexpr (!std::is_fundamental_v<T> && !std::is_enum_v<T>)
-			{
-				uintptr_t s_Offset = p_OwnOffset + c_get_aligned(sizeof(T), alignof(T)) * i;
-				T::Serialize(&s_Item, p_Serializer, s_Offset);
-			}
-		}
-	}
+            if constexpr (!std::is_fundamental_v<T> && !std::is_enum_v<T>) {
+                uintptr_t s_Offset = p_OwnOffset + c_get_aligned(sizeof(T), alignof(T)) * i;
+                T::Serialize(&s_Item, p_Serializer, s_Offset);
+            }
+        }
+    }
 
-	bool operator==(const TFixedArray<T, N>& p_Other) const
-	{
-		// Empty arrays are not equal.
-		if (size() == 0)
-			return false;
+    bool operator==(const TFixedArray<T, N>& p_Other) const {
+        // Empty arrays are not equal.
+        if (size() == 0)
+            return false;
 
-		if (size() != p_Other.size())
-			return false;
+        if (size() != p_Other.size())
+            return false;
 
-		for (size_t i = 0; i < size(); ++i)
-		{
-			if (begin()[i] != p_Other[i])
-				return false;
-		}
+        for (size_t i = 0; i < size(); ++i) {
+            if (begin()[i] != p_Other[i])
+                return false;
+        }
 
-		return true;
-	}
+        return true;
+    }
 
-	bool operator!=(const TFixedArray<T, N>& p_Other) const
-	{
-		return !(*this == p_Other);
-	}
+    bool operator!=(const TFixedArray<T, N>& p_Other) const {
+        return !(*this == p_Other);
+    }
 
 public:
-	T m_Elements[N];
+    T m_Elements[N];
 };
 
 #pragma pack(pop)

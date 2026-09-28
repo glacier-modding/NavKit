@@ -1,9 +1,13 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 
+#ifdef _WIN32
 #include <CommCtrl.h>
+#endif
 #include <filesystem>
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#endif
 #include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -14,7 +18,9 @@
 #include "../../include/NavKit/module/SceneExtract.h"
 
 HWND NavKitSettings::hSettingsDialog = nullptr;
+#ifdef _WIN32
 #pragma comment(lib, "comctl32.lib")
+#endif
 
 void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.backgroundColor = 0.16f;
@@ -25,6 +31,7 @@ void NavKitSettings::resetDefaults(DialogSettings& settings) {
 }
 
 void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings& tempSettings) {
+#ifdef _WIN32
     const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
     SendMessage(hSlider, TBM_SETRANGE, TRUE, MAKELONG(0, 100));
     SendMessage(hSlider, TBM_SETPOS, TRUE, tempSettings.backgroundColor * 100.0f);
@@ -32,10 +39,12 @@ void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings& temp
     SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings.outputFolder.c_str());
     SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings.blenderPath.c_str());
     CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS, tempSettings.showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
+#endif
 }
 
 INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(
     const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
+#ifdef _WIN32
     auto navKitSettings = reinterpret_cast<NavKitSettings*>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
 
     switch (message) {
@@ -132,6 +141,9 @@ INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(
     default:;
     }
     return FALSE;
+#else
+    return 0;
+#endif
 }
 
 NavKitSettings::NavKitSettings() :
@@ -139,6 +151,7 @@ NavKitSettings::NavKitSettings() :
     shouldOpenSettingsDialog(false) {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
+#ifdef _WIN32
     if (hSettingsDialog) {
         SetForegroundWindow(hSettingsDialog);
         return;
@@ -169,6 +182,9 @@ void NavKitSettings::showNavKitSettingsDialog() {
 
         ShowWindow(hSettingsDialog, SW_SHOW);
     }
+#else
+    Logger::log(NK_WARN, "The NavKit settings dialog is only available on Windows.");
+#endif
 }
 
 void NavKitSettings::loadSettings() {

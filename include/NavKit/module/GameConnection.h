@@ -37,6 +37,8 @@ public:
 private:
     void sendHelloMessage() const;
 
+#ifdef _WIN32
     WSADATA wsaData{};
+#endif
     std::unique_ptr<WebSocket> ws;
 };

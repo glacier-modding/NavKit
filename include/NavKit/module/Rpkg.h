@@ -15,7 +15,7 @@ enum ResourceType { NAVP, AIRG, TEXT };
 class HashListEntry {
 public:
     HashListEntry(const std::string& hash, const std::string& ioiString, const std::string& type) :
-        hash(hash), ioiString(ioiString), type(type) {};
+        hash(hash), ioiString(ioiString), type(type) {}
 
     std::string hash;
     std::string ioiString;

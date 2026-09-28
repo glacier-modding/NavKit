@@ -2,16 +2,37 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/InputHandler.h"
 
+#include <chrono>
 #include <cstdarg>
+#include <thread>
 #include <vector>
 
 #include "../../include/NavKit/module/NavKitSettings.h"
 
 Logger::Logger() :
     messageCount(0), textPoolSize(0),
-    logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()) {
+    logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()), running(false) {
     memset(messages, 0, sizeof(char*) * MAX_MESSAGES);
     logFile.open("NavKit.log", std::ios::out | std::ios::trunc);
+}
+
+Logger::~Logger() {
+    stop();
+}
+
+void Logger::start() {
+    if (logThread.joinable()) {
+        return;
+    }
+    running = true;
+    logThread = std::thread(logRunner);
+}
+
+void Logger::stop() {
+    running = false;
+    if (logThread.joinable()) {
+        logThread.join();
+    }
 }
 
 void Logger::doLog(const char* msg, const int len) {
@@ -35,9 +56,9 @@ std::deque<std::string>& Logger::getLogBuffer() {
     return logBuffer;
 }
 
-[[noreturn]] void Logger::logRunner() {
+void Logger::logRunner() {
     Logger& logger = getInstance();
-    while (true) {
+    while (logger.running || !logger.logQueue->empty()) {
         if (std::optional<std::pair<LogCategory, std::string>> message = logger.logQueue->try_pop();
             message.has_value()) {
             std::string msg;

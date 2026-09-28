@@ -10,8 +10,6 @@
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include <SDL.h>
 #include <GL/glew.h>
-#include <GL/glu.h>
-
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
@@ -27,13 +25,8 @@ Gui::Gui() {
 void Gui::drawGui() {
     glFrontFace(GL_CCW);
     glDisable(GL_DEPTH_TEST);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
     const InputHandler& inputHandler = InputHandler::getInstance();
     const Renderer& renderer = Renderer::getInstance();
-    gluOrtho2D(0, renderer.width, 0, renderer.height);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
     mouseOverMenu = false;
     imguiBeginFrame(
         inputHandler.mousePos[0], inputHandler.mousePos[1], inputHandler.mouseButtonMask, inputHandler.mouseScroll);

@@ -1,6 +1,8 @@
 #pragma once
+#include <atomic>
 #include <string>
-#include "../../include/ConcurrentQueue/ConcurrentQueue.h"
+#include <thread>
+#include "../../ConcurrentQueue/ConcurrentQueue.h"
 #include <fstream>
 
 enum LogCategory { NK_INFO = 1, NK_WARN, NK_ERROR, NK_DEBUG };
@@ -14,9 +16,15 @@ class Logger {
     int messageCount;
     int textPoolSize;
     std::unique_ptr<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>> logQueue;
+    std::atomic<bool> running;
+    std::thread logThread;
+
+    static void logRunner();
 
 public:
     explicit Logger();
+
+    ~Logger();
 
     int getLogCount() const;
 
@@ -31,7 +39,9 @@ public:
 
     static void log(LogCategory category, const char* format, ...);
 
-    [[noreturn]] static void logRunner();
+    void start();
+
+    void stop();
 
     static void rustLogCallback(const char* message);
 

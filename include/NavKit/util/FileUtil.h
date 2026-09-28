@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nfd.h>
+#include <string>
 
 namespace FileUtil {
     char* openNfdLoadDialog(nfdu8filteritem_t* filters, nfdfiltersize_t filterCount);
@@ -10,4 +11,7 @@ namespace FileUtil {
     char* openNfdFolderDialog(char* defaultPath = nullptr);
 
     void initNdf();
+
+    /// Absolute path of the running executable.
+    std::string getExecutablePath();
 } // namespace FileUtil

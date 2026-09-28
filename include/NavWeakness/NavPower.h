@@ -36,12 +36,7 @@ SOFTWARE.
 #include <stdlib.h>
 #include <limits>
 
-#if _WIN32
-#define SIMD_PATH "..\\..\\extern\\simdjson\\simdjson.h"
-#else
-#define SIMD_PATH "../Src/External/simdjson.h"
-#endif
-#include SIMD_PATH
+#include "../../extern/simdjson/simdjson.h"
 
 #include "Vec3.h"
 
@@ -507,7 +502,7 @@ namespace NavPower {
         Binary::KDNode* m_rootKDNode;
         bool m_isKnt;
 
-        NavGraph() {};
+        NavGraph() {}
         NavGraph(auto s_NavGraphJson);
 
         // Build m_areas pointer to index map so the pointers can be replaced with indices (+1) in the JSON file
@@ -563,7 +558,7 @@ namespace NavPower {
         Binary::NavSetHeader* m_setHdr;
         std::vector<NavGraph> m_aNavGraphs;
 
-        Section() {};
+        Section() {}
 
         void read(uintptr_t& p_data, bool& p_isKnt);
 
@@ -580,7 +575,7 @@ namespace NavPower {
         std::vector<Section> m_aSections;
         bool m_isKnt = false;
 
-        NavMesh() {};
+        NavMesh() {}
         NavMesh(const char* p_NavGraphJsonPath);
         NavMesh(uintptr_t p_data, uint32_t p_filesize) {
             read(p_data, p_filesize);

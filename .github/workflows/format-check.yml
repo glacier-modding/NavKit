@@ -11,18 +11,38 @@ on:
 jobs:
   clang-format:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || github.ref }}
 
       - name: Install ClangFormat
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format
+          sudo apt-get install -y clang-format-19
 
-      - name: Verify Formatting
+      - name: Format Sources
         run: |
-          # Find files and run clang-format in dry-run mode. 
-          # --Werror forces a non-zero exit code if formatting violations are found.
-          find src/ include/ -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) | xargs clang-format --dry-run --Werror -style=file
+          # Keep this exclusion list in sync with QUALITY_SOURCES in CMakeLists.txt.
+          clang-format-19 --version
+          find src/ include/ -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) |
+            grep -Ev 'vcpkg_cached_data|build|vcpkg|extern|simdjson|swfmill|stb_truetype|ConcurrentQueue|easywsclient|QuickDigest|ResourceLib_HM3|RecastDemo' |
+            xargs -r clang-format-19 -i -style=file
+
+      - name: Commit Formatting Changes
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ include/
+          git commit -m "Apply clang-format fixes"
+          git push

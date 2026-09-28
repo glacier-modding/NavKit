@@ -1,4 +1,5 @@
 #include <chrono>
+#include <ctime>
 #include <queue>
 #include <thread>
 #include <vector>
@@ -73,7 +74,11 @@ void GridGenerator::build() {
     const auto now = std::chrono::system_clock::now();
     const auto in_time_t = std::chrono::system_clock::to_time_t(now);
     std::tm buf{};
+#ifdef _WIN32
     localtime_s(&buf, &in_time_t); // Use localtime_s for thread-safety on Windows
+#else
+    localtime_r(&in_time_t, &buf);
+#endif
 
     char time_str[256];
     std::strftime(time_str, sizeof(time_str), "%c %Z", &buf);
