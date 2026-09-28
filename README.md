@@ -1,7 +1,7 @@
 # NavKit
 *A tool to generate Navp and Airg files for Hitman: World of Assassination Scenes in the Glacier 2 Engine*
 # How to Use
-The [NavKit Guide](https://glaciermodding.org/docs/modding/hitman/customcampaigns/using_navkit) is available on the [Glacier Modding Wiki](https://glaciermodding.org/).
+The [NavKit Guide](https://glaciermodding.org/docs/modding/hitman/guides/customcampaigns/using_navkit) is available on the [Glacier Modding Wiki](https://glaciermodding.org/).
 
 You can run NavKit by opening `NavKit.exe`. To use the **Scene Extraction** feature, you will need ZHMModSdk installed. For the **Build Obj** and **Build Blend file** feature, you will also need to have Blender installed.
 
