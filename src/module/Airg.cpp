@@ -11,11 +11,17 @@
 #include <SDL.h>
 #include <sstream>
 #include <string>
-#include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/VisionData.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Logger.h"
+#include "../../include/NavKit/module/WxApplication.h"
+#include <wx/choice.h>
+#include <wx/button.h>
+#include <wx/sizer.h>
+#include <wx/slider.h>
+#include <wx/stattext.h>
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
@@ -42,7 +48,8 @@ Airg::Airg() :
 
 Airg::~Airg() = default;
 
-HWND Airg::hAirgDialog = nullptr;
+wxDialog* Airg::hAirgDialog = nullptr;
+wxDialog* Airg::hExtractAirgDialog = nullptr;
 std::string Airg::selectedRpkgAirg{};
 std::map<std::string, std::string> Airg::airgHashIoiStringMap;
 std::mutex Airg::airgHashIoiStringMapMutex;
@@ -65,136 +72,91 @@ static std::string formatFloat(const float val) {
     return ss.str();
 }
 
-INT_PTR CALLBACK Airg::airgDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-#ifdef _WIN32
-    Grid& grid = Grid::getInstance();
-
-    switch (message) {
-    case WM_INITDIALOG: {
-        UpdateDialogControls(hDlg);
-        return TRUE;
-    }
-
-    case WM_HSCROLL: {
-        const float oldSpacing = grid.spacing;
-
-        if (reinterpret_cast<HWND>(lParam) == GetDlgItem(hDlg, IDC_SLIDER_SPACING)) {
-            const int pos = SendMessage(reinterpret_cast<HWND>(lParam), TBM_GETPOS, 0, 0);
-            grid.spacing = 0.1f + (pos * 0.05f);
-            SetDlgItemText(hDlg, IDC_STATIC_SPACING_VAL, formatFloat(grid.spacing).c_str());
-
-            if (oldSpacing != grid.spacing) {
-                grid.saveSpacing(grid.spacing);
-                UpdateDialogControls(hDlg);
-                airgDirty = true;
-            }
-        } else if (reinterpret_cast<HWND>(lParam) == GetDlgItem(hDlg, IDC_SLIDER_XOFFSET)) {
-            const int pos = SendMessage(reinterpret_cast<HWND>(lParam), TBM_GETPOS, 0, 0);
-            grid.xOffset = -grid.spacing + (pos * 0.05f);
-            SetDlgItemText(hDlg, IDC_STATIC_XOFFSET_VAL, formatFloat(grid.xOffset).c_str());
-            airgDirty = true;
-        } else if (reinterpret_cast<HWND>(lParam) == GetDlgItem(hDlg, IDC_SLIDER_ZOFFSET)) {
-            const int pos = SendMessage(reinterpret_cast<HWND>(lParam), TBM_GETPOS, 0, 0);
-            grid.yOffset = -grid.spacing + (pos * 0.05f);
-            SetDlgItemText(hDlg, IDC_STATIC_ZOFFSET_VAL, formatFloat(grid.yOffset).c_str());
-            airgDirty = true;
-        }
-        return TRUE;
-    }
-
-    case WM_COMMAND: {
-        if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
-            Logger::log(NK_INFO, "Resetting Airg Default settings");
-            resetDefaults();
-            UpdateDialogControls(hDlg);
-            airgDirty = true;
-        }
-        return TRUE;
-    }
-
-    case WM_CLOSE:
-        DestroyWindow(hDlg);
-        return TRUE;
-
-    case WM_DESTROY:
-        hAirgDialog = nullptr;
-        return TRUE;
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
-}
-
 void Airg::showAirgDialog() {
-#ifdef _WIN32
     if (hAirgDialog) {
-        SetForegroundWindow(hAirgDialog);
+        hAirgDialog->Raise();
         return;
     }
-
-    const HINSTANCE hInstance = GetModuleHandle(nullptr);
-    const HWND hParentWnd = Renderer::hwnd;
-
-    hAirgDialog = CreateDialogParam(
-        hInstance, MAKEINTRESOURCE(IDD_AIRG_MENU), hParentWnd, airgDialogProc, reinterpret_cast<LPARAM>(this));
-
-    if (hAirgDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hAirgDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hAirgDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Airg Properties", wxDefaultPosition, wxSize(360, 200));
+    hAirgDialog = dialog;
+    auto* gridSizer = new wxFlexGridSizer(3, 3, 8, 8);
+    gridSizer->Add(new wxStaticText(dialog, wxID_ANY, "Spacing:"), 0, wxALIGN_CENTER_VERTICAL);
+    gridSizer->Add(new wxSlider(dialog, IDC_SLIDER_SPACING, 0, 0, 78), 1, wxEXPAND);
+    gridSizer->Add(new wxStaticText(dialog, IDC_STATIC_SPACING_VAL, ""), 0, wxALIGN_CENTER_VERTICAL);
+    gridSizer->Add(new wxStaticText(dialog, wxID_ANY, "X Offset:"), 0, wxALIGN_CENTER_VERTICAL);
+    gridSizer->Add(new wxSlider(dialog, IDC_SLIDER_XOFFSET, 0, 0, 1), 1, wxEXPAND);
+    gridSizer->Add(new wxStaticText(dialog, IDC_STATIC_XOFFSET_VAL, ""), 0, wxALIGN_CENTER_VERTICAL);
+    gridSizer->Add(new wxStaticText(dialog, wxID_ANY, "Z Offset:"), 0, wxALIGN_CENTER_VERTICAL);
+    gridSizer->Add(new wxSlider(dialog, IDC_SLIDER_ZOFFSET, 0, 0, 1), 1, wxEXPAND);
+    gridSizer->Add(new wxStaticText(dialog, IDC_STATIC_ZOFFSET_VAL, ""), 0, wxALIGN_CENTER_VERTICAL);
+    gridSizer->AddGrowableCol(1, 1);
+    auto* buttons = new wxBoxSizer(wxHORIZONTAL);
+    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    buttons->Add(reset);
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(gridSizer, 1, wxEXPAND | wxALL, 12);
+    sizer->Add(buttons, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    dialog->SetSizer(sizer);
+    UpdateDialogControls(dialog);
+    const auto sliderChanged = [dialog](wxCommandEvent& event) {
+        Grid& grid = Grid::getInstance();
+        if (event.GetId() == IDC_SLIDER_SPACING) {
+            const float oldSpacing = grid.spacing;
+            grid.spacing = 0.1f + static_cast<float>(event.GetInt()) * 0.05f;
+            if (oldSpacing != grid.spacing) {
+                grid.saveSpacing(grid.spacing);
+                Airg::UpdateDialogControls(dialog);
+                airgDirty = true;
+            }
+        } else if (event.GetId() == IDC_SLIDER_XOFFSET) {
+            grid.xOffset = -grid.spacing + static_cast<float>(event.GetInt()) * 0.05f;
+            dialog->FindWindow(IDC_STATIC_XOFFSET_VAL)->SetLabel(formatFloat(grid.xOffset));
+            airgDirty = true;
+        } else if (event.GetId() == IDC_SLIDER_ZOFFSET) {
+            grid.yOffset = -grid.spacing + static_cast<float>(event.GetInt()) * 0.05f;
+            dialog->FindWindow(IDC_STATIC_ZOFFSET_VAL)->SetLabel(formatFloat(grid.yOffset));
+            airgDirty = true;
         }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hAirgDialog, &dialogRect);
-
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-
-        SetWindowPos(hAirgDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-
-        ShowWindow(hAirgDialog, SW_SHOW);
+    };
+    for (const int id : {IDC_SLIDER_SPACING, IDC_SLIDER_XOFFSET, IDC_SLIDER_ZOFFSET}) {
+        dialog->Bind(wxEVT_SLIDER, sliderChanged, id);
     }
-#else
-    Logger::log(NK_WARN, "The Airg settings dialog is only available on Windows.");
-#endif
+    reset->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+        Logger::log(NK_INFO, "Resetting Airg Default settings");
+        Airg::resetDefaults();
+        Airg::UpdateDialogControls(dialog);
+        airgDirty = true;
+    });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hAirgDialog == dialog) {
+            hAirgDialog = nullptr;
+        }
+        dialog->Destroy();
+    });
+    dialog->SetSizeHints(320, 150);
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
 }
 
-void Airg::UpdateDialogControls(const HWND hDlg) {
-#ifdef _WIN32
+void Airg::UpdateDialogControls(wxDialog* dialog) {
     const Grid& grid = Grid::getInstance();
-
-    const HWND hSliderSpacing = GetDlgItem(hDlg, IDC_SLIDER_SPACING);
-    const HWND hSliderX = GetDlgItem(hDlg, IDC_SLIDER_XOFFSET);
-    const HWND hSliderZ = GetDlgItem(hDlg, IDC_SLIDER_ZOFFSET);
-
-    // --- Spacing Slider ---
-    SendMessage(hSliderSpacing, TBM_SETRANGE, TRUE, MAKELONG(0, 78));
+    auto* hSliderSpacing = static_cast<wxSlider*>(dialog->FindWindow(IDC_SLIDER_SPACING));
+    auto* hSliderX = static_cast<wxSlider*>(dialog->FindWindow(IDC_SLIDER_XOFFSET));
+    auto* hSliderZ = static_cast<wxSlider*>(dialog->FindWindow(IDC_SLIDER_ZOFFSET));
+    hSliderSpacing->SetRange(0, 78);
     const int spacingPos = static_cast<int>((grid.spacing - 0.1f) / 0.05f);
-    SendMessage(hSliderSpacing, TBM_SETPOS, TRUE, spacingPos);
-    SetDlgItemText(hDlg, IDC_STATIC_SPACING_VAL, formatFloat(grid.spacing).c_str());
-
-    // --- X and Z Offset Sliders ---
+    hSliderSpacing->SetValue(spacingPos);
+    dialog->FindWindow(IDC_STATIC_SPACING_VAL)->SetLabel(formatFloat(grid.spacing));
     const int range = static_cast<int>((grid.spacing * 2) / 0.05f);
-
-    // X Offset
-    SendMessage(hSliderX, TBM_SETRANGE, TRUE, MAKELONG(0, range));
+    hSliderX->SetRange(0, range);
     const int xPos = static_cast<int>((grid.xOffset + grid.spacing) / 0.05f);
-    SendMessage(hSliderX, TBM_SETPOS, TRUE, xPos);
-    SetDlgItemText(hDlg, IDC_STATIC_XOFFSET_VAL, formatFloat(grid.xOffset).c_str());
-
-    // Z Offset
-    SendMessage(hSliderZ, TBM_SETRANGE, TRUE, MAKELONG(0, range));
+    hSliderX->SetValue(xPos);
+    dialog->FindWindow(IDC_STATIC_XOFFSET_VAL)->SetLabel(formatFloat(grid.xOffset));
+    hSliderZ->SetRange(0, range);
     const int zPos = static_cast<int>((grid.yOffset + grid.spacing) / 0.05f);
-    SendMessage(hSliderZ, TBM_SETPOS, TRUE, zPos);
-    SetDlgItemText(hDlg, IDC_STATIC_ZOFFSET_VAL, formatFloat(grid.yOffset).c_str());
-#endif
+    hSliderZ->SetValue(zPos);
+    dialog->FindWindow(IDC_STATIC_ZOFFSET_VAL)->SetLabel(formatFloat(grid.yOffset));
 }
 
 void Airg::resetDefaults() {
@@ -926,37 +888,22 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
     Menu::updateMenuState();
 }
 
-void Airg::updateAirgDialogControls(const HWND hwnd) {
-#ifdef _WIN32
-    const auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_AIRG);
-    SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
-
-    if (!airgHashIoiStringMap.empty()) {
-        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(
-            airgHashIoiStringMap.begin(), airgHashIoiStringMap.end());
-        auto comparator = [](const std::pair<std::string, std::string>& a,
-                              const std::pair<std::string, std::string>& b) {
-            if (a.second != b.second) {
-                return a.second < b.second;
-            }
-            return a.first < b.first;
-        };
-        std::ranges::sort(sorted_hash_ioi_string_pairs, comparator);
-        for (auto& [hash, ioiString] : sorted_hash_ioi_string_pairs) {
-            std::string listItemString;
-            if (!ioiString.empty()) {
-                listItemString = ioiString;
-            } else {
-                listItemString = hash;
-            }
-            SendMessage(hWndComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
-            if (selectedRpkgAirg.empty()) {
-                selectedRpkgAirg = ioiString;
-            }
+void Airg::updateAirgDialogControls(wxDialog* dialog) {
+    auto* choice = static_cast<wxChoice*>(dialog->FindWindow(IDC_COMBOBOX_AIRG));
+    choice->Clear();
+    std::vector<std::pair<std::string, std::string>> entries(airgHashIoiStringMap.begin(), airgHashIoiStringMap.end());
+    std::ranges::sort(entries,
+        [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first < b.first; });
+    for (const auto& [hash, ioiString] : entries) {
+        const std::string& display = ioiString.empty() ? hash : ioiString;
+        choice->Append(wxString::FromUTF8(display));
+        if (selectedRpkgAirg.empty()) {
+            selectedRpkgAirg = display;
         }
-        SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);
     }
-#endif
+    if (!entries.empty()) {
+        choice->SetSelection(0);
+    }
 }
 
 void Airg::extractAirgFromRpkgs(const std::string& hash) {
@@ -967,112 +914,50 @@ void Airg::extractAirgFromRpkgs(const std::string& hash) {
     }
 }
 
-INT_PTR CALLBACK Airg::extractAirgDialogProc(
-    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-#ifdef _WIN32
-    Airg* pAirg = nullptr;
-    if (message == WM_INITDIALOG) {
-        pAirg = reinterpret_cast<Airg*>(lParam);
-        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pAirg));
-    } else {
-        pAirg = reinterpret_cast<Airg*>(GetWindowLongPtr(hDlg, DWLP_USER));
-    }
-
-    if (!pAirg) {
-        return FALSE;
-    }
-
-    switch (message) {
-    case WM_INITDIALOG:
-        updateAirgDialogControls(hDlg);
-        return TRUE;
-
-    case WM_COMMAND:
-
-        if (HIWORD(wParam) == CBN_SELCHANGE) {
-            const int ItemIndex = SendMessage(reinterpret_cast<HWND>(lParam), CB_GETCURSEL, 0, 0);
-            char ListItem[256];
-            SendMessage(reinterpret_cast<HWND>(lParam), CB_GETLBTEXT, static_cast<WPARAM>(ItemIndex), (LPARAM)ListItem);
-            selectedRpkgAirg = ListItem;
-
-            return TRUE;
-        }
-        if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_AIRG_FROM_RPKG) {
-            for (auto& [hash, ioiString] : airgHashIoiStringMap) {
-                if (hash == selectedRpkgAirg) {
-                    getInstance().loadedAirgText = hash;
-                } else if (ioiString == selectedRpkgAirg) {
-                    getInstance().loadedAirgText = ioiString;
-                } else {
-                    continue;
-                }
-                extractAirgFromRpkgs(hash);
-            }
-            DestroyWindow(hDlg);
-            return TRUE;
-        } else if (commandId == IDCANCEL) {
-            DestroyWindow(hDlg);
-            return TRUE;
-        }
-        return TRUE;
-
-    case WM_CLOSE:
-        DestroyWindow(hDlg);
-        return TRUE;
-
-    case WM_DESTROY:
-        hAirgDialog = nullptr;
-        return TRUE;
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
-}
-
 void Airg::showExtractAirgDialog() {
-#ifdef _WIN32
-    if (hAirgDialog) {
-        SetForegroundWindow(hAirgDialog);
+    if (hExtractAirgDialog) {
+        hExtractAirgDialog->Raise();
         return;
     }
-
-    HINSTANCE hInstance = nullptr;
-    if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            (LPCSTR)&Airg::extractAirgDialogProc, &hInstance)) {
-        Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
-        return;
-    }
-
-    const HWND hParentWnd = Renderer::hwnd;
-
-    hAirgDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_AIRG_DIALOG), hParentWnd,
-        extractAirgDialogProc, reinterpret_cast<LPARAM>(this));
-
-    if (hAirgDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hAirgDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hAirgDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    auto* dialog =
+        new wxDialog(getMainFrame(), wxID_ANY, "Load Airg from resource package", wxDefaultPosition, wxSize(500, 150));
+    hExtractAirgDialog = dialog;
+    auto* choice = new wxChoice(dialog, IDC_COMBOBOX_AIRG);
+    updateAirgDialogControls(dialog);
+    auto* buttons = new wxStdDialogButtonSizer();
+    auto* open = new wxButton(dialog, IDC_BUTTON_LOAD_AIRG_FROM_RPKG, "Open Airg");
+    auto* cancel = new wxButton(dialog, wxID_CANCEL, "Cancel");
+    buttons->AddButton(open);
+    buttons->AddButton(cancel);
+    buttons->Realize();
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(
+        new wxStaticText(dialog, wxID_ANY, "Airg file in resource packages (Rpkg) to extract and load"), 0, wxALL, 10);
+    sizer->Add(choice, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
+    dialog->SetSizer(sizer);
+    choice->Bind(wxEVT_CHOICE, [](wxCommandEvent& event) { selectedRpkgAirg = event.GetString().ToStdString(); });
+    open->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+        for (auto& [hash, ioiString] : airgHashIoiStringMap) {
+            if (hash == selectedRpkgAirg) {
+                getInstance().loadedAirgText = hash;
+            } else if (ioiString == selectedRpkgAirg) {
+                getInstance().loadedAirgText = ioiString;
+            } else {
+                continue;
+            }
+            extractAirgFromRpkgs(hash);
         }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hAirgDialog, &dialogRect);
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-        SetWindowPos(hAirgDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-        ShowWindow(hAirgDialog, SW_SHOW);
-    } else {
-        const DWORD error = GetLastError();
-        Logger::log(NK_ERROR,
-            "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_AIRG_DIALOG in the DLL.",
-            error);
-    }
-#else
-    Logger::log(NK_WARN, "The Extract Airg dialog is only available on Windows.");
-#endif
+        dialog->Close();
+    });
+    cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hExtractAirgDialog == dialog) {
+            hExtractAirgDialog = nullptr;
+        }
+        dialog->Destroy();
+    });
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
 }

@@ -5,8 +5,9 @@
 #include <fstream>
 #include <functional>
 #include <iomanip>
+#include <array>
 #include <sstream>
-#include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
@@ -14,6 +15,11 @@
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/module/WxApplication.h"
+#include <wx/button.h>
+#include <wx/sizer.h>
+#include <wx/slider.h>
+#include <wx/stattext.h>
 
 Scene::Scene() :
     sceneLoaded(false), showBBox(true), showAxes(true), version(2), loadSceneName("Load NavKit Scene"),
@@ -23,7 +29,7 @@ Scene::Scene() :
 
 Scene::~Scene() {}
 
-HWND Scene::hSceneDialog = nullptr;
+wxDialog* Scene::hSceneDialog = nullptr;
 
 static std::string format_float_scene(const float val) {
     std::stringstream ss;
@@ -349,34 +355,21 @@ void Scene::resetBBoxDefaults() {
     setBBox(pos, scale);
 }
 
-void Scene::updateSceneDialogControls(const HWND hDlg) const {
-#ifdef _WIN32
-    // Position Sliders (-500 to 500)
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[0] + 500.0f));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(bBoxPos[0]).c_str());
-
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[1] + 500.0f));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(bBoxPos[1]).c_str());
-
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETRANGE, TRUE, MAKELONG(0, 1000));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z), TBM_SETPOS, TRUE, static_cast<int>(bBoxPos[2] + 500.0f));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(bBoxPos[2]).c_str());
-
-    // Scale Sliders (1 to 800)
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[0]));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(bBoxScale[0]).c_str());
-
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[1]));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(bBoxScale[1]).c_str());
-
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETRANGE, TRUE, MAKELONG(1, 800));
-    SendMessage(GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z), TBM_SETPOS, TRUE, static_cast<int>(bBoxScale[2]));
-    SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(bBoxScale[2]).c_str());
-#endif
+void Scene::updateSceneDialogControls(wxDialog* dialog) const {
+    const std::array<int, 6> sliders = {IDC_SLIDER_BBOX_POS_X, IDC_SLIDER_BBOX_POS_Y, IDC_SLIDER_BBOX_POS_Z,
+        IDC_SLIDER_BBOX_SCALE_X, IDC_SLIDER_BBOX_SCALE_Y, IDC_SLIDER_BBOX_SCALE_Z};
+    const std::array<int, 6> labels = {IDC_STATIC_BBOX_POS_X_VAL, IDC_STATIC_BBOX_POS_Y_VAL, IDC_STATIC_BBOX_POS_Z_VAL,
+        IDC_STATIC_BBOX_SCALE_X_VAL, IDC_STATIC_BBOX_SCALE_Y_VAL, IDC_STATIC_BBOX_SCALE_Z_VAL};
+    for (int axis = 0; axis < 3; ++axis) {
+        auto* position = static_cast<wxSlider*>(dialog->FindWindow(sliders[axis]));
+        position->SetRange(0, 1000);
+        position->SetValue(static_cast<int>(bBoxPos[axis] + 500.0f));
+        dialog->FindWindow(labels[axis])->SetLabel(format_float_scene(bBoxPos[axis]));
+        auto* scale = static_cast<wxSlider*>(dialog->FindWindow(sliders[axis + 3]));
+        scale->SetRange(1, 800);
+        scale->SetValue(static_cast<int>(bBoxScale[axis]));
+        dialog->FindWindow(labels[axis + 3])->SetLabel(format_float_scene(bBoxScale[axis]));
+    }
 }
 
 const Json::Mesh* Scene::findMeshByHashAndIdAndPos(
@@ -399,104 +392,61 @@ const Json::Mesh* Scene::findMeshByHashAndIdAndPos(
     return closestMeshes[0];
 }
 
-INT_PTR CALLBACK Scene::sceneDialogProc(const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-#ifdef _WIN32
-    Scene& scene = getInstance();
-
-    switch (message) {
-    case WM_INITDIALOG:
-        scene.updateSceneDialogControls(hDlg);
-        return TRUE;
-
-    case WM_HSCROLL: {
-        bool changed = false;
-        const int pos = SendMessage((HWND)lParam, TBM_GETPOS, 0, 0);
-
-        if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_X)) {
-            scene.bBoxPos[0] = static_cast<float>(pos) - 500.0f;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_X_VAL, format_float_scene(scene.bBoxPos[0]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Y)) {
-            scene.bBoxPos[1] = static_cast<float>(pos) - 500.0f;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Y_VAL, format_float_scene(scene.bBoxPos[1]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_POS_Z)) {
-            scene.bBoxPos[2] = static_cast<float>(pos) - 500.0f;
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_POS_Z_VAL, format_float_scene(scene.bBoxPos[2]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_X)) {
-            scene.bBoxScale[0] = static_cast<float>(pos);
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_X_VAL, format_float_scene(scene.bBoxScale[0]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Y)) {
-            scene.bBoxScale[1] = static_cast<float>(pos);
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Y_VAL, format_float_scene(scene.bBoxScale[1]).c_str());
-            changed = true;
-        } else if ((HWND)lParam == GetDlgItem(hDlg, IDC_SLIDER_BBOX_SCALE_Z)) {
-            scene.bBoxScale[2] = static_cast<float>(pos);
-            SetDlgItemText(hDlg, IDC_STATIC_BBOX_SCALE_Z_VAL, format_float_scene(scene.bBoxScale[2]).c_str());
-            changed = true;
-        }
-
-        if (changed) {
-            scene.setBBox(scene.bBoxPos, scene.bBoxScale);
-        }
-        return TRUE;
-    }
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDC_BUTTON_RESET_DEFAULTS) {
-            scene.resetBBoxDefaults();
-            scene.updateSceneDialogControls(hDlg);
-        }
-        return TRUE;
-
-    case WM_CLOSE:
-        DestroyWindow(hDlg);
-        return TRUE;
-
-    case WM_DESTROY:
-        hSceneDialog = nullptr;
-        return TRUE;
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
-}
-
 void Scene::showSceneDialog() {
-#ifdef _WIN32
     if (hSceneDialog) {
-        SetForegroundWindow(hSceneDialog);
+        hSceneDialog->Raise();
         return;
     }
-
-    const HINSTANCE hInstance = GetModuleHandle(nullptr);
-    const HWND hParentWnd = Renderer::hwnd;
-
-    hSceneDialog = CreateDialogParam(
-        hInstance, MAKEINTRESOURCE(IDD_SCENE_MENU), hParentWnd, sceneDialogProc, reinterpret_cast<LPARAM>(this));
-
-    if (hSceneDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hSceneDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hSceneDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
-        }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hSceneDialog, &dialogRect);
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-        SetWindowPos(hSceneDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-        ShowWindow(hSceneDialog, SW_SHOW);
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Scene Properties", wxDefaultPosition, wxSize(500, 330));
+    hSceneDialog = dialog;
+    const std::array<int, 6> sliderIds = {IDC_SLIDER_BBOX_POS_X, IDC_SLIDER_BBOX_POS_Y, IDC_SLIDER_BBOX_POS_Z,
+        IDC_SLIDER_BBOX_SCALE_X, IDC_SLIDER_BBOX_SCALE_Y, IDC_SLIDER_BBOX_SCALE_Z};
+    const std::array<int, 6> labelIds = {IDC_STATIC_BBOX_POS_X_VAL, IDC_STATIC_BBOX_POS_Y_VAL,
+        IDC_STATIC_BBOX_POS_Z_VAL, IDC_STATIC_BBOX_SCALE_X_VAL, IDC_STATIC_BBOX_SCALE_Y_VAL,
+        IDC_STATIC_BBOX_SCALE_Z_VAL};
+    const std::array<const char*, 6> names = {
+        "BBox Pos X:", "BBox Pos Y:", "BBox Pos Z:", "BBox Scale X:", "BBox Scale Y:", "BBox Scale Z:"};
+    auto* controls = new wxFlexGridSizer(6, 3, 8, 8);
+    for (int i = 0; i < 6; ++i) {
+        controls->Add(new wxStaticText(dialog, wxID_ANY, names[i]), 0, wxALIGN_CENTER_VERTICAL);
+        controls->Add(new wxSlider(dialog, sliderIds[i], 0, 0, 1), 1, wxEXPAND);
+        controls->Add(new wxStaticText(dialog, labelIds[i], ""), 0, wxALIGN_CENTER_VERTICAL);
     }
-#else
-    Logger::log(NK_WARN, "The Scene settings dialog is only available on Windows.");
-#endif
+    controls->AddGrowableCol(1, 1);
+    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(controls, 1, wxEXPAND | wxALL, 12);
+    sizer->Add(reset, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    dialog->SetSizer(sizer);
+    updateSceneDialogControls(dialog);
+    for (int i = 0; i < 6; ++i) {
+        dialog->Bind(
+            wxEVT_SLIDER,
+            [dialog, i, labelId = labelIds[i]](wxCommandEvent& event) {
+                Scene& scene = Scene::getInstance();
+                if (i < 3) {
+                    scene.bBoxPos[i] = static_cast<float>(event.GetInt()) - 500.0f;
+                    dialog->FindWindow(labelId)->SetLabel(format_float_scene(scene.bBoxPos[i]));
+                } else {
+                    scene.bBoxScale[i - 3] = static_cast<float>(event.GetInt());
+                    dialog->FindWindow(labelId)->SetLabel(format_float_scene(scene.bBoxScale[i - 3]));
+                }
+                scene.setBBox(scene.bBoxPos, scene.bBoxScale);
+            },
+            sliderIds[i]);
+    }
+    reset->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+        Scene& scene = Scene::getInstance();
+        scene.resetBBoxDefaults();
+        scene.updateSceneDialogControls(dialog);
+    });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hSceneDialog == dialog) {
+            hSceneDialog = nullptr;
+        }
+        dialog->Destroy();
+    });
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
 }

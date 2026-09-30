@@ -36,6 +36,7 @@ set(MODULE_SOURCES
         module/Scene.cpp
         module/SceneExtract.cpp
         module/SceneMesh.cpp
+        module/WxApplication.cpp
 )
 set(RENDER_SOURCES
         render/CoreProfileDraw.cpp
@@ -64,7 +65,7 @@ add_library(NavKitLib STATIC
         ${RENDER_SOURCES}
         ${UTIL_SOURCES}
 )
-target_compile_definitions(NavKitLib PRIVATE NOMINMAX)
+target_compile_definitions(NavKitLib PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
 
 if (APPLE)
     # Silence platform deprecation notices for OpenGL calls exposed by system headers.
@@ -125,15 +126,13 @@ target_link_libraries(NavKitLib PUBLIC
         nfd::nfd
         simdjson::simdjson
         simpleini
+        wx::core
+        wx::gl
+        wx::base
 )
 
-set(NAVKIT_PLATFORM_SOURCES)
-if (WIN32)
-    list(APPEND NAVKIT_PLATFORM_SOURCES NavKit.rc)
-endif ()
 add_executable(NavKit
         NavKit.cpp
-        ${NAVKIT_PLATFORM_SOURCES}
 )
 target_compile_definitions(NavKit PRIVATE NOMINMAX)
 target_link_libraries(NavKit PRIVATE NavKitLib)
@@ -168,7 +167,7 @@ if (WIN32)
             WIN32
             updater.cpp
     )
-    target_link_libraries(updater PRIVATE shell32)
+    target_link_libraries(updater PRIVATE shell32 wx::core wx::base)
 
     set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES}
             "$<TARGET_FILE:updater>"

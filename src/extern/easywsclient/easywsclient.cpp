@@ -92,7 +92,11 @@ namespace { // private module-only namespace
         hints.ai_socktype = SOCK_STREAM;
         snprintf(sport, 16, "%d", port);
         if ((ret = getaddrinfo(hostname.c_str(), sport, &hints, &result)) != 0) {
+#ifdef _WIN32
+            fprintf(stderr, "getaddrinfo: %ls\n", gai_strerror(ret));
+#else
             fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
+#endif
             return 1;
         }
         for (p = result; p != NULL; p = p->ai_next) {

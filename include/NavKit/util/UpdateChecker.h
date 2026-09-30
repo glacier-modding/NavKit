@@ -1,6 +1,5 @@
 #pragma once
 #include <mutex>
-#include <SDL_syswm.h>
 #include "Platform.h"
 #include <string>
 #include <thread>
@@ -15,8 +14,6 @@ public:
 
     UpdateChecker& operator=(const UpdateChecker&) = delete;
 
-    static INT_PTR CALLBACK updateDialogHandler(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
     static UpdateChecker& getInstance() {
         static UpdateChecker instance;
         return instance;
@@ -28,6 +25,8 @@ public:
 
     void startUpdateCheck();
 
+    void waitForUpdateCheck();
+
     void renderUpdatePopup();
 
 private:
@@ -37,7 +36,6 @@ private:
 
     std::thread updateThread;
     std::mutex mutex;
-    std::string updateMessage;
     std::string responseBody;
     bool updateCheckCompleted;
     bool isUpdateAvailable;

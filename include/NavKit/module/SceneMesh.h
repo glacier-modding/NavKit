@@ -4,7 +4,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <wx/dialog.h>
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <set>
 #include "../util/Platform.h"
 #include <GL/glew.h>
@@ -24,7 +27,7 @@ class SceneMesh {
 
     static void loadTileTexture();
 
-    static void updateObjDialogControls(HWND hDlg);
+    static void updateObjDialogControls(wxDialog* dialog);
 
 public:
     static SceneMesh& getInstance() {
@@ -63,7 +66,7 @@ public:
     bool blendFileBuilt;
     bool extractTextures;
     bool applyTextures;
-    static HWND hSceneMeshDialog;
+    static wxDialog* hSceneMeshDialog;
     Model model;
 
     static char* openSetBlenderFileDialog();
@@ -131,8 +134,6 @@ public:
     void saveSceneMeshSettings() const;
 
     void resetDefaults();
-
-    static INT_PTR ObjSettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
     void showSceneMeshDialog();
 

@@ -13,7 +13,7 @@
 #include <glm/glm.hpp>
 #include <cpptrace/from_current.hpp>
 
-#include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Airg.h"
@@ -26,6 +26,11 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/module/WxApplication.h"
+#include <wx/button.h>
+#include <wx/choice.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
@@ -44,7 +49,7 @@ Navp::Navp() :
 
 Navp::~Navp() = default;
 
-HWND Navp::hNavpDialog = nullptr;
+wxDialog* Navp::hNavpDialog = nullptr;
 std::string Navp::selectedRpkgNavp{};
 std::map<std::string, std::string> Navp::navpHashIoiStringMap;
 std::mutex Navp::navpHashIoiStringMapMutex;
@@ -1137,37 +1142,22 @@ void Navp::finalizeBuild() {
     }
 }
 
-void Navp::updateNavpDialogControls(const HWND hwnd) {
-#ifdef _WIN32
-    const auto hWndComboBox = GetDlgItem(hwnd, IDC_COMBOBOX_NAVP);
-    SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
-
-    if (!navpHashIoiStringMap.empty()) {
-        std::vector<std::pair<std::string, std::string>> sorted_hash_ioi_string_pairs(
-            navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
-        auto comparator = [](const std::pair<std::string, std::string>& a,
-                              const std::pair<std::string, std::string>& b) {
-            if (a.second != b.second) {
-                return a.second < b.second;
-            }
-            return a.first < b.first;
-        };
-        std::ranges::sort(sorted_hash_ioi_string_pairs, comparator);
-        for (auto& [hash, ioiString] : sorted_hash_ioi_string_pairs) {
-            std::string listItemString;
-            if (!ioiString.empty()) {
-                listItemString = ioiString;
-            } else {
-                listItemString = hash;
-            }
-            SendMessage(hWndComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(listItemString.c_str()));
-            if (selectedRpkgNavp.empty()) {
-                selectedRpkgNavp = ioiString;
-            }
+void Navp::updateNavpDialogControls(wxDialog* dialog) {
+    auto* choice = static_cast<wxChoice*>(dialog->FindWindow(IDC_COMBOBOX_NAVP));
+    choice->Clear();
+    std::vector<std::pair<std::string, std::string>> entries(navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
+    std::ranges::sort(entries,
+        [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first < b.first; });
+    for (const auto& [hash, ioiString] : entries) {
+        const std::string& display = ioiString.empty() ? hash : ioiString;
+        choice->Append(wxString::FromUTF8(display));
+        if (selectedRpkgNavp.empty()) {
+            selectedRpkgNavp = display;
         }
-        SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);
     }
-#endif
+    if (!entries.empty()) {
+        choice->SetSelection(0);
+    }
 }
 
 void Navp::extractNavpFromRpkgs(const std::string& hash) {
@@ -1178,112 +1168,50 @@ void Navp::extractNavpFromRpkgs(const std::string& hash) {
     }
 }
 
-INT_PTR CALLBACK Navp::extractNavpDialogProc(
-    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-#ifdef _WIN32
-    Navp* pNavp = nullptr;
-    if (message == WM_INITDIALOG) {
-        pNavp = reinterpret_cast<Navp*>(lParam);
-        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(pNavp));
-    } else {
-        pNavp = reinterpret_cast<Navp*>(GetWindowLongPtr(hDlg, DWLP_USER));
-    }
-
-    if (!pNavp) {
-        return FALSE;
-    }
-
-    switch (message) {
-    case WM_INITDIALOG:
-        updateNavpDialogControls(hDlg);
-        return TRUE;
-
-    case WM_COMMAND:
-
-        if (HIWORD(wParam) == CBN_SELCHANGE) {
-            const int ItemIndex = SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
-            char ListItem[256];
-            SendMessage((HWND)lParam, CB_GETLBTEXT, static_cast<WPARAM>(ItemIndex), (LPARAM)ListItem);
-            selectedRpkgNavp = ListItem;
-
-            return TRUE;
-        }
-        if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_LOAD_NAVP_FROM_RPKG) {
-            for (auto& [hash, ioiString] : navpHashIoiStringMap) {
-                if (hash == selectedRpkgNavp) {
-                    getInstance().loadedNavpText = hash;
-                } else if (ioiString == selectedRpkgNavp) {
-                    getInstance().loadedNavpText = ioiString;
-                } else {
-                    continue;
-                }
-                extractNavpFromRpkgs(hash);
-            }
-            DestroyWindow(hDlg);
-            return TRUE;
-        } else if (commandId == IDCANCEL) {
-            DestroyWindow(hDlg);
-            return TRUE;
-        }
-        return TRUE;
-
-    case WM_CLOSE:
-        DestroyWindow(hDlg);
-        return TRUE;
-
-    case WM_DESTROY:
-        hNavpDialog = nullptr;
-        return TRUE;
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
-}
-
 void Navp::showExtractNavpDialog() {
-#ifdef _WIN32
     if (hNavpDialog) {
-        SetForegroundWindow(hNavpDialog);
+        hNavpDialog->Raise();
         return;
     }
-
-    HINSTANCE hInstance = nullptr;
-    if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            (LPCSTR)&Navp::extractNavpDialogProc, &hInstance)) {
-        Logger::log(NK_ERROR, "GetModuleHandleEx failed.");
-        return;
-    }
-
-    const HWND hParentWnd = Renderer::hwnd;
-
-    hNavpDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_EXTRACT_NAVP_DIALOG), hParentWnd,
-        extractNavpDialogProc, reinterpret_cast<LPARAM>(this));
-
-    if (hNavpDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hNavpDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hNavpDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    auto* dialog =
+        new wxDialog(getMainFrame(), wxID_ANY, "Load Navp from resource package", wxDefaultPosition, wxSize(500, 150));
+    hNavpDialog = dialog;
+    auto* choice = new wxChoice(dialog, IDC_COMBOBOX_NAVP);
+    updateNavpDialogControls(dialog);
+    auto* buttons = new wxStdDialogButtonSizer();
+    auto* open = new wxButton(dialog, IDC_BUTTON_LOAD_NAVP_FROM_RPKG, "Open Navp");
+    auto* cancel = new wxButton(dialog, wxID_CANCEL, "Cancel");
+    buttons->AddButton(open);
+    buttons->AddButton(cancel);
+    buttons->Realize();
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(
+        new wxStaticText(dialog, wxID_ANY, "Navp file in resource packages (Rpkg) to extract and load"), 0, wxALL, 10);
+    sizer->Add(choice, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
+    dialog->SetSizer(sizer);
+    choice->Bind(wxEVT_CHOICE, [](wxCommandEvent& event) { selectedRpkgNavp = event.GetString().ToStdString(); });
+    open->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+        for (auto& [hash, ioiString] : navpHashIoiStringMap) {
+            if (hash == selectedRpkgNavp) {
+                getInstance().loadedNavpText = hash;
+            } else if (ioiString == selectedRpkgNavp) {
+                getInstance().loadedNavpText = ioiString;
+            } else {
+                continue;
+            }
+            extractNavpFromRpkgs(hash);
         }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hNavpDialog, &dialogRect);
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-        SetWindowPos(hNavpDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-        ShowWindow(hNavpDialog, SW_SHOW);
-    } else {
-        const DWORD error = GetLastError();
-        Logger::log(NK_ERROR,
-            "Failed to create dialog. Error code: %lu. Likely missing resource IDD_EXTRACT_NAVP_DIALOG in the DLL.",
-            error);
-    }
-#else
-    Logger::log(NK_WARN, "The Extract Navp dialog is only available on Windows.");
-#endif
+        dialog->Close();
+    });
+    cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hNavpDialog == dialog) {
+            hNavpDialog = nullptr;
+        }
+        dialog->Destroy();
+    });
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
 }

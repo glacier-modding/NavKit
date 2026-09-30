@@ -1,11 +1,12 @@
 #pragma once
-#include <SDL_events.h>
-#include <SDL_syswm.h>
 #include "../util/Platform.h"
+#include <wx/menu.h>
 
 class Menu {
 public:
-    static int handleMenuClicked(const SDL_SysWMmsg* wmMsg);
+    static wxMenuBar* createMenuBar();
+
+    static int handleMenuClicked(int menuId);
 
     static void setMenuItemEnabled(UINT menuId, bool isEnabled);
 

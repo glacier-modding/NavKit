@@ -3,7 +3,7 @@
 #include <DetourNavMeshQuery.h>
 #include <RecastDebugDraw.h>
 
-#include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -12,13 +12,19 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/util/Math.h"
+#include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/RecastDemo/InputGeom.h"
-
-#ifdef _WIN32
-#include <CommCtrl.h>
-#endif
+#include <wx/button.h>
+#include <wx/radiobut.h>
+#include <wx/scrolwin.h>
+#include <wx/checkbox.h>
+#include <wx/sizer.h>
+#include <wx/slider.h>
+#include <wx/stattext.h>
 #include <iomanip>
 #include <queue>
+#include <array>
+#include <algorithm>
 #include <SDL_keyboard.h>
 #include <sstream>
 
@@ -55,7 +61,7 @@ RecastAdapter::RecastAdapter() {
     markerPosition[2] = 0;
 }
 
-HWND RecastAdapter::hRecastDialog = nullptr;
+wxDialog* RecastAdapter::hRecastDialog = nullptr;
 
 static std::string formatRecastFloat(const float val, const int precision) {
     std::stringstream ss;
@@ -92,8 +98,7 @@ inline unsigned int nextPow2(unsigned int v) {
     return v;
 }
 
-#ifdef _WIN32
-static void updateRecastDialogControls(const HWND hDlg) {
+static void updateRecastDialogControls(wxDialog* dialog) {
     const RecastAdapter& adapter = RecastAdapter::getInstance();
     Sample_TileMesh* sample = adapter.sample;
     if (!sample) {
@@ -103,9 +108,10 @@ static void updateRecastDialogControls(const HWND hDlg) {
     auto set_slider = [&](const int sliderId, const int textId, const float value, const float min_val,
                           const float step, const int num_steps, const int precision) {
         const int pos = static_cast<int>((value - min_val) / step);
-        SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETRANGE, TRUE, MAKELONG(0, num_steps));
-        SendMessage(GetDlgItem(hDlg, sliderId), TBM_SETPOS, TRUE, pos);
-        SetDlgItemTextA(hDlg, textId, formatRecastFloat(value, precision).c_str());
+        auto* slider = static_cast<wxSlider*>(dialog->FindWindow(sliderId));
+        slider->SetRange(0, num_steps);
+        slider->SetValue(std::clamp(pos, 0, num_steps));
+        dialog->FindWindow(textId)->SetLabel(formatRecastFloat(value, precision));
     };
 
     set_slider(IDC_SLIDER_CELL_SIZE, IDC_STATIC_CELL_SIZE_VAL, sample->m_cellSize, 0.01f, 0.01f, 39, 2);
@@ -142,23 +148,19 @@ static void updateRecastDialogControls(const HWND hDlg) {
     set_slider(IDC_SLIDER_TILING_TILE_SIZE, IDC_STATIC_TILING_TILE_SIZE_VAL, sample->m_tileSize, 16.0f, 16.0f, 15,
         0); // Range: 16 to 256
 
-    if (sample->m_partitionType == SAMPLE_PARTITION_WATERSHED) {
-        CheckRadioButton(
-            hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_WATERSHED);
-    } else if (sample->m_partitionType == SAMPLE_PARTITION_MONOTONE) {
-        CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_MONOTONE);
-    } else {
-        CheckRadioButton(hDlg, IDC_RADIO_PARTITION_WATERSHED, IDC_RADIO_PARTITION_LAYERS, IDC_RADIO_PARTITION_LAYERS);
-    }
-
-    CheckDlgButton(
-        hDlg, IDC_CHECK_FILTER_LOW_HANGING, sample->m_filterLowHangingObstacles ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_FILTER_LEDGE_SPANS, sample->m_filterLedgeSpans ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(
-        hDlg, IDC_CHECK_FILTER_WALKABLE_LOW, sample->m_filterWalkableLowHeightSpans ? BST_CHECKED : BST_UNCHECKED);
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_PARTITION_WATERSHED))
+        ->SetValue(sample->m_partitionType == SAMPLE_PARTITION_WATERSHED);
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_PARTITION_MONOTONE))
+        ->SetValue(sample->m_partitionType == SAMPLE_PARTITION_MONOTONE);
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_PARTITION_LAYERS))
+        ->SetValue(sample->m_partitionType == SAMPLE_PARTITION_LAYERS);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_FILTER_LOW_HANGING))
+        ->SetValue(sample->m_filterLowHangingObstacles);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_FILTER_LEDGE_SPANS))->SetValue(sample->m_filterLedgeSpans);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_FILTER_WALKABLE_LOW))
+        ->SetValue(sample->m_filterWalkableLowHeightSpans);
 
     if (sample->m_geom) {
-        char text[64];
         int gw = 0, gh = 0;
         const float* bmin = sample->m_geom->getNavMeshBoundsMin();
         const float* bmax = sample->m_geom->getNavMeshBoundsMax();
@@ -174,162 +176,194 @@ static void updateRecastDialogControls(const HWND hDlg) {
         const int polyBits = 22 - tileBits;
         sample->m_maxTiles = 1 << tileBits;
         sample->m_maxPolysPerTile = 1 << polyBits;
-        snprintf(text, 64, "Tiles: %d x %d", tw, th);
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_TILES, text);
-        snprintf(text, 64, "Max Tiles: %d", sample->m_maxTiles);
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_TILES, text);
-        snprintf(text, 64, "Max Polys: %d", sample->m_maxPolysPerTile);
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_POLYS, text);
+        dialog->FindWindow(IDC_STATIC_TILING_INFO_TILES)->SetLabel(wxString::Format("Tiles: %d x %d", tw, th));
+        dialog->FindWindow(IDC_STATIC_TILING_INFO_MAX_TILES)
+            ->SetLabel(wxString::Format("Max Tiles: %d", sample->m_maxTiles));
+        dialog->FindWindow(IDC_STATIC_TILING_INFO_MAX_POLYS)
+            ->SetLabel(wxString::Format("Max Polys: %d", sample->m_maxPolysPerTile));
     } else {
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_TILES, "Tiles: N/A");
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_TILES, "Max Tiles: N/A");
-        SetDlgItemTextA(hDlg, IDC_STATIC_TILING_INFO_MAX_POLYS, "Max Polys: N/A");
+        dialog->FindWindow(IDC_STATIC_TILING_INFO_TILES)->SetLabel("Tiles: N/A");
+        dialog->FindWindow(IDC_STATIC_TILING_INFO_MAX_TILES)->SetLabel("Max Tiles: N/A");
+        dialog->FindWindow(IDC_STATIC_TILING_INFO_MAX_POLYS)->SetLabel("Max Polys: N/A");
     }
-}
-#endif
-
-INT_PTR CALLBACK RecastAdapter::recastDialogProc(
-    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-#ifdef _WIN32
-    Sample_TileMesh* sample = getInstance().sample;
-    if (!sample) {
-        return FALSE;
-    }
-
-    switch (message) {
-    case WM_INITDIALOG: {
-        updateRecastDialogControls(hDlg);
-        return TRUE;
-    }
-    case WM_HSCROLL: {
-        const auto hSlider = (HWND)lParam;
-        const int pos = SendMessage(hSlider, TBM_GETPOS, 0, 0);
-        bool needs_tiling_update = false;
-
-        auto update_float_slider = [&](float& value, const float min_val, const float step, const int textId,
-                                       const int precision) {
-            value = min_val + (pos * step);
-            SetDlgItemTextA(hDlg, textId, formatRecastFloat(value, precision).c_str());
-        };
-
-        auto update_int_slider = [&](float& value, const int min_val, const int step, const int textId) {
-            value = static_cast<float>(min_val + (pos * step));
-            SetDlgItemTextA(hDlg, textId, std::to_string(static_cast<int>(value)).c_str());
-        };
-
-        if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_CELL_SIZE)) {
-            update_float_slider(sample->m_cellSize, 0.01f, 0.01f, IDC_STATIC_CELL_SIZE_VAL, 2);
-            needs_tiling_update = true;
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_CELL_HEIGHT)) {
-            update_float_slider(sample->m_cellHeight, 0.01f, 0.01f, IDC_STATIC_CELL_HEIGHT_VAL, 2);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_HEIGHT)) {
-            update_float_slider(sample->m_agentHeight, 0.1f, 0.01f, IDC_STATIC_AGENT_HEIGHT_VAL, 2);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_RADIUS)) {
-            update_float_slider(sample->m_agentRadius, 0.0f, 0.01f, IDC_STATIC_AGENT_RADIUS_VAL, 2);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_MAX_CLIMB)) {
-            update_float_slider(sample->m_agentMaxClimb, 0.0f, 0.01f, IDC_STATIC_AGENT_MAX_CLIMB_VAL, 2);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_AGENT_MAX_SLOPE)) {
-            update_int_slider(sample->m_agentMaxSlope, 0, 1, IDC_STATIC_AGENT_MAX_SLOPE_VAL);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_REGION_MIN_SIZE)) {
-            update_int_slider(sample->m_regionMinSize, 0, 1, IDC_STATIC_REGION_MIN_SIZE_VAL);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_REGION_MERGE_SIZE)) {
-            update_int_slider(sample->m_regionMergeSize, 0, 1, IDC_STATIC_REGION_MERGE_SIZE_VAL);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_POLY_MAX_EDGE_LEN)) {
-            update_float_slider(sample->m_edgeMaxLen, 0.0f, 1.0f, IDC_STATIC_POLY_MAX_EDGE_LEN_VAL, 1);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_POLY_MAX_EDGE_ERR)) {
-            update_float_slider(sample->m_edgeMaxError, 0.1f, 0.1f, IDC_STATIC_POLY_MAX_EDGE_ERR_VAL, 2);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_POLY_VERTS_PER_POLY)) {
-            update_int_slider(sample->m_vertsPerPoly, 3, 1, IDC_STATIC_POLY_VERTS_PER_POLY_VAL);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_DETAIL_SAMPLE_DIST)) {
-            update_float_slider(sample->m_detailSampleDist, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, 1);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR)) {
-            update_float_slider(sample->m_detailSampleMaxError, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL, 1);
-        } else if (hSlider == GetDlgItem(hDlg, IDC_SLIDER_TILING_TILE_SIZE)) {
-            update_int_slider(sample->m_tileSize, 16, 16, IDC_STATIC_TILING_TILE_SIZE_VAL);
-            needs_tiling_update = true;
-        }
-
-        if (needs_tiling_update) {
-            updateRecastDialogControls(hDlg);
-        }
-        getInstance().saveSettings();
-        return TRUE;
-    }
-    case WM_COMMAND: {
-        const WORD commandId = LOWORD(wParam);
-        if (commandId >= IDC_RADIO_PARTITION_WATERSHED && commandId <= IDC_RADIO_PARTITION_LAYERS) {
-            if (commandId == IDC_RADIO_PARTITION_WATERSHED) {
-                sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
-            } else if (commandId == IDC_RADIO_PARTITION_MONOTONE) {
-                sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
-            } else if (commandId == IDC_RADIO_PARTITION_LAYERS) {
-                sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
-            }
-        } else if (commandId >= IDC_CHECK_FILTER_LOW_HANGING && commandId <= IDC_CHECK_FILTER_WALKABLE_LOW) {
-            const bool checked = IsDlgButtonChecked(hDlg, commandId) == BST_CHECKED;
-            if (commandId == IDC_CHECK_FILTER_LOW_HANGING) {
-                sample->m_filterLowHangingObstacles = checked;
-            } else if (commandId == IDC_CHECK_FILTER_LEDGE_SPANS) {
-                sample->m_filterLedgeSpans = checked;
-            } else if (commandId == IDC_CHECK_FILTER_WALKABLE_LOW) {
-                sample->m_filterWalkableLowHeightSpans = checked;
-            }
-        } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
-            getInstance().resetCommonSettings();
-            updateRecastDialogControls(hDlg);
-        }
-        getInstance().saveSettings();
-        return TRUE;
-    }
-    case WM_CLOSE:
-        DestroyWindow(hDlg);
-        return TRUE;
-    case WM_DESTROY:
-        hRecastDialog = nullptr;
-        return TRUE;
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
 }
 
 void RecastAdapter::showRecastDialog() {
-#ifdef _WIN32
     if (hRecastDialog) {
-        SetForegroundWindow(hRecastDialog);
+        hRecastDialog->Raise();
         return;
     }
-    const HINSTANCE hInstance = GetModuleHandle(nullptr);
-    const HWND hParentWnd = Renderer::hwnd;
-    hRecastDialog = CreateDialogParam(
-        hInstance, MAKEINTRESOURCE(IDD_RECAST_MENU), hParentWnd, recastDialogProc, reinterpret_cast<LPARAM>(this));
-
-    if (hRecastDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hRecastDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hRecastDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Recast Properties", wxDefaultPosition, wxSize(420, 760));
+    hRecastDialog = dialog;
+    auto* scroll = new wxScrolledWindow(dialog);
+    scroll->SetScrollRate(0, 12);
+    auto* content = new wxBoxSizer(wxVERTICAL);
+    struct SliderRow {
+        int id;
+        int labelId;
+        const char* name;
+        float min;
+        float step;
+        int max;
+        int precision;
+    };
+    const std::array<SliderRow, 14> sliderRows = {{
+        {IDC_SLIDER_CELL_SIZE, IDC_STATIC_CELL_SIZE_VAL, "Cell Size:", 0.01f, 0.01f, 39, 2},
+        {IDC_SLIDER_CELL_HEIGHT, IDC_STATIC_CELL_HEIGHT_VAL, "Cell Height:", 0.01f, 0.01f, 39, 2},
+        {IDC_SLIDER_AGENT_HEIGHT, IDC_STATIC_AGENT_HEIGHT_VAL, "Agent Height:", 0.1f, 0.01f, 490, 2},
+        {IDC_SLIDER_AGENT_RADIUS, IDC_STATIC_AGENT_RADIUS_VAL, "Agent Radius:", 0.0f, 0.01f, 200, 2},
+        {IDC_SLIDER_AGENT_MAX_CLIMB, IDC_STATIC_AGENT_MAX_CLIMB_VAL, "Max Climb:", 0.0f, 0.01f, 500, 2},
+        {IDC_SLIDER_AGENT_MAX_SLOPE, IDC_STATIC_AGENT_MAX_SLOPE_VAL, "Max Slope:", 0.0f, 1.0f, 90, 0},
+        {IDC_SLIDER_REGION_MIN_SIZE, IDC_STATIC_REGION_MIN_SIZE_VAL, "Min Region Size:", 0.0f, 1.0f, 150, 0},
+        {IDC_SLIDER_REGION_MERGE_SIZE, IDC_STATIC_REGION_MERGE_SIZE_VAL, "Merged Size:", 0.0f, 1.0f, 150, 0},
+        {IDC_SLIDER_POLY_MAX_EDGE_LEN, IDC_STATIC_POLY_MAX_EDGE_LEN_VAL, "Max Edge Len:", 0.0f, 1.0f, 50, 1},
+        {IDC_SLIDER_POLY_MAX_EDGE_ERR, IDC_STATIC_POLY_MAX_EDGE_ERR_VAL, "Max Edge Err:", 0.1f, 0.1f, 29, 2},
+        {IDC_SLIDER_POLY_VERTS_PER_POLY, IDC_STATIC_POLY_VERTS_PER_POLY_VAL, "Verts Per Poly:", 3.0f, 1.0f, 9, 0},
+        {IDC_SLIDER_DETAIL_SAMPLE_DIST, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, "Sample Dist:", 0.0f, 1.0f, 16, 1},
+        {IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL, "Max Sample Err:", 0.0f, 1.0f, 16, 1},
+        {IDC_SLIDER_TILING_TILE_SIZE, IDC_STATIC_TILING_TILE_SIZE_VAL, "Tile Size:", 16.0f, 16.0f, 15, 0},
+    }};
+    for (const SliderRow& row : sliderRows) {
+        if (row.id == wxID_NONE) {
+            continue;
         }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hRecastDialog, &dialogRect);
-
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-
-        SetWindowPos(hRecastDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-
-        ShowWindow(hRecastDialog, SW_SHOW);
+        auto* line = new wxBoxSizer(wxHORIZONTAL);
+        line->Add(new wxStaticText(scroll, wxID_ANY, row.name), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6);
+        line->Add(new wxSlider(scroll, row.id, 0, 0, row.max), 1, wxEXPAND | wxRIGHT, 6);
+        line->Add(new wxStaticText(scroll, row.labelId, ""), 0, wxALIGN_CENTER_VERTICAL);
+        content->Add(line, 0, wxEXPAND | wxALL, 5);
     }
-#else
-    Logger::log(NK_WARN, "The Recast settings dialog is only available on Windows.");
-#endif
+    content->Add(new wxStaticText(scroll, wxID_ANY, "Partitioning"), 0, wxTOP | wxLEFT, 6);
+    auto* partition = new wxBoxSizer(wxHORIZONTAL);
+    partition->Add(new wxRadioButton(scroll, IDC_RADIO_PARTITION_WATERSHED, "Watershed", wxDefaultPosition,
+                       wxDefaultSize, wxRB_GROUP),
+        0, wxRIGHT, 12);
+    partition->Add(new wxRadioButton(scroll, IDC_RADIO_PARTITION_MONOTONE, "Monotone"), 0, wxRIGHT, 12);
+    partition->Add(new wxRadioButton(scroll, IDC_RADIO_PARTITION_LAYERS, "Layers"));
+    content->Add(partition, 0, wxALL, 6);
+    content->Add(new wxStaticText(scroll, wxID_ANY, "Filtering"), 0, wxTOP | wxLEFT, 6);
+    content->Add(new wxCheckBox(scroll, IDC_CHECK_FILTER_LOW_HANGING, "Low Hanging Obstacles"), 0, wxALL, 4);
+    content->Add(new wxCheckBox(scroll, IDC_CHECK_FILTER_LEDGE_SPANS, "Ledge Spans"), 0, wxALL, 4);
+    content->Add(new wxCheckBox(scroll, IDC_CHECK_FILTER_WALKABLE_LOW, "Walkable Low Height Spans"), 0, wxALL, 4);
+    content->Add(new wxStaticText(scroll, IDC_STATIC_TILING_INFO_TILES, ""), 0, wxALL, 4);
+    content->Add(new wxStaticText(scroll, IDC_STATIC_TILING_INFO_MAX_TILES, ""), 0, wxLEFT | wxRIGHT | wxBOTTOM, 4);
+    content->Add(new wxStaticText(scroll, IDC_STATIC_TILING_INFO_MAX_POLYS, ""), 0, wxLEFT | wxRIGHT | wxBOTTOM, 4);
+    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* outer = new wxBoxSizer(wxVERTICAL);
+    scroll->SetSizer(content);
+    scroll->FitInside();
+    outer->Add(scroll, 1, wxEXPAND | wxALL, 6);
+    outer->Add(reset, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    dialog->SetSizer(outer);
+    updateRecastDialogControls(dialog);
+
+    for (const SliderRow& row : sliderRows) {
+        dialog->Bind(
+            wxEVT_SLIDER,
+            [dialog, id = row.id](wxCommandEvent& event) {
+                Sample_TileMesh* sample = getInstance().sample;
+                const int pos = event.GetInt();
+                bool updateTiling = false;
+                auto updateFloat = [pos, dialog](float& value, const float minimum, const float step, const int labelId,
+                                       const int precision) {
+                    value = minimum + static_cast<float>(pos) * step;
+                    dialog->FindWindow(labelId)->SetLabel(formatRecastFloat(value, precision));
+                };
+                auto updateInt = [pos, dialog](float& value, const int minimum, const int step, const int labelId) {
+                    value = static_cast<float>(minimum + pos * step);
+                    dialog->FindWindow(labelId)->SetLabel(std::to_string(static_cast<int>(value)));
+                };
+                switch (id) {
+                case IDC_SLIDER_CELL_SIZE:
+                    updateFloat(sample->m_cellSize, 0.01f, 0.01f, IDC_STATIC_CELL_SIZE_VAL, 2);
+                    updateTiling = true;
+                    break;
+                case IDC_SLIDER_CELL_HEIGHT:
+                    updateFloat(sample->m_cellHeight, 0.01f, 0.01f, IDC_STATIC_CELL_HEIGHT_VAL, 2);
+                    break;
+                case IDC_SLIDER_AGENT_HEIGHT:
+                    updateFloat(sample->m_agentHeight, 0.1f, 0.01f, IDC_STATIC_AGENT_HEIGHT_VAL, 2);
+                    break;
+                case IDC_SLIDER_AGENT_RADIUS:
+                    updateFloat(sample->m_agentRadius, 0.0f, 0.01f, IDC_STATIC_AGENT_RADIUS_VAL, 2);
+                    break;
+                case IDC_SLIDER_AGENT_MAX_CLIMB:
+                    updateFloat(sample->m_agentMaxClimb, 0.0f, 0.01f, IDC_STATIC_AGENT_MAX_CLIMB_VAL, 2);
+                    break;
+                case IDC_SLIDER_AGENT_MAX_SLOPE:
+                    updateInt(sample->m_agentMaxSlope, 0, 1, IDC_STATIC_AGENT_MAX_SLOPE_VAL);
+                    break;
+                case IDC_SLIDER_REGION_MIN_SIZE:
+                    updateInt(sample->m_regionMinSize, 0, 1, IDC_STATIC_REGION_MIN_SIZE_VAL);
+                    break;
+                case IDC_SLIDER_REGION_MERGE_SIZE:
+                    updateInt(sample->m_regionMergeSize, 0, 1, IDC_STATIC_REGION_MERGE_SIZE_VAL);
+                    break;
+                case IDC_SLIDER_POLY_MAX_EDGE_LEN:
+                    updateFloat(sample->m_edgeMaxLen, 0.0f, 1.0f, IDC_STATIC_POLY_MAX_EDGE_LEN_VAL, 1);
+                    break;
+                case IDC_SLIDER_POLY_MAX_EDGE_ERR:
+                    updateFloat(sample->m_edgeMaxError, 0.1f, 0.1f, IDC_STATIC_POLY_MAX_EDGE_ERR_VAL, 2);
+                    break;
+                case IDC_SLIDER_POLY_VERTS_PER_POLY:
+                    updateInt(sample->m_vertsPerPoly, 3, 1, IDC_STATIC_POLY_VERTS_PER_POLY_VAL);
+                    break;
+                case IDC_SLIDER_DETAIL_SAMPLE_DIST:
+                    updateFloat(sample->m_detailSampleDist, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_DIST_VAL, 1);
+                    break;
+                case IDC_SLIDER_DETAIL_SAMPLE_MAX_ERR:
+                    updateFloat(sample->m_detailSampleMaxError, 0.0f, 1.0f, IDC_STATIC_DETAIL_SAMPLE_MAX_ERR_VAL, 1);
+                    break;
+                case IDC_SLIDER_TILING_TILE_SIZE:
+                    updateInt(sample->m_tileSize, 16, 16, IDC_STATIC_TILING_TILE_SIZE_VAL);
+                    updateTiling = true;
+                    break;
+                default:
+                    break;
+                }
+                if (updateTiling) {
+                    updateRecastDialogControls(dialog);
+                }
+                getInstance().saveSettings();
+            },
+            row.id);
+    }
+    dialog->Bind(wxEVT_RADIOBUTTON, [](wxCommandEvent& event) {
+        auto* sample = getInstance().sample;
+        if (event.GetId() == IDC_RADIO_PARTITION_WATERSHED) {
+            sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
+        } else if (event.GetId() == IDC_RADIO_PARTITION_MONOTONE) {
+            sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
+        } else {
+            sample->m_partitionType = SAMPLE_PARTITION_LAYERS;
+        }
+        getInstance().saveSettings();
+    });
+    dialog->Bind(wxEVT_CHECKBOX, [](wxCommandEvent& event) {
+        const bool checked = event.IsChecked();
+        auto* sample = getInstance().sample;
+        if (event.GetId() == IDC_CHECK_FILTER_LOW_HANGING) {
+            sample->m_filterLowHangingObstacles = checked;
+        } else if (event.GetId() == IDC_CHECK_FILTER_LEDGE_SPANS) {
+            sample->m_filterLedgeSpans = checked;
+        } else {
+            sample->m_filterWalkableLowHeightSpans = checked;
+        }
+        getInstance().saveSettings();
+    });
+    reset->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+        getInstance().resetCommonSettings();
+        updateRecastDialogControls(dialog);
+        getInstance().saveSettings();
+    });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent& event) {
+        if (hRecastDialog == dialog) {
+            hRecastDialog = nullptr;
+        }
+        event.Skip();
+    });
+    dialog->CentreOnParent();
+    dialog->Show();
 }
 
 void RecastAdapter::drawInputGeom() const {

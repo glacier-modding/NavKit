@@ -50,6 +50,7 @@ find_package(OpenSSL CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(wxWidgets CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(cpptrace CONFIG REQUIRED)
@@ -147,6 +148,8 @@ add_custom_target(clion_indexer_helper
 set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:GLEW::glew>"
         "$<TARGET_FILE:SDL2::SDL2>"
+        "$<TARGET_FILE:wx::core>"
+        "$<TARGET_FILE:wx::base>"
         "$<TARGET_FILE:assimp::assimp>"
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"

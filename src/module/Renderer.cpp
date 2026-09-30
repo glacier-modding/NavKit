@@ -1,4 +1,3 @@
-#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
@@ -21,12 +20,11 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/util/Math.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-HWND Renderer::hwnd = nullptr;
 
 Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     framebuffer = 0;
@@ -92,25 +90,8 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
 
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
-
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 2);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 2);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 2);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 2);
-
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
-
     SDL_DisplayMode displayMode;
     SDL_GetCurrentDisplayMode(0, &displayMode);
-    constexpr Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED;
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     if (const float settingsWidth = atof(persistedSettings.getValue("Renderer", "windowWidth", "-1.0f")),
         settingsHeight = atof(persistedSettings.getValue("Renderer", "windowHeight", "-1.0f"));
@@ -122,34 +103,34 @@ bool Renderer::initWindowAndRenderer() {
         width = settingsWidth;
         height = settingsHeight;
     }
-    window = SDL_CreateWindow("", 0, 0, width, height, flags);
-    if (const auto context = SDL_GL_CreateContext(window); context == nullptr) {
-        printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
+    wxWindow* renderPanel = getRenderPanel();
+    if (!renderPanel) {
+        Logger::log(NK_ERROR, "Could not create the wxWidgets render panel.");
         return false;
     }
-    SDL_SetWindowMinimumSize(window, 200, 100);
-
+    getMainFrame()->SetClientSize(width, height);
+    window = SDL_CreateWindowFrom(renderPanel->GetHandle());
     if (!window) {
-        printf("Could not initialise SDL opengl\nError: %s\n", SDL_GetError());
-        SDL_Quit();
+        Logger::log(NK_ERROR, "Could not attach SDL to the wxWidgets render panel: %s", SDL_GetError());
         return false;
     }
+    if (!initializeRenderContext()) {
+        Logger::log(NK_ERROR, "Could not create or activate the wxWidgets OpenGL context.");
+        return false;
+    }
+    getMainFrame()->SetMinSize(wxSize(200, 100));
     const char* modeStr = persistedSettings.getValue("Renderer", "fullscreen", "WINDOWED");
     if (strcmp(modeStr, "BORDERLESS_FULLSCREEN") == 0) {
-        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-        SDL_GetWindowSize(window, &width, &height);
-        SDL_SetWindowPosition(window, 0, 0);
+        getMainFrame()->ShowFullScreen(true);
     } else if (strcmp(modeStr, "MAXIMIZED") == 0) {
-        SDL_MaximizeWindow(window);
-        SDL_GetWindowSize(window, &width, &height);
-        SDL_SetWindowPosition(window, 0, 0);
+        getMainFrame()->Maximize();
     } else {
         const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
                     y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
         if (x == -1.0f || y == -1.0f) {
-            SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            getMainFrame()->Centre();
         } else {
-            SDL_SetWindowPosition(window, static_cast<int>(x), static_cast<int>(y));
+            getMainFrame()->Move(static_cast<int>(x), static_cast<int>(y));
         }
     }
     initFrameBuffer(width, height);
@@ -157,7 +138,7 @@ bool Renderer::initWindowAndRenderer() {
     constexpr std::string_view navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
     std::string title = "NavKit ";
     title += navKitVersion;
-    SDL_SetWindowTitle(window, title.data());
+    getMainFrame()->SetTitle(title);
 
     if (!imguiRenderGLInit("DroidSans.ttf")) {
         printf("Could not init GUI renderer.\n");
@@ -175,23 +156,6 @@ bool Renderer::initWindowAndRenderer() {
     glClearColor(backgroundColor, backgroundColor, backgroundColor, 1.0f);
     prevFrameTime = SDL_GetTicks();
 
-#ifdef _WIN32
-    SDL_SysWMinfo wmInfo;
-    SDL_VERSION(&wmInfo.version);
-    if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
-        Logger::log(NK_ERROR, "Could not get window manager info.");
-        return false;
-    }
-    hwnd = wmInfo.info.win.window;
-    const HINSTANCE hInstance = wmInfo.info.win.hinstance;
-
-    if (const HMENU hMenu = LoadMenu(hInstance, MAKEINTRESOURCE(IDR_NAVKITMENU))) {
-        SetMenu(hwnd, hMenu);
-    } else {
-        Logger::log(NK_ERROR, "Failed to load menu resource.");
-    }
-#endif
-
     return true;
 }
 
@@ -206,14 +170,13 @@ void Renderer::loadSettings() {
 
 void Renderer::handleMoved() {
     updateFrameRate();
-    if (const Uint32 windowFlags = SDL_GetWindowFlags(window);
-        windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP || windowFlags & SDL_WINDOW_MAXIMIZED) {
+    if (getMainFrame()->IsFullScreen() || getMainFrame()->IsMaximized()) {
         return;
     }
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    int x;
-    int y;
-    SDL_GetWindowPosition(window, &x, &y);
+    const wxPoint position = getMainFrame()->GetPosition();
+    const int x = position.x;
+    const int y = position.y;
     persistedSettings.setValue("Renderer", "windowX", std::to_string(x));
     persistedSettings.setValue("Renderer", "windowY", std::to_string(y));
     persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
@@ -239,13 +202,12 @@ void Renderer::handleFullscreen(const FullscreenMode mode) const {
     std::string modeStr = "WINDOWED";
     switch (mode) {
     case BORDERLESS_FULLSCREEN:
-        SDL_SetWindowPosition(window, 0, 0);
-        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        getMainFrame()->ShowFullScreen(true);
         modeStr = "BORDERLESS_FULLSCREEN";
         break;
     case MAXIMIZED:
-        SDL_SetWindowFullscreen(window, 0);
-        SDL_MaximizeWindow(window);
+        getMainFrame()->ShowFullScreen(false);
+        getMainFrame()->Maximize();
         modeStr = "MAXIMIZED";
         break;
     case WINDOWED:
@@ -253,12 +215,12 @@ void Renderer::handleFullscreen(const FullscreenMode mode) const {
         const float x = atof(persistedSettings.getValue("Renderer", "windowX", "-1.0f")),
                     y = atof(persistedSettings.getValue("Renderer", "windowY", "-1.0f"));
         if (x == -1.0f || y == -1.0f) {
-            SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            getMainFrame()->Centre();
         } else {
-            SDL_SetWindowPosition(window, static_cast<int>(x), static_cast<int>(y));
+            getMainFrame()->Move(static_cast<int>(x), static_cast<int>(y));
         }
-        SDL_SetWindowFullscreen(window, 0);
-        SDL_RestoreWindow(window);
+        getMainFrame()->ShowFullScreen(false);
+        getMainFrame()->Restore();
         break;
     }
 
@@ -273,8 +235,11 @@ void Renderer::initShaders() {
 }
 
 void Renderer::handleResize() {
-    width = SDL_GetWindowSurface(window)->w;
-    height = SDL_GetWindowSurface(window)->h;
+    if (const wxGLCanvas* renderPanel = getRenderPanel()) {
+        const wxSize size = renderPanel->GetClientSize();
+        width = size.GetWidth();
+        height = size.GetHeight();
+    }
     Logger::log(
         NK_INFO, ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
@@ -285,6 +250,10 @@ void Renderer::handleResize() {
 }
 
 void Renderer::renderFrame() {
+    if (!makeRenderContextCurrent()) {
+        Logger::log(NK_ERROR, "Could not activate the wxWidgets OpenGL context.");
+        return;
+    }
     setCoreProfileFogEnabled(true);
     glViewport(0, 0, width, height);
     glGetIntegerv(GL_VIEWPORT, viewport);
@@ -410,7 +379,7 @@ void Renderer::renderFrame() {
 
 void Renderer::finalizeFrame() const {
     glEnable(GL_DEPTH_TEST);
-    SDL_GL_SwapWindow(window);
+    swapRenderBuffers();
 }
 
 void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view, const glm::mat4& projection,

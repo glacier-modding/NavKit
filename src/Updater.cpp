@@ -1,29 +1,93 @@
 #define NOMINMAX
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <shellapi.h>
+#include <wx/app.h>
+#include <wx/button.h>
+#include <wx/frame.h>
+#include <wx/msgdlg.h>
+#include <wx/sizer.h>
+#include <wx/textctrl.h>
+#include <wx/thread.h>
 #include <filesystem>
 #include <string>
 #include <vector>
 #include <memory>
-
-HWND g_hMainWnd = nullptr;
-HWND g_hEditLog = nullptr;
-HWND g_hCloseButton = nullptr;
-
-#define WM_APP_LOG_MESSAGE (WM_APP + 1)
-#define WM_APP_UPDATE_COMPLETE (WM_APP + 2)
-
-#define IDC_EDIT_LOG 101
-#define IDC_CLOSE_BUTTON 102
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+#include <thread>
 
 DWORD WINAPI UpdaterThread(LPVOID lpParam);
 
 void LogMessage(const std::string& msg);
 
 std::string ConvertWideToUTF8(const wchar_t* wstr);
+
+wxDECLARE_EVENT(EVT_UPDATER_LOG, wxThreadEvent);
+wxDECLARE_EVENT(EVT_UPDATER_COMPLETE, wxThreadEvent);
+wxDEFINE_EVENT(EVT_UPDATER_LOG, wxThreadEvent);
+wxDEFINE_EVENT(EVT_UPDATER_COMPLETE, wxThreadEvent);
+
+class UpdaterFrame final : public wxFrame {
+public:
+    UpdaterFrame() : wxFrame(nullptr, wxID_ANY, "NavKit Updater", wxDefaultPosition, wxSize(500, 300)) {
+        log = new wxTextCtrl(
+            this, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2);
+        closeButton = new wxButton(this, wxID_CLOSE, "Close");
+        closeButton->Disable();
+        auto* sizer = new wxBoxSizer(wxVERTICAL);
+        sizer->Add(log, 1, wxEXPAND | wxALL, 10);
+        sizer->Add(closeButton, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+        SetSizer(sizer);
+        Bind(EVT_UPDATER_LOG, &UpdaterFrame::onLog, this);
+        Bind(EVT_UPDATER_COMPLETE, &UpdaterFrame::onUpdateComplete, this);
+        closeButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Close(); });
+        Bind(wxEVT_CLOSE_WINDOW, &UpdaterFrame::onClose, this);
+    }
+
+    bool updateCompleted = false;
+
+private:
+    void onLog(wxThreadEvent& event) {
+        log->AppendText(event.GetString() + "\n");
+    }
+
+    void onUpdateComplete(wxThreadEvent& event) {
+        updateCompleted = true;
+        if (event.GetInt() == 1) {
+            Close(true);
+        } else {
+            closeButton->Enable();
+            closeButton->SetFocus();
+        }
+    }
+
+    void onClose(wxCloseEvent& event) {
+        if (!updateCompleted) {
+            event.Veto();
+            return;
+        }
+        event.Skip();
+    }
+
+    wxTextCtrl* log;
+    wxButton* closeButton;
+};
+
+class UpdaterApp final : public wxApp {
+public:
+    bool OnInit() override {
+        frame = new UpdaterFrame();
+        SetTopWindow(frame);
+        frame->Show();
+        return true;
+    }
+
+    UpdaterFrame* frame = nullptr;
+};
+
+wxIMPLEMENT_APP_NO_MAIN(UpdaterApp);
+static UpdaterFrame* g_updaterFrame = nullptr;
 
 struct MainWindowSearch {
     DWORD process_id;
@@ -95,17 +159,31 @@ struct UpdaterThreadArgs {
     std::filesystem::path install_dir;
 };
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
-    int argc;
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
+    int argc = 0;
     LPWSTR* argvW = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argvW == nullptr || argc < 5) {
-        MessageBoxW(nullptr,
+    if (!argvW) {
+        return 1;
+    }
+    if (!wxEntryStart(argc, argvW)) {
+        LocalFree(argvW);
+        return 1;
+    }
+    if (!wxTheApp->CallOnInit()) {
+        LocalFree(argvW);
+        wxEntryCleanup();
+        return 1;
+    }
+    g_updaterFrame = static_cast<UpdaterApp*>(wxTheApp)->frame;
+    if (argc < 5) {
+        wxMessageBox(
             L"Updater: Invalid arguments.\n\nUsage: updater.exe <path_to_msi> <parent_process_id> <new_version> "
             L"<install_dir>",
-            L"Argument Error", MB_OK | MB_ICONERROR);
+            "Argument Error", wxOK | wxICON_ERROR, g_updaterFrame);
         if (argvW) {
             LocalFree(argvW);
         }
+        wxEntryCleanup();
         return 1;
     }
 
@@ -119,94 +197,23 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     } catch (const std::exception& e) {
         std::string error_msg_str = "Updater: Failed to parse arguments. Error: ";
         error_msg_str += e.what();
-        const std::wstring error_msg_wstr(error_msg_str.begin(), error_msg_str.end());
-        MessageBoxW(nullptr, error_msg_wstr.c_str(), L"Argument Error", MB_OK | MB_ICONERROR);
+        wxMessageBox(wxString::FromUTF8(error_msg_str), "Argument Error", wxOK | wxICON_ERROR, g_updaterFrame);
         LocalFree(argvW);
+        wxEntryCleanup();
         return 1;
     }
     LocalFree(argvW);
-
-    constexpr wchar_t CLASS_NAME[] = L"NavKitUpdaterWindowClass";
-    WNDCLASSW wc = {};
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = reinterpret_cast<HBRUSH>((COLOR_WINDOW + 1));
-    RegisterClassW(&wc);
-
-    g_hMainWnd =
-        CreateWindowExW(0, CLASS_NAME, L"NavKit Updater", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-            CW_USEDEFAULT, CW_USEDEFAULT, 500, 300, nullptr, nullptr, hInstance, nullptr);
-
-    if (g_hMainWnd == nullptr) {
-        return 0;
-    }
-
-    const HANDLE hThread = CreateThread(nullptr, 0, UpdaterThread, args.release(), 0, nullptr);
-    if (hThread == nullptr) {
-        MessageBoxW(g_hMainWnd, L"Failed to start updater thread.", L"Fatal Error", MB_OK | MB_ICONERROR);
+    std::thread updateThread([threadArgs = args.release()] { UpdaterThread(threadArgs); });
+    if (!updateThread.joinable()) {
+        wxMessageBox("Failed to start updater thread.", "Fatal Error", wxOK | wxICON_ERROR, g_updaterFrame);
+        wxEntryCleanup();
         return 1;
     }
-    CloseHandle(hThread);
-
-    ShowWindow(g_hMainWnd, nCmdShow);
-    UpdateWindow(g_hMainWnd);
-
-    MSG msg = {};
-    while (GetMessage(&msg, nullptr, 0, 0) > 0) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-    return static_cast<int>(msg.wParam);
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_CREATE: {
-        g_hEditLog = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
-            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY, 10, 10, 465, 200, hwnd,
-            reinterpret_cast<HMENU>(IDC_EDIT_LOG), GetModuleHandle(nullptr), nullptr);
-
-        g_hCloseButton =
-            CreateWindowExW(0, L"BUTTON", L"Close", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_DISABLED,
-                385, 220, 90, 25, hwnd, reinterpret_cast<HMENU>(IDC_CLOSE_BUTTON), GetModuleHandle(nullptr), nullptr);
-
-        auto hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-        SendMessage(g_hEditLog, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-        SendMessage(g_hCloseButton, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-        return 0;
-    }
-    case WM_APP_LOG_MESSAGE: {
-        char* msg = reinterpret_cast<char*>(lParam);
-        const int len = GetWindowTextLength(g_hEditLog);
-        SendMessage(g_hEditLog, EM_SETSEL, len, len);
-        SendMessageA(g_hEditLog, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>(msg));
-        SendMessageA(g_hEditLog, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>("\r\n"));
-        delete[] msg;
-        return 0;
-    }
-    case WM_APP_UPDATE_COMPLETE: {
-        if (wParam == 1) {
-            DestroyWindow(hwnd);
-        } else {
-            EnableWindow(g_hCloseButton, TRUE);
-            SetFocus(g_hCloseButton);
-        }
-        return 0;
-    }
-    case WM_COMMAND: {
-        if (LOWORD(wParam) == IDC_CLOSE_BUTTON) {
-            DestroyWindow(hwnd);
-        }
-        return 0;
-    }
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    default:;
-    }
-    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+    const int result = wxTheApp->OnRun();
+    updateThread.join();
+    wxTheApp->OnExit();
+    wxEntryCleanup();
+    return result;
 }
 
 std::string ConvertWideToUTF8(const wchar_t* wstr) {
@@ -221,10 +228,19 @@ std::string ConvertWideToUTF8(const wchar_t* wstr) {
 }
 
 void LogMessage(const std::string& msg) {
-    const size_t len = msg.length() + 1;
-    auto msg_copy = new char[len];
-    strcpy_s(msg_copy, len, msg.c_str());
-    PostMessage(g_hMainWnd, WM_APP_LOG_MESSAGE, 0, reinterpret_cast<LPARAM>(msg_copy));
+    if (g_updaterFrame) {
+        auto* event = new wxThreadEvent(EVT_UPDATER_LOG);
+        event->SetString(wxString::FromUTF8(msg));
+        wxQueueEvent(g_updaterFrame, event);
+    }
+}
+
+void NotifyUpdateComplete(const WPARAM status) {
+    if (g_updaterFrame) {
+        auto* event = new wxThreadEvent(EVT_UPDATER_COMPLETE);
+        event->SetInt(static_cast<int>(status));
+        wxQueueEvent(g_updaterFrame, event);
+    }
 }
 
 DWORD WINAPI UpdaterThread(LPVOID lpParam) {
@@ -258,7 +274,7 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
 
     if (!CreateProcessA(nullptr, command_line_buf.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
         LogMessage("Updater: Failed to launch installer. Error: " + std::to_string(GetLastError()));
-        PostMessage(g_hMainWnd, WM_APP_UPDATE_COMPLETE, 0, 0);
+        NotifyUpdateComplete(0);
         return 1;
     }
     LogMessage("Updater: Waiting for MSI installation to complete...");
@@ -326,6 +342,6 @@ DWORD WINAPI UpdaterThread(LPVOID lpParam) {
         }
     }
 
-    PostMessage(g_hMainWnd, WM_APP_UPDATE_COMPLETE, update_status, 0);
+    NotifyUpdateComplete(update_status);
     return 0;
 }

@@ -10,10 +10,11 @@
 #include <filesystem>
 #include <fstream>
 #include <httplib.h>
+#include <simdjson.h>
 #include "../../include/NavKit/NavKitConfig.h"
-#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/module/Logger.h"
-#include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/WxApplication.h"
+#include <wx/msgdlg.h>
 
 UpdateChecker::UpdateChecker() : updateCheckCompleted(false), isUpdateAvailable(false) {}
 
@@ -28,6 +29,12 @@ void UpdateChecker::startUpdateCheck() {
         return;
     }
     updateThread = std::thread(&UpdateChecker::performUpdateCheck);
+}
+
+void UpdateChecker::waitForUpdateCheck() {
+    if (updateThread.joinable()) {
+        updateThread.join();
+    }
 }
 
 void UpdateChecker::performUpdateCheck() {
@@ -69,12 +76,14 @@ void UpdateChecker::performUpdateCheck() {
                         std::lock_guard lock(updateChecker.mutex);
                         updateChecker.latestVersion = "v" + latestVersionStr;
                         updateChecker.msiUrl = std::string(url_sv);
-                        Logger::log(NK_INFO, ("MSI URL: " + std::string(url_sv)).c_str());
                         updateChecker.updateCheckCompleted = true;
                         updateChecker.isUpdateAvailable = true;
-                        updateChecker.renderUpdatePopup();
-                        return;
                     }
+                    Logger::log(NK_INFO, ("MSI URL: " + std::string(url_sv)).c_str());
+                    if (wxTheApp) {
+                        wxTheApp->CallAfter([&updateChecker] { updateChecker.renderUpdatePopup(); });
+                    }
+                    return;
                 }
             }
             Logger::log(NK_ERROR, "No MSI asset found in the latest GitHub release.");
@@ -206,53 +215,11 @@ void UpdateChecker::performUpdate() const {
 #endif
 }
 
-INT_PTR CALLBACK UpdateChecker::updateDialogHandler(
-    const HWND hwndDlg, const UINT uMsg, const WPARAM wParam, LPARAM lParam) {
-#ifdef _WIN32
-    const UpdateChecker& updateChecker = getInstance();
-    switch (uMsg) {
-    case WM_INITDIALOG: {
-        const HWND hStatic = GetDlgItem(hwndDlg, IDC_UPDATE_TEXT);
-        SetWindowTextA(hStatic, updateChecker.updateMessage.c_str());
-        return TRUE;
-    }
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDNO) {
-            EndDialog(hwndDlg, IDNO);
-            return TRUE;
-        }
-        if (LOWORD(wParam) == IDYES) {
-            getInstance().performUpdate();
-            EndDialog(hwndDlg, IDYES);
-            return TRUE;
-        }
-        return FALSE;
-    case WM_CLOSE:
-        EndDialog(hwndDlg, IDOK);
-        return TRUE;
-    default:
-        return FALSE;
-    }
-#else
-    return 0;
-#endif
-}
-
 void UpdateChecker::openUpdateDialog(const std::string& message) {
-#ifdef _WIN32
-    std::string formattedMessage = message;
-
-    size_t pos = 0;
-    while ((pos = formattedMessage.find('\n', pos)) != std::string::npos) {
-        formattedMessage.replace(pos, 1, "\r\n");
-        pos += 2;
+    if (wxMessageBox(wxString::FromUTF8(message), "Update available", wxYES_NO | wxICON_INFORMATION, getMainFrame()) ==
+        wxYES) {
+        performUpdate();
     }
-    updateMessage = std::string(formattedMessage);
-    DialogBoxParamA(
-        GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_UPDATE_DIALOG), Renderer::hwnd, updateDialogHandler, 0);
-#else
-    Logger::log(NK_INFO, "%s", message.c_str());
-#endif
 }
 
 bool UpdateChecker::isVersionGreaterThan(const std::string& v1, const std::string& v2) {

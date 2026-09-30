@@ -5,7 +5,10 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <wx/dialog.h>
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include "../util/Platform.h"
 
 #include "../../RecastDemo/Sample_TileMesh.h"
@@ -138,10 +141,8 @@ public:
     float markerPosition[3]{};
     std::string selectedObject;
 
-    static HWND hRecastDialog;
+    static wxDialog* hRecastDialog;
 
 private:
     std::vector<dtPolyRef> pfSeedPointAreas;
-
-    static INT_PTR CALLBACK recastDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

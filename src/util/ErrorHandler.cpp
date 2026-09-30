@@ -1,63 +1,43 @@
 #include "../../include/NavKit/util/ErrorHandler.h"
-#include "../../include/NavKit/Resource.h"
 #include "../../include/NavKit/module/Logger.h"
-#include "../../include/NavKit/module/Renderer.h"
-
-std::string* ErrorHandler::errorMessage = nullptr;
-
-INT_PTR CALLBACK ErrorHandler::ErrorDialogHandler(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-#ifdef _WIN32
-    switch (uMsg) {
-    case WM_INITDIALOG: {
-        const HWND hStatic = GetDlgItem(hwndDlg, IDC_ERROR_TEXT);
-        if (errorMessage) {
-            SetWindowTextA(hStatic, errorMessage->c_str());
-        }
-        return TRUE;
-    }
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK) {
-            EndDialog(hwndDlg, IDOK);
-            return TRUE;
-        }
-        if (LOWORD(wParam) == IDC_COPY_BUTTON) {
-            OpenClipboard(hwndDlg);
-            EmptyClipboard();
-            if (errorMessage) {
-                const HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, errorMessage->length() + 1);
-                char* data = (char*)GlobalLock(hMem);
-                strcpy_s(data, errorMessage->length() + 1, errorMessage->c_str());
-                GlobalUnlock(hMem);
-                SetClipboardData(CF_TEXT, hMem);
-                CloseClipboard();
-                GlobalFree(hMem);
-            }
-            return TRUE;
-        }
-        return FALSE;
-    case WM_CLOSE:
-        EndDialog(hwndDlg, IDOK);
-        return TRUE;
-    default:
-        return FALSE;
-    }
-#else
-    return 0;
-#endif
-}
+#include "../../include/NavKit/module/WxApplication.h"
+#include <wx/clipbrd.h>
+#include <wx/button.h>
+#include <wx/dialog.h>
+#include <wx/sizer.h>
+#include <wx/textctrl.h>
+#include <wx/thread.h>
 
 void ErrorHandler::openErrorDialog(const std::string& message) {
-#ifdef _WIN32
-    std::string formattedMessage = message;
-
-    size_t pos = 0;
-    while ((pos = formattedMessage.find('\n', pos)) != std::string::npos) {
-        formattedMessage.replace(pos, 1, "\r\n");
-        pos += 2;
+    if (!wxTheApp) {
+        Logger::log(NK_ERROR, "%s", message.c_str());
+        return;
     }
-    errorMessage = new std::string(formattedMessage);
-    DialogBoxParamA(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_ERROR_DIALOG), Renderer::hwnd, ErrorDialogHandler, 0);
-#else
-    Logger::log(NK_ERROR, "%s", message.c_str());
-#endif
+    if (!wxIsMainThread()) {
+        wxTheApp->CallAfter([message] { openErrorDialog(message); });
+        return;
+    }
+    wxDialog dialog(getMainFrame(), wxID_ANY, "Error", wxDefaultPosition, wxSize(650, 500));
+    auto* text = new wxTextCtrl(&dialog, wxID_ANY, wxString::FromUTF8(message), wxDefaultPosition, wxDefaultSize,
+        wxTE_MULTILINE | wxTE_READONLY);
+    auto* buttons = new wxBoxSizer(wxHORIZONTAL);
+    auto* copyButton = new wxButton(&dialog, wxID_COPY, "Copy");
+    auto* okButton = new wxButton(&dialog, wxID_OK, "OK");
+    buttons->Add(copyButton, 0, wxRIGHT, 8);
+    buttons->Add(okButton);
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(text, 1, wxEXPAND | wxALL, 10);
+    sizer->Add(buttons, 0, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10);
+    dialog.SetSizer(sizer);
+    copyButton->Bind(wxEVT_BUTTON, [&message](wxCommandEvent&) {
+        if (wxTheClipboard->Open()) {
+            wxTheClipboard->SetData(new wxTextDataObject(wxString::FromUTF8(message)));
+            wxTheClipboard->Close();
+        }
+    });
+    okButton->Bind(wxEVT_BUTTON, [&dialog](wxCommandEvent&) { dialog.EndModal(wxID_OK); });
+    dialog.SetDefaultItem(okButton);
+    dialog.Layout();
+    dialog.CentreOnParent();
+    dialog.ShowModal();
 }

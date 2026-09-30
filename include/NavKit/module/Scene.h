@@ -1,6 +1,9 @@
 #pragma once
 #include <functional>
+#include <wx/dialog.h>
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <map>
 #include <thread>
 #include "../util/Platform.h"
@@ -55,7 +58,7 @@ public:
 
     void resetBBoxDefaults();
 
-    void updateSceneDialogControls(HWND hDlg) const;
+    void updateSceneDialogControls(wxDialog* dialog) const;
 
     static Scene& getInstance() {
         static Scene instance;
@@ -84,7 +87,7 @@ public:
     bool showBBox;
     bool showAxes;
     int version;
-    static HWND hSceneDialog;
+    static wxDialog* hSceneDialog;
 
     const Json::Mesh* findMeshByHashAndIdAndPos(const std::string& hash, const std::string& id, const float* pos) const;
 
@@ -93,6 +96,4 @@ public:
 private:
     std::string loadSceneName;
     std::string saveSceneName;
-
-    static INT_PTR CALLBACK sceneDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 };

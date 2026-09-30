@@ -15,7 +15,7 @@
 #include <future>
 #include <assimp/scene.h>
 
-#include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -24,6 +24,12 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/module/WxApplication.h"
+#include <array>
+#include <wx/button.h>
+#include <wx/checkbox.h>
+#include <wx/radiobut.h>
+#include <wx/sizer.h>
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
@@ -42,7 +48,7 @@ SceneMesh::SceneMesh() :
     primLods{true, true, true, true, true, true, true, true}, blendFileBuilt(false), extractTextures(false),
     applyTextures(false) {}
 
-HWND SceneMesh::hSceneMeshDialog = nullptr;
+wxDialog* SceneMesh::hSceneMeshDialog = nullptr;
 
 GLuint SceneMesh::tileTextureId = 0;
 
@@ -74,155 +80,161 @@ void SceneMesh::loadTileTexture() {
     }
 }
 
-void SceneMesh::updateObjDialogControls(const HWND hDlg) {
-#ifdef _WIN32
+void SceneMesh::updateObjDialogControls(wxDialog* dialog) {
     const SceneMesh& obj = getInstance();
-    CheckRadioButton(hDlg, IDC_RADIO_MESH_TYPE_ALOC, IDC_RADIO_MESH_TYPE_PRIM,
-        obj.meshTypeForBuild == ALOC ? IDC_RADIO_MESH_TYPE_ALOC : IDC_RADIO_MESH_TYPE_PRIM);
-
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_MESH_TYPE_ALOC))->SetValue(obj.meshTypeForBuild == ALOC);
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_MESH_TYPE_PRIM))->SetValue(obj.meshTypeForBuild == PRIM);
     for (int i = 0; i < 8; ++i) {
-        CheckDlgButton(hDlg, IDC_CHECK_PRIM_LOD_1 + i, obj.primLods[i] ? BST_CHECKED : BST_UNCHECKED);
+        auto* control = static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_PRIM_LOD_1 + i));
+        control->SetValue(obj.primLods[i]);
+        control->Enable(obj.meshTypeForBuild == PRIM);
     }
-    const bool isPrim = obj.meshTypeForBuild == PRIM;
-    for (int i = 0; i < 8; ++i) {
-        EnableWindow(GetDlgItem(hDlg, IDC_CHECK_PRIM_LOD_1 + i), isPrim);
-    }
-    EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_SELECT_ALL_LODS), isPrim);
-    EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_DESELECT_ALL_LODS), isPrim);
-
-    CheckRadioButton(hDlg, IDC_RADIO_BUILD_TYPE_COPY, IDC_RADIO_BUILD_TYPE_INSTANCE,
-        obj.sceneMeshBuildType == COPY ? IDC_RADIO_BUILD_TYPE_COPY : IDC_RADIO_BUILD_TYPE_INSTANCE);
-
-    CheckDlgButton(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT, obj.skipExtractingAlocsOrPrims ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX, obj.filterToIncludeBox ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_ONLY_COLLIDABLE, obj.onlyCollidable ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES, obj.extractTextures ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton(hDlg, IDC_CHECK_APPLY_TEXTURES, obj.applyTextures ? BST_CHECKED : BST_UNCHECKED);
-#endif
+    dialog->FindWindow(IDC_BUTTON_SELECT_ALL_LODS)->Enable(obj.meshTypeForBuild == PRIM);
+    dialog->FindWindow(IDC_BUTTON_DESELECT_ALL_LODS)->Enable(obj.meshTypeForBuild == PRIM);
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_BUILD_TYPE_COPY))
+        ->SetValue(obj.sceneMeshBuildType == COPY);
+    static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_BUILD_TYPE_INSTANCE))
+        ->SetValue(obj.sceneMeshBuildType == INSTANCE);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_SKIP_RPKG_EXTRACT))->SetValue(obj.skipExtractingAlocsOrPrims);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_FILTER_TO_INCLUDE_BOX))->SetValue(obj.filterToIncludeBox);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_ONLY_COLLIDABLE))->SetValue(obj.onlyCollidable);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_EXTRACT_TEXTURE_FILES))->SetValue(obj.extractTextures);
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_APPLY_TEXTURES))->SetValue(obj.applyTextures);
 }
 
-INT_PTR CALLBACK SceneMesh::ObjSettingsDialogProc(
-    const HWND hDlg, const UINT message, const WPARAM wParam, LPARAM lParam) {
-#ifdef _WIN32
-    SceneMesh& sceneMesh = getInstance();
-    switch (message) {
-    case WM_INITDIALOG: {
-        updateObjDialogControls(hDlg);
-        return TRUE;
+void SceneMesh::showSceneMeshDialog() {
+    if (hSceneMeshDialog) {
+        hSceneMeshDialog->Raise();
+        return;
     }
-    case WM_COMMAND:
-        switch (LOWORD(wParam)) {
-        case IDC_RADIO_MESH_TYPE_ALOC:
-        case IDC_RADIO_MESH_TYPE_PRIM: {
-            sceneMesh.meshTypeForBuild = IsDlgButtonChecked(hDlg, IDC_RADIO_MESH_TYPE_ALOC) ? ALOC : PRIM;
-            sceneMesh.saveSceneMeshSettings();
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Scene Mesh Settings", wxDefaultPosition, wxSize(430, 450));
+    hSceneMeshDialog = dialog;
+    auto* content = new wxBoxSizer(wxVERTICAL);
+    auto* meshType = new wxStaticBoxSizer(wxVERTICAL, dialog, "Mesh Type for Build");
+    auto* aloc =
+        new wxRadioButton(dialog, IDC_RADIO_MESH_TYPE_ALOC, "Aloc", wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
+    auto* prim = new wxRadioButton(dialog, IDC_RADIO_MESH_TYPE_PRIM, "Prim");
+    auto* meshTypeRow = new wxBoxSizer(wxHORIZONTAL);
+    meshTypeRow->Add(aloc, 0, wxRIGHT, 12);
+    meshTypeRow->Add(prim);
+    meshType->Add(meshTypeRow, 0, wxALL, 6);
+    content->Add(meshType, 0, wxEXPAND | wxALL, 6);
+
+    auto* lodGroup = new wxStaticBoxSizer(wxVERTICAL, dialog, "Prim Level of Detail");
+    auto* lodGrid = new wxGridSizer(2, 4, 4, 10);
+    for (int i = 0; i < 8; ++i) {
+        const wxString label = i == 0 ? wxString("LOD 1 (Highest)") : wxString::Format("LOD %d", i + 1);
+        lodGrid->Add(new wxCheckBox(dialog, IDC_CHECK_PRIM_LOD_1 + i, label));
+    }
+    lodGroup->Add(lodGrid, 0, wxALL, 6);
+    auto* lodButtons = new wxBoxSizer(wxHORIZONTAL);
+    lodButtons->Add(new wxButton(dialog, IDC_BUTTON_SELECT_ALL_LODS, "Select All"), 0, wxRIGHT, 6);
+    lodButtons->Add(new wxButton(dialog, IDC_BUTTON_DESELECT_ALL_LODS, "Deselect All"));
+    lodGroup->Add(lodButtons, 0, wxLEFT | wxRIGHT | wxBOTTOM, 6);
+    content->Add(lodGroup, 0, wxEXPAND | wxALL, 6);
+
+    auto* buildType = new wxStaticBoxSizer(wxHORIZONTAL, dialog, "Build Type for Blender File");
+    buildType->Add(
+        new wxRadioButton(dialog, IDC_RADIO_BUILD_TYPE_COPY, "Copy", wxDefaultPosition, wxDefaultSize, wxRB_GROUP), 0,
+        wxALL, 6);
+    buildType->Add(new wxRadioButton(dialog, IDC_RADIO_BUILD_TYPE_INSTANCE, "Instance"), 0, wxALL, 6);
+    content->Add(buildType, 0, wxEXPAND | wxALL, 6);
+
+    const std::array<std::pair<int, const char*>, 5> options = {{
+        {IDC_CHECK_SKIP_RPKG_EXTRACT, "Skip Aloc / Prim Extraction from RPKG files"},
+        {IDC_CHECK_FILTER_TO_INCLUDE_BOX, "Filter meshes to include box"},
+        {IDC_CHECK_ONLY_COLLIDABLE, "Only include collidable meshes"},
+        {IDC_CHECK_EXTRACT_TEXTURE_FILES, "Extract texture TEXT files from RPKG files"},
+        {IDC_CHECK_APPLY_TEXTURES, "Apply textures to scene mesh"},
+    }};
+    for (const auto& [id, label] : options) {
+        content->Add(new wxCheckBox(dialog, id, label), 0, wxALL, 6);
+    }
+    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    content->Add(reset, 0, wxALIGN_RIGHT | wxALL, 8);
+    dialog->SetSizer(content);
+    updateObjDialogControls(dialog);
+
+    auto& sceneMesh = getInstance();
+    const auto saveCheckbox = [dialog, &sceneMesh](const int id, bool& setting, const char* name) {
+        bool* settingPtr = &setting;
+        dialog->Bind(
+            wxEVT_CHECKBOX,
+            [&sceneMesh, settingPtr, name](wxCommandEvent& event) {
+                *settingPtr = event.IsChecked();
+                sceneMesh.saveSceneMeshSettings();
+                Logger::log(NK_INFO, "%s set to %s.", name, *settingPtr ? "true" : "false");
+            },
+            id);
+    };
+    dialog->Bind(wxEVT_RADIOBUTTON, [dialog, &sceneMesh](wxCommandEvent& event) {
+        if (!event.IsChecked()) {
+            return;
+        }
+        if (event.GetId() == IDC_RADIO_MESH_TYPE_ALOC || event.GetId() == IDC_RADIO_MESH_TYPE_PRIM) {
+            sceneMesh.meshTypeForBuild = event.GetId() == IDC_RADIO_MESH_TYPE_ALOC ? ALOC : PRIM;
             Logger::log(
                 NK_INFO, "Mesh type for build set to %s.", sceneMesh.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-        case IDC_RADIO_BUILD_TYPE_COPY:
-        case IDC_RADIO_BUILD_TYPE_INSTANCE: {
-            sceneMesh.sceneMeshBuildType = IsDlgButtonChecked(hDlg, IDC_RADIO_BUILD_TYPE_COPY) ? COPY : INSTANCE;
-            sceneMesh.saveSceneMeshSettings();
+        } else {
+            sceneMesh.sceneMeshBuildType = event.GetId() == IDC_RADIO_BUILD_TYPE_COPY ? COPY : INSTANCE;
             Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
                 sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
-            updateObjDialogControls(hDlg);
-            return TRUE;
         }
-
-        case IDC_CHECK_FILTER_TO_INCLUDE_BOX: {
-            sceneMesh.filterToIncludeBox = IsDlgButtonChecked(hDlg, IDC_CHECK_FILTER_TO_INCLUDE_BOX);
-            sceneMesh.saveSceneMeshSettings();
-            Logger::log(NK_INFO, "Filter to include box set to %s.", sceneMesh.filterToIncludeBox ? "true" : "false");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-
-        case IDC_CHECK_ONLY_COLLIDABLE: {
-            sceneMesh.onlyCollidable = IsDlgButtonChecked(hDlg, IDC_CHECK_ONLY_COLLIDABLE);
-            sceneMesh.saveSceneMeshSettings();
-            Logger::log(NK_INFO, "Only collidable meshes set to %s.", sceneMesh.onlyCollidable ? "true" : "false");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-
-        case IDC_CHECK_SKIP_RPKG_EXTRACT: {
-            sceneMesh.skipExtractingAlocsOrPrims = IsDlgButtonChecked(hDlg, IDC_CHECK_SKIP_RPKG_EXTRACT);
-            sceneMesh.saveSceneMeshSettings();
-            Logger::log(NK_INFO, "Skip Extracting ALOCs or PRIMs set to %s.",
-                sceneMesh.skipExtractingAlocsOrPrims ? "true" : "false");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-        case IDC_CHECK_EXTRACT_TEXTURE_FILES: {
-            sceneMesh.extractTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_EXTRACT_TEXTURE_FILES);
-            sceneMesh.saveSceneMeshSettings();
-            Logger::log(NK_INFO, "Extract textures set to %s.", sceneMesh.extractTextures ? "true" : "false");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-        case IDC_CHECK_APPLY_TEXTURES: {
-            sceneMesh.applyTextures = IsDlgButtonChecked(hDlg, IDC_CHECK_APPLY_TEXTURES);
-            sceneMesh.saveSceneMeshSettings();
-            Logger::log(NK_INFO, "Apply textures set to %s.", sceneMesh.applyTextures ? "true" : "false");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-
-        case IDC_BUTTON_SELECT_ALL_LODS:
-        case IDC_BUTTON_DESELECT_ALL_LODS: {
-            const bool check = LOWORD(wParam) == IDC_BUTTON_SELECT_ALL_LODS;
-            for (bool& primLod : sceneMesh.primLods) {
-                primLod = check;
-            }
-            sceneMesh.saveSceneMeshSettings();
-            Logger::log(NK_INFO, "Prim LODs %s.", check ? "all selected" : "all deselected");
-            updateObjDialogControls(hDlg);
-            return TRUE;
-        }
-
-        case IDC_BUTTON_RESET_DEFAULTS: {
-            sceneMesh.resetDefaults();
-            updateObjDialogControls(hDlg);
-            Logger::log(NK_INFO, "Prim LODs set to %s.", sceneMesh.buildPrimLodsString().c_str());
-            Logger::log(
-                NK_INFO, "Mesh type for build set to %s.", sceneMesh.meshTypeForBuild == ALOC ? "Aloc" : "Prim");
-            Logger::log(NK_INFO, "Scene Mesh Build type set to %s.",
-                sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
-            sceneMesh.saveSceneMeshSettings();
-            break;
-        }
-        case WM_CLOSE:
-            DestroyWindow(hDlg);
-            return TRUE;
-
-        default:
-            if (LOWORD(wParam) >= IDC_CHECK_PRIM_LOD_1 && LOWORD(wParam) <= IDC_CHECK_PRIM_LOD_8) {
-                const int index = LOWORD(wParam) - IDC_CHECK_PRIM_LOD_1;
-                const bool isChecked = IsDlgButtonChecked(hDlg, LOWORD(wParam)) == BST_CHECKED;
-                sceneMesh.primLods[index] = isChecked;
+        sceneMesh.saveSceneMeshSettings();
+        updateObjDialogControls(dialog);
+    });
+    saveCheckbox(IDC_CHECK_SKIP_RPKG_EXTRACT, sceneMesh.skipExtractingAlocsOrPrims, "Skip Extracting ALOCs or PRIMs");
+    saveCheckbox(IDC_CHECK_FILTER_TO_INCLUDE_BOX, sceneMesh.filterToIncludeBox, "Filter to include box");
+    saveCheckbox(IDC_CHECK_ONLY_COLLIDABLE, sceneMesh.onlyCollidable, "Only collidable meshes");
+    saveCheckbox(IDC_CHECK_EXTRACT_TEXTURE_FILES, sceneMesh.extractTextures, "Extract textures");
+    saveCheckbox(IDC_CHECK_APPLY_TEXTURES, sceneMesh.applyTextures, "Apply textures");
+    for (int i = 0; i < 8; ++i) {
+        dialog->Bind(
+            wxEVT_CHECKBOX,
+            [&sceneMesh, i](wxCommandEvent& event) {
+                sceneMesh.primLods[i] = event.IsChecked();
                 sceneMesh.saveSceneMeshSettings();
                 Logger::log(NK_INFO, "Prim LODs set to %s.", sceneMesh.buildPrimLodsString().c_str());
+            },
+            IDC_CHECK_PRIM_LOD_1 + i);
+    }
+    dialog->Bind(
+        wxEVT_BUTTON,
+        [&sceneMesh, dialog](wxCommandEvent& event) {
+            const bool check = event.GetId() == IDC_BUTTON_SELECT_ALL_LODS;
+            for (bool& lod : sceneMesh.primLods) {
+                lod = check;
             }
-            break;
+            sceneMesh.saveSceneMeshSettings();
+            updateObjDialogControls(dialog);
+            Logger::log(NK_INFO, "Prim LODs %s.", check ? "all selected" : "all deselected");
+        },
+        IDC_BUTTON_SELECT_ALL_LODS);
+    dialog->Bind(
+        wxEVT_BUTTON,
+        [&sceneMesh, dialog](wxCommandEvent&) {
+            for (bool& lod : sceneMesh.primLods) {
+                lod = false;
+            }
+            sceneMesh.saveSceneMeshSettings();
+            updateObjDialogControls(dialog);
+            Logger::log(NK_INFO, "Prim LODs all deselected.");
+        },
+        IDC_BUTTON_DESELECT_ALL_LODS);
+    reset->Bind(wxEVT_BUTTON, [&sceneMesh, dialog](wxCommandEvent&) {
+        sceneMesh.resetDefaults();
+        updateObjDialogControls(dialog);
+        sceneMesh.saveSceneMeshSettings();
+    });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hSceneMeshDialog == dialog) {
+            hSceneMeshDialog = nullptr;
         }
-        break;
-    case WM_CLOSE: {
-        DestroyWindow(hDlg);
-        return TRUE;
-    }
-
-    case WM_DESTROY: {
-        hSceneMeshDialog = nullptr;
-        return TRUE;
-    } break;
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
+        dialog->Destroy();
+    });
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
 }
 
 void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
@@ -841,41 +853,4 @@ void SceneMesh::resetDefaults() {
     skipExtractingAlocsOrPrims = false;
     filterToIncludeBox = true;
     onlyCollidable = true;
-}
-
-void SceneMesh::showSceneMeshDialog() {
-#ifdef _WIN32
-    if (hSceneMeshDialog) {
-        SetForegroundWindow(hSceneMeshDialog);
-        return;
-    }
-    const HINSTANCE hInstance = GetModuleHandle(nullptr);
-    const HWND hParentWnd = Renderer::hwnd;
-    hSceneMeshDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_SCENE_MESH_SETTINGS), hParentWnd,
-        ObjSettingsDialogProc, reinterpret_cast<LPARAM>(this));
-
-    if (hSceneMeshDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hSceneMeshDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hSceneMeshDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
-        }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hSceneMeshDialog, &dialogRect);
-
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-
-        SetWindowPos(hSceneMeshDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-
-        ShowWindow(hSceneMeshDialog, SW_SHOW);
-    }
-#else
-    Logger::log(NK_WARN, "The Scene Mesh settings dialog is only available on Windows.");
-#endif
 }

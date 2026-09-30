@@ -1,5 +1,6 @@
 #pragma once
 #include <SimpleIni.h>
+#include <wx/dialog.h>
 #include "../util/Platform.h"
 
 struct DialogSettings {
@@ -13,9 +14,7 @@ struct DialogSettings {
 class NavKitSettings {
     static void resetDefaults(DialogSettings& settings);
 
-    static void setDialogInputs(HWND hDlg, const DialogSettings& tempSettings);
-
-    static INT_PTR SettingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    static void setDialogInputs(wxDialog* dialog, const DialogSettings& tempSettings);
 
     explicit NavKitSettings();
 
@@ -34,7 +33,7 @@ public:
     std::string blenderPath;
     bool showDebugLogs;
     bool shouldOpenSettingsDialog;
-    static HWND hSettingsDialog;
+    static wxDialog* hSettingsDialog;
 
     void setHitmanFolder(const std::string& folderName);
 

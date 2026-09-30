@@ -6,7 +6,10 @@
 #include <optional>
 #include <thread>
 #include <atomic>
+#include <wx/dialog.h>
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include "../util/Platform.h"
 #include <GL/glew.h>
 
@@ -45,7 +48,7 @@ public:
 
     static GLuint navMeshTriVAO;
 
-    static HWND hNavpDialog;
+    static wxDialog* hNavpDialog;
 
     static int navMeshLineCount;
 
@@ -90,9 +93,7 @@ public:
 
     void finalizeBuild();
 
-    static void updateNavpDialogControls(HWND hwnd);
-
-    static INT_PTR CALLBACK extractNavpDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    static void updateNavpDialogControls(wxDialog* dialog);
 
     void showExtractNavpDialog();
 

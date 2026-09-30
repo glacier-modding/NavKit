@@ -1,5 +1,7 @@
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #else
 #include <csignal>
@@ -52,7 +54,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
         errorCallback();
         return;
     }
-    STARTUPINFO si;
+    STARTUPINFOA si;
     PROCESS_INFORMATION pi;
 
     ZeroMemory(&si, sizeof(si));
@@ -66,7 +68,7 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
 
     char* commandLineChar = _strdup(command.c_str());
 
-    if (!CreateProcess(nullptr, commandLineChar, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
+    if (!CreateProcessA(nullptr, commandLineChar, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
         Logger::log(NK_ERROR, ("Error creating process for command: " + command + ".").c_str());
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <SDL_syswm.h>
 #include "../util/Platform.h"
 #include "../../NavWeakness/Vec3.h"
 #include "../util/Math.h"
 #include "../render/Shader.h"
 #include <glm/mat4x4.hpp>
+#include <SDL.h>
 
 typedef double GLdouble;
 typedef int GLint;
@@ -100,7 +100,6 @@ public:
     SDL_Window* window;
     glm::mat4 projection;
     glm::mat4 view;
-    static HWND hwnd;
     Uint32 prevFrameTime;
 };
 

@@ -7,12 +7,11 @@
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/RecastDemo/imgui.h"
 
 #include <algorithm>
 #include <SDL.h>
-
-#include "../../include/NavKit/module/NavKitSettings.h"
 
 InputHandler::InputHandler() {
     mouseButtonMask = 0;
@@ -40,11 +39,10 @@ int InputHandler::handleInput() {
             if (event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
                 renderer.handleResize();
 
-                const Uint32 windowFlags = SDL_GetWindowFlags(renderer.window);
                 Renderer::FullscreenMode mode = Renderer::WINDOWED;
-                if (windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+                if (getMainFrame()->IsFullScreen()) {
                     mode = Renderer::BORDERLESS_FULLSCREEN;
-                } else if (windowFlags & SDL_WINDOW_MAXIMIZED) {
+                } else if (getMainFrame()->IsMaximized()) {
                     mode = Renderer::MAXIMIZED;
                 }
                 renderer.handleFullscreen(mode);
@@ -60,8 +58,7 @@ int InputHandler::handleInput() {
                 Gui::getInstance().showMenu = !gui.showMenu;
             }
             if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
-                const Uint32 windowFlags = SDL_GetWindowFlags(renderer.window);
-                if (windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+                if (getMainFrame()->IsFullScreen()) {
                     renderer.handleFullscreen(Renderer::WINDOWED);
                 } else {
                     renderer.handleFullscreen(Renderer::BORDERLESS_FULLSCREEN);
@@ -132,28 +129,6 @@ int InputHandler::handleInput() {
 
         case SDL_QUIT:
             done = true;
-            break;
-        case SDL_SYSWMEVENT:
-#ifdef _WIN32
-            if (SDL_SysWMmsg* wmMsg = event.syswm.msg;
-                (NavKitSettings::hSettingsDialog &&
-                    IsDialogMessage(NavKitSettings::hSettingsDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Airg::hAirgDialog &&
-                    IsDialogMessage(Airg::hAirgDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Scene::hSceneDialog &&
-                    IsDialogMessage(Scene::hSceneDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (SceneMesh::hSceneMeshDialog &&
-                    IsDialogMessage(SceneMesh::hSceneMeshDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (Navp::hNavpDialog &&
-                    IsDialogMessage(Navp::hNavpDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg))) ||
-                (RecastAdapter::hRecastDialog &&
-                    IsDialogMessage(RecastAdapter::hRecastDialog, reinterpret_cast<LPMSG>(&wmMsg->msg.win.msg)))) {
-                continue;
-            }
-            if (Menu::handleMenuClicked(event.syswm.msg) == QUIT) {
-                done = true;
-            }
-#endif
             break;
         default:
             break;

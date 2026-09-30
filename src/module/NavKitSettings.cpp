@@ -1,26 +1,25 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 
-#ifdef _WIN32
-#include <CommCtrl.h>
-#endif
 #include <filesystem>
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#endif
-#include "../../include/NavKit/Resource.h"
+#include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
-#include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/WxApplication.h"
+#include <wx/button.h>
+#include <wx/checkbox.h>
+#include <wx/slider.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
+#include <wx/textctrl.h>
+#include <array>
+#include <memory>
+#include <tuple>
 
-HWND NavKitSettings::hSettingsDialog = nullptr;
-#ifdef _WIN32
-#pragma comment(lib, "comctl32.lib")
-#endif
+wxDialog* NavKitSettings::hSettingsDialog = nullptr;
 
 void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.backgroundColor = 0.16f;
@@ -30,120 +29,16 @@ void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.showDebugLogs = false;
 }
 
-void NavKitSettings::setDialogInputs(const HWND hDlg, const DialogSettings& tempSettings) {
-#ifdef _WIN32
-    const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
-    SendMessage(hSlider, TBM_SETRANGE, TRUE, MAKELONG(0, 100));
-    SendMessage(hSlider, TBM_SETPOS, TRUE, tempSettings.backgroundColor * 100.0f);
-    SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings.hitmanFolder.c_str());
-    SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings.outputFolder.c_str());
-    SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings.blenderPath.c_str());
-    CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS, tempSettings.showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
-#endif
-}
-
-INT_PTR CALLBACK NavKitSettings::SettingsDialogProc(
-    const HWND hDlg, const UINT message, const WPARAM wParam, const LPARAM lParam) {
-#ifdef _WIN32
-    auto navKitSettings = reinterpret_cast<NavKitSettings*>(GetWindowLongPtr(hDlg, GWLP_USERDATA));
-
-    switch (message) {
-    case WM_INITDIALOG: {
-        navKitSettings = reinterpret_cast<NavKitSettings*>(lParam);
-        SetWindowLongPtr(hDlg, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(navKitSettings));
-
-        auto tempSettings = new DialogSettings();
-        tempSettings->backgroundColor = navKitSettings->backgroundColor;
-        tempSettings->hitmanFolder = navKitSettings->hitmanFolder;
-        tempSettings->outputFolder = navKitSettings->outputFolder;
-        tempSettings->blenderPath = navKitSettings->blenderPath;
-        tempSettings->showDebugLogs = navKitSettings->showDebugLogs;
-        SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(tempSettings));
-
-        setDialogInputs(hDlg, *tempSettings);
-
-        return TRUE;
-    }
-
-    case WM_HSCROLL: {
-        if (const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER))) {
-            const HWND hSlider = GetDlgItem(hDlg, IDC_SLIDER_BG_COLOR);
-            tempSettings->backgroundColor = static_cast<float>(SendMessage(hSlider, TBM_GETPOS, 0, 0)) / 100.0f;
-        }
-        return TRUE;
-    }
-
-    case WM_COMMAND: {
-        const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER));
-
-        if (const UINT commandId = LOWORD(wParam); commandId == IDC_BUTTON_BROWSE_HITMAN) {
-            if (const char* folderName = SceneExtract::openHitmanFolderDialog(navKitSettings->hitmanFolder.data())) {
-                tempSettings->hitmanFolder = folderName;
-                SetDlgItemText(hDlg, IDC_EDIT_HITMAN_PATH, tempSettings->hitmanFolder.c_str());
-            }
-        } else if (commandId == IDC_BUTTON_BROWSE_OUTPUT) {
-            if (const char* folderName = SceneExtract::openOutputFolderDialog(navKitSettings->outputFolder.data())) {
-                tempSettings->outputFolder = folderName;
-                SetDlgItemText(hDlg, IDC_EDIT_OUTPUT_PATH, tempSettings->outputFolder.c_str());
-            }
-        } else if (commandId == IDC_BUTTON_BROWSE_BLENDER) {
-            if (const char* blenderFileName = SceneMesh::openSetBlenderFileDialog()) {
-                tempSettings->blenderPath = blenderFileName;
-                SetDlgItemText(hDlg, IDC_EDIT_BLENDER_PATH, tempSettings->blenderPath.c_str());
-            }
-        } else if (commandId == IDC_CHECK_SHOW_DEBUG_LOGS) {
-            tempSettings->showDebugLogs = IsDlgButtonChecked(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS);
-            Logger::log(NK_INFO, "Show Debug logs set to %s.", tempSettings->showDebugLogs ? "true" : "false");
-            CheckDlgButton(hDlg, IDC_CHECK_SHOW_DEBUG_LOGS, tempSettings->showDebugLogs ? BST_CHECKED : BST_UNCHECKED);
-            return TRUE;
-        } else if (commandId == IDC_BUTTON_RESET_DEFAULTS) {
-            navKitSettings->resetDefaults(*tempSettings);
-            setDialogInputs(hDlg, *tempSettings);
-        } else if (commandId == IDOK || commandId == IDC_APPLY) {
-            if (tempSettings) {
-                navKitSettings->backgroundColor = tempSettings->backgroundColor;
-                navKitSettings->setHitmanFolder(tempSettings->hitmanFolder);
-                navKitSettings->setOutputFolder(tempSettings->outputFolder);
-                navKitSettings->setBlenderFile(tempSettings->blenderPath);
-                navKitSettings->showDebugLogs = tempSettings->showDebugLogs;
-
-                PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-                persistedSettings.setValue(
-                    "NavKit", "backgroundColor", std::to_string(navKitSettings->backgroundColor));
-                persistedSettings.setValue("NavKit", "hitman", tempSettings->hitmanFolder);
-                persistedSettings.setValue("NavKit", "output", tempSettings->outputFolder);
-                persistedSettings.setValue("NavKit", "blender", tempSettings->blenderPath);
-                persistedSettings.setValue("NavKit", "showDebugLogs", tempSettings->showDebugLogs ? "true" : "false");
-                persistedSettings.save();
-            }
-            if (commandId == IDOK) {
-                DestroyWindow(hDlg);
-            }
-            return TRUE;
-        } else if (commandId == IDCANCEL) {
-            DestroyWindow(hDlg);
-            return TRUE;
-        }
-        break;
-    }
-
-    case WM_CLOSE: {
-        DestroyWindow(hDlg);
-        return TRUE;
-    }
-
-    case WM_DESTROY: {
-        const auto tempSettings = reinterpret_cast<DialogSettings*>(GetWindowLongPtr(hDlg, DWLP_USER));
-        delete tempSettings;
-        hSettingsDialog = nullptr;
-        return TRUE;
-    }
-    default:;
-    }
-    return FALSE;
-#else
-    return 0;
-#endif
+void NavKitSettings::setDialogInputs(wxDialog* dialog, const DialogSettings& tempSettings) {
+    static_cast<wxSlider*>(dialog->FindWindow(IDC_SLIDER_BG_COLOR))
+        ->SetValue(static_cast<int>(tempSettings.backgroundColor * 100.0f));
+    static_cast<wxTextCtrl*>(dialog->FindWindow(IDC_EDIT_HITMAN_PATH))
+        ->ChangeValue(wxString::FromUTF8(tempSettings.hitmanFolder));
+    static_cast<wxTextCtrl*>(dialog->FindWindow(IDC_EDIT_OUTPUT_PATH))
+        ->ChangeValue(wxString::FromUTF8(tempSettings.outputFolder));
+    static_cast<wxTextCtrl*>(dialog->FindWindow(IDC_EDIT_BLENDER_PATH))
+        ->ChangeValue(wxString::FromUTF8(tempSettings.blenderPath));
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_SHOW_DEBUG_LOGS))->SetValue(tempSettings.showDebugLogs);
 }
 
 NavKitSettings::NavKitSettings() :
@@ -151,40 +46,103 @@ NavKitSettings::NavKitSettings() :
     shouldOpenSettingsDialog(false) {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
-#ifdef _WIN32
     if (hSettingsDialog) {
-        SetForegroundWindow(hSettingsDialog);
+        hSettingsDialog->Raise();
         return;
     }
-    const HINSTANCE hInstance = GetModuleHandle(nullptr);
-    const HWND hParentWnd = Renderer::hwnd;
-    hSettingsDialog = CreateDialogParam(hInstance, MAKEINTRESOURCE(IDD_NAVKIT_SETTINGS), hParentWnd, SettingsDialogProc,
-        reinterpret_cast<LPARAM>(this));
-
-    if (hSettingsDialog) {
-        if (HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON))) {
-            SendMessage(hSettingsDialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-            SendMessage(hSettingsDialog, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
-        }
-        RECT parentRect, dialogRect;
-        GetWindowRect(hParentWnd, &parentRect);
-        GetWindowRect(hSettingsDialog, &dialogRect);
-
-        const int parentWidth = parentRect.right - parentRect.left;
-        const int parentHeight = parentRect.bottom - parentRect.top;
-        const int dialogWidth = dialogRect.right - dialogRect.left;
-        const int dialogHeight = dialogRect.bottom - dialogRect.top;
-
-        const int newX = parentRect.left + (parentWidth - dialogWidth) / 2;
-        const int newY = parentRect.top + (parentHeight - dialogHeight) / 2;
-
-        SetWindowPos(hSettingsDialog, nullptr, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-
-        ShowWindow(hSettingsDialog, SW_SHOW);
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "NavKit Settings", wxDefaultPosition, wxSize(640, 330));
+    hSettingsDialog = dialog;
+    auto settings = std::make_shared<DialogSettings>(
+        DialogSettings{backgroundColor, hitmanFolder, outputFolder, blenderPath, showDebugLogs});
+    auto* layout = new wxFlexGridSizer(5, 3, 10, 8);
+    layout->Add(new wxStaticText(dialog, wxID_ANY, "Background Color:"), 0, wxALIGN_CENTER_VERTICAL);
+    layout->Add(new wxSlider(dialog, IDC_SLIDER_BG_COLOR, 0, 0, 100), 1, wxEXPAND);
+    layout->AddSpacer(1);
+    const std::array<std::tuple<int, int, const char*>, 3> paths = {{
+        {IDC_EDIT_HITMAN_PATH, IDC_BUTTON_BROWSE_HITMAN, "Hitman Directory:"},
+        {IDC_EDIT_OUTPUT_PATH, IDC_BUTTON_BROWSE_OUTPUT, "Output Directory:"},
+        {IDC_EDIT_BLENDER_PATH, IDC_BUTTON_BROWSE_BLENDER, "Blender Executable:"},
+    }};
+    for (const auto& [textId, buttonId, label] : paths) {
+        layout->Add(new wxStaticText(dialog, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+        layout->Add(new wxTextCtrl(dialog, textId, {}, wxDefaultPosition, wxDefaultSize, wxTE_READONLY), 1, wxEXPAND);
+        layout->Add(new wxButton(dialog, buttonId, "Browse..."));
     }
-#else
-    Logger::log(NK_WARN, "The NavKit settings dialog is only available on Windows.");
-#endif
+    layout->Add(new wxStaticText(dialog, wxID_ANY, "Show Debug logs:"), 0, wxALIGN_CENTER_VERTICAL);
+    layout->Add(new wxCheckBox(dialog, IDC_CHECK_SHOW_DEBUG_LOGS, "Show Debug logs"), 0, wxALIGN_CENTER_VERTICAL);
+    layout->AddSpacer(1);
+    layout->AddGrowableCol(1, 1);
+    auto* buttons = new wxBoxSizer(wxHORIZONTAL);
+    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* ok = new wxButton(dialog, wxID_OK, "OK");
+    auto* cancel = new wxButton(dialog, wxID_CANCEL, "Cancel");
+    auto* apply = new wxButton(dialog, IDC_APPLY, "Apply");
+    buttons->Add(reset, 0, wxRIGHT, 10);
+    buttons->Add(ok, 0, wxRIGHT, 6);
+    buttons->Add(cancel, 0, wxRIGHT, 6);
+    buttons->Add(apply);
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(layout, 1, wxEXPAND | wxALL, 12);
+    sizer->Add(buttons, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    dialog->SetSizer(sizer);
+    setDialogInputs(dialog, *settings);
+    static_cast<wxSlider*>(dialog->FindWindow(IDC_SLIDER_BG_COLOR))
+        ->Bind(wxEVT_SLIDER, [settings](wxCommandEvent& event) {
+            settings->backgroundColor = static_cast<float>(event.GetInt()) / 100.0f;
+        });
+
+    dialog->Bind(wxEVT_BUTTON, [this, dialog, settings](wxCommandEvent& event) {
+        if (event.GetId() == IDC_BUTTON_BROWSE_HITMAN) {
+            if (const char* folder = SceneExtract::openHitmanFolderDialog(hitmanFolder.data())) {
+                settings->hitmanFolder = folder;
+            }
+        } else if (event.GetId() == IDC_BUTTON_BROWSE_OUTPUT) {
+            if (const char* folder = SceneExtract::openOutputFolderDialog(outputFolder.data())) {
+                settings->outputFolder = folder;
+            }
+        } else if (event.GetId() == IDC_BUTTON_BROWSE_BLENDER) {
+            if (const char* file = SceneMesh::openSetBlenderFileDialog()) {
+                settings->blenderPath = file;
+            }
+        } else if (event.GetId() == IDC_BUTTON_RESET_DEFAULTS) {
+            resetDefaults(*settings);
+        }
+        setDialogInputs(dialog, *settings);
+    });
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_SHOW_DEBUG_LOGS))
+        ->Bind(wxEVT_CHECKBOX, [settings](wxCommandEvent& event) {
+            settings->showDebugLogs = event.IsChecked();
+            Logger::log(NK_INFO, "Show Debug logs set to %s.", settings->showDebugLogs ? "true" : "false");
+        });
+    const auto saveSettings = [this, settings] {
+        backgroundColor = settings->backgroundColor;
+        setHitmanFolder(settings->hitmanFolder);
+        setOutputFolder(settings->outputFolder);
+        setBlenderFile(settings->blenderPath);
+        showDebugLogs = settings->showDebugLogs;
+        PersistedSettings& persisted = PersistedSettings::getInstance();
+        persisted.setValue("NavKit", "backgroundColor", std::to_string(backgroundColor));
+        persisted.setValue("NavKit", "hitman", settings->hitmanFolder);
+        persisted.setValue("NavKit", "output", settings->outputFolder);
+        persisted.setValue("NavKit", "blender", settings->blenderPath);
+        persisted.setValue("NavKit", "showDebugLogs", settings->showDebugLogs ? "true" : "false");
+        persisted.save();
+    };
+    ok->Bind(wxEVT_BUTTON, [dialog, saveSettings](wxCommandEvent&) {
+        saveSettings();
+        dialog->Close();
+    });
+    apply->Bind(wxEVT_BUTTON, [saveSettings](wxCommandEvent&) { saveSettings(); });
+    cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hSettingsDialog == dialog) {
+            hSettingsDialog = nullptr;
+        }
+        dialog->Destroy();
+    });
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
 }
 
 void NavKitSettings::loadSettings() {

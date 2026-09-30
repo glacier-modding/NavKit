@@ -1,6 +1,8 @@
 #include "../../include/NavKit/module/Rpkg.h"
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #pragma comment(lib, "Version.lib")
 #endif

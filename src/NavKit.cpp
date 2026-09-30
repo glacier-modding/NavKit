@@ -20,7 +20,6 @@
  * SOFTWARE.
  */
 #include <SDL.h>
-#include <SDL_syswm.h>
 #include <cpptrace/from_current.hpp>
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Gui.h"
@@ -38,6 +37,7 @@
 #include "../include/NavKit/util/Platform.h"
 
 #include "../include/NavKit/module/NavKitSettings.h"
+#include "../include/NavKit/module/WxApplication.h"
 
 #undef main
 
@@ -56,6 +56,7 @@ void runFrameIteration() {
 }
 
 bool mainLoopIteration() {
+    processWxEvents();
     if (InputHandler::getInstance().handleInput() == InputHandler::QUIT) {
         return false;
     }
@@ -63,36 +64,22 @@ bool mainLoopIteration() {
     return true;
 }
 
-static int SDLCALL eventFilter(void* userdata, SDL_Event* event) {
-#ifdef _WIN32
-    if (event->type == SDL_SYSWMEVENT) {
-        const SDL_SysWMmsg* wmMsg = event->syswm.msg;
-        if (wmMsg->subsystem == SDL_SYSWM_WINDOWS) {
-            if (wmMsg->msg.win.msg == WM_ENTERMENULOOP) {
-                SetTimer(wmMsg->msg.win.hwnd, 1, 1, nullptr);
-            } else if (wmMsg->msg.win.msg == WM_EXITMENULOOP) {
-                KillTimer(wmMsg->msg.win.hwnd, 1);
-            } else if (wmMsg->msg.win.msg == WM_TIMER) {
-                runFrameIteration();
-            }
-        }
-    }
-#endif
-    return 1;
-}
-
 int SDL_main(const int argc, char** argv) {
     CPPTRACE_TRY {
         Logger::getInstance().start();
+        int wxArgc = argc;
+        if (!initializeWx(wxArgc, argv)) {
+            Logger::log(NK_ERROR, "Could not initialize wxWidgets.");
+            return -1;
+        }
 
         PersistedSettings::getInstance().load();
         Renderer& renderer = Renderer::getInstance();
         if (!renderer.initWindowAndRenderer()) {
+            shutdownWx();
             return -1;
         }
         renderer.initShaders();
-        SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-        SDL_SetEventFilter(eventFilter, nullptr);
 
         UpdateChecker& updateChecker = UpdateChecker::getInstance();
         updateChecker.startUpdateCheck();
@@ -109,7 +96,9 @@ int SDL_main(const int argc, char** argv) {
 
         NFD_Quit();
         renderer.closeWindow();
+        updateChecker.waitForUpdateCheck();
         Logger::getInstance().stop();
+        shutdownWx();
         return 0;
     }
     CPPTRACE_CATCH(const std::exception& e) {
@@ -123,7 +112,7 @@ int SDL_main(const int argc, char** argv) {
     return 0;
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32)
 // SDL2main only supplies main() on platforms that need it (Windows, iOS, Android...).
 int main(const int argc, char** argv) {
     return SDL_main(argc, argv);

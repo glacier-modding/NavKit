@@ -4,7 +4,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <wx/dialog.h>
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <map>
 #include <GL/glew.h>
 #include <glm/vec3.hpp>
@@ -98,9 +101,7 @@ public:
 
     void loadAirgFromFile(const std::string& fileName);
 
-    static void updateAirgDialogControls(HWND hwnd);
-
-    static INT_PTR CALLBACK extractAirgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    static void updateAirgDialogControls(wxDialog* dialog);
 
     void showExtractAirgDialog();
 
@@ -127,9 +128,10 @@ public:
 
     void showAirgDialog();
 
-    static void UpdateDialogControls(HWND hDlg);
+    static void UpdateDialogControls(wxDialog* dialog);
 
-    static HWND hAirgDialog;
+    static wxDialog* hAirgDialog;
+    static wxDialog* hExtractAirgDialog;
 
     std::string loadedAirgText;
 
@@ -152,8 +154,6 @@ private:
     static GLuint airgHitTestVbo;
 
     static int airgHitTestCount;
-
-    static INT_PTR CALLBACK airgDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
     static char* openSaveAirgFileDialog(char* lastAirgFolder);
 
