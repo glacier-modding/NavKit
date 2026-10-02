@@ -1,11 +1,4 @@
 #include "../../include/NavKit/module/Rpkg.h"
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#pragma comment(lib, "Version.lib")
-#endif
 #include <mutex>
 #include <fstream>
 
@@ -19,6 +12,7 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
+#include "../../include/NavKit/util/FileUtil.h"
 class NavKitSettings;
 
 std::string Rpkg::gameVersion = "HM3";
@@ -31,48 +25,11 @@ std::map<std::string, HashListEntry> Rpkg::ioiStringToHashListEntryMap{};
 std::mutex Rpkg::hashMapsMutex;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
-std::string Rpkg::getExeVersion(const std::string& filePath) {
-#ifdef _WIN32
-    DWORD handle = 0;
-    std::wstring widePath = std::filesystem::path(filePath).wstring();
-
-    DWORD size = GetFileVersionInfoSizeW(widePath.c_str(), &handle);
-
-    if (size == 0) {
-        Logger::log(NK_ERROR, "Failed to get version size.");
-
-        return "Failed to get version size.";
-    }
-
-    std::vector<BYTE> buffer(size);
-    if (!GetFileVersionInfoW(widePath.c_str(), 0, size, buffer.data())) {
-        Logger::log(NK_ERROR, "Failed to retrieve version info.");
-
-        return "Failed to retrieve version info.";
-    }
-
-    VS_FIXEDFILEINFO* fileInfo = nullptr;
-    UINT len = 0;
-    if (!VerQueryValueW(buffer.data(), L"\\", reinterpret_cast<LPVOID*>(&fileInfo), &len) || len == 0) {
-        Logger::log(NK_ERROR, "Failed to query root version value.");
-        return "Failed to query root version value.";
-    }
-
-    std::string major = std::to_string(HIWORD(fileInfo->dwFileVersionMS));
-    std::string minor = std::to_string(LOWORD(fileInfo->dwFileVersionMS));
-    std::string build = std::to_string(HIWORD(fileInfo->dwFileVersionLS));
-
-    return major + "." + minor + "." + build;
-#else
-    Logger::log(NK_WARN, "Reading executable version info is only supported on Windows.");
-    return "Failed to retrieve version info.";
-#endif
-}
-
 void Rpkg::initExtractionData() {
     CPPTRACE_TRY {
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-        const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
+        const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
+        const std::string retailFolder = (hitmanPath / "Retail").string();
         Logger::log(NK_INFO, "Checking Hitman Platform.");
         checkHitmanVersion();
         if (unknownGameVersion) {
@@ -82,7 +39,8 @@ void Rpkg::initExtractionData() {
 
         std::jthread filteredHashListThread([]() {
             Logger::log(NK_INFO, "Reading filtered hash list.");
-            if (std::ifstream file("hash_list_filtered.txt"); file.is_open()) {
+            const std::filesystem::path hashListPath = FileUtil::getApplicationResourcePath("hash_list_filtered.txt");
+            if (std::ifstream file(hashListPath); file.is_open()) {
                 std::string line;
                 while (std::getline(file, line)) {
                     if (line.find(".NAVP") != std::string::npos) {
@@ -245,24 +203,25 @@ void Rpkg::checkHitmanVersion() {
             std::pair("9a17c533634f4b4bdbfa2e03cc72cfaf", "steam"), // base game
             std::pair("82484078c5a1a78e2f84e9f0ad67760f", "steam"), // ansel unlock
             std::pair("7814483cb24ba31e9d3cc5d8c0977920", "microsoft")});
-    const std::string exePath = hitmanFolder + "\\Retail\\HITMAN3.exe";
-    const std::string exeVersion = getExeVersion(exePath);
+    const std::filesystem::path hitmanPath = std::filesystem::u8path(hitmanFolder);
+    const std::filesystem::path retailPath = hitmanPath / "Retail";
+    const std::filesystem::path exePath = retailPath / "HITMAN3.exe";
+    const std::filesystem::path runtimePackagePath = retailPath / "Runtime" / "chunk0.rpkg";
+    const std::filesystem::path microsoftGameConfigPath = hitmanPath / "MicrosoftGame.Config";
 
-    if (!(std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") ||
-            std::filesystem::exists(exePath))) {
+    if (!(std::filesystem::exists(runtimePackagePath) || std::filesystem::exists(exePath))) {
         Logger::log(NK_ERROR, "HITMAN3.exe couldn't be located.");
     }
 
-    if (std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)") &&
-        !std::filesystem::exists(hitmanFolder + "\\MicrosoftGame.Config")) {
+    if (std::filesystem::exists(runtimePackagePath) && !std::filesystem::exists(microsoftGameConfigPath)) {
         Logger::log(NK_ERROR, "The game config couldn't be located.");
     }
     std::string platform;
-    if (std::filesystem::exists(hitmanFolder + R"(\Retail\Runtime\chunk0.rpkg)")) {
-        const std::string hash = QuickDigest5::fileToHash(hitmanFolder + "\\MicrosoftGame.Config");
+    if (std::filesystem::exists(runtimePackagePath)) {
+        const std::string hash = QuickDigest5::fileToHash(microsoftGameConfigPath.string());
         platform = gameHashes.contains(hash) ? gameHashes[hash] : "undefined";
     } else {
-        const std::string hash = QuickDigest5::fileToHash(hitmanFolder + "\\Retail\\HITMAN3.exe");
+        const std::string hash = QuickDigest5::fileToHash(exePath.string());
         platform = gameHashes.contains(hash) ? gameHashes[hash] : "undefined";
     }
     if (platform == "undefined") {
@@ -271,8 +230,8 @@ void Rpkg::checkHitmanVersion() {
             "developers are already aware. If you're using a cracked version of the game, that's the problem.");
         unknownGameVersion = true;
     } else {
-        Logger::log(NK_INFO, "Detected game platform: %s version %s. Currently supported version: %s", platform.c_str(),
-            exeVersion.c_str(), GAME_VERSION);
+        Logger::log(
+            NK_INFO, "Detected game platform: %s. Currently supported version: %s", platform.c_str(), GAME_VERSION);
     }
 }
 
@@ -283,11 +242,13 @@ bool Rpkg::canExtract() {
 int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, const ResourceType type) {
     CPPTRACE_TRY {
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-        const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
-        const std::string resourceFolder = navKitSettings.outputFolder + "\\" +
+        const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
+        const std::string runtimeFolder = (hitmanPath / "Runtime").string();
+        const std::string resourceFolder = (std::filesystem::u8path(navKitSettings.outputFolder) /
             (type == NAVP          ? "navp"
                     : type == AIRG ? "airg"
-                                   : "tga");
+                                   : "tga"))
+                                               .string();
         std::vector<const char*> hashPtrs(hashes.size());
         for (size_t i = 0; i < hashes.size(); ++i) {
             hashPtrs[i] = hashes[i].c_str();

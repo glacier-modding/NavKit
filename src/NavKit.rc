@@ -1,0 +1,4 @@
+#include <windows.h>
+#include "resource/resource.h"
+
+IDI_NAVKIT ICON "resource/NavKitLogo.ico"

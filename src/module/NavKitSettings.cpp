@@ -9,6 +9,7 @@
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/WxApplication.h"
+#include <wx/stdpaths.h>
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/slider.h>
@@ -21,11 +22,32 @@
 
 wxDialog* NavKitSettings::hSettingsDialog = nullptr;
 
+namespace {
+    std::string wxPathToUtf8(const wxString& path) {
+        const wxScopedCharBuffer utf8 = path.ToUTF8();
+        return utf8 ? utf8.data() : "";
+    }
+
+    std::string defaultOutputFolder() {
+        std::string baseDirectory = wxPathToUtf8(wxStandardPaths::Get().GetDocumentsDir());
+        if (baseDirectory.empty()) {
+            baseDirectory = wxPathToUtf8(wxStandardPaths::Get().GetUserDataDir());
+        }
+        const std::filesystem::path outputPath = std::filesystem::u8path(baseDirectory) / "NavKitOutput";
+        std::error_code error;
+        std::filesystem::create_directories(outputPath, error);
+        if (error) {
+            Logger::log(NK_WARN, "Could not create default output folder: %s", error.message().c_str());
+        }
+        return outputPath.string();
+    }
+} // namespace
+
 void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.backgroundColor = 0.16f;
-    settings.hitmanFolder = R"(C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)";
-    settings.outputFolder = R"(D:\workspace\output)";
-    settings.blenderPath = R"(C:\Program Files\Blender Foundation\Blender 4.3\blender.exe)";
+    settings.hitmanFolder.clear();
+    settings.outputFolder = defaultOutputFolder();
+    settings.blenderPath.clear();
     settings.showDebugLogs = false;
 }
 
@@ -148,9 +170,12 @@ void NavKitSettings::showNavKitSettingsDialog() {
 void NavKitSettings::loadSettings() {
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     backgroundColor = static_cast<float>(atof(persistedSettings.getValue("NavKit", "backgroundColor", "0.16f")));
-    setHitmanFolder(persistedSettings.getValue("NavKit", "hitman", "default"));
-    setOutputFolder(persistedSettings.getValue("NavKit", "output", "default"));
-    setBlenderFile(persistedSettings.getValue("NavKit", "blender", "default"));
+    const std::string hitmanFolder = persistedSettings.getValue("NavKit", "hitman", "");
+    const std::string outputFolder = persistedSettings.getValue("NavKit", "output", defaultOutputFolder());
+    const std::string blenderPath = persistedSettings.getValue("NavKit", "blender", "");
+    setHitmanFolder(hitmanFolder);
+    setOutputFolder(outputFolder);
+    setBlenderFile(blenderPath);
     showDebugLogs = strcmp(persistedSettings.getValue("NavKit", "showDebugLogs", "false"), "true") == 0;
 }
 

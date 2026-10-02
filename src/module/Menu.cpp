@@ -103,13 +103,13 @@ wxMenuBar* Menu::createMenuBar() {
     return bar;
 }
 
-void Menu::setMenuItemEnabled(const UINT menuId, const bool isEnabled) {
+void Menu::setMenuItemEnabled(const int menuId, const bool isEnabled) {
     if (wxFrame* frame = getMainFrame(); frame && frame->GetMenuBar()) {
         frame->GetMenuBar()->Enable(menuId, isEnabled);
     }
 }
 
-void Menu::handleCheckboxMenuItem(const UINT menuId, bool& stateVariable, const char* itemName) {
+void Menu::handleCheckboxMenuItem(const int menuId, bool& stateVariable, const char* itemName) {
     stateVariable = !stateVariable;
     if (wxFrame* frame = getMainFrame(); frame && frame->GetMenuBar()) {
         frame->GetMenuBar()->Check(menuId, stateVariable);
@@ -118,11 +118,11 @@ void Menu::handleCheckboxMenuItem(const UINT menuId, bool& stateVariable, const 
 }
 
 void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
-    const std::vector<UINT> menuGroupIds = {IDM_VIEW_AIRG_CELL_COLOR_OFF, IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
+    const std::vector<int> menuGroupIds = {IDM_VIEW_AIRG_CELL_COLOR_OFF, IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
         IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, IDM_VIEW_AIRG_CELL_COLOR_LAYER};
     if (wxFrame* frame = getMainFrame(); frame && frame->GetMenuBar()) {
-        for (const UINT menuId : menuGroupIds) {
-            frame->GetMenuBar()->Check(menuId, selectedMenuId == static_cast<int>(menuId));
+        for (const int menuId : menuGroupIds) {
+            frame->GetMenuBar()->Check(menuId, selectedMenuId == menuId);
         }
     }
     std::string itemName;
@@ -204,7 +204,7 @@ void Menu::updateMenuState() {
         IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled, "Disconnect Waypoint Mode Enabled");
 }
 
-void Menu::setMenuItemChecked(const UINT menuId, const bool isChecked, const char* itemName) {
+void Menu::setMenuItemChecked(const int menuId, const bool isChecked, const char* itemName) {
     if (wxFrame* frame = getMainFrame(); frame && frame->GetMenuBar()) {
         frame->GetMenuBar()->Check(menuId, isChecked);
     }

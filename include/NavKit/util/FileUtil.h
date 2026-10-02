@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nfd.h>
+#include <filesystem>
 #include <string>
 
 namespace FileUtil {
@@ -14,4 +15,8 @@ namespace FileUtil {
 
     /// Absolute path of the running executable.
     std::string getExecutablePath();
+
+    std::filesystem::path getApplicationResourcePath(const std::filesystem::path& filename);
+
+    std::filesystem::path getUserDataDirectory();
 } // namespace FileUtil

@@ -1,9 +1,7 @@
 #include "../../include/NavKit/util/UpdateChecker.h"
-#ifdef _WIN32
-#include <shellapi.h>
-#endif
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -11,10 +9,47 @@
 #include <fstream>
 #include <httplib.h>
 #include <simdjson.h>
+#include <wx/process.h>
+#include <wx/stdpaths.h>
+#include <wx/utils.h>
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/WxApplication.h"
+#include "../../include/NavKit/util/FileUtil.h"
 #include <wx/msgdlg.h>
+
+namespace {
+    bool isPlatformReleaseAsset(const std::string_view url) {
+#ifdef _WIN32
+        return url.ends_with(".msi");
+#elif defined(__APPLE__)
+#if defined(__arm64__) || defined(__aarch64__)
+        return url.ends_with("NavKit-macos-arm64.dmg");
+#elif defined(__x86_64__)
+        return url.ends_with("NavKit-macos-x86_64.dmg");
+#else
+        return false;
+#endif
+#else
+        return false;
+#endif
+    }
+
+    wxString pathToWxString(const std::filesystem::path& path) {
+        const std::u8string utf8Path = path.u8string();
+        return wxString::FromUTF8(reinterpret_cast<const char*>(utf8Path.c_str()));
+    }
+
+    long executeArguments(const std::vector<wxString>& arguments, int flags, const wxExecuteEnv* environment) {
+        std::vector<const wxChar*> argv;
+        argv.reserve(arguments.size() + 1);
+        for (const wxString& argument : arguments) {
+            argv.push_back(argument.c_str());
+        }
+        argv.push_back(nullptr);
+        return wxExecute(argv.data(), flags, nullptr, environment);
+    }
+} // namespace
 
 UpdateChecker::UpdateChecker() : updateCheckCompleted(false), isUpdateAvailable(false) {}
 
@@ -71,22 +106,22 @@ void UpdateChecker::performUpdateCheck() {
         Logger::log(NK_INFO, std::string(updateAvailable ? "Update available." : "No update available.").c_str());
         if (updateAvailable) {
             for (simdjson::ondemand::object asset : doc["assets"]) {
-                if (std::string_view url_sv = asset["browser_download_url"]; url_sv.ends_with(".msi")) {
+                if (std::string_view url_sv = asset["browser_download_url"]; isPlatformReleaseAsset(url_sv)) {
                     {
                         std::lock_guard lock(updateChecker.mutex);
                         updateChecker.latestVersion = "v" + latestVersionStr;
-                        updateChecker.msiUrl = std::string(url_sv);
+                        updateChecker.updateUrl = std::string(url_sv);
                         updateChecker.updateCheckCompleted = true;
                         updateChecker.isUpdateAvailable = true;
                     }
-                    Logger::log(NK_INFO, ("MSI URL: " + std::string(url_sv)).c_str());
+                    Logger::log(NK_INFO, ("Platform update URL: " + std::string(url_sv)).c_str());
                     if (wxTheApp) {
                         wxTheApp->CallAfter([&updateChecker] { updateChecker.renderUpdatePopup(); });
                     }
                     return;
                 }
             }
-            Logger::log(NK_ERROR, "No MSI asset found in the latest GitHub release.");
+            Logger::log(NK_ERROR, "No update asset for this platform was found in the latest GitHub release.");
         }
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
@@ -99,7 +134,12 @@ void UpdateChecker::performUpdateCheck() {
 
 void UpdateChecker::renderUpdatePopup() {
     if (updateCheckCompleted && isUpdateAvailable) {
+#ifdef __APPLE__
+        openUpdateDialog(
+            "A new version is available: " + latestVersion + ". Would you like to download the macOS update?");
+#else
         openUpdateDialog("A new version is available: " + latestVersion + ". Would you like to update?");
+#endif
     }
 }
 
@@ -124,14 +164,12 @@ void UpdateChecker::performUpdate() const {
 #ifdef _WIN32
     Logger::log(NK_INFO, "Preparing update...");
 
-    if (msiUrl.empty()) {
-        Logger::log(NK_ERROR, "NavKit: No MSI URL available for update.");
+    if (updateUrl.empty()) {
+        Logger::log(NK_ERROR, "NavKit: No update URL available.");
         return;
     }
 
-    char current_exe_path[MAX_PATH];
-    GetModuleFileNameA(nullptr, current_exe_path, MAX_PATH);
-    const std::filesystem::path install_dir = std::filesystem::path(current_exe_path).parent_path();
+    const std::filesystem::path install_dir = std::filesystem::u8path(FileUtil::getExecutablePath()).parent_path();
     const std::filesystem::path original_updater_path = install_dir / "updater.exe";
     const std::filesystem::path original_settings_path = install_dir / "NavKit.ini";
 
@@ -140,10 +178,9 @@ void UpdateChecker::performUpdate() const {
         return;
     }
 
-    char temp_path_buf[MAX_PATH];
-    GetTempPathA(MAX_PATH, temp_path_buf);
-    const std::filesystem::path temp_updater_dir =
-        std::filesystem::path(temp_path_buf) / ("NavKitUpdate_" + std::to_string(GetCurrentProcessId()));
+    const std::filesystem::path temp_path =
+        std::filesystem::u8path(wxStandardPaths::Get().GetTempDir().ToUTF8().data());
+    const std::filesystem::path temp_updater_dir = temp_path / ("NavKitUpdate_" + std::to_string(wxGetProcessId()));
     std::filesystem::create_directories(temp_updater_dir);
     const std::filesystem::path temp_updater_path = temp_updater_dir / "updater.exe";
 
@@ -171,9 +208,9 @@ void UpdateChecker::performUpdate() const {
         }
     }
 
-    const std::filesystem::path local_msi_path = std::filesystem::path(temp_path_buf) / "NavKit.msi";
+    const std::filesystem::path local_msi_path = temp_path / "NavKit.msi";
     std::string domain, msi_path_part;
-    splitUrl(msiUrl, domain, msi_path_part);
+    splitUrl(updateUrl, domain, msi_path_part);
     httplib::Client cli("https://" + domain);
     cli.set_follow_location(true);
 
@@ -196,20 +233,28 @@ void UpdateChecker::performUpdate() const {
         return;
     }
 
-    const std::string command = "\"" + local_msi_path.string() + "\" " + std::to_string(GetCurrentProcessId()) + " " +
-        latestVersion + " " + "\"" + install_dir.string() + "\"";
-
-    Logger::log(NK_INFO, ("Launching updater with command: " + command).c_str());
-    if (reinterpret_cast<INT_PTR>(ShellExecuteA(nullptr, "open", temp_updater_path.string().c_str(), command.c_str(),
-            temp_updater_dir.string().c_str(), SW_SHOWNORMAL)) <= 32) {
+    const std::vector<wxString> arguments = {pathToWxString(temp_updater_path), pathToWxString(local_msi_path),
+        std::to_string(wxGetProcessId()), wxString::FromUTF8(latestVersion.c_str()), pathToWxString(install_dir)};
+    Logger::log(NK_INFO, ("Launching updater: " + temp_updater_path.string()).c_str());
+    wxExecuteEnv environment;
+    environment.cwd = pathToWxString(temp_updater_dir);
+    if (executeArguments(arguments, wxEXEC_ASYNC, &environment) == 0) {
         Logger::log(NK_ERROR, "NavKit: Failed to launch updater.exe from temp directory.");
         return;
     }
     Logger::log(NK_INFO, "Closing NavKit to allow update to proceed.");
 
-    Sleep(1000);
+    wxMilliSleep(1000);
     Logger::getInstance().stop();
     exit(0);
+#elif defined(__APPLE__)
+    if (updateUrl.empty()) {
+        Logger::log(NK_ERROR, "NavKit: No macOS update URL available.");
+        return;
+    }
+    if (!wxLaunchDefaultBrowser(wxString::FromUTF8(updateUrl))) {
+        Logger::log(NK_ERROR, "NavKit: Could not open the macOS update download URL.");
+    }
 #else
     Logger::log(NK_WARN, "Automatic updates are only supported on Windows.");
 #endif

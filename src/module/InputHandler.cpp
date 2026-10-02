@@ -114,7 +114,7 @@ int InputHandler::handleInput() {
 
         case SDL_MOUSEMOTION:
             mousePos[0] = event.motion.x;
-            mousePos[1] = renderer.height - event.motion.y - MENU_HEIGHT;
+            mousePos[1] = renderer.height - event.motion.y;
 
             if (rotate) {
                 const auto dx = static_cast<float>(mousePos[0] - origMousePos[0]);

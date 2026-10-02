@@ -195,6 +195,67 @@ jobs:
           name: release-build
           path: build/x64-release/
 
+  validate_macos:
+    name: Validate macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+    env:
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}/vcpkg_cache
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    steps:
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/macos-release/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Create vcpkg cache directory
+        run: mkdir -p "${VCPKG_CACHE_DIR}"
+
+      - name: Verify runner architecture
+        run: test "$(uname -m)" = "${{ matrix.arch }}"
+
+      - name: Build macOS release
+        run: |
+          cmake --preset macos-release
+          cmake --build --preset macos-release --parallel 4
+          cmake --install build/macos-release --prefix "${GITHUB_WORKSPACE}/build/macos-stage"
+
+      - name: Package app bundle
+        run: |
+          hdiutil create -volname NavKit \
+            -srcfolder build/macos-stage/NavKit.app \
+            -ov -format UDZO \
+            "build/NavKit-macos-${{ matrix.arch }}.dmg"
+
+      - name: Upload macOS release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: build/NavKit-macos-${{ matrix.arch }}.dmg
+
   create_release:
     name: Create Release with MSI
     runs-on: windows-2022
@@ -267,3 +328,23 @@ jobs:
           asset_name: NavKit.msi
           tag: ${{ github.ref }}
           overwrite: true
+
+  create_macos_release:
+    name: Add macOS builds to release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ validate_macos, create_release ]
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*
+          path: build/macos-release/
+          merge-multiple: true
+
+      - name: Upload macOS builds to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" build/macos-release/*.dmg --clobber

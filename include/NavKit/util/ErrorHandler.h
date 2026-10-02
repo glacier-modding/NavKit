@@ -1,5 +1,4 @@
 #pragma once
-#include "Platform.h"
 #include <string>
 
 class ErrorHandler {

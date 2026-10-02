@@ -1,7 +1,4 @@
 #include "../../include/NavKit/module/Scene.h"
-#ifdef _WIN32
-#include <CommCtrl.h>
-#endif
 #include <fstream>
 #include <functional>
 #include <iomanip>

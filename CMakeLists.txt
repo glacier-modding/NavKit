@@ -149,7 +149,16 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:GLEW::glew>"
         "$<TARGET_FILE:SDL2::SDL2>"
         "$<TARGET_FILE:wx::core>"
+        "$<TARGET_FILE:wx::gl>"
         "$<TARGET_FILE:wx::base>"
+        "$<TARGET_FILE_DIR:wx::core>/pcre2-16.dll"
+        "$<TARGET_FILE_DIR:wx::core>/jpeg62.dll"
+        "$<TARGET_FILE_DIR:wx::core>/tiff.dll"
+        "$<TARGET_FILE_DIR:wx::core>/liblzma.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libwebp.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libwebpdecoder.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libwebpdemux.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libsharpyuv.dll"
         "$<TARGET_FILE:assimp::assimp>"
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"
@@ -168,6 +177,10 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlib1.dll"
 )
 option(BUILD_INSTALLER "Build the WiX MSI installer package" OFF)
+
+if(BUILD_INSTALLER AND NOT WIN32)
+    message(FATAL_ERROR "BUILD_INSTALLER is only supported on Windows.")
+endif()
 
 if(BUILD_INSTALLER)
     if (PROJECT_IS_TOP_LEVEL)
@@ -199,7 +212,6 @@ if(BUILD_INSTALLER)
             )
             install(FILES
                     $<TARGET_FILE:navkit-rpkg-lib>
-                    $<TARGET_FILE:ResourceLib_HM3>
                     DESTINATION .
             )
             install(FILES ${THIRD_PARTY_DLL_PATHS}

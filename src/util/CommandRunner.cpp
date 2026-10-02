@@ -1,303 +1,140 @@
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#else
-#include <csignal>
-#include <spawn.h>
-#include <sys/wait.h>
-#include <unistd.h>
-extern char** environ;
-#endif
-#include <filesystem>
-
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 
-CommandRunner::CommandRunner() {
-    closing = false;
-    commandsRun = 0;
-}
+#include <wx/process.h>
+#include <wx/utils.h>
+
+#include <array>
+#include <vector>
+
+namespace {
+    enum class CommandError { None, ResourceExtraction, Blender };
+
+    constexpr const char* BLENDER_ERROR =
+        "Error building obj or blend file. The blender python script threw an unhandled exception. Please report "
+        "this to AtomicForce.";
+
+    bool appendAvailableOutput(wxInputStream* stream, std::vector<char>& output) {
+        if (stream == nullptr || !stream->CanRead()) {
+            return false;
+        }
+
+        std::array<char, 4096> buffer{};
+        stream->Read(buffer.data(), buffer.size());
+        const size_t bytesRead = stream->LastRead();
+        output.insert(output.end(), buffer.begin(), buffer.begin() + bytesRead);
+        return bytesRead > 0;
+    }
+} // namespace
+
+CommandRunner::CommandRunner() : closing(false), commandsRun(0) {}
 
 CommandRunner::~CommandRunner() {
     closing = true;
-#ifdef _WIN32
-    for (int commandIndex = 0; commandIndex < commandsRun; commandIndex++) {
-        for (const HANDLE& handle : handles[commandIndex]) {
-            TerminateProcess(handle, 0);
-            CloseHandle(handle);
+    for (const auto& [commandIndex, pid] : childPids) {
+        (void)commandIndex;
+        if (pid > 0 && wxProcess::Exists(static_cast<int>(pid))) {
+            wxProcess::Kill(static_cast<int>(pid), wxSIGTERM);
         }
     }
-#else
-    for (int commandIndex = 0; commandIndex < commandsRun; commandIndex++) {
-        for (const pid_t pid : childPids[commandIndex]) {
-            kill(pid, SIGTERM);
-            int status = 0;
-            waitpid(pid, &status, 0);
+    for (const auto& [commandIndex, pid] : childPids) {
+        (void)commandIndex;
+        while (pid > 0 && wxProcess::Exists(static_cast<int>(pid))) {
+            wxMilliSleep(10);
         }
     }
-#endif
 }
 
-#ifdef _WIN32
 void CommandRunner::runCommand(const std::string& command, const std::string& logFileName,
     const std::function<void()>& callback, const std::function<void()>& errorCallback) {
-    int commandIndex = commandsRun;
-    commandsRun++;
-    handles.emplace(std::pair<int, std::vector<HANDLE>>(commandIndex, {}));
-    SECURITY_ATTRIBUTES saAttr = {sizeof(saAttr), nullptr, TRUE};
-    HANDLE hReadPipe, hWritePipe;
-    if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-        Logger::log(NK_ERROR, ("Error creating pipe to command: " + command + ".").c_str());
-        errorCallback();
-        return;
-    }
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
+    (void)logFileName;
+    const int commandIndex = commandsRun++;
+    childPids.emplace(commandIndex, 0);
 
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-    si.hStdOutput = hWritePipe;
-    si.hStdError = hWritePipe;
-    si.wShowWindow = SW_HIDE;
-
-    ZeroMemory(&pi, sizeof(pi));
-
-    char* commandLineChar = _strdup(command.c_str());
-
-    if (!CreateProcessA(nullptr, commandLineChar, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
+    wxProcess process;
+    process.Redirect();
+    const long pid = wxExecute(wxString::FromUTF8(command.c_str()), wxEXEC_ASYNC, &process);
+    if (pid == 0) {
         Logger::log(NK_ERROR, ("Error creating process for command: " + command + ".").c_str());
-        CloseHandle(hReadPipe);
-        CloseHandle(hWritePipe);
         errorCallback();
         return;
     }
+    childPids[commandIndex] = pid;
 
-    CloseHandle(hWritePipe);
-    std::vector<char> lastOutput;
     std::vector<char> output;
-    char buffer[4096];
-    DWORD bytesRead;
-    handles[commandIndex].push_back(hReadPipe);
-    handles[commandIndex].push_back(pi.hProcess);
-    handles[commandIndex].push_back(pi.hThread);
+    std::vector<char> previousOutput;
+    CommandError commandError = CommandError::None;
 
-    while (true) {
-        if (closing) {
+    const auto processOutput = [&] {
+        if (output.empty()) {
             return;
         }
-        if (!(ReadFile(hReadPipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0)) {
-            break;
-        }
-        output.insert(output.end(), buffer, buffer + bytesRead);
 
-        // Check if the output size exceeds the threshold
-        // if (output.size() >= 1024) {
-        // Process and clear the output
-        std::string outputString(output.begin(), output.end());
+        const std::string outputString(output.begin(), output.end());
         size_t start = 0;
         size_t pos = 0;
-        while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
-            std::string line = outputString.substr(start, pos - start);
-            Logger::log(NK_INFO, line.c_str());
-            pos++;
-            start = pos;
+        while ((pos = outputString.find_first_of("\r\n", pos)) != std::string::npos) {
+            Logger::log(NK_INFO, outputString.substr(start, pos - start).c_str());
+            start = ++pos;
         }
-        if (size_t found = outputString.find("panic"); found != std::string::npos) {
+
+        if (commandError == CommandError::None && outputString.find("panic") != std::string::npos) {
             Logger::log(NK_ERROR, "Error extracting resources from Rpkg files. Please report this to AtomicForce.");
-            WaitForSingleObject(pi.hProcess, INFINITE);
-            CloseHandle(hReadPipe);
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-            handles[commandIndex].pop_back();
-            handles[commandIndex].pop_back();
-            handles[commandIndex].pop_back();
-            errorCallback();
-            return;
+            commandError = CommandError::ResourceExtraction;
+        } else if (commandError == CommandError::None && outputString.find("Error") != std::string::npos) {
+            Logger::log(NK_ERROR, BLENDER_ERROR);
+            commandError = CommandError::Blender;
         }
-        if (outputString.find("Error") != std::string::npos) {
-            Logger::log(NK_ERROR,
-                "Error building obj or blend file. The blender python script threw an unhandled exception. Please "
-                "report this to AtomicForce.");
-            errorCallback();
-            WaitForSingleObject(pi.hProcess, INFINITE);
-            CloseHandle(hReadPipe);
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-            handles[commandIndex].pop_back();
-            handles[commandIndex].pop_back();
-            handles[commandIndex].pop_back();
-            std::string errorMessage;
-            if (!lastOutput.empty()) {
-                errorMessage.append(lastOutput.begin(), lastOutput.end());
-            }
-            errorMessage += outputString;
-            errorMessage += "Error building obj or blend file. The blender python script threw an unhandled exception. "
-                            "Please report this to AtomicForce.";
-            ErrorHandler::openErrorDialog(errorMessage);
-            return;
-        }
+
         if (start > 0) {
-            lastOutput.assign(output.begin(), output.begin() + start);
+            previousOutput.assign(output.begin(), output.begin() + start);
             output.erase(output.begin(), output.begin() + start);
         } else {
-            lastOutput.clear();
+            previousOutput.clear();
         }
-    }
-
-    // Process any remaining output
-    if (!output.empty()) {
-        std::string outputString(output.begin(), output.end());
-        size_t start = 0;
-        size_t pos = 0;
-        while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
-            std::string line = outputString.substr(start, pos - start);
-            Logger::log(NK_INFO, line.c_str());
-            pos++;
-            start = pos;
-        }
-        if (start < outputString.size()) {
-            std::string line = outputString.substr(start);
-            Logger::log(NK_INFO, line.c_str());
-        }
-    }
-
-    if (closing) {
-        return;
-    }
-
-    WaitForSingleObject(pi.hProcess, INFINITE);
-
-    CloseHandle(hReadPipe);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    handles[commandIndex].pop_back();
-    handles[commandIndex].pop_back();
-    handles[commandIndex].pop_back();
-
-    callback();
-}
-#else
-void CommandRunner::runCommand(const std::string& command, const std::string& logFileName,
-    const std::function<void()>& callback, const std::function<void()>& errorCallback) {
-    const int commandIndex = commandsRun;
-    commandsRun++;
-    childPids.emplace(commandIndex, std::vector<pid_t>{});
-
-    int pipeFds[2];
-    if (pipe(pipeFds) != 0) {
-        Logger::log(NK_ERROR, ("Error creating pipe to command: " + command + ".").c_str());
-        errorCallback();
-        return;
-    }
-
-    posix_spawn_file_actions_t fileActions;
-    posix_spawn_file_actions_init(&fileActions);
-    posix_spawn_file_actions_adddup2(&fileActions, pipeFds[1], STDOUT_FILENO);
-    posix_spawn_file_actions_adddup2(&fileActions, pipeFds[1], STDERR_FILENO);
-    posix_spawn_file_actions_addclose(&fileActions, pipeFds[0]);
-    posix_spawn_file_actions_addclose(&fileActions, pipeFds[1]);
-
-    // Run through the shell so the command string is parsed the same way as on Windows.
-    const char* argv[] = {"/bin/sh", "-c", command.c_str(), nullptr};
-    pid_t pid = 0;
-    const int spawnResult =
-        posix_spawn(&pid, "/bin/sh", &fileActions, nullptr, const_cast<char* const*>(argv), environ);
-    posix_spawn_file_actions_destroy(&fileActions);
-    close(pipeFds[1]);
-    if (spawnResult != 0) {
-        Logger::log(NK_ERROR, ("Error creating process for command: " + command + ".").c_str());
-        close(pipeFds[0]);
-        errorCallback();
-        return;
-    }
-    childPids[commandIndex].push_back(pid);
-
-    const auto finish = [&] {
-        int status = 0;
-        waitpid(pid, &status, 0);
-        close(pipeFds[0]);
-        childPids[commandIndex].clear();
     };
 
-    std::vector<char> lastOutput;
-    std::vector<char> output;
-    char buffer[4096];
-
-    while (true) {
+    while (wxProcess::Exists(static_cast<int>(pid))) {
         if (closing) {
+            process.Detach();
             return;
         }
-        const ssize_t bytesRead = read(pipeFds[0], buffer, sizeof(buffer) - 1);
-        if (bytesRead <= 0) {
-            break;
-        }
-        output.insert(output.end(), buffer, buffer + bytesRead);
-
-        std::string outputString(output.begin(), output.end());
-        size_t start = 0;
-        size_t pos = 0;
-        while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
-            std::string line = outputString.substr(start, pos - start);
-            Logger::log(NK_INFO, line.c_str());
-            pos++;
-            start = pos;
-        }
-        if (size_t found = outputString.find("panic"); found != std::string::npos) {
-            Logger::log(NK_ERROR, "Error extracting resources from Rpkg files. Please report this to AtomicForce.");
-            finish();
-            errorCallback();
-            return;
-        }
-        if (outputString.find("Error") != std::string::npos) {
-            Logger::log(NK_ERROR,
-                "Error building obj or blend file. The blender python script threw an unhandled exception. Please "
-                "report this to AtomicForce.");
-            errorCallback();
-            finish();
-            std::string errorMessage;
-            if (!lastOutput.empty()) {
-                errorMessage.append(lastOutput.begin(), lastOutput.end());
+        while (true) {
+            const bool readOutput = appendAvailableOutput(process.GetInputStream(), output);
+            const bool readError = appendAvailableOutput(process.GetErrorStream(), output);
+            processOutput();
+            if (!readOutput && !readError) {
+                break;
             }
-            errorMessage += outputString;
-            errorMessage += "Error building obj or blend file. The blender python script threw an unhandled exception. "
-                            "Please report this to AtomicForce.";
-            ErrorHandler::openErrorDialog(errorMessage);
-            return;
         }
-        if (start > 0) {
-            lastOutput.assign(output.begin(), output.begin() + start);
-            output.erase(output.begin(), output.begin() + start);
-        } else {
-            lastOutput.clear();
-        }
+        wxMilliSleep(10);
     }
 
-    // Process any remaining output
+    appendAvailableOutput(process.GetInputStream(), output);
+    appendAvailableOutput(process.GetErrorStream(), output);
+    processOutput();
+
     if (!output.empty()) {
-        std::string outputString(output.begin(), output.end());
-        size_t start = 0;
-        size_t pos = 0;
-        while ((pos = outputString.find_first_of("\r\n\0", pos)) != std::string::npos) {
-            std::string line = outputString.substr(start, pos - start);
-            Logger::log(NK_INFO, line.c_str());
-            pos++;
-            start = pos;
-        }
-        if (start < outputString.size()) {
-            std::string line = outputString.substr(start);
-            Logger::log(NK_INFO, line.c_str());
-        }
+        Logger::log(NK_INFO, std::string(output.begin(), output.end()).c_str());
     }
 
-    if (closing) {
+    childPids[commandIndex] = 0;
+
+    if (commandError == CommandError::ResourceExtraction) {
+        errorCallback();
+        return;
+    }
+    if (commandError == CommandError::Blender) {
+        errorCallback();
+        std::string errorMessage(previousOutput.begin(), previousOutput.end());
+        errorMessage.append(output.begin(), output.end());
+        errorMessage += BLENDER_ERROR;
+        ErrorHandler::openErrorDialog(errorMessage);
         return;
     }
 
-    finish();
-    callback();
+    if (!closing) {
+        callback();
+    }
 }
-#endif

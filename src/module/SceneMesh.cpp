@@ -1,9 +1,5 @@
 #include "../../include/NavKit/module/SceneMesh.h"
 
-#ifdef _WIN32
-#include <direct.h>
-#endif
-#include <sys/stat.h>
 #include <SDL.h>
 #include <GL/glew.h>
 #include <filesystem>
@@ -57,7 +53,8 @@ void SceneMesh::loadTileTexture() {
         return;
     }
 
-    if (SDL_Surface* loadedSurface = SDL_LoadBMP("tile.bmp")) {
+    const std::string tilePath = FileUtil::getApplicationResourcePath("tile.bmp").string();
+    if (SDL_Surface* loadedSurface = SDL_LoadBMP(tilePath.c_str())) {
         SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(loadedSurface, SDL_PIXELFORMAT_RGBA32, 0);
         SDL_FreeSurface(loadedSurface);
 
@@ -239,7 +236,7 @@ void SceneMesh::showSceneMeshDialog() {
 
 void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    const std::string fileName = navKitSettings.outputFolder + "\\outputNavp.obj";
+    const std::string fileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.obj").string();
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
 
@@ -302,11 +299,13 @@ void SceneMesh::buildSceneMeshFromScene() {
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
     command += navKitSettings.blenderPath;
-    command += "\" -b --factory-startup -P glacier2obj.py -- \""; //--debug-all
+    command += "\" -b --factory-startup -P \"";
+    command += FileUtil::getApplicationResourcePath("Glacier2Obj.py").string();
+    command += "\" -- \""; //--debug-all
     command += scene.lastLoadSceneFile;
     command += "\" \"";
-    command += navKitSettings.outputFolder;
-    command += "\\output." + buildOutputFileType + "\"";
+    command += (std::filesystem::u8path(navKitSettings.outputFolder) / ("output." + buildOutputFileType)).string();
+    command += "\"";
     if (meshTypeForBuild == ALOC) {
         command += " ALOC ";
     } else {
@@ -360,27 +359,20 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
     const std::string meshFileType = meshTypeForBuild == ALOC ? "ALOC" : "PRIM";
     const std::string meshFileTypeLower = meshTypeForBuild == ALOC ? "aloc" : "prim";
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    const std::string alocOrPrimFolder = navKitSettings.outputFolder + "\\" + meshFileTypeLower;
-
-    struct stat folderExists{};
-    if (const int statRC = stat(alocOrPrimFolder.data(), &folderExists); statRC != 0) {
-        if (errno == ENOENT) {
-#ifdef _WIN32
-            const int status = _mkdir(alocOrPrimFolder.c_str());
-#else
-            const int status = mkdir(alocOrPrimFolder.c_str(), 0755);
-#endif
-            if (status != 0) {
-                Logger::log(NK_ERROR, "Error creating %s folder", meshFileType.c_str());
-                errorExtracting = true;
-                return;
-            }
-        }
+    const std::filesystem::path alocOrPrimPath =
+        std::filesystem::u8path(navKitSettings.outputFolder) / meshFileTypeLower;
+    const std::string alocOrPrimFolder = alocOrPrimPath.string();
+    std::error_code directoryError;
+    if (!std::filesystem::create_directories(alocOrPrimPath, directoryError) && directoryError) {
+        Logger::log(NK_ERROR, "Error creating %s folder: %s", meshFileType.c_str(), directoryError.message().c_str());
+        errorExtracting = true;
+        return;
     }
     Scene& scene = Scene::getInstance();
     const std::string& fileNameString = scene.lastLoadSceneFile;
-    const std::string runtimeFolder = navKitSettings.hitmanFolder + "\\Runtime";
-    const std::string retailFolder = navKitSettings.hitmanFolder + "\\Retail";
+    const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
+    const std::string runtimeFolder = (hitmanPath / "Runtime").string();
+    const std::string retailFolder = (hitmanPath / "Retail").string();
     const std::string navJsonFilePath = fileNameString;
     if (skipExtractingAlocsOrPrims) {
         Logger::log(NK_INFO, "Skipping extraction of %ss from Rpkg files.", meshFileType.c_str());
@@ -443,8 +435,7 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
 }
 
 char* SceneMesh::openSetBlenderFileDialog() {
-    nfdu8filteritem_t filters[1] = {{"Exe files", "exe"}};
-    return FileUtil::openNfdLoadDialog(filters, 1);
+    return FileUtil::openNfdLoadDialog(nullptr, 0);
 }
 
 void SceneMesh::finalizeExtractResources() {
@@ -480,11 +471,9 @@ void SceneMesh::finalizeSceneMeshBuild() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     if (blenderSceneMeshGenerationDone) {
         startedSceneMeshGeneration = false;
-        objToLoad = navKitSettings.outputFolder;
-        objToLoad += "\\" + generatedObjName;
+        objToLoad = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedObjName).string();
         loadObj = !blendFileOnlyBuild;
-        lastObjFileName = navKitSettings.outputFolder;
-        lastObjFileName += generatedObjName;
+        lastObjFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedObjName).string();
         blenderSceneMeshBuildStarted = false;
         blenderSceneMeshGenerationDone = false;
         sceneExtract.alsoBuildObj = false;
@@ -695,7 +684,8 @@ void SceneMesh::handleSaveBlendClicked() {
     if (const char* fileName = openSaveBlendFileDialog()) {
         const std::string fileNameStr = fileName;
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-        const std::string blendOutputFileName = navKitSettings.outputFolder + "\\output.blend";
+        const std::string blendOutputFileName =
+            (std::filesystem::u8path(navKitSettings.outputFolder) / "output.blend").string();
         saveBlendMesh(blendOutputFileName, fileNameStr);
     }
 }

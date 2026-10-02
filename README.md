@@ -125,8 +125,12 @@ in this working directory:
 # 🛠️ Building instructions (Rider)
 See [Rider Instructions](docs/rider_instructions.md)
 
-# Building on macOS (experimental)
-NavKit configures, compiles and links on macOS (Apple Silicon, using the same vcpkg manifest), but it is not usable there yet.
+# Building on macOS
+Configure and build with `cmake --preset macos-release` and `cmake --build --preset macos-release`. To stage the app bundle, run `cmake --install build/macos-release --prefix "$PWD/build/macos-stage"`; the resulting `NavKit.app` is in `build/macos-stage`.
+
+The macOS build links the native `navkit-rpkg-lib` library for RPKG scene and resource extraction. AIRG files are read and written directly by NavKit. Scene extraction also requires a compatible HITMAN installation and ZHMModSDK editor endpoint on the Mac. For Blender mesh generation, set the Blender executable path in NavKit settings to the executable inside the Blender app bundle.
+
+Tagged releases are packaged as separate Apple Silicon (`arm64`) and Intel (`x86_64`) DMGs. These CI-built app bundles are not code-signed or notarized, so macOS may ask users to approve opening them.
 
 # Credits
 2kpr  

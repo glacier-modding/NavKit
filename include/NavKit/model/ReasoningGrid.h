@@ -1,7 +1,7 @@
 #pragma once
 
+#include <filesystem>
 #include <vector>
-#include "../../../extern/simdjson/simdjson.h"
 #include "../../NavWeakness/NavPower.h"
 
 class Vec4 {
@@ -10,10 +10,6 @@ public:
     float y;
     float z;
     float w;
-
-    const void writeJson(std::ostream& f);
-
-    void readJson(simdjson::ondemand::object p_Json);
 };
 
 class Properties {
@@ -23,20 +19,12 @@ public:
     uint32_t nGridWidth;
     float fGridSpacing;
     uint32_t nVisibilityRange;
-
-    const void writeJson(std::ostream& f);
-
-    void readJson(simdjson::ondemand::object p_Json);
 };
 
 class SizedArray {
 public:
     std::vector<uint8_t> m_aBytes;
     uint32_t m_nSize;
-
-    const void writeJson(std::ostream& f);
-
-    void readJson(simdjson::ondemand::object p_Json);
 };
 
 class Waypoint {
@@ -54,10 +42,6 @@ public:
     int xi;
     int yi;
     int zi;
-
-    const void writeJson(std::ostream& f);
-
-    void readJson(simdjson::ondemand::object p_Json);
 };
 
 class ReasoningGridBuilderHelper {
@@ -89,9 +73,9 @@ public:
     std::vector<Waypoint> m_WaypointList;
     std::vector<uint8_t> m_pVisibilityData;
 
-    const void writeJson(std::ostream& f);
+    void writeAirg(const std::filesystem::path& p_AirgPath) const;
 
-    void readJson(const char* p_AirgPath);
+    void readAirg(const std::filesystem::path& p_AirgPath);
 
     std::vector<uint8_t> getWaypointVisionData(int waypointIndex);
 

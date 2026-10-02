@@ -24,7 +24,6 @@ public:
 
 class Rpkg {
 public:
-    static std::string getExeVersion(const std::string& filePath);
     static void initExtractionData();
 
     static void checkHitmanVersion();

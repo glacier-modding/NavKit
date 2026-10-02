@@ -1,12 +1,8 @@
 #pragma once
 #include <functional>
 #include <wx/dialog.h>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #include <map>
 #include <thread>
-#include "../util/Platform.h"
 #include "../model/Json.h"
 
 class Scene {

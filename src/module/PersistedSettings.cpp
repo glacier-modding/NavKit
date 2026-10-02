@@ -9,10 +9,20 @@
 #include "../../include/NavKit/util/FileUtil.h"
 
 PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {
-    std::filesystem::path exeDir = std::filesystem::path(FileUtil::getExecutablePath()).parent_path();
-
-    iniPath = (exeDir / "NavKit.ini").string();
-    oldIniPath = (exeDir / "NavKit.ini.old").string();
+#ifdef __APPLE__
+    const std::filesystem::path settingsDirectory = FileUtil::getUserDataDirectory();
+    std::error_code error;
+    std::filesystem::create_directories(settingsDirectory, error);
+    if (error) {
+        Logger::log(NK_ERROR, "Could not create settings directory %s: %s", settingsDirectory.string().c_str(),
+            error.message().c_str());
+    }
+#else
+    const std::filesystem::path settingsDirectory =
+        std::filesystem::u8path(FileUtil::getExecutablePath()).parent_path();
+#endif
+    iniPath = (settingsDirectory / "NavKit.ini").string();
+    oldIniPath = (settingsDirectory / "NavKit.ini.old").string();
 }
 
 void PersistedSettings::load() {

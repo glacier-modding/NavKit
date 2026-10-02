@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../util/Platform.h"
 #include "../../NavWeakness/Vec3.h"
 #include "../util/Math.h"
 #include "../render/Shader.h"
@@ -68,6 +67,8 @@ public:
     void updateFrameRate();
 
     void handleResize();
+
+    void handleResizeFinished();
 
     void handleFullscreen(FullscreenMode mode) const;
 

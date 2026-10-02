@@ -1,14 +1,16 @@
 #include "../../include/NavKit/util/FileUtil.h"
-#include "../../include/NavKit/util/Platform.h"
-#include <vector>
 
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#elif !defined(_WIN32)
 #include <filesystem>
-#endif
+#include <wx/stdpaths.h>
 
 namespace FileUtil {
+    namespace {
+        std::string toUtf8(const wxString& value) {
+            const wxScopedCharBuffer utf8 = value.ToUTF8();
+            return utf8 ? utf8.data() : "";
+        }
+    } // namespace
+
     char* openNfdLoadDialog(nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
         nfdu8char_t* outPath;
 
@@ -61,22 +63,20 @@ namespace FileUtil {
     }
 
     std::string getExecutablePath() {
-#ifdef _WIN32
-        char buffer[MAX_PATH];
-        GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-        return buffer;
-#elif defined(__APPLE__)
-        uint32_t size = 0;
-        _NSGetExecutablePath(nullptr, &size);
-        std::vector buffer(size + 1, '\0');
-        if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
-            return "";
-        }
-        return buffer.data();
+        return toUtf8(wxStandardPaths::Get().GetExecutablePath());
+    }
+
+    std::filesystem::path getApplicationResourcePath(const std::filesystem::path& filename) {
+#ifdef __APPLE__
+        const std::filesystem::path resourceDirectory =
+            std::filesystem::u8path(toUtf8(wxStandardPaths::Get().GetResourcesDir()));
 #else
-        std::error_code error;
-        const std::filesystem::path path = std::filesystem::read_symlink("/proc/self/exe", error);
-        return error ? "" : path.string();
+        const std::filesystem::path resourceDirectory = std::filesystem::u8path(getExecutablePath()).parent_path();
 #endif
+        return resourceDirectory / filename;
+    }
+
+    std::filesystem::path getUserDataDirectory() {
+        return std::filesystem::u8path(toUtf8(wxStandardPaths::Get().GetUserDataDir()));
     }
 } // namespace FileUtil

@@ -1,6 +1,6 @@
 #pragma once
 #include <mutex>
-#include "Platform.h"
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -40,5 +40,5 @@ private:
     bool updateCheckCompleted;
     bool isUpdateAvailable;
     std::string latestVersion;
-    std::string msiUrl;
+    std::string updateUrl;
 };

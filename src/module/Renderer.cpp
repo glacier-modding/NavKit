@@ -21,6 +21,7 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/WxApplication.h"
+#include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/Math.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -109,6 +110,8 @@ bool Renderer::initWindowAndRenderer() {
         return false;
     }
     getMainFrame()->SetClientSize(width, height);
+    getMainFrame()->Layout();
+    handleResize();
     window = SDL_CreateWindowFrom(renderPanel->GetHandle());
     if (!window) {
         Logger::log(NK_ERROR, "Could not attach SDL to the wxWidgets render panel: %s", SDL_GetError());
@@ -133,6 +136,9 @@ bool Renderer::initWindowAndRenderer() {
             getMainFrame()->Move(static_cast<int>(x), static_cast<int>(y));
         }
     }
+    getMainFrame()->Hide();
+    getMainFrame()->Layout();
+    handleResize();
     initFrameBuffer(width, height);
 
     constexpr std::string_view navKitVersion = NavKit_VERSION_MAJOR "." NavKit_VERSION_MINOR "." NavKit_VERSION_PATCH;
@@ -140,7 +146,8 @@ bool Renderer::initWindowAndRenderer() {
     title += navKitVersion;
     getMainFrame()->SetTitle(title);
 
-    if (!imguiRenderGLInit("DroidSans.ttf")) {
+    const std::string fontPath = FileUtil::getApplicationResourcePath("DroidSans.ttf").string();
+    if (!imguiRenderGLInit(fontPath.c_str())) {
         printf("Could not init GUI renderer.\n");
         SDL_Quit();
         return false;
@@ -231,7 +238,9 @@ void Renderer::handleFullscreen(const FullscreenMode mode) const {
 
 void Renderer::initShaders() {
     shader = Shader();
-    shader.loadShaders("vertex.glsl", "fragment.glsl");
+    const std::string vertexShaderPath = FileUtil::getApplicationResourcePath("vertex.glsl").string();
+    const std::string fragmentShaderPath = FileUtil::getApplicationResourcePath("fragment.glsl").string();
+    shader.loadShaders(vertexShaderPath.c_str(), fragmentShaderPath.c_str());
 }
 
 void Renderer::handleResize() {
@@ -240,6 +249,10 @@ void Renderer::handleResize() {
         width = size.GetWidth();
         height = size.GetHeight();
     }
+}
+
+void Renderer::handleResizeFinished() {
+    handleResize();
     Logger::log(
         NK_INFO, ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();

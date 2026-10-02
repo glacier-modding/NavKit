@@ -1,8 +1,5 @@
 #include "../../include/NavKit/module/Navp.h"
 #include <numbers>
-#ifdef _WIN32
-#include <CommCtrl.h>
-#endif
 #include <fstream>
 #include <functional>
 #include <algorithm>
@@ -817,8 +814,9 @@ void Navp::loadNavMesh(
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         if (isFromBuildingNavp || isFromBuildingAirg) {
             setStairsFlags();
-            outputNavpFilename =
-                navKitSettings.outputFolder + (isFromBuildingNavp ? "\\output.navp" : "\\outputForAirg.navp");
+            outputNavpFilename = (std::filesystem::u8path(navKitSettings.outputFolder) /
+                (isFromBuildingNavp ? "output.navp" : "outputForAirg.navp"))
+                                     .string();
             NavWeakness::OutputNavMesh_JSON_Write(navMesh, (outputNavpFilename + ".json").c_str());
             NavPower::NavMesh reloadedNavMesh =
                 NavWeakness::LoadNavMeshFromJson((outputNavpFilename + ".json").c_str());
@@ -965,7 +963,8 @@ void Navp::saveNavMesh(const std::string& fileName, const std::string& extension
             NavWeakness::OutputNavMesh_JSON_Write(navMesh, fileName.c_str());
         } else if (upper_extension == "NAVP") {
             const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-            const std::string tempOutputJSONFilename = navKitSettings.outputFolder + "\\temp_save.navp.json";
+            const std::string tempOutputJSONFilename =
+                (std::filesystem::u8path(navKitSettings.outputFolder) / "temp_save.navp.json").string();
 
             NavWeakness::OutputNavMesh_JSON_Write(navMesh, tempOutputJSONFilename.c_str());
 
@@ -1133,7 +1132,7 @@ void Navp::finalizeBuild() {
         navpLoaded = true;
         const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-        outputNavpFilename = navKitSettings.outputFolder + "\\output.navp.json";
+        outputNavpFilename = (std::filesystem::u8path(navKitSettings.outputFolder) / "output.navp.json").string();
         recastAdapter.save(outputNavpFilename, false);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
         navpBuildDone.store(false);
@@ -1162,7 +1161,8 @@ void Navp::updateNavpDialogControls(wxDialog* dialog) {
 
 void Navp::extractNavpFromRpkgs(const std::string& hash) {
     if (!Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
-        const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\navp\\" + hash + ".NAVP";
+        const std::string fileName =
+            (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "navp" / (hash + ".NAVP")).string();
         Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
         getInstance().loadNavpFromFile(fileName);
     }
@@ -1179,7 +1179,7 @@ void Navp::showExtractNavpDialog() {
     auto* choice = new wxChoice(dialog, IDC_COMBOBOX_NAVP);
     updateNavpDialogControls(dialog);
     auto* buttons = new wxStdDialogButtonSizer();
-    auto* open = new wxButton(dialog, IDC_BUTTON_LOAD_NAVP_FROM_RPKG, "Open Navp");
+    auto* open = new wxButton(dialog, wxID_OK, "Open Navp");
     auto* cancel = new wxButton(dialog, wxID_CANCEL, "Cancel");
     buttons->AddButton(open);
     buttons->AddButton(cancel);

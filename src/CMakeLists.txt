@@ -83,18 +83,15 @@ if (WIN32)
             IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib.dll"
             IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll"
     )
-
-    add_library(ResourceLib_HM3 SHARED IMPORTED GLOBAL)
-    set_target_properties(ResourceLib_HM3 PROPERTIES
-            IMPORTED_IMPLIB_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.lib"
-            IMPORTED_IMPLIB_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.lib"
-            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/ResourceLib_HM3.dll"
-            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/ResourceLib_HM3.dll"
+elseif (APPLE)
+    add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
+            include/navkit-rpkg-lib/navkit-rpkg-lib.h)
+    set_target_properties(navkit-rpkg-lib PROPERTIES
+            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/libnavkit_rpkg_lib.dylib"
+            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/libnavkit_rpkg_lib.dylib"
     )
 else ()
-    # TODO: replace shims with real things
-    add_library(navkit-rpkg-lib STATIC platform/NavKitRpkgLibStub.cpp)
-    add_library(ResourceLib_HM3 STATIC platform/ResourceLibHM3Stub.cpp)
+    message(FATAL_ERROR "navkit-rpkg-lib has no native library for this platform.")
 endif ()
 target_include_directories(NavKitLib
         PUBLIC
@@ -115,7 +112,6 @@ target_link_libraries(NavKitLib PUBLIC
         RecastNavigation::DetourCrowd
         RecastNavigation::DetourTileCache
         RecastNavigation::Recast
-        ResourceLib_HM3
         SDL2::SDL2
         SDL2::SDL2main
         assimp::assimp
@@ -134,11 +130,40 @@ target_link_libraries(NavKitLib PUBLIC
 add_executable(NavKit
         NavKit.cpp
 )
+if (WIN32)
+    target_sources(NavKit PRIVATE NavKit.rc)
+elseif (APPLE)
+    set(NAVKIT_BUNDLE_RESOURCES
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/DroidSans.ttf"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/Glacier2Obj.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/hash_list_filtered.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/res.blend"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/vertex.glsl"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/fragment.glsl"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/tile.bmp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/NavKitLogo.png"
+    )
+    set_source_files_properties(
+            ${NAVKIT_BUNDLE_RESOURCES}
+            resource/NavKitLogo.icns
+            PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+    )
+    target_sources(NavKit PRIVATE ${NAVKIT_BUNDLE_RESOURCES} resource/NavKitLogo.icns)
+    set_target_properties(NavKit PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_ICON_FILE NavKitLogo.icns
+            MACOSX_BUNDLE_BUNDLE_NAME NavKit
+            MACOSX_BUNDLE_GUI_IDENTIFIER org.glaciermodding.navkit
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+            BUILD_RPATH_USE_ORIGIN TRUE
+            INSTALL_RPATH "@executable_path/../Frameworks"
+    )
+endif ()
 target_compile_definitions(NavKit PRIVATE NOMINMAX)
 target_link_libraries(NavKit PRIVATE NavKitLib)
 set(RUNTIME_TARGET_DEPENDENCIES
         navkit-rpkg-lib
-        ResourceLib_HM3
 )
 set(RUNTIME_TARGET_DEPENDENCIES ${RUNTIME_TARGET_DEPENDENCIES} PARENT_SCOPE)
 
@@ -151,6 +176,7 @@ set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/vertex.glsl"
         "${NavKit_SOURCE_DIR}/src/resource/fragment.glsl"
         "${NavKit_SOURCE_DIR}/src/resource/tile.bmp"
+        "${NavKit_SOURCE_DIR}/src/resource/NavKitLogo.png"
 )
 set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES} PARENT_SCOPE)
 
@@ -167,7 +193,7 @@ if (WIN32)
             WIN32
             updater.cpp
     )
-    target_link_libraries(updater PRIVATE shell32 wx::core wx::base)
+    target_link_libraries(updater PRIVATE wx::core wx::base)
 
     set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES}
             "$<TARGET_FILE:updater>"
@@ -175,16 +201,48 @@ if (WIN32)
     )
     add_dependencies(NavKit updater)
 endif ()
-add_custom_command(TARGET NavKit POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_FILE:NavKit>
-        ${STAGED_DLL_PATHS}
-        ${RUNTIME_FILE_DEPENDENCIES}
-        $<TARGET_FILE_DIR:NavKit>
-        COMMENT "Copying runtime files to build output directory..."
-        VERBATIM
-)
+if (NOT APPLE)
+    add_custom_command(TARGET NavKit POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:NavKit>
+            ${STAGED_DLL_PATHS}
+            ${RUNTIME_FILE_DEPENDENCIES}
+            $<TARGET_FILE_DIR:NavKit>
+            COMMENT "Copying runtime files to build output directory..."
+            VERBATIM
+    )
+endif ()
 
-set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
+if (WIN32)
+    set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
+elseif (APPLE)
+    install(TARGETS NavKit BUNDLE DESTINATION .)
+
+    set(NAVKIT_BUNDLE_SEARCH_DIRS)
+    foreach(prefix IN LISTS CMAKE_PREFIX_PATH)
+        list(APPEND NAVKIT_BUNDLE_SEARCH_DIRS "${prefix}/lib" "${prefix}/bin" "${prefix}/Frameworks")
+    endforeach()
+    if (VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+        list(APPEND NAVKIT_BUNDLE_SEARCH_DIRS
+                "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"
+                "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
+                "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/Frameworks"
+        )
+    endif()
+    list(APPEND NAVKIT_BUNDLE_SEARCH_DIRS
+            "${NavKit_SOURCE_DIR}/lib/Debug"
+            "${NavKit_SOURCE_DIR}/lib/Release"
+    )
+    list(REMOVE_DUPLICATES NAVKIT_BUNDLE_SEARCH_DIRS)
+    install(CODE "
+        include(BundleUtilities)
+        fixup_bundle(
+            \"\${CMAKE_INSTALL_PREFIX}/NavKit.app/Contents/MacOS/NavKit\"
+            \"\"
+            \"${NAVKIT_BUNDLE_SEARCH_DIRS}\"
+        )
+    ")
+endif ()
+
 set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)
 #add_definitions(-DDT_POLYREF64) # TODO: Add Recast Detour 64 bit support

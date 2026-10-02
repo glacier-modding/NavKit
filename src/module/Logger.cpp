@@ -4,16 +4,18 @@
 
 #include <chrono>
 #include <cstdarg>
+#include <filesystem>
+#include <iostream>
 #include <thread>
 #include <vector>
 
 #include "../../include/NavKit/module/NavKitSettings.h"
+#include "../../include/NavKit/util/FileUtil.h"
 
 Logger::Logger() :
     messageCount(0), textPoolSize(0),
     logQueue(std::make_unique<rsj::ConcurrentQueue<std::pair<LogCategory, std::string>>>()), running(false) {
     memset(messages, 0, sizeof(char*) * MAX_MESSAGES);
-    logFile.open("NavKit.log", std::ios::out | std::ios::trunc);
 }
 
 Logger::~Logger() {
@@ -24,6 +26,17 @@ void Logger::start() {
     if (logThread.joinable()) {
         return;
     }
+#ifdef __APPLE__
+    const std::filesystem::path logDirectory = FileUtil::getUserDataDirectory();
+    std::error_code error;
+    std::filesystem::create_directories(logDirectory, error);
+    if (error) {
+        std::cerr << "Could not create log directory " << logDirectory.string() << ": " << error.message() << '\n';
+    }
+    logFile.open(logDirectory / "NavKit.log", std::ios::out | std::ios::trunc);
+#else
+    logFile.open("NavKit.log", std::ios::out | std::ios::trunc);
+#endif
     running = true;
     logThread = std::thread(logRunner);
 }

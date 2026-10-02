@@ -13,7 +13,8 @@
       },
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install/${presetName}",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/extern/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/extern/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0"
       },
       "vendor": {
         "microsoft.com/VisualStudioSettings/CMake/1.0": {

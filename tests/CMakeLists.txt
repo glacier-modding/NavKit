@@ -1,5 +1,11 @@
 find_package(Catch2 CONFIG REQUIRED)
 
+add_executable(ReasoningGridTests
+        reasoning_grid_tests.cpp
+        ../src/model/ReasoningGrid.cpp
+)
+add_test(NAME ReasoningGridTests COMMAND ReasoningGridTests)
+
 add_executable(NavKitTests
         tests.cpp
 )
@@ -11,7 +17,7 @@ target_link_libraries(NavKitTests PRIVATE
 set(TEST_DLLS)
 if (WIN32)
     set(TEST_DLLS
-            "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/ResourceLib_HM3.dll"
+            "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/navkit_rpkg_lib.dll"
             "${NavKit_SOURCE_DIR}/lib/$<CONFIG>/nfd.dll"
     )
 endif ()

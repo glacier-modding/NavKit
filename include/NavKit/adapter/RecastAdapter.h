@@ -6,10 +6,6 @@
 #include <string>
 #include <vector>
 #include <wx/dialog.h>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include "../util/Platform.h"
 
 #include "../../RecastDemo/Sample_TileMesh.h"
 

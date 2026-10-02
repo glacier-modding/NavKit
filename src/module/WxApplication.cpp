@@ -4,11 +4,20 @@
 
 #include <SDL.h>
 #include <wx/evtloop.h>
+#include <wx/filename.h>
+#include <wx/icon.h>
+#include <wx/image.h>
+#include <wx/stdpaths.h>
 #include <wx/sizer.h>
+#ifdef __WXMSW__
+#include <windows.h>
+#endif
 
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/InputHandler.h"
+#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
+#include "../../include/NavKit/util/FileUtil.h"
 
 wxIMPLEMENT_APP_NO_MAIN(NavKitApp);
 
@@ -24,8 +33,6 @@ namespace {
 bool NavKitApp::OnInit() {
     mainFrame = new MainFrame();
     SetTopWindow(mainFrame);
-    mainFrame->Show();
-    mainFrame->renderPanel()->SetFocus();
     return true;
 }
 
@@ -33,6 +40,16 @@ MainFrame::MainFrame() :
     wxFrame(nullptr, wxID_ANY, "NavKit", wxDefaultPosition, wxSize(900, 600), wxDEFAULT_FRAME_STYLE),
     panel(new wxGLCanvas(this, wxID_ANY, renderCanvasAttributes)) {
     SetMenuBar(Menu::createMenuBar());
+    wxInitAllImageHandlers();
+    const std::string iconFilePath = FileUtil::getApplicationResourcePath("NavKitLogo.png").string();
+    wxFileName iconPath(wxString::FromUTF8(iconFilePath));
+    const wxIconBundle icons(iconPath.GetFullPath(), wxBITMAP_TYPE_PNG);
+    if (icons.GetIconCount() == 0) {
+        Logger::log(NK_ERROR, "Could not load the NavKit application icon from %s.",
+            iconPath.GetFullPath().ToStdString().c_str());
+    } else {
+        SetIcons(icons);
+    }
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(panel, 1, wxEXPAND);
     SetSizer(sizer);
@@ -75,6 +92,16 @@ void MainFrame::onSize(wxSizeEvent& event) {
     }
 }
 
+#ifdef __WXMSW__
+WXLRESULT MainFrame::MSWWindowProc(const WXUINT message, const WXWPARAM wParam, const WXLPARAM lParam) {
+    const WXLRESULT result = wxFrame::MSWWindowProc(message, wParam, lParam);
+    if (message == WM_EXITSIZEMOVE && Renderer::getInstance().window) {
+        Renderer::getInstance().handleResizeFinished();
+    }
+    return result;
+}
+#endif
+
 bool initializeWx(int& argc, char** argv) {
     if (!wxEntryStart(argc, argv)) {
         return false;
@@ -107,6 +134,13 @@ bool makeRenderContextCurrent() {
 void swapRenderBuffers() {
     if (mainFrame) {
         mainFrame->renderPanel()->SwapBuffers();
+    }
+}
+
+void showMainWindow() {
+    if (mainFrame) {
+        mainFrame->Show();
+        mainFrame->renderPanel()->SetFocus();
     }
 }
 

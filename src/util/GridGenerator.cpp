@@ -1,8 +1,10 @@
 #include <chrono>
 #include <ctime>
+#include <filesystem>
 #include <queue>
 #include <thread>
 #include <vector>
+#include <wx/datetime.h>
 
 #include <DetourNavMeshQuery.h>
 
@@ -35,7 +37,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    const std::string objFileName = navKitSettings.outputFolder + "\\outputNavp.obj";
+    const std::string objFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.obj").string();
     Logger::log(NK_INFO, "Loading navmesh Obj into Recast...");
     if (!recastAirgAdapter.loadInputGeom(objFileName)) {
         airg.airgLoaded = false;
@@ -63,7 +65,8 @@ bool GridGenerator::initRecastAirgAdapter() {
         Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
         return true;
     }
-    const std::string outputNavpFilename = navKitSettings.outputFolder + "\\outputForAirg.navp.json";
+    const std::string outputNavpFilename =
+        (std::filesystem::u8path(navKitSettings.outputFolder) / "outputForAirg.navp.json").string();
     recastAirgAdapter.save(outputNavpFilename, false);
 
     Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, false, true);
@@ -71,18 +74,8 @@ bool GridGenerator::initRecastAirgAdapter() {
 }
 
 void GridGenerator::build() {
-    const auto now = std::chrono::system_clock::now();
-    const auto in_time_t = std::chrono::system_clock::to_time_t(now);
-    std::tm buf{};
-#ifdef _WIN32
-    localtime_s(&buf, &in_time_t); // Use localtime_s for thread-safety on Windows
-#else
-    localtime_r(&in_time_t, &buf);
-#endif
-
-    char time_str[256];
-    std::strftime(time_str, sizeof(time_str), "%c %Z", &buf);
-    Logger::log(NK_INFO, "Started building Airg at %s", time_str);
+    const std::string time = wxDateTime::Now().Format("%c %Z").ToStdString();
+    Logger::log(NK_INFO, "Started building Airg at %s", time.c_str());
     const auto start = std::chrono::high_resolution_clock::now();
 
     if (initRecastAirgAdapter()) {

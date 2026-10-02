@@ -21,6 +21,15 @@
  */
 #include <SDL.h>
 #include <cpptrace/from_current.hpp>
+#include <wx/process.h>
+#include <wx/utils.h>
+
+#include <charconv>
+#include <filesystem>
+#include <iostream>
+#include <string>
+#include <string_view>
+
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Gui.h"
 #include "../include/NavKit/module/InputHandler.h"
@@ -34,7 +43,6 @@
 #include "../include/NavKit/util/ErrorHandler.h"
 #include "../include/NavKit/util/FileUtil.h"
 #include "../include/NavKit/util/UpdateChecker.h"
-#include "../include/NavKit/util/Platform.h"
 
 #include "../include/NavKit/module/NavKitSettings.h"
 #include "../include/NavKit/module/WxApplication.h"
@@ -65,13 +73,43 @@ bool mainLoopIteration() {
 }
 
 int SDL_main(const int argc, char** argv) {
+    if (argc == 5 && std::string_view(argv[1]) == "--cleanup-update") {
+        long updaterPid = 0;
+        const char* pidEnd = argv[2] + std::char_traits<char>::length(argv[2]);
+        if (const auto [end, error] = std::from_chars(argv[2], pidEnd, updaterPid);
+            error != std::errc{} || end != pidEnd || updaterPid <= 0) {
+            return 1;
+        }
+        while (wxProcess::Exists(static_cast<int>(updaterPid))) {
+            wxMilliSleep(100);
+        }
+
+        const std::filesystem::path updaterPath = std::filesystem::u8path(argv[3]);
+        const std::filesystem::path updaterDirectory = std::filesystem::u8path(argv[4]);
+        std::error_code error;
+        const std::filesystem::path tempDirectory = std::filesystem::temp_directory_path(error);
+        if (error || updaterPath.filename() != "updater.exe" ||
+            updaterPath.parent_path().lexically_normal() != updaterDirectory.lexically_normal() ||
+            updaterDirectory.parent_path().lexically_normal() != tempDirectory.lexically_normal() ||
+            !updaterDirectory.filename().string().starts_with("NavKitUpdate_")) {
+            return 1;
+        }
+
+        std::filesystem::remove(updaterPath, error);
+        if (error) {
+            return 1;
+        }
+        std::filesystem::remove_all(updaterDirectory, error);
+        return error ? 1 : 0;
+    }
+
     CPPTRACE_TRY {
-        Logger::getInstance().start();
         int wxArgc = argc;
         if (!initializeWx(wxArgc, argv)) {
-            Logger::log(NK_ERROR, "Could not initialize wxWidgets.");
+            std::cerr << "Could not initialize wxWidgets.\n";
             return -1;
         }
+        Logger::getInstance().start();
 
         PersistedSettings::getInstance().load();
         Renderer& renderer = Renderer::getInstance();
@@ -86,10 +124,14 @@ int SDL_main(const int argc, char** argv) {
 
         Menu::updateMenuState();
         bool isRunning = true;
+        Logger::log(NK_INFO, "NavKit initialized.");
+        renderer.renderFrame();
+        Gui::getInstance().drawGui();
+        renderer.finalizeFrame();
+        showMainWindow();
         if (NavKitSettings& navKitSettings = NavKitSettings::getInstance(); navKitSettings.shouldOpenSettingsDialog) {
             navKitSettings.showNavKitSettingsDialog();
         }
-        Logger::log(NK_INFO, "NavKit initialized.");
         while (isRunning) {
             isRunning = mainLoopIteration();
         }

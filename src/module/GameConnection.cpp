@@ -1,6 +1,7 @@
 #include "../../include/NavKit/module/GameConnection.h"
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -120,10 +121,10 @@ int GameConnection::listNavKitSceneEntities() const {
     std::jthread writer_thread([&](std::stop_token stoken) {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
         const std::string outputFolder = NavKitSettings::getInstance().outputFolder;
-        std::ofstream f(outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME, std::ios::app);
+        const std::filesystem::path outputFile = std::filesystem::u8path(outputFolder) / Scene::OUTPUT_SCENE_FILE_NAME;
+        std::ofstream f(outputFile, std::ios::app);
         if (!f.is_open()) {
-            Logger::log(NK_ERROR, "Writer thread failed to open output file: %s",
-                (outputFolder + "\\" + Scene::OUTPUT_SCENE_FILE_NAME).c_str());
+            Logger::log(NK_ERROR, "Writer thread failed to open output file: %s", outputFile.string().c_str());
             return;
         }
 

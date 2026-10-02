@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <array>
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 #include <future>
 #include <map>
@@ -24,20 +25,13 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
     texture.id = 0;
     texture.loaded = false;
 
-    std::string filename = std::string(path);
-
-    std::replace(filename.begin(), filename.end(), '/', '\\');
-
-    bool isAbsolute = (filename.size() >= 2 && filename[1] == ':') || (filename.size() >= 1 && filename[0] == '\\');
-
-    if (!isAbsolute && !directory.empty()) {
-        std::string dir = directory;
-        std::replace(dir.begin(), dir.end(), '/', '\\');
-        if (dir.back() != '\\') {
-            dir += '\\';
-        }
-        filename = dir + filename;
+    std::string normalizedPath(path);
+    std::replace(normalizedPath.begin(), normalizedPath.end(), '\\', '/');
+    std::filesystem::path texturePath = std::filesystem::u8path(normalizedPath);
+    if (texturePath.is_relative() && !directory.empty()) {
+        texturePath = std::filesystem::u8path(directory) / texturePath;
     }
+    const std::string filename = texturePath.string();
 
     int width, height, nrChannels;
     unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 0);
@@ -198,13 +192,7 @@ void Model::loadModelData(std::string const& path) {
         Logger::log(NK_ERROR, "ERROR::ASSIMP::%s", importer.GetErrorString());
         return;
     }
-    directory = path.substr(0, path.find_last_of('/'));
-    if (directory == path) {
-        directory = path.substr(0, path.find_last_of('\\'));
-    }
-    if (directory == path) {
-        directory = "";
-    }
+    directory = std::filesystem::u8path(path).parent_path().string();
 
     meshes.clear();
     texturesLoaded.clear();

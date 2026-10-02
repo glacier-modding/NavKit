@@ -1,12 +1,9 @@
 #include "../../include/NavKit/module/Airg.h"
 
 #include <filesystem>
-#include <fstream>
 #include <numbers>
+#include <stdexcept>
 
-#ifdef _WIN32
-#include <CommCtrl.h>
-#endif
 #include <iomanip>
 #include <SDL.h>
 #include <sstream>
@@ -33,17 +30,11 @@
 #include "../../include/RecastDemo/imguiRenderGL.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/GridGenerator.h"
-#include "../../include/ResourceLib_HM3/ResourceConverter.h"
-#include "../../include/ResourceLib_HM3/ResourceGenerator.h"
-#include "../../include/ResourceLib_HM3/ResourceLib_HM3.h"
-#include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 Airg::Airg() :
     airgName("Load Airg"), lastLoadAirgFile(airgName), saveAirgName("Save Airg"), lastSaveAirgFile(saveAirgName),
     airgLoaded(false), airgLoading(false), airgBuilding(false), connectWaypointModeEnabled(false), showAirg(true),
-    showAirgIndices(false), showRecastDebugInfo(false), cellColorSource(OFF),
-    airgResourceConverter(HM3_GetConverterForResource("AIRG")),
-    airgResourceGenerator(HM3_GetGeneratorForResource("AIRG")), reasoningGrid(new ReasoningGrid()),
+    showAirgIndices(false), showRecastDebugInfo(false), cellColorSource(OFF), reasoningGrid(new ReasoningGrid()),
     selectedWaypointIndex(-1), doAirgHitTest(false), buildingVisionAndDeadEndData(false) {}
 
 Airg::~Airg() = default;
@@ -188,42 +179,31 @@ void Airg::loadAirgFromFile(const std::string& fileName) {
     std::string extension = airgName.substr(airgName.length() - 4, airgName.length());
     std::ranges::transform(extension, extension.begin(), ::toupper);
 
-    if (extension == "JSON") {
-        delete reasoningGrid;
-        reasoningGrid = new ReasoningGrid();
-        Logger::log(NK_INFO, "Loading Airg.Json file: '%s'...", fileNameStr.c_str());
-        backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, true);
-    } else if (extension == "AIRG") {
+    if (extension == "AIRG") {
         delete reasoningGrid;
         reasoningGrid = new ReasoningGrid();
         Logger::log(NK_INFO, "Loading Airg file: '%s'...", fileNameStr.c_str());
-        backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr, false);
+        backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr);
     }
     airgDirty = true;
 }
 
 void Airg::handleOpenAirgClicked() {
-    if (const char* fileName = openAirgFileDialog(lastLoadAirgFile.data())) {
+    if (const char* fileName = openAirgFileDialog()) {
         loadedAirgText = fileName;
         loadAirgFromFile(fileName);
     }
 }
 
 void Airg::handleSaveAirgClicked() {
-    if (char* fileName = openSaveAirgFileDialog(lastLoadAirgFile.data())) {
+    if (char* fileName = openSaveAirgFileDialog()) {
         setLastSaveFileName(fileName);
         const auto fileNameString = std::string{fileName};
-        std::string extension = fileNameString.substr(fileNameString.length() - 4, fileNameString.length());
-        std::ranges::transform(extension, extension.begin(), ::toupper);
-        std::string msg = "Saving Airg";
-        if (extension == "JSON") {
-            msg += ".json";
-        }
-        msg += " file: '";
+        std::string msg = "Saving Airg file: '";
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&Airg::saveAirg, this, fileName, extension == "JSON");
+        backgroundWorker.emplace(&Airg::saveAirg, this, fileNameString);
     }
 }
 
@@ -371,14 +351,14 @@ void Airg::disconnectWaypoints(const int startWaypointIndex, const int endWaypoi
     Logger::log(NK_INFO, "Exiting Disconnect Waypoint mode.");
 }
 
-char* Airg::openAirgFileDialog(const char* lastAirgFolder) {
-    nfdu8filteritem_t filters[2] = {{"Airg files", "airg"}, {"Airg.json files", "airg.json"}};
-    return FileUtil::openNfdLoadDialog(filters, 2);
+char* Airg::openAirgFileDialog() {
+    nfdu8filteritem_t filter = {"Airg files", "airg"};
+    return FileUtil::openNfdLoadDialog(&filter, 1);
 }
 
-char* Airg::openSaveAirgFileDialog(char* lastAirgFolder) {
-    nfdu8filteritem_t filters[2] = {{"Airg files", "airg"}, {"Airg.json files", "airg.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 2, "output");
+char* Airg::openSaveAirgFileDialog() {
+    nfdu8filteritem_t filter = {"Airg files", "airg"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output");
 }
 
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
@@ -761,41 +741,31 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
     Menu::updateMenuState();
 }
 
-void Airg::saveAirg(Airg* airg, const std::string& fileName, const bool isJson) {
+void Airg::saveAirg(Airg* airg, const std::string& fileName) {
     airg->airgSaveState.push_back(true);
-    std::string outputFileName = std::filesystem::path(fileName).string();
-    const std::time_t startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Saving Airg to file at ";
-    msg += std::ctime(&startTime);
-    Logger::log(NK_INFO, msg.data());
-    const auto start = std::chrono::high_resolution_clock::now();
+    try {
+        const std::time_t startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::string msg = "Saving Airg to file at ";
+        msg += std::ctime(&startTime);
+        Logger::log(NK_INFO, msg.data());
+        const auto start = std::chrono::high_resolution_clock::now();
 
-    std::string tempJsonFile = fileName;
-    tempJsonFile += ".temp.json";
-    if (!isJson) {
-        outputFileName = std::filesystem::path(tempJsonFile).string();
+        airg->reasoningGrid->writeAirg(fileName);
+        const auto end = std::chrono::high_resolution_clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+        msg = "Finished saving Airg to " + fileName + " in ";
+        msg += std::to_string(duration.count());
+        msg += " seconds";
+        Logger::log(NK_INFO, msg.data());
+    } catch (const std::exception& error) {
+        Logger::log(NK_ERROR, ("Failed to save AIRG file: " + std::string(error.what())).c_str());
+    } catch (...) {
+        Logger::log(NK_ERROR, "Failed to save AIRG file due to an unknown error.");
     }
-    std::filesystem::remove(outputFileName);
-    // Write the airg to JSON file
-    std::ofstream fileOutputStream(outputFileName);
-    airg->reasoningGrid->writeJson(fileOutputStream);
-    fileOutputStream.close();
-
-    if (!isJson) {
-        airg->airgResourceGenerator->FromJsonFileToResourceFile(
-            tempJsonFile.data(), std::string{fileName}.c_str(), false);
-        std::filesystem::remove(tempJsonFile);
-    }
-    const auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    msg = "Finished saving Airg to " + std::string{fileName} + " in ";
-    msg += std::to_string(duration.count());
-    msg += " seconds";
-    Logger::log(NK_INFO, msg.data());
     airg->airgSaveState.push_back(true);
 }
 
-void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJson) {
+void Airg::loadAirg(Airg* airg, const std::string& fileName) {
     airg->airgLoading = true;
     airg->airgLoaded = false;
 
@@ -806,18 +776,34 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName, const bool isFromJs
     Logger::log(NK_INFO, msg.data());
     const auto start = std::chrono::high_resolution_clock::now();
 
-    std::string jsonFileName = fileName;
-    if (!isFromJson) {
-        const std::string nameWithoutExtension = jsonFileName.substr(0, jsonFileName.length() - 5);
-
-        jsonFileName = nameWithoutExtension + ".temp.airg.json";
-        airg->airgResourceConverter->FromResourceFileToJsonFile(fileName.data(), jsonFileName.data());
+    try {
+        airg->reasoningGrid->readAirg(fileName);
+        if (airg->reasoningGrid->m_WaypointList.empty()) {
+            throw std::runtime_error("AIRG file contains no waypoints.");
+        }
+        uint32_t previousOffset = 0;
+        for (const Waypoint& waypoint : airg->reasoningGrid->m_WaypointList) {
+            if (waypoint.nVisionDataOffset < previousOffset ||
+                waypoint.nVisionDataOffset > airg->reasoningGrid->m_pVisibilityData.size()) {
+                throw std::runtime_error("AIRG waypoint visibility offsets are invalid.");
+            }
+            previousOffset = waypoint.nVisionDataOffset;
+        }
+    } catch (const std::exception& error) {
+        airg->airgLoading = false;
+        airg->airgLoaded = false;
+        Logger::log(NK_ERROR, ("Failed to load AIRG file: " + std::string(error.what())).c_str());
+        Menu::updateMenuState();
+        return;
+    } catch (...) {
+        airg->airgLoading = false;
+        airg->airgLoaded = false;
+        Logger::log(NK_ERROR, "Failed to load AIRG file due to an unknown error.");
+        Menu::updateMenuState();
+        return;
     }
-    airg->reasoningGrid->readJson(jsonFileName.data());
     Grid::getInstance().saveSpacing(airg->reasoningGrid->m_Properties.fGridSpacing);
-    if (!isFromJson) {
-        std::filesystem::remove(jsonFileName);
-    }
+
     int lastVisionDataSize = 0;
     int count = 1;
     int total = 0;
@@ -908,7 +894,8 @@ void Airg::updateAirgDialogControls(wxDialog* dialog) {
 
 void Airg::extractAirgFromRpkgs(const std::string& hash) {
     if (!Rpkg::extractResourcesFromRpkgs({hash}, AIRG)) {
-        const std::string fileName = NavKitSettings::getInstance().outputFolder + "\\airg\\" + hash + ".AIRG";
+        const std::string fileName =
+            (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "airg" / (hash + ".AIRG")).string();
         Logger::log(NK_INFO, ("Loading airg from file: " + fileName).c_str());
         getInstance().loadAirgFromFile(fileName);
     }
@@ -925,7 +912,7 @@ void Airg::showExtractAirgDialog() {
     auto* choice = new wxChoice(dialog, IDC_COMBOBOX_AIRG);
     updateAirgDialogControls(dialog);
     auto* buttons = new wxStdDialogButtonSizer();
-    auto* open = new wxButton(dialog, IDC_BUTTON_LOAD_AIRG_FROM_RPKG, "Open Airg");
+    auto* open = new wxButton(dialog, wxID_OK, "Open Airg");
     auto* cancel = new wxButton(dialog, wxID_CANCEL, "Cancel");
     buttons->AddButton(open);
     buttons->AddButton(cancel);

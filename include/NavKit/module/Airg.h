@@ -5,19 +5,13 @@
 #include <thread>
 #include <vector>
 #include <wx/dialog.h>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #include <map>
 #include <GL/glew.h>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
-#include "../util/Platform.h"
 #include "../model/ReasoningGrid.h"
 
 struct Vec3;
-struct ResourceConverter;
-struct ResourceGenerator;
 class ReasoningGrid;
 
 enum CellColorDataSource { OFF, AIRG_BITMAP, VISION_DATA, LAYER };
@@ -59,8 +53,6 @@ public:
     bool showAirgIndices;
     bool showRecastDebugInfo;
     CellColorDataSource cellColorSource;
-    ResourceConverter* airgResourceConverter;
-    ResourceGenerator* airgResourceGenerator;
     ReasoningGrid* reasoningGrid;
     int selectedWaypointIndex;
     bool doAirgHitTest;
@@ -155,11 +147,11 @@ private:
 
     static int airgHitTestCount;
 
-    static char* openSaveAirgFileDialog(char* lastAirgFolder);
+    static char* openSaveAirgFileDialog();
 
-    static char* openAirgFileDialog(const char* lastAirgFolder);
+    static char* openAirgFileDialog();
 
-    static void saveAirg(Airg* airg, const std::string& fileName, bool isJson);
+    static void saveAirg(Airg* airg, const std::string& fileName);
 
-    static void loadAirg(Airg* airg, const std::string& fileName, bool isFromJson);
+    static void loadAirg(Airg* airg, const std::string& fileName);
 };

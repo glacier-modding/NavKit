@@ -1,7 +1,6 @@
 #pragma once
 #include <SimpleIni.h>
 #include <wx/dialog.h>
-#include "../util/Platform.h"
 
 struct DialogSettings {
     float backgroundColor{};
