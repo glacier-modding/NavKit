@@ -12,7 +12,7 @@ endif ()
 
 project(
         NavKit
-        VERSION 3.7.0
+        VERSION 3.8.0
         DESCRIPTION "An app to create NAVP and AIRG files for use with Hitman: World of Assassination and 007 First Light"
         LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
