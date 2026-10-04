@@ -478,7 +478,7 @@ void Airg::renderAirg() {
                 lineVerts.push_back({p4, glm::vec3(0, 1, 0), boundaryColor});
                 lineVerts.push_back({p1, glm::vec3(0, 1, 0), boundaryColor});
 
-                if (cellColorSource == VISION_DATA) {
+                if (cellColorSource == LAYER) {
                     const unsigned int colorRgb = (waypoint.nLayerIndex << 6) | 0x80000000;
                     unsigned char a = (colorRgb >> 24) & 0xFF;
                     unsigned char b = (colorRgb >> 16) & 0xFF;
@@ -500,7 +500,7 @@ void Airg::renderAirg() {
                         for (int k = 0; k < 25; k++) {
                             data.push_back(waypoint.cellBitmap[k] * 255);
                         }
-                    } else if (cellColorSource == LAYER) { // Render Vision Data
+                    } else if (cellColorSource == VISION_DATA) { // Render Vision Data
                         size = visibilityDataSize(reasoningGrid, i);
                         data = reasoningGrid->getWaypointVisionData(i);
                     }
