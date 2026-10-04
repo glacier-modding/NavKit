@@ -1174,7 +1174,7 @@ void Navp::showExtractNavpDialog() {
         return;
     }
     auto* dialog =
-        new wxDialog(getMainFrame(), wxID_ANY, "Load Navp from resource package", wxDefaultPosition, wxSize(500, 150));
+        new wxDialog(getMainFrame(), wxID_ANY, "Load Navp from resource package", wxDefaultPosition, wxSize(750, 150));
     hNavpDialog = dialog;
     auto* choice = new wxChoice(dialog, IDC_COMBOBOX_NAVP);
     updateNavpDialogControls(dialog);
