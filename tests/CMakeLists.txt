@@ -5,6 +5,7 @@ add_executable(ReasoningGridTests
         ../src/model/ReasoningGrid.cpp
 )
 add_test(NAME ReasoningGridTests COMMAND ReasoningGridTests)
+set_tests_properties(ReasoningGridTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
 add_executable(NavKitTests
         tests.cpp
