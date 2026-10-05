@@ -241,7 +241,7 @@ jobs:
 
       - name: Build macOS release
         run: |
-          cmake --preset macos-release -D BUILD_TESTING=ON
+          cmake --preset macos-release -D BUILD_TESTING=ON -D CMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
           cmake --build --preset macos-release --parallel 4
           ctest --test-dir build/macos-release --output-on-failure
           cmake --install build/macos-release --prefix "${GITHUB_WORKSPACE}/build/macos-stage"
