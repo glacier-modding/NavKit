@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <thread>
@@ -339,7 +340,7 @@ void SceneMesh::buildSceneMeshFromScene() {
     generatedObjName = "output.obj";
 
     backgroundWorker.emplace(
-        &CommandRunner::runCommand, CommandRunner::getInstance(), command, "Glacier2Obj.log",
+        &CommandRunner::runCommand, std::ref(CommandRunner::getInstance()), command, "Glacier2Obj.log",
         [this, buildOutputFileType, start] {
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

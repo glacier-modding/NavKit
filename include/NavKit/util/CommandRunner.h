@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <functional>
 #include <map>
 #include <string>
@@ -17,7 +18,7 @@ public:
     void runCommand(const std::string& command, const std::string& logFileName, const std::function<void()>& callback,
         const std::function<void()>& errorCallback);
 
-    bool closing;
+    std::atomic_bool closing;
     int commandsRun;
 
 private:

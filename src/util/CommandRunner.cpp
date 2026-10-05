@@ -2,14 +2,29 @@
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 
+#include <wx/app.h>
 #include <wx/process.h>
+#include <wx/thread.h>
 #include <wx/utils.h>
 
 #include <array>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <future>
+#include <memory>
+#include <mutex>
+#include <utility>
 #include <vector>
 
 namespace {
     enum class CommandError { None, ResourceExtraction, Blender };
+
+    struct ProcessState {
+        std::mutex mutex;
+        std::condition_variable terminatedCondition;
+        bool terminated = false;
+    };
 
     constexpr const char* BLENDER_ERROR =
         "Error building obj or blend file. The blender python script threw an unhandled exception. Please report "
@@ -52,13 +67,51 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
     const int commandIndex = commandsRun++;
     childPids.emplace(commandIndex, 0);
 
-    wxProcess process;
-    process.Redirect();
-    const long pid = wxExecute(wxString::FromUTF8(command.c_str()), wxEXEC_ASYNC, &process);
+    auto processState = std::make_shared<ProcessState>();
+    const auto launchProcess = [&processState, &command] {
+        auto* process = new wxProcess();
+        process->Redirect();
+        process->Bind(wxEVT_END_PROCESS, [processState](wxProcessEvent&) {
+            {
+                std::lock_guard lock(processState->mutex);
+                processState->terminated = true;
+            }
+            processState->terminatedCondition.notify_one();
+        });
+        const long pid = wxExecute(wxString::FromUTF8(command.c_str()), wxEXEC_ASYNC, process);
+        if (pid == 0) {
+            delete process;
+            process = nullptr;
+        }
+        return std::pair{pid, process};
+    };
+
+    wxProcess* process = nullptr;
+    long pid = 0;
+    const bool runOnMainThread = wxIsMainThread();
+    if (runOnMainThread) {
+        const auto launch = launchProcess();
+        pid = launch.first;
+        process = launch.second;
+    } else if (wxTheApp) {
+        using LaunchResult = std::pair<long, wxProcess*>;
+        std::promise<LaunchResult> launchResult;
+        std::future<LaunchResult> launchFuture = launchResult.get_future();
+        wxTheApp->CallAfter([&launchResult, &launchProcess] { launchResult.set_value(launchProcess()); });
+        const LaunchResult launch = launchFuture.get();
+        pid = launch.first;
+        process = launch.second;
+    } else {
+        Logger::log(NK_ERROR, "Cannot create process for command because the wxWidgets application is unavailable.");
+    }
     if (pid == 0) {
         Logger::log(NK_ERROR, ("Error creating process for command: " + command + ".").c_str());
         errorCallback();
         return;
+    }
+    if (pid == -1) {
+        std::lock_guard lock(processState->mutex);
+        processState->terminated = true;
     }
     childPids[commandIndex] = pid;
 
@@ -97,26 +150,66 @@ void CommandRunner::runCommand(const std::string& command, const std::string& lo
 
     while (wxProcess::Exists(static_cast<int>(pid))) {
         if (closing) {
-            process.Detach();
+            process->Detach();
+            delete process;
             return;
         }
         while (true) {
-            const bool readOutput = appendAvailableOutput(process.GetInputStream(), output);
-            const bool readError = appendAvailableOutput(process.GetErrorStream(), output);
+            const bool readOutput = appendAvailableOutput(process->GetInputStream(), output);
+            const bool readError = appendAvailableOutput(process->GetErrorStream(), output);
             processOutput();
             if (!readOutput && !readError) {
                 break;
             }
         }
         wxMilliSleep(10);
+        if (runOnMainThread && wxTheApp) {
+            wxTheApp->Yield(true);
+        }
     }
 
-    appendAvailableOutput(process.GetInputStream(), output);
-    appendAvailableOutput(process.GetErrorStream(), output);
+    {
+        std::unique_lock lock(processState->mutex);
+        while (!processState->terminated && !closing) {
+            processState->terminatedCondition.wait_for(lock, std::chrono::milliseconds(10));
+        }
+        if (!processState->terminated) {
+            process->Detach();
+            delete process;
+            return;
+        }
+    }
+
+    appendAvailableOutput(process->GetInputStream(), output);
+    appendAvailableOutput(process->GetErrorStream(), output);
     processOutput();
 
     if (!output.empty()) {
         Logger::log(NK_INFO, std::string(output.begin(), output.end()).c_str());
+    }
+
+    if (runOnMainThread) {
+        delete process;
+    } else {
+        auto cleanupClaimed = std::make_shared<std::atomic_bool>(false);
+        auto cleanupResult = std::make_shared<std::promise<void>>();
+        std::future<void> cleanupFuture = cleanupResult->get_future();
+        wxTheApp->CallAfter([process, cleanupClaimed, cleanupResult] {
+            bool expected = false;
+            if (cleanupClaimed->compare_exchange_strong(expected, true)) {
+                delete process;
+                cleanupResult->set_value();
+            }
+        });
+        while (cleanupFuture.wait_for(std::chrono::milliseconds(10)) != std::future_status::ready) {
+            if (closing || !wxTheApp) {
+                bool expected = false;
+                if (cleanupClaimed->compare_exchange_strong(expected, true)) {
+                    delete process;
+                    cleanupResult->set_value();
+                }
+            }
+        }
     }
 
     childPids[commandIndex] = 0;
