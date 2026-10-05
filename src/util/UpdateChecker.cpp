@@ -237,7 +237,7 @@ void UpdateChecker::performUpdate() const {
         std::to_string(wxGetProcessId()), wxString::FromUTF8(latestVersion.c_str()), pathToWxString(install_dir)};
     Logger::log(NK_INFO, ("Launching updater: " + temp_updater_path.string()).c_str());
     wxExecuteEnv environment;
-    environment.cwd = pathToWxString(temp_updater_dir);
+    environment.cwd = pathToWxString(install_dir);
     if (executeArguments(arguments, wxEXEC_ASYNC, &environment) == 0) {
         Logger::log(NK_ERROR, "NavKit: Failed to launch updater.exe from temp directory.");
         return;
