@@ -1,4 +1,5 @@
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/ProcessFlow.h"
 
 #include <filesystem>
 #include <numbers>
@@ -303,7 +304,7 @@ void Airg::connectWaypoints(const int startWaypointIndex, const int endWaypointI
         } else if (direction == 3 || direction == 4 || direction == 5) {
             dy = 1;
         }
-        Vec3 directionVec = {dx, dy, 0.0f};
+        const Vec3 directionVec = Vec3{dx, dy, 0.0f}.GetUnitVec();
         if (const float dot = directionNormalized.Dot(directionVec); dot > maxParallelization) {
             maxParallelization = dot;
             bestDirection = direction;
@@ -409,12 +410,13 @@ int Airg::visibilityDataSize(const ReasoningGrid* reasoningGrid, const int waypo
 }
 
 void Airg::buildAirg(Airg* airg) {
-    GridGenerator::getInstance().build();
-    airg->airgBuilding = false;
-    airg->airgLoaded = true;
-    airgDirty = true;
-    airgDirty = true;
-    Menu::updateMenuState();
+    NavKit::ProcessFlow::buildAirg([] { return GridGenerator::getInstance().build(); },
+        [airg](const bool succeeded) {
+            airg->airgBuilding = false;
+            airg->airgLoaded = succeeded;
+            airgDirty = true;
+            Menu::updateMenuState();
+        });
 }
 
 void Airg::renderAirg() {

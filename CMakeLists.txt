@@ -69,6 +69,38 @@ set_target_properties(simpleini PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${SIMPLEINI_INCLUDE_DIR}"
 )
 add_subdirectory(src)
+
+set(THIRD_PARTY_DLL_PATHS
+        "$<TARGET_FILE:GLEW::glew>"
+        "$<TARGET_FILE:SDL2::SDL2>"
+        "$<TARGET_FILE:wx::core>"
+        "$<TARGET_FILE:wx::gl>"
+        "$<TARGET_FILE:wx::base>"
+        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:wx::core>/pcre2-16d.dll,$<TARGET_FILE_DIR:wx::core>/pcre2-16.dll>"
+        "$<TARGET_FILE_DIR:wx::core>/jpeg62.dll"
+        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:wx::core>/tiffd.dll,$<TARGET_FILE_DIR:wx::core>/tiff.dll>"
+        "$<TARGET_FILE_DIR:wx::core>/liblzma.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libwebp.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libwebpdecoder.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libwebpdemux.dll"
+        "$<TARGET_FILE_DIR:wx::core>/libsharpyuv.dll"
+        "$<TARGET_FILE:assimp::assimp>"
+        "$<TARGET_FILE:cpptrace::cpptrace>"
+        "$<TARGET_FILE:freetype>"
+        "$<TARGET_FILE:ftgl>"
+        "$<TARGET_FILE:unofficial::minizip::minizip>"
+        "$<TARGET_FILE:nfd::nfd>"
+        "$<TARGET_FILE:simdjson::simdjson>"
+        "$<TARGET_FILE:unofficial::brotli::brotlicommon>"
+        "$<TARGET_FILE:unofficial::brotli::brotlidec>"
+        "$<TARGET_FILE_DIR:assimp::assimp>/poly2tri.dll"
+        "$<TARGET_FILE_DIR:assimp::assimp>/pugixml.dll"
+        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2d.dll,$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2.dll>"
+        "$<TARGET_FILE_DIR:OpenSSL::Crypto>/../bin/libcrypto-3-x64.dll"
+        "$<TARGET_FILE_DIR:OpenSSL::SSL>/../bin/libssl-3-x64.dll"
+        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:PNG::PNG>/../bin/libpng16d.dll,$<TARGET_FILE_DIR:PNG::PNG>/../bin/libpng16.dll>"
+        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlibd1.dll,$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlib1.dll>"
+)
 if (BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
@@ -145,37 +177,6 @@ add_custom_target(clion_indexer_helper
         SOURCES ${IDE_RESOURCES}
 )
 
-set(THIRD_PARTY_DLL_PATHS
-        "$<TARGET_FILE:GLEW::glew>"
-        "$<TARGET_FILE:SDL2::SDL2>"
-        "$<TARGET_FILE:wx::core>"
-        "$<TARGET_FILE:wx::gl>"
-        "$<TARGET_FILE:wx::base>"
-        "$<TARGET_FILE_DIR:wx::core>/pcre2-16.dll"
-        "$<TARGET_FILE_DIR:wx::core>/jpeg62.dll"
-        "$<TARGET_FILE_DIR:wx::core>/tiff.dll"
-        "$<TARGET_FILE_DIR:wx::core>/liblzma.dll"
-        "$<TARGET_FILE_DIR:wx::core>/libwebp.dll"
-        "$<TARGET_FILE_DIR:wx::core>/libwebpdecoder.dll"
-        "$<TARGET_FILE_DIR:wx::core>/libwebpdemux.dll"
-        "$<TARGET_FILE_DIR:wx::core>/libsharpyuv.dll"
-        "$<TARGET_FILE:assimp::assimp>"
-        "$<TARGET_FILE:cpptrace::cpptrace>"
-        "$<TARGET_FILE:freetype>"
-        "$<TARGET_FILE:ftgl>"
-        "$<TARGET_FILE:unofficial::minizip::minizip>"
-        "$<TARGET_FILE:nfd::nfd>"
-        "$<TARGET_FILE:simdjson::simdjson>"
-        "$<TARGET_FILE:unofficial::brotli::brotlicommon>"
-        "$<TARGET_FILE:unofficial::brotli::brotlidec>"
-        "$<TARGET_FILE_DIR:assimp::assimp>/poly2tri.dll"
-        "$<TARGET_FILE_DIR:assimp::assimp>/pugixml.dll"
-        "$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2.dll"
-        "$<TARGET_FILE_DIR:OpenSSL::Crypto>/../bin/libcrypto-3-x64.dll"
-        "$<TARGET_FILE_DIR:OpenSSL::SSL>/../bin/libssl-3-x64.dll"
-        "$<TARGET_FILE_DIR:PNG::PNG>/../bin/libpng16.dll"
-        "$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlib1.dll"
-)
 option(BUILD_INSTALLER "Build the WiX MSI installer package" OFF)
 
 if(BUILD_INSTALLER AND NOT WIN32)

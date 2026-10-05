@@ -21,7 +21,7 @@ public:
     std::unordered_map<int, std::vector<int>> m_WaypointMap{};
     std::map<int, std::vector<Pathfinding::SGCell>> waypointCells{};
 
-    void build();
+    bool build();
 
     static void addVisibilityData(ReasoningGrid* grid);
 

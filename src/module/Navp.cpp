@@ -1,4 +1,5 @@
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/ProcessFlow.h"
 #include <numbers>
 #include <fstream>
 #include <functional>
@@ -873,11 +874,15 @@ void Navp::buildNavp() {
         building = true;
         Menu::updateMenuState();
         Logger::log(NK_INFO, "Beginning Recast build...");
-        if (recastAdapter.handleBuild()) {
+        const bool buildSucceeded =
+            NavKit::ProcessFlow::buildNavp([&recastAdapter] { return recastAdapter.handleBuild(); },
+                [&recastAdapter] {
+                    recastAdapter.findPfSeedPointAreas();
+                    recastAdapter.excludeNonReachableAreas();
+                });
+        if (buildSucceeded) {
             Logger::log(NK_INFO, "Done with Recast build.");
             Logger::log(NK_INFO, "Pruning areas unreachable by PF Seed Points.");
-            recastAdapter.findPfSeedPointAreas();
-            recastAdapter.excludeNonReachableAreas();
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
             navpBuildDone.store(true);
@@ -895,6 +900,9 @@ void Navp::buildNavp() {
         }
     }
     CPPTRACE_CATCH(const std::exception& e) {
+        building = false;
+        navpBuildDone.store(false);
+        Menu::updateMenuState();
         std::string msg = "Error building Navp: ";
         msg += e.what();
         msg += " Stack trace: ";
@@ -902,6 +910,9 @@ void Navp::buildNavp() {
         Logger::log(NK_ERROR, msg.c_str());
     }
     catch (...) {
+        building = false;
+        navpBuildDone.store(false);
+        Menu::updateMenuState();
         Logger::log(NK_ERROR, "Error building Navp.");
     }
 }

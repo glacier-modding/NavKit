@@ -1,8 +1,7 @@
 #pragma once
 #include <filesystem>
-#include <fstream>
-
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/module/ProcessFlow.h"
 #include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/GameConnection.h"
 #include "../../include/NavKit/module/Gui.h"
@@ -71,19 +70,10 @@ void SceneExtract::extractFromGame(const std::function<void()>& callback, const 
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::filesystem::path scenePath =
         std::filesystem::u8path(navKitSettings.outputFolder) / Scene::OUTPUT_SCENE_FILE_NAME;
-    std::ofstream f(scenePath);
-    f.clear();
-    f.close();
-
-    if (gameConnection.connectToGame()) {
-        errorCallback();
-        return;
-    }
-    if (gameConnection.listNavKitSceneEntities()) {
-        errorCallback();
-        return;
-    }
-    if (gameConnection.closeConnection()) {
+    if (!NavKit::ProcessFlow::extractScene(
+            scenePath, [&gameConnection] { return gameConnection.connectToGame(); },
+            [&gameConnection] { return gameConnection.listNavKitSceneEntities(); },
+            [&gameConnection] { return gameConnection.closeConnection(); })) {
         errorCallback();
         return;
     }

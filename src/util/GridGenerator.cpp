@@ -45,7 +45,7 @@ bool GridGenerator::initRecastAirgAdapter() {
         airg.airgBuilding = false;
         Menu::updateMenuState();
         Logger::log(NK_ERROR, "Error loading navmesh Obj into Recast...");
-        return true;
+        return false;
     }
     recastAirgAdapter.handleMeshChanged();
     const Scene& scene = Scene::getInstance();
@@ -63,23 +63,23 @@ bool GridGenerator::initRecastAirgAdapter() {
         Menu::updateMenuState();
 
         Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
-        return true;
+        return false;
     }
     const std::string outputNavpFilename =
         (std::filesystem::u8path(navKitSettings.outputFolder) / "outputForAirg.navp.json").string();
     recastAirgAdapter.save(outputNavpFilename, false);
 
     Navp::getAirgInstance().loadNavMesh(outputNavpFilename, true, false, true);
-    return false;
+    return true;
 }
 
-void GridGenerator::build() {
+bool GridGenerator::build() {
     const std::string time = wxDateTime::Now().Format("%c %Z").ToStdString();
     Logger::log(NK_INFO, "Started building Airg at %s", time.c_str());
     const auto start = std::chrono::high_resolution_clock::now();
 
-    if (initRecastAirgAdapter()) {
-        return;
+    if (!initRecastAirgAdapter()) {
+        return false;
     }
 
     Logger::log(NK_INFO, "Building waypoints within areas...");
@@ -96,6 +96,7 @@ void GridGenerator::build() {
     sceneExtract.alsoBuildAll = false;
     Grid::getInstance().loadBoundsFromAirg();
     Menu::updateMenuState();
+    return true;
 }
 
 void GridGenerator::addVisibilityData(ReasoningGrid* grid) {
