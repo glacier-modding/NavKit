@@ -55,6 +55,7 @@
 00502113C44B93BB.NAVP,[assembly:/_pro/scenes/missions/mumbai/scene_mongoose.navp].pc_navp
 0082C522173ACA20.NAVP,[assembly:/_pro/scenes/missions/opulent/mission_stingray/scene_opulent_hot_hilo.navp].pc_navp
 00ED1C611761DFA9.NAVP,[assembly:/_pro/scenes/missions/opulent/mission_stingray/scene_stingray_basic.navp].pc_navp
+0095A61465474618.NAVP,[assembly:/_pro/scenes/missions/opulent/scene_greentini.navp].pc_navp
 007B3CB603E76F21.NAVP,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01.navp].pc_navp
 0038FF4EF4F9FDB1.NAVP,[assembly:/_pro/scenes/missions/paris/_scene_frenchmartini.navp].pc_navp
 00B67EC300F24587.NAVP,[assembly:/_pro/scenes/missions/rocky/scene_dugong.navp].pc_navp
@@ -68,6 +69,7 @@
 0053A7F8B6CC7A03.NAVP,[assembly:/_pro/scenes/missions/skunk/scene_skunk.navp].pc_navp
 007B459198DF1DDD.NAVP,[assembly:/_pro/scenes/missions/snug/scene_vanilla.navp].pc_navp
 00F82512557D8BC3.NAVP,[assembly:/_pro/scenes/missions/theark/scene_magpie.navp].pc_navp
+0020480A10FC4EE7.NAVP,[assembly:/_pro/scenes/missions/theark/scene_pomada.navp].pc_navp
 00AFA4BA3A51D4CA.NAVP,[assembly:/_pro/scenes/missions/theark/scene_penicillin.navp].pc_navp
 0024B884D4EE2848.NAVP,[assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_002_contracts_creation_tutorial.navp].pc_navp
 00B3E7FB1731124A.NAVP,[assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_002_for_escalation_.navp].pc_navp
@@ -119,6 +121,7 @@
 0038AB47C43CCDA1.AIRG,[assembly:/_pro/scenes/missions/mumbai/scene_mongoose_scene.airg].pc_airg
 00360519962FEEB2.AIRG,[assembly:/_pro/scenes/missions/opulent/mission_stingray/scene_opulent_hot_hilo_scene.airg].pc_airg
 00F804EBCF92CDC0.AIRG,[assembly:/_pro/scenes/missions/opulent/mission_stingray/scene_stingray_basic_scene.airg].pc_airg
+005E0DD5A7229087.AIRG,[assembly:/_pro/scenes/missions/opulent/scene_greentini_scene.airg].pc_airg
 005D543656F539F3.AIRG,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01_scene.airg].pc_airg
 00D147B9750F423F.AIRG,[assembly:/_pro/scenes/missions/paris/_scene_frenchmartini_scene.airg].pc_airg
 00885F24BB2BDB68.AIRG,[assembly:/_pro/scenes/missions/rocky/scene_dugong_scene.airg].pc_airg
@@ -130,6 +133,7 @@
 0020957FCD691405.AIRG,[assembly:/_pro/scenes/missions/snug/scene_vanilla_scene.airg].pc_airg
 00C1C4B6CF0DCAEC.AIRG,[assembly:/_pro/scenes/missions/theark/scene_magpie_scene.airg].pc_airg
 0075BF2FAEAF7101.AIRG,[assembly:/_pro/scenes/missions/theark/scene_penicillin_scene.airg].pc_airg
+00C780410EFF8747.AIRG,[assembly:/_pro/scenes/missions/theark/scene_pomada_scene.airg].pc_airg
 00F0F6D86275BBC5.AIRG,[assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_002_contracts_creation_tutorial_scene.airg].pc_airg
 00CB87A5290D210F.AIRG,[assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_002_for_escalation__scene.airg].pc_airg
 00AAEE8FBE8F706E.AIRG,[assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_intro_scene.airg].pc_airg
