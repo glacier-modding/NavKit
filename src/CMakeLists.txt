@@ -85,24 +85,11 @@ if (WIN32)
             IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll"
     )
 elseif (APPLE)
-    if (CMAKE_OSX_ARCHITECTURES)
-        set(NAVKIT_RPKG_ARCH "${CMAKE_OSX_ARCHITECTURES}")
-    else ()
-        set(NAVKIT_RPKG_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
-    endif ()
-    if (NAVKIT_RPKG_ARCH STREQUAL "aarch64")
-        set(NAVKIT_RPKG_ARCH "arm64")
-    elseif (NAVKIT_RPKG_ARCH STREQUAL "AMD64")
-        set(NAVKIT_RPKG_ARCH "x86_64")
-    endif ()
-    if (NOT NAVKIT_RPKG_ARCH STREQUAL "arm64" AND NOT NAVKIT_RPKG_ARCH STREQUAL "x86_64")
-        message(FATAL_ERROR "Unsupported macOS architecture for navkit-rpkg-lib: ${NAVKIT_RPKG_ARCH}")
-    endif ()
     add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
             include/navkit-rpkg-lib/navkit-rpkg-lib.h)
     set_target_properties(navkit-rpkg-lib PROPERTIES
-            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/navkit_rpkg_lib_${NAVKIT_RPKG_ARCH}.dylib"
-            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib_${NAVKIT_RPKG_ARCH}.dylib"
+            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/libnavkit_rpkg_lib.dylib"
+            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/libnavkit_rpkg_lib.dylib"
     )
 else ()
     message(FATAL_ERROR "navkit-rpkg-lib has no native library for this platform.")
