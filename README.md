@@ -104,6 +104,42 @@ NavKit performs the following series of steps to be able to generate Navp files.
 `cmake -B . -S ..`
 1. Then change back to the main directory and run  
 `cmake --preset x64-debug`
+
+# 🧪 Manually running the integration test
+
+`NavKitIntegrationTests` is an opt-in end-to-end test and is not registered with CTest, so it does not run in the release test gate. It connects to the live HITMAN editor socket, scans and extracts ALOC resources from the installed RPKG files with `navkit-rpkg-lib`, invokes the repository's `Glacier2Obj.py` script using Blender, then builds and validates a NAVP and AIRG.
+The test logs each editor-socket open, scene-entity request, and close call. On Windows it also attempts to widen a real console window to 240 columns to reduce line wrapping.
+
+Before running it:
+
+1. Configure and build the opt-in target from the repository root:
+   ```powershell
+   cmake --preset x64-debug-integration
+   cmake --build --preset x64-debug-integration --target NavKitIntegrationTests
+   ```
+1. Install ZHMModSDK into a supported HITMAN installation containing its `Retail` and `Runtime` directories and RPKG files. The test sets `Retail\mods.ini` `[sdk]` `auto_load_scene` to the HITMAN intro mission entity, launches HITMAN through Steam, then retries the editor socket connection and scene extraction every 5 seconds within one 2-minute timeout. It continues extracting while the mission has no mesh entities, allowing time for the map to finish loading. Once the scene is extracted and the editor socket is closed, the test requests a normal close of HITMAN and waits up to 30 seconds for it to exit. The `mods.ini` change is retained after the test.
+1. Install Blender and note the path to `blender.exe`.
+
+The executable reads `hitman`, `blender`, and `output` from the `[NavKit]` section in the repository's default `src\resource\NavKit.ini`. If a `NavKit.ini` is present beside `NavKitIntegrationTests.exe`, its values override the default INI values. Command-line arguments override those settings positionally. `--gameversion` defaults to `steam`; the test launches the registered Steam client with `-applaunch 1659040` rather than starting `HITMAN3.exe` directly. It preserves the current environment and sets `SteamGameId`, `SteamAppId`, and `SteamOverlayGameId` to `1659040`. Steam is currently the only supported game version. `--interactivemode` defaults to `false`, so the executable exits immediately after displaying the result. Set it to `true` to wait at “Press any key to close”. To use the configured defaults, run this from the repository root:
+
+```powershell
+.\build\x64-debug-integration\tests\Debug\NavKitIntegrationTests.exe --gameversion steam
+```
+
+To keep the results visible until a key is pressed:
+
+```powershell
+.\build\x64-debug-integration\tests\Debug\NavKitIntegrationTests.exe --gameversion steam --interactivemode true
+```
+
+To override all three paths at the command line:
+
+```powershell
+.\build\x64-debug-integration\tests\Debug\NavKitIntegrationTests.exe "C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3" "C:\Program Files\Blender Foundation\Blender 4.3\blender.exe" "C:\NavKit\IntegrationOutput" --gameversion steam
+```
+
+The test keeps each run's extracted scene, assets, OBJ, NAVP, and AIRG in a uniquely named `integration-*` directory under the output directory. A nonzero exit code or `[fail]` message indicates that a stage failed.
+
 # 🛠️ Pre-commit Hooks
 
 This repository uses local pre-commit hooks located in the `scripts/` directory. To activate them, run the following command in your terminal from the project root:

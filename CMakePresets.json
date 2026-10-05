@@ -35,6 +35,21 @@
       "inherits": [ "base" ]
     },
     {
+      "name": "x64-debug-integration",
+      "inherits": "x64-debug",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "NAVKIT_BUILD_INTEGRATION_TESTS": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    },
+    {
       "name": "x64-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
@@ -97,6 +112,11 @@
     {
       "name": "x64-debug",
       "configurePreset": "x64-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "x64-debug-integration",
+      "configurePreset": "x64-debug-integration",
       "configuration": "Debug"
     },
     {

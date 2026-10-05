@@ -14,22 +14,41 @@ target_link_libraries(NavKitTests PRIVATE
         NavKitLib
 )
 
+option(NAVKIT_BUILD_INTEGRATION_TESTS "Build the manually run live game integration test" OFF)
+if (NAVKIT_BUILD_INTEGRATION_TESTS)
+    add_executable(NavKitIntegrationTests
+            pipeline_tests.cpp
+    )
+    target_link_libraries(NavKitIntegrationTests PRIVATE
+            NavKitLib
+    )
+    target_compile_definitions(NavKitIntegrationTests PRIVATE
+            NAVKIT_TEST_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+    )
+endif ()
+
 set(TEST_DLLS)
+set(TEST_TARGETS NavKitTests)
 if (WIN32)
     set(TEST_DLLS
             ${THIRD_PARTY_DLL_PATHS}
             "$<TARGET_FILE:navkit-rpkg-lib>"
     )
 endif ()
+if (NAVKIT_BUILD_INTEGRATION_TESTS)
+    list(APPEND TEST_TARGETS NavKitIntegrationTests)
+endif ()
 if (TEST_DLLS)
-    add_custom_command(
-            TARGET NavKitTests POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${TEST_DLLS}
-            $<TARGET_FILE_DIR:NavKitTests>/
-            COMMENT "Copying runtime dependencies for tests..."
-            VERBATIM
-    )
+    foreach (TEST_TARGET ${TEST_TARGETS})
+        add_custom_command(
+                TARGET ${TEST_TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TEST_DLLS}
+                $<TARGET_FILE_DIR:${TEST_TARGET}>/
+                COMMENT "Copying runtime dependencies for ${TEST_TARGET}..."
+                VERBATIM
+        )
+    endforeach ()
 endif ()
 
 add_test(NAME NavKitTests COMMAND NavKitTests)

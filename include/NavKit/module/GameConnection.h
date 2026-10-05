@@ -39,6 +39,7 @@ private:
 
 #ifdef _WIN32
     WSADATA wsaData{};
+    bool winsockInitialized = false;
 #endif
     std::unique_ptr<WebSocket> ws;
 };

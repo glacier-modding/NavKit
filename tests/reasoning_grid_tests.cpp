@@ -245,12 +245,12 @@ namespace {
     void testRealBin1Airg(const std::filesystem::path& path) {
         ReasoningGrid grid;
         grid.readAirg(path);
-        require(grid.m_WaypointList.size() == 179, "real AIRG waypoint count was not read");
-        require(grid.m_nNodeCount == 179, "real AIRG node count was not read");
-        require(grid.m_Properties.nGridWidth == 12, "real AIRG grid width was not read");
-        require(grid.m_Properties.nVisibilityRange == 23, "real AIRG visibility range was not read");
-        require(grid.m_pVisibilityData.size() == 178746, "real AIRG visibility data was not read");
-        require(grid.m_deadEndData.m_aBytes.size() == 23, "real AIRG dead-end bytes were not read");
+        require(grid.m_WaypointList.size() == 649, "intro AIRG waypoint count was not read");
+        require(grid.m_nNodeCount == 649, "intro AIRG node count was not read");
+        require(grid.m_Properties.nGridWidth == 52, "intro AIRG grid width was not read");
+        require(grid.m_Properties.nVisibilityRange == 23, "intro AIRG visibility range was not read");
+        require(grid.m_pVisibilityData.size() == 360844, "intro AIRG visibility data was not read");
+        require(grid.m_deadEndData.m_aBytes.empty(), "intro AIRG dead-end bytes were not read");
     }
 } // namespace
 
@@ -260,9 +260,9 @@ int main(const int argc, char** argv) {
         testTruncatedFile();
         testBin1Airg();
         testEmptyArrayRoundTrip();
-        if (argc > 1) {
-            testRealBin1Airg(argv[1]);
-        }
+        const std::filesystem::path realAirgPath =
+            argc > 1 ? std::filesystem::path(argv[1]) : "tests/resources/intro.airg";
+        testRealBin1Airg(realAirgPath);
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;
