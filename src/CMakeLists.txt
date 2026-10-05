@@ -25,6 +25,7 @@ set(MODULE_SOURCES
         module/GameConnection.cpp
         module/Grid.cpp
         module/Gui.cpp
+        module/HelpDialog.cpp
         module/InputHandler.cpp
         module/Logger.cpp
         module/Menu.cpp

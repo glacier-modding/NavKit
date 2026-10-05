@@ -6,6 +6,7 @@
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Gui.h"
+#include "../../include/NavKit/module/HelpDialog.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
@@ -98,6 +99,8 @@ wxMenuBar* Menu::createMenuBar() {
     bar->Append(build, "&Build");
 
     auto* help = new wxMenu();
+    help->Append(IDM_HELP_CONTENTS, "&Help Contents");
+    help->AppendSeparator();
     help->Append(IDM_HELP_ABOUT, "&About");
     bar->Append(help, "&Help");
     return bar;
@@ -375,6 +378,9 @@ int Menu::handleMenuClicked(const int menuId) {
         wxMessageBox("NavKit version " + currentVersionStr, "About", wxOK | wxICON_INFORMATION, getMainFrame());
         break;
     }
+    case IDM_HELP_CONTENTS:
+        showHelpDialog();
+        break;
 
     case IDM_SETTINGS_NAVKIT:
         NavKitSettings::getInstance().showNavKitSettingsDialog();
