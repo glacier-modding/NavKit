@@ -662,7 +662,7 @@ void SceneMesh::renderGlbUsingRecast() {
 }
 
 char* SceneMesh::openLoadGlbFileDialog() {
-    nfdu8filteritem_t filters[2] = {{"glTF files", "gltf"}, {"glTF Binary files", "glb"}};
+    nfdu8filteritem_t filters[2] = {{"glTF Binary files", "glb"}, {"glTF files", "gltf"}};
     return FileUtil::openNfdLoadDialog(filters, 2);
 }
 
