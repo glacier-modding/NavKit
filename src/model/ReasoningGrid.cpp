@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -426,11 +427,92 @@ void ReasoningGrid::readAirg(const std::filesystem::path& path) {
     *this = std::move(loaded);
 }
 
-std::vector<uint8_t> ReasoningGrid::getWaypointVisionData(int waypointIndex) {
+std::vector<uint8_t> ReasoningGrid::getWaypointVisionData(const int waypointIndex) const {
+    if (waypointIndex < 0 || waypointIndex >= static_cast<int>(m_WaypointList.size())) {
+        return {};
+    }
     const Waypoint& waypoint = m_WaypointList[waypointIndex];
-    const auto first = m_pVisibilityData.begin() + waypoint.nVisionDataOffset;
-    const auto last = (waypointIndex + 1) < m_WaypointList.size()
-        ? m_pVisibilityData.begin() + m_WaypointList[waypointIndex + 1].nVisionDataOffset
-        : m_pVisibilityData.end();
-    return {first, last};
+    const size_t start = waypoint.nVisionDataOffset;
+    const size_t end = (waypointIndex + 1) < static_cast<int>(m_WaypointList.size())
+        ? m_WaypointList[waypointIndex + 1].nVisionDataOffset
+        : m_pVisibilityData.size();
+    if (start > end || end > m_pVisibilityData.size()) {
+        return {};
+    }
+    return {m_pVisibilityData.begin() + static_cast<std::ptrdiff_t>(start),
+        m_pVisibilityData.begin() + static_cast<std::ptrdiff_t>(end)};
+}
+
+std::optional<WaypointVisibility> ReasoningGrid::getVisibility(
+    const int fromWaypointIndex, const int toWaypointIndex) const {
+    if (fromWaypointIndex < 0 || toWaypointIndex < 0 || fromWaypointIndex >= static_cast<int>(m_WaypointList.size()) ||
+        toWaypointIndex >= static_cast<int>(m_WaypointList.size()) || m_Properties.fGridSpacing <= 0.0f ||
+        m_Properties.nVisibilityRange > 512) {
+        return std::nullopt;
+    }
+    const Waypoint& from = m_WaypointList[fromWaypointIndex];
+    const Waypoint& to = m_WaypointList[toWaypointIndex];
+    const auto cellX = [this](const float x) {
+        return static_cast<int>(std::floor((x - m_Properties.vMin.x) / m_Properties.fGridSpacing));
+    };
+    const auto cellY = [this](const float y) {
+        return static_cast<int>(std::floor((y - m_Properties.vMin.y) / m_Properties.fGridSpacing));
+    };
+    const int fromCellX = cellX(from.vPos.x);
+    const int fromCellY = cellY(from.vPos.y);
+    const int toCellX = cellX(to.vPos.x);
+    const int toCellY = cellY(to.vPos.y);
+    const int range = static_cast<int>(m_Properties.nVisibilityRange);
+    const int dx = toCellX - fromCellX;
+    const int dy = toCellY - fromCellY;
+    if (std::abs(dx) > range || std::abs(dy) > range) {
+        return std::nullopt;
+    }
+
+    const size_t recordStart = from.nVisionDataOffset;
+    const size_t recordEnd = fromWaypointIndex + 1 < static_cast<int>(m_WaypointList.size())
+        ? m_WaypointList[fromWaypointIndex + 1].nVisionDataOffset
+        : m_pVisibilityData.size();
+    if (recordStart > recordEnd || recordEnd > m_pVisibilityData.size() || recordEnd - recordStart < 2) {
+        return std::nullopt;
+    }
+    const size_t recordSize = recordEnd - recordStart;
+    const size_t layerCount = static_cast<size_t>(m_pVisibilityData[recordStart]) |
+        (static_cast<size_t>(m_pVisibilityData[recordStart + 1]) << 8);
+    if (layerCount > (recordSize - 2) / 2) {
+        return std::nullopt;
+    }
+
+    size_t layerDataIndex = 0;
+    if (to.nLayerIndex != from.nLayerIndex) {
+        bool found = false;
+        for (size_t i = 0; i < layerCount; ++i) {
+            const size_t layerOffset = 2 + 2 * i;
+            const int16_t layer = static_cast<int16_t>(
+                static_cast<uint16_t>(m_pVisibilityData[recordStart + layerOffset]) |
+                static_cast<uint16_t>(static_cast<uint16_t>(m_pVisibilityData[recordStart + layerOffset + 1]) << 8));
+            if (layer == to.nLayerIndex) {
+                layerDataIndex = i + 1;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return std::nullopt;
+        }
+    }
+
+    const size_t width = static_cast<size_t>(range) * 2 + 1;
+    const size_t bitsOffset = 2 + layerCount * 2;
+    const size_t bitCount = width * width * (layerCount + 1) * 2;
+    if (bitsOffset > recordSize || (bitCount + 7) / 8 > recordSize - bitsOffset) {
+        return std::nullopt;
+    }
+    const size_t xOffset = static_cast<size_t>(range + dx);
+    const size_t yOffset = static_cast<size_t>(range + dy);
+    const auto readBit = [&](const size_t channel) {
+        const size_t bitIndex = xOffset + width * (yOffset + width * (channel + 2 * layerDataIndex));
+        return (m_pVisibilityData[recordStart + bitsOffset + bitIndex / 8] & (1u << (bitIndex % 8))) != 0;
+    };
+    return WaypointVisibility{readBit(1), readBit(0)};
 }

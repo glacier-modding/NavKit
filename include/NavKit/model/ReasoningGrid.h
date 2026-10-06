@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <vector>
 #include "../../NavWeakness/NavPower.h"
 
@@ -25,6 +26,11 @@ class SizedArray {
 public:
     std::vector<uint8_t> m_aBytes;
     uint32_t m_nSize;
+};
+
+struct WaypointVisibility {
+    bool low;
+    bool high;
 };
 
 class Waypoint {
@@ -77,7 +83,9 @@ public:
 
     void readAirg(const std::filesystem::path& p_AirgPath);
 
-    std::vector<uint8_t> getWaypointVisionData(int waypointIndex);
+    std::vector<uint8_t> getWaypointVisionData(int waypointIndex) const;
+
+    std::optional<WaypointVisibility> getVisibility(int fromWaypointIndex, int toWaypointIndex) const;
 
     static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, float spacing, float zSpacing, float tolerance,
         float zTolerance);

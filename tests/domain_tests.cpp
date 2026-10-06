@@ -1,5 +1,6 @@
 #include "../include/NavKit/adapter/RecastAdapter.h"
 #include "../include/NavKit/model/Json.h"
+#include "../include/NavKit/model/ReasoningGrid.h"
 #include "../include/NavKit/model/VisionData.h"
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Grid.h"
@@ -531,6 +532,46 @@ namespace {
         }
     }
 
+    void testPackedWaypointVisibilityLookup() {
+        ReasoningGrid grid;
+        grid.m_Properties.vMin = {0.0f, 0.0f, 0.0f, 1.0f};
+        grid.m_Properties.vMax = {4.0f, 4.0f, 1.0f, 1.0f};
+        grid.m_Properties.nGridWidth = 4;
+        grid.m_Properties.fGridSpacing = 1.0f;
+        grid.m_Properties.nVisibilityRange = 1;
+
+        for (const auto& [x, y, layer] : {std::tuple{1.5f, 1.5f, 1}, std::tuple{2.5f, 1.5f, 7},
+                 std::tuple{0.5f, 1.5f, 7}, std::tuple{1.5f, 2.5f, 7}, std::tuple{3.5f, 3.5f, 7}}) {
+            Waypoint waypoint;
+            waypoint.vPos = {x, y, 0.0f, 1.0f};
+            waypoint.nLayerIndex = layer;
+            waypoint.nVisionDataOffset = static_cast<uint32_t>(grid.m_pVisibilityData.size());
+            grid.m_WaypointList.push_back(waypoint);
+            grid.m_pVisibilityData.insert(grid.m_pVisibilityData.end(), 9, 0);
+        }
+        grid.m_pVisibilityData[0] = 1;
+        grid.m_pVisibilityData[2] = 7;
+        const auto setBit = [&grid](const size_t recordOffset, const size_t bitIndex) {
+            grid.m_pVisibilityData[recordOffset + 4 + bitIndex / 8] |= static_cast<uint8_t>(1u << (bitIndex % 8));
+        };
+        setBit(0, 4);
+        setBit(0, 13);
+        setBit(0, 21);
+        setBit(0, 32);
+
+        const auto selfVisibility = grid.getVisibility(0, 0);
+        check(selfVisibility.has_value() && selfVisibility->low && selfVisibility->high,
+            "source-layer visibility should read the first packed layer in low/high channel order");
+        const auto otherLayerVisibility = grid.getVisibility(0, 1);
+        check(otherLayerVisibility.has_value() && otherLayerVisibility->low && !otherLayerVisibility->high,
+            "other-layer low visibility should decode from its layer offset and LSB-first bit position");
+        const auto highOnlyVisibility = grid.getVisibility(0, 2);
+        check(highOnlyVisibility.has_value() && !highOnlyVisibility->low && highOnlyVisibility->high,
+            "other-layer high visibility should decode independently from the low channel");
+        check(!grid.getVisibility(0, 4).has_value(),
+            "visibility lookup should reject targets outside the source waypoint range");
+    }
+
     void testSceneSaveSerializesCollections() {
         Scene& scene = Scene::getInstance();
         scene.version = 17;
@@ -894,6 +935,7 @@ void runDomainTests() {
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);
+    run("Packed waypoint visibility lookup", testPackedWaypointVisibilityLookup);
     run("Scene JSON persistence", testSceneSaveSerializesCollections);
     run("Render mesh CPU properties", testMeshCpuProperties);
     run("Render model mesh batching", testModelMeshBatching);

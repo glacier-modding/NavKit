@@ -32,6 +32,8 @@
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/util/GridGenerator.h"
 
+#include <array>
+
 Airg::Airg() :
     airgName("Load Airg"), lastLoadAirgFile(airgName), saveAirgName("Save Airg"), lastSaveAirgFile(saveAirgName),
     airgLoaded(false), airgLoading(false), airgBuilding(false), connectWaypointModeEnabled(false), showAirg(true),
@@ -494,17 +496,34 @@ void Airg::renderAirg() {
                     triVerts.push_back({p1, glm::vec3(0, 1, 0), color});
                     triVerts.push_back({p3, glm::vec3(0, 1, 0), color});
                     triVerts.push_back({p4, glm::vec3(0, 1, 0), color});
-                } else {
-                    std::vector<uint8_t> data;
-                    float size = 0;
-                    if (cellColorSource == AIRG_BITMAP) {
-                        size = 25;
-                        for (int k = 0; k < 25; k++) {
-                            data.push_back(waypoint.cellBitmap[k] * 255);
+                } else if (cellColorSource == VISION_DATA) {
+                    constexpr std::array<glm::vec4, 4> visibilityColors = {glm::vec4(0.08f, 0.08f, 0.08f, 0.55f),
+                        glm::vec4(0.13f, 0.75f, 0.32f, 0.55f), glm::vec4(0.95f, 0.72f, 0.12f, 0.55f),
+                        glm::vec4(0.95f, 0.95f, 0.95f, 0.65f)};
+                    unsigned int visibilityColor = 0;
+                    if (selectedWaypointIndex >= 0) {
+                        if (const auto visibility = reasoningGrid->getVisibility(selectedWaypointIndex, i)) {
+                            visibilityColor = static_cast<unsigned int>(visibility->low) |
+                                (static_cast<unsigned int>(visibility->high) << 1);
                         }
-                    } else if (cellColorSource == VISION_DATA) { // Render Vision Data
-                        size = visibilityDataSize(reasoningGrid, i);
-                        data = reasoningGrid->getWaypointVisionData(i);
+                    }
+                    const glm::vec4 color = visibilityColors[visibilityColor];
+                    const float cellZ = waypoint.vPos.z + (selected ? 0.001f : 0.01f) + zRenderOffset;
+                    const glm::vec3 cellP1(x - cellSpacing / 2, cellZ, -(y - cellSpacing / 2));
+                    const glm::vec3 cellP2(x - cellSpacing / 2, cellZ, -(y + cellSpacing / 2));
+                    const glm::vec3 cellP3(x + cellSpacing / 2, cellZ, -(y + cellSpacing / 2));
+                    const glm::vec3 cellP4(x + cellSpacing / 2, cellZ, -(y - cellSpacing / 2));
+                    triVerts.push_back({cellP1, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({cellP2, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({cellP3, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({cellP1, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({cellP3, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({cellP4, glm::vec3(0, 1, 0), color});
+                } else {
+                    constexpr float size = 25.0f;
+                    std::array<uint8_t, 25> data{};
+                    for (size_t k = 0; k < data.size(); ++k) {
+                        data[k] = waypoint.cellBitmap[k] ? 255 : 0;
                     }
 
                     float bw = reasoningGrid->m_Properties.fGridSpacing / sqrt(size);
@@ -512,14 +531,11 @@ void Airg::renderAirg() {
                     for (int byi = 0; byi < numBoxesPerSide; byi++) {
                         for (int bxi = 0; bxi < numBoxesPerSide; bxi++) {
                             float bx = x - reasoningGrid->m_Properties.fGridSpacing / 2 + bxi * bw;
-                            float byRaw = (cellColorSource == AIRG_BITMAP)
-                                ? -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw)
-                                : -y - reasoningGrid->m_Properties.fGridSpacing / 2 + byi * bw;
+                            float byRaw = -(y - reasoningGrid->m_Properties.fGridSpacing / 2 + (byi + 1) * bw);
 
                             uint8_t val = data[numBoxesPerSide * byi + bxi];
                             float c = val / 255.0f;
-                            glm::vec4 cellColor = (cellColorSource == AIRG_BITMAP) ? glm::vec4(c, c, c, 0.3)
-                                                                                   : glm::vec4(0.0, c, 0.0, 0.3);
+                            glm::vec4 cellColor(c, c, c, 0.3f);
 
                             float zChange = selected ? 0.001 : 0.01;
                             float zc = waypoint.vPos.z + zChange;
