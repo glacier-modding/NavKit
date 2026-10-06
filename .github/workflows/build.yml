@@ -230,8 +230,8 @@ jobs:
 
       - name: Verify navkit-rpkg-lib universal binaries
         run: |
-          lipo -verify_arch arm64 x86_64 lib/Debug/libnavkit_rpkg_lib.dylib
-          lipo -verify_arch arm64 x86_64 lib/Release/libnavkit_rpkg_lib.dylib
+          lipo lib/Debug/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
+          lipo lib/Release/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
 
       - name: Build universal macOS release
         run: |
@@ -256,7 +256,7 @@ jobs:
               )
               if "Mach-O" in description:
                   subprocess.run(
-                      ["lipo", "-verify_arch", "arm64", "x86_64", str(path)],
+                      ["lipo", str(path), "-verify_arch", "arm64", "x86_64"],
                       check=True,
                   )
                   binaries.append(path)
