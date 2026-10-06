@@ -183,7 +183,8 @@ namespace {
         return first < last ? std::string(first, last) : std::string{};
     }
 
-    void configureAutoLoadScene(const std::filesystem::path& modsIni) {
+    std::vector<std::string> updateAutoLoadScene(
+        const std::filesystem::path& modsIni, const std::vector<std::string>& replacementSettings) {
         require(std::filesystem::is_regular_file(modsIni), "Could not find Retail\\mods.ini.");
         std::ifstream input(modsIni);
         require(input.is_open(), "Could not read Retail\\mods.ini.");
@@ -196,9 +197,7 @@ namespace {
         }
         require(input.eof(), "Could not finish reading Retail\\mods.ini.");
 
-        constexpr std::string_view setting =
-            "auto_load_scene = "
-            "assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_intro_firsttime.entity";
+        std::vector<std::string> originalSettings;
         bool inSdkSection = false;
         bool sdkSectionFound = false;
         bool settingWritten = false;
@@ -213,7 +212,7 @@ namespace {
             }
             if (content.size() >= 2 && content.front() == '[' && content.back() == ']') {
                 if (inSdkSection && !settingWritten) {
-                    updatedLines.emplace_back(setting);
+                    updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
                     settingWritten = true;
                 }
                 inSdkSection = trim(content.substr(1, content.size() - 2)) == "sdk";
@@ -225,8 +224,9 @@ namespace {
             if (inSdkSection) {
                 const size_t equals = content.find('=');
                 if (equals != std::string::npos && trim(content.substr(0, equals)) == "auto_load_scene") {
+                    originalSettings.push_back(line);
                     if (!settingWritten) {
-                        updatedLines.emplace_back(setting);
+                        updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
                         settingWritten = true;
                     }
                     continue;
@@ -236,15 +236,15 @@ namespace {
         }
 
         if (inSdkSection && !settingWritten) {
-            updatedLines.emplace_back(setting);
+            updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
             settingWritten = true;
         }
-        if (!sdkSectionFound) {
+        if (!sdkSectionFound && !replacementSettings.empty()) {
             if (!updatedLines.empty() && !updatedLines.back().empty()) {
                 updatedLines.emplace_back();
             }
             updatedLines.emplace_back("[sdk]");
-            updatedLines.emplace_back(setting);
+            updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
         }
 
         std::ofstream output(modsIni, std::ios::binary | std::ios::trunc);
@@ -258,7 +258,37 @@ namespace {
         output << "\r\n";
         output.flush();
         require(output.good(), "Could not save the auto_load_scene setting to Retail\\mods.ini.");
+        return originalSettings;
     }
+
+    class ScopedAutoLoadScene {
+    public:
+        explicit ScopedAutoLoadScene(const std::filesystem::path& modsIni) : modsIni(modsIni) {
+            originalSettings = updateAutoLoadScene(modsIni,
+                {"auto_load_scene = "
+                 "assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_intro_firsttime.entity"});
+        }
+
+        ~ScopedAutoLoadScene() {
+            if (!restored) {
+                try {
+                    restore();
+                } catch (const std::exception& error) {
+                    std::cerr << "[fail] Could not restore auto_load_scene: " << error.what() << '\n';
+                }
+            }
+        }
+
+        void restore() {
+            updateAutoLoadScene(modsIni, originalSettings);
+            restored = true;
+        }
+
+    private:
+        std::filesystem::path modsIni;
+        std::vector<std::string> originalSettings;
+        bool restored = false;
+    };
 
     std::filesystem::path findSteamExecutable(const std::filesystem::path& hitmanDirectory) {
 #ifdef _WIN32
@@ -616,7 +646,7 @@ namespace {
         require(Rpkg::canExtract() && Rpkg::partitionManager != nullptr,
             "RPKG initialization failed; ensure this is a supported Hitman installation.");
 
-        configureAutoLoadScene(hitmanDirectory / "Retail" / "mods.ini");
+        ScopedAutoLoadScene autoLoadScene(hitmanDirectory / "Retail" / "mods.ini");
         constexpr auto integrationTimeout = std::chrono::minutes(2);
         const IntegrationDeadline deadline = std::chrono::steady_clock::now() + integrationTimeout;
         launchHitmanAndWaitForEditor(hitmanDirectory, gameVersion, deadline);
@@ -632,6 +662,7 @@ namespace {
         buildNavp(outputDirectory);
         std::cout << "[integration] Building and validating AIRG...\n";
         buildAirg(outputDirectory);
+        autoLoadScene.restore();
         std::cout << "[integration] Passed. Artifacts are in " << outputDirectory.string() << '\n';
     }
 } // namespace
