@@ -5,6 +5,11 @@ set(VCPKG_LIBRARY_LINKAGE dynamic)
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
 set(VCPKG_OSX_ARCHITECTURES "arm64;x86_64")
 
+# ARM NEON intrinsics cannot compile for the x86_64 slice of a universal build.
+if(PORT STREQUAL "libpng")
+    list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DPNG_ARM_NEON=off")
+endif()
+
 # OpenSSL selects assembly for VCPKG_TARGET_ARCHITECTURE, which cannot be
 # compiled for both slices of a universal binary. Use its portable C code.
 if(PORT STREQUAL "openssl")
