@@ -5,6 +5,11 @@ set(VCPKG_LIBRARY_LINKAGE dynamic)
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
 set(VCPKG_OSX_ARCHITECTURES "arm64;x86_64")
 
+# libjpeg-turbo's architecture-specific SIMD cannot serve both slices.
+if(PORT STREQUAL "libjpeg-turbo")
+    list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DWITH_SIMD=OFF")
+endif()
+
 # ARM NEON intrinsics cannot compile for the x86_64 slice of a universal build.
 if(PORT STREQUAL "libpng")
     list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DPNG_ARM_NEON=off")

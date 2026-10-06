@@ -225,7 +225,7 @@ jobs:
           path: |
             ${{ env.VCPKG_CACHE_DIR }}
             build/macos-release/vcpkg_installed/
-          key: vcpkg-${{ runner.os }}-universal-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'triplets/arm64-universal-osx.cmake') }}
+          key: vcpkg-${{ runner.os }}-universal-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'triplets/arm64-universal-osx.cmake', 'ports/libjpeg-turbo/**') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-universal-
 
