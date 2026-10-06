@@ -4,7 +4,9 @@ add_executable(ReasoningGridTests
         reasoning_grid_tests.cpp
         ../src/model/ReasoningGrid.cpp
 )
-add_test(NAME ReasoningGridTests COMMAND ReasoningGridTests)
+add_test(NAME ReasoningGridTests
+        COMMAND ReasoningGridTests "${CMAKE_CURRENT_SOURCE_DIR}/resources/intro.airg"
+)
 set_tests_properties(ReasoningGridTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
 add_executable(NavKitTests
