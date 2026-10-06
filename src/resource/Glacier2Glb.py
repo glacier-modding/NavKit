@@ -2947,7 +2947,7 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
 
 def main():
     log("TRACE",
-        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.glb path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <debug logs enabled (true | false)>",
+        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.gltf path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <debug logs enabled (true | false)>",
         "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
@@ -2978,11 +2978,11 @@ def main():
         return 1
     if output_path.endswith('.both'):
         save_blend_file(output_path[:-4] + "blend")
-        save_glb_file(output_path[:-4] + "glb")
+        save_gltf_file(output_path[:-4] + "gltf")
     elif output_path.endswith('.blend'):
         save_blend_file(output_path)
     else:
-        save_glb_file(output_path)
+        save_gltf_file(output_path)
 
     log("INFO", "Script finished, waiting...", "main")
     try:
@@ -3041,10 +3041,10 @@ def bake_geometry_node_instances():
         bpy.data.objects.remove(source_object, do_unlink=True)
 
 
-def save_glb_file(output_path: str):
-    log("INFO", "Attempting to save GLB file to :" + output_path, "main")
+def save_gltf_file(output_path: str):
+    log("INFO", "Attempting to save glTF file to :" + output_path, "main")
     bake_geometry_node_instances()
-    bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLB', export_apply=True)
+    bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLTF_SEPARATE', export_apply=True)
 
 
 def save_blend_file(output_path: str):

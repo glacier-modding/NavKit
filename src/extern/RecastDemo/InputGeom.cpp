@@ -267,7 +267,7 @@ bool InputGeom::load(rcContext* ctx, const std::string& filepath) {
     std::transform(extension.begin(), extension.end(), extension.begin(), tolower);
     if (extension == ".gset")
         return loadGeomSet(ctx, filepath);
-    if (extension == ".glb")
+    if (extension == ".glb" || extension == ".gltf")
         return loadMesh(ctx, filepath);
 
     return false;

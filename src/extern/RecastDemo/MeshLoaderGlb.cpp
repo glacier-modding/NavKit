@@ -99,12 +99,12 @@ bool rcMeshLoaderGlb::load(const std::string& filename) {
     std::string extension = extensionPos == std::string::npos ? std::string() : filename.substr(extensionPos);
     std::transform(extension.begin(), extension.end(), extension.begin(),
         [](unsigned char c) { return static_cast<char>(tolower(c)); });
-    if (extension != ".glb")
+    if (extension != ".glb" && extension != ".gltf")
         return false;
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_PreTransformVertices);
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
-        Logger::log(NK_ERROR, "Failed to import GLB '%s' for Recast: %s", filename.c_str(), importer.GetErrorString());
+        Logger::log(NK_ERROR, "Failed to import glTF '%s' for Recast: %s", filename.c_str(), importer.GetErrorString());
         return false;
     }
 
@@ -134,7 +134,7 @@ bool rcMeshLoaderGlb::load(const std::string& filename) {
             sceneMesh.objectTriangleRanges[objectName] = {firstTriangle, m_triCount};
     }
     if (m_vertCount == 0 || m_triCount == 0) {
-        Logger::log(NK_ERROR, "GLB '%s' contains no usable triangle geometry.", filename.c_str());
+        Logger::log(NK_ERROR, "glTF '%s' contains no usable triangle geometry.", filename.c_str());
         return false;
     }
     calculateNormals();

@@ -86,8 +86,8 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 NavKit performs the following series of steps to be able to generate Navp files.
 1. Connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's ZGeomEntities, PFBox entities, and PFSeedPoint entities and send their data back to NavKit, where they are saved to `output.nav.json` in the specified output folder.
 1. Extract all the necessary Aloc or Prim files from the rpkg files to the `aloc` or `prim` folder of the specified output folder using navkit-rpkg-lib (A rust library included in the installer).
-1. Open the Blender CLI and run the `Glacier2Glb.py` script to generate a GLB by importing the ALOC or PRIM files, copying and transforming them as specified by the game, then save it to `output.glb` and/or `output.blend` in the specified output folder.
-1. Load `output.glb` from the specified output folder or another GLB file.
+1. Open the Blender CLI and run the `Glacier2Glb.py` script to generate a glTF by importing the ALOC or PRIM files, copying and transforming them as specified by the game, then save it to `output.gltf` and/or `output.blend` in the specified output folder. The glTF references its texture files separately using relative paths.
+1. Load `output.gltf` from the specified output folder or another GLB file.
 1. At this point, the build Navp section of the menu will be available. You can customize the parameters with "Settings > Recast Settings" on the menu bar, then press "Build > Build Navp" on the menu bar to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
 1. At this point, the build Airg section of the menu will be available, and you can customize the parameters, then press build to generate the Airg.
 # Disclaimer
@@ -107,7 +107,7 @@ NavKit performs the following series of steps to be able to generate Navp files.
 
 # 🧪 Manually running the integration test
 
-`NavKitIntegrationTests` is an opt-in end-to-end test and is not registered with CTest, so it does not run in the release test gate. It connects to the live HITMAN editor socket, scans and extracts ALOC resources from the installed RPKG files with `navkit-rpkg-lib`, invokes the repository's `Glacier2Glb.py` script using Blender, then builds and validates a NAVP and AIRG.
+`NavKitIntegrationTests` is an opt-in end-to-end test and is not registered with CTest, so it does not run in the release test gate. It connects to the live HITMAN editor socket, scans and extracts ALOC resources from the installed RPKG files with `navkit-rpkg-lib`, invokes the repository's `Glacier2Glb.py` script using Blender to create a separate glTF, then builds and validates a NAVP and AIRG.
 The test logs each editor-socket open, scene-entity request, and close call. On Windows it also attempts to widen a real console window to 240 columns to reduce line wrapping.
 
 Before running it:

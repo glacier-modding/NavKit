@@ -439,7 +439,7 @@ namespace {
         const std::filesystem::path sceneFile = outputDirectory / Scene::OUTPUT_SCENE_FILE_NAME;
         const std::filesystem::path runtimeDirectory = hitmanDirectory / "Runtime";
         const std::filesystem::path alocDirectory = outputDirectory / "aloc";
-        const std::filesystem::path generatedGlb = outputDirectory / "output.glb";
+        const std::filesystem::path generatedGltf = outputDirectory / "output.gltf";
         const std::filesystem::path scriptFile =
             std::filesystem::u8path(NAVKIT_TEST_SOURCE_DIR) / "src" / "resource" / "Glacier2Glb.py";
         std::filesystem::create_directories(alocDirectory);
@@ -458,7 +458,7 @@ namespace {
             "RPKG extraction produced no ALOC files.");
 
         const std::vector<wxString> blenderArguments = {pathToWxString(blenderExecutable), "-b", "--factory-startup",
-            "-P", pathToWxString(scriptFile), "--", pathToWxString(sceneFile), pathToWxString(generatedGlb), "ALOC",
+            "-P", pathToWxString(scriptFile), "--", pathToWxString(sceneFile), pathToWxString(generatedGltf), "ALOC",
             "11111111", "copy", "true", "false"};
         std::vector<const wxChar*> blenderArgumentPointers;
         blenderArgumentPointers.reserve(blenderArguments.size() + 1);
@@ -468,12 +468,12 @@ namespace {
         blenderArgumentPointers.push_back(nullptr);
         require(wxExecute(blenderArgumentPointers.data(), wxEXEC_SYNC) == 0,
             "Blender failed while running the repository's Glacier2Glb.py script.");
-        requireNonEmptyFile(generatedGlb, "Blender-generated GLB");
+        requireNonEmptyFile(generatedGltf, "Blender-generated glTF");
 
         RecastAdapter& adapter = RecastAdapter::getInstance();
         adapter.resetCommonSettings();
         adapter.cleanup();
-        require(adapter.loadInputGeom(generatedGlb.string()), "Recast could not load the Blender-generated GLB.");
+        require(adapter.loadInputGeom(generatedGltf.string()), "Recast could not load the Blender-generated glTF.");
         adapter.handleMeshChanged();
     }
 
