@@ -1,3 +1,4 @@
+#include "../../include/NavKit/util/Threading.h"
 #include <chrono>
 #include <ctime>
 #include <filesystem>
@@ -122,7 +123,20 @@ void GridGenerator::addVisibilityData(ReasoningGrid* grid) {
     const auto* mesh = geometry->getMesh();
     const auto* chunks = geometry->getChunkyMesh();
     // Size for every node: a long ray must never silently drop overlapping chunks.
-    std::vector<int> ids(chunks->nnodes);
+    struct Triangle {
+        glm::vec3 origin, edge1, edge2;
+    };
+    std::vector<Triangle> triangles(chunks->ntris);
+    const float* vertices = mesh->getVerts();
+    Threading::parallelFor(triangles.size(), [&](size_t i) {
+        const int* indices = chunks->tris + 3 * i;
+        const auto vertex = [&](int index) {
+            const float* v = vertices + 3 * index;
+            return glm::vec3(v[0], v[1], v[2]);
+        };
+        const auto origin = vertex(indices[0]);
+        triangles[i] = {origin, vertex(indices[1]) - origin, vertex(indices[2]) - origin};
+    });
     grid->generateVisionData(
         [&](const Vec4& from, const Vec4& to) {
             const Vec3 a = RecastAdapter::convertFromNavPowerToRecast({from.x, from.y, from.z});
@@ -132,18 +146,18 @@ void GridGenerator::addVisibilityData(ReasoningGrid* grid) {
             const float length = glm::length(direction);
             if (length < 0.0001f)
                 return true;
+            const float epsilon = 0.0001f / length;
+            thread_local std::vector<int> ids;
+            ids.resize(chunks->nnodes);
             float p[2] = {a.X, a.Z}, q[2] = {b.X, b.Z};
             const int count = rcGetChunksOverlappingSegment(chunks, p, q, ids.data(), static_cast<int>(ids.size()));
-            const auto vertex = [&](int index) {
-                const float* v = mesh->getVerts() + 3 * index;
-                return glm::vec3(v[0], v[1], v[2]);
-            };
             for (int i = 0; i < count; ++i) {
                 const auto& node = chunks->nodes[ids[i]];
                 for (int j = 0; j < node.n; ++j) {
-                    const int* triangle = chunks->tris + 3 * (node.i + j);
-                    const auto v0 = vertex(triangle[0]);
-                    const auto e1 = vertex(triangle[1]) - v0, e2 = vertex(triangle[2]) - v0;
+                    const auto& triangle = triangles[node.i + j];
+                    const auto& v0 = triangle.origin;
+                    const auto& e1 = triangle.edge1;
+                    const auto& e2 = triangle.edge2;
                     const auto h = glm::cross(direction, e2);
                     const float det = glm::dot(e1, h);
                     // Two-sided collision: winding must not affect visibility.
@@ -159,7 +173,6 @@ void GridGenerator::addVisibilityData(ReasoningGrid* grid) {
                         continue;
                     const float t = glm::dot(e2, cross) / det;
                     // Ignore only 0.1 mm at either endpoint, avoiding floor/self contacts.
-                    const float epsilon = 0.0001f / length;
                     if (t > epsilon && t < 1 - epsilon)
                         return false;
                 }
@@ -230,8 +243,8 @@ void GridGenerator::GenerateWaypointNodes() {
 
     waypointCells.clear();
     const int areaCount = Navp::getTotalAreaCount(navMesh);
-    const unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
-    std::vector<std::jthread> threads;
+    const unsigned int num_threads =
+        static_cast<unsigned int>(std::min<size_t>(Threading::getMaxThreads(), std::max(1, areaCount)));
     std::mutex waypointCellsMutex;
     const int areas_per_thread = (areaCount + num_threads - 1) / num_threads;
     Logger::log(NK_INFO, "Generating waypoint nodes using %u threads.", num_threads);
@@ -325,13 +338,12 @@ void GridGenerator::GenerateWaypointNodes() {
             }
         }
     };
-    for (unsigned int i = 0; i < num_threads; ++i) {
-        const int start_index = i * areas_per_thread;
+    Threading::parallelFor(num_threads, [&](size_t i) {
+        const int start_index = static_cast<int>(i) * areas_per_thread;
         const int end_index = std::min(start_index + areas_per_thread, areaCount);
-        if (start_index < end_index) {
-            threads.emplace_back(worker, start_index, end_index, i);
-        }
-    }
+        if (start_index < end_index)
+            worker(start_index, end_index, static_cast<int>(i));
+    }); // All workers have joined before sorting their output.
 
     for (auto& cells : waypointCells | std::views::values) {
         std::ranges::sort(

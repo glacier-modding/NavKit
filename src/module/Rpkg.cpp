@@ -1,5 +1,7 @@
 #include "../../include/NavKit/module/Rpkg.h"
 #include <mutex>
+#include <future>
+#include "../../include/NavKit/util/Threading.h"
 #include <fstream>
 
 #include <cpptrace/from_current.hpp>
@@ -37,7 +39,8 @@ void Rpkg::initExtractionData() {
         }
         Logger::log(NK_INFO, "Scanning resource packages.");
 
-        std::jthread filteredHashListThread([]() {
+        const unsigned int threadLimit = Threading::getMaxThreads();
+        auto filteredHashListThread = std::async(threadLimit > 1 ? std::launch::async : std::launch::deferred, []() {
             Logger::log(NK_INFO, "Reading filtered hash list.");
             const std::filesystem::path hashListPath = FileUtil::getApplicationResourcePath("hash_list_filtered.txt");
             if (std::ifstream file(hashListPath); file.is_open()) {
@@ -80,7 +83,8 @@ void Rpkg::initExtractionData() {
         extractionDataInitComplete = true;
         Logger::log(NK_INFO, "Done scanning resource packages.");
 
-        std::jthread navpThread([]() {
+        filteredHashListThread.get();
+        auto navpThread = std::async(threadLimit > 1 ? std::launch::async : std::launch::deferred, []() {
             const auto navpFilesInRpkgsRustStringList =
                 get_all_resources_hashes_by_type_from_rpkg_files(partitionManager, "NAVP", Logger::rustLogCallback);
             std::lock_guard lock(Navp::navpHashIoiStringMapMutex);
@@ -107,7 +111,7 @@ void Rpkg::initExtractionData() {
             }
         });
 
-        std::jthread airgThread([]() {
+        auto airgThread = std::async(std::launch::deferred, []() {
             const auto airgFilesInRpkgsRustStringList =
                 get_all_resources_hashes_by_type_from_rpkg_files(partitionManager, "AIRG", Logger::rustLogCallback);
             std::lock_guard lock(Airg::airgHashIoiStringMapMutex);
@@ -140,9 +144,8 @@ void Rpkg::initExtractionData() {
         //     getHashList();
         // });
 
-        navpThread.join();
-        airgThread.join();
-        filteredHashListThread.join();
+        airgThread.get();
+        navpThread.get();
         // hashListThread.join();
 
         // Logger::log(NK_INFO, "Loading hash list into memory.");

@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <thread>
+#include "../../include/NavKit/util/Threading.h"
 #include <vector>
 #include <future>
 #include <assimp/Exporter.hpp>
@@ -580,7 +581,8 @@ void SceneMesh::loadGlbMesh() {
     Logger::log(NK_INFO, msg.data());
     const auto start = std::chrono::high_resolution_clock::now();
 
-    auto recastFuture = std::async(std::launch::async, [this]() {
+    const auto loadPolicy = Threading::getMaxThreads() > 1 ? std::launch::async : std::launch::deferred;
+    auto recastFuture = std::async(loadPolicy, [this]() {
         Logger::log(NK_INFO, "Loading GLB model data to Recast...");
         const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         const int result = recastAdapter.loadInputGeom(glbToLoad) && recastAdapter.getVertCount() != 0;
@@ -588,14 +590,14 @@ void SceneMesh::loadGlbMesh() {
         return result;
     });
 
-    const auto modelFuture = std::async(std::launch::async, [this]() {
+    auto modelFuture = std::async(std::launch::deferred, [this]() {
         Logger::log(NK_INFO, "Loading GLB model data to rendering system...");
         model.loadModelData(glbToLoad);
         Logger::log(NK_INFO, "Done loading GLB model data to rendering system.");
     });
 
+    modelFuture.get();
     if (recastFuture.get()) {
-        modelFuture.wait();
         if (glbLoadDone.empty()) {
             glbLoadDone.push_back(true);
             // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the GLB.
@@ -623,7 +625,6 @@ void SceneMesh::loadGlbMesh() {
             Logger::log(NK_INFO, msg.data());
         }
     } else {
-        modelFuture.wait();
         Logger::log(NK_ERROR, "Error loading GLB. It may be invalid, too large, or contain no triangles.");
         model.meshes.clear();
         SceneExtract::getInstance().alsoBuildAll = false;

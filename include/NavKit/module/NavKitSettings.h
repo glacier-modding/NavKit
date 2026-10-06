@@ -8,6 +8,7 @@ struct DialogSettings {
     std::string outputFolder;
     std::string blenderPath;
     bool showDebugLogs;
+    unsigned int maxThreads;
 };
 
 class NavKitSettings {

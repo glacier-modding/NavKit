@@ -1,5 +1,8 @@
 #include "../include/NavKit/model/ReasoningGrid.h"
 
+#include "../include/NavKit/util/Threading.h"
+#include <atomic>
+#include <chrono>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -238,7 +241,7 @@ namespace {
         }
         grid.m_WaypointList[2].nLayerIndex = -7;
         grid.m_nNodeCount = static_cast<uint32_t>(grid.m_WaypointList.size());
-        int rays = 0;
+        std::atomic<int> rays{0};
         grid.generateVisionData([&](const Vec4& a, const Vec4& b) {
             ++rays;
             // A short wall at x=0.75 blocks the low ray but lets the high ray pass.
@@ -269,6 +272,19 @@ namespace {
         require(loaded.m_pVisibilityData == grid.m_pVisibilityData, "generated vision did not round trip");
         require(loaded.getVisibility(0, 2)->high, "generated layer lookup failed after serialization");
         const auto original = grid.m_pVisibilityData;
+        const auto savedThreads = Threading::getMaxThreads();
+        const auto ray = [](const Vec4& a, const Vec4& b) {
+            if ((a.x < 0.75f) == (b.x < 0.75f))
+                return true;
+            const float t = (0.75f - a.x) / (b.x - a.x);
+            return a.z + t * (b.z - a.z) > 1;
+        };
+        Threading::setMaxThreads(1);
+        grid.generateVisionData(ray);
+        require(grid.m_pVisibilityData == original, "serial visibility differs");
+        Threading::setMaxThreads(4);
+        grid.generateVisionData(ray);
+        require(grid.m_pVisibilityData == original, "parallel visibility differs");
         bool failed = false;
         try {
             grid.generateVisionData([](const Vec4&, const Vec4&) -> bool { throw std::runtime_error("ray failure"); });
@@ -276,8 +292,70 @@ namespace {
             failed = true;
         }
         require(failed && grid.m_pVisibilityData == original, "ray failure published incomplete vision data");
+        Threading::setMaxThreads(savedThreads);
         grid.m_WaypointList[1].nVisionDataOffset = 1;
         require(!grid.getVisibility(0, 1), "truncated generated record was accepted");
+    }
+
+    void testParallelVision() {
+        const auto savedThreads = Threading::getMaxThreads();
+        ReasoningGrid grid;
+        grid.m_Properties.fGridSpacing = 1;
+        grid.m_Properties.nVisibilityRange = 3;
+        for (int y = -7; y <= 7; ++y) {
+            for (int x = -7; x <= 7; ++x) {
+                Waypoint waypoint;
+                waypoint.vPos = {static_cast<float>(x), static_cast<float>(y), 0, 1};
+                waypoint.nLayerIndex = (x + y) % 3;
+                grid.m_WaypointList.push_back(waypoint);
+            }
+        }
+        const auto ray = [](const Vec4& a, const Vec4& b) { return a.x <= b.x || a.z > 1; };
+        Threading::setMaxThreads(1);
+        grid.generateVisionData(ray);
+        const auto expected = grid.m_pVisibilityData;
+        std::vector<uint32_t> offsets;
+        for (const auto& waypoint : grid.m_WaypointList)
+            offsets.push_back(waypoint.nVisionDataOffset);
+        Threading::setMaxThreads(4);
+        std::vector<size_t> reports;
+        grid.generateVisionData(ray, 0.6f, 1.6f, [&](size_t completed, size_t total) {
+            require(total == 225, "progress total changed");
+            reports.push_back(completed);
+        });
+        require(grid.m_pVisibilityData == expected, "parallel layered visibility differs");
+        require(reports == std::vector<size_t>{100, 200, 225}, "progress is not ordered or complete");
+        for (size_t i = 0; i < offsets.size(); ++i)
+            require(grid.m_WaypointList[i].nVisionDataOffset == offsets[i], "parallel record order changed");
+        bool failed = false;
+        try {
+            grid.generateVisionData(
+                ray, 0.6f, 1.6f, [](size_t, size_t) { throw std::runtime_error("progress failure"); });
+        } catch (const std::runtime_error&) {
+            failed = true;
+        }
+        require(failed && grid.m_pVisibilityData == expected, "progress failure published partial data");
+        for (size_t i = 0; i < offsets.size(); ++i)
+            require(grid.m_WaypointList[i].nVisionDataOffset == offsets[i], "failure changed offsets");
+
+        // Verify actual concurrency and the cap, including the participating caller.
+        Threading::setMaxThreads(2);
+        std::atomic<int> active{0}, peak{0};
+        Threading::parallelFor(100, [&](size_t) {
+            const int running = ++active;
+            int previous = peak.load();
+            while (previous < running && !peak.compare_exchange_weak(previous, running)) {
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            --active;
+        });
+        require(peak == 2 && active == 0, "parallel worker cap or joining failed");
+        Threading::setMaxThreads(0);
+        require(Threading::getMaxThreads() == 1, "zero thread cap must fall back to one");
+        const auto caller = std::this_thread::get_id();
+        Threading::parallelFor(
+            5, [&](size_t) { require(std::this_thread::get_id() == caller, "single-thread work did not use caller"); });
+        Threading::setMaxThreads(savedThreads);
     }
 
     void testEmptyArrayRoundTrip() {
@@ -315,6 +393,7 @@ int main(const int argc, char** argv) {
         testBin1Airg();
         testEmptyArrayRoundTrip();
         testGeneratedVisionData();
+        testParallelVision();
         const std::filesystem::path realAirgPath =
             argc > 1 ? std::filesystem::path(argv[1]) : "tests/resources/intro.airg";
         testRealBin1Airg(realAirgPath);

@@ -1,3 +1,4 @@
+#include "../include/NavKit/util/Threading.h"
 #include "../include/NavKit/adapter/RecastAdapter.h"
 #include "../include/NavKit/model/Json.h"
 #include "../include/NavKit/model/ReasoningGrid.h"
@@ -757,7 +758,14 @@ namespace {
         above.vPos = {101.0f, -6.5f, 6, 1};
         above.nLayerIndex = 1;
         vision.m_WaypointList = {below, above};
+        const auto savedThreads = Threading::getMaxThreads();
+        Threading::setMaxThreads(1);
         GridGenerator::addVisibilityData(&vision);
+        const auto serialVision = vision.m_pVisibilityData;
+        Threading::setMaxThreads(4);
+        GridGenerator::addVisibilityData(&vision);
+        check(vision.m_pVisibilityData == serialVision, "parallel collision visibility differs from serial");
+        Threading::setMaxThreads(savedThreads);
         const auto forward = vision.getVisibility(0, 1), reverse = vision.getVisibility(1, 0);
         check(forward && !forward->low && forward->high, "collision floor should block only the low ray");
         check(reverse && !reverse->low && reverse->high, "collision must block from either triangle side");

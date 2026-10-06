@@ -1,6 +1,10 @@
 #include "../../include/NavKit/module/NavKitSettings.h"
 
 #include <filesystem>
+#include <charconv>
+#include <limits>
+#include <wx/spinctrl.h>
+#include "../../include/NavKit/util/Threading.h"
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -49,6 +53,7 @@ void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.outputFolder = defaultOutputFolder();
     settings.blenderPath.clear();
     settings.showDebugLogs = false;
+    settings.maxThreads = Threading::defaultMaxThreads();
 }
 
 void NavKitSettings::setDialogInputs(wxDialog* dialog, const DialogSettings& tempSettings) {
@@ -61,6 +66,7 @@ void NavKitSettings::setDialogInputs(wxDialog* dialog, const DialogSettings& tem
     static_cast<wxTextCtrl*>(dialog->FindWindow(IDC_EDIT_BLENDER_PATH))
         ->ChangeValue(wxString::FromUTF8(tempSettings.blenderPath));
     static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_SHOW_DEBUG_LOGS))->SetValue(tempSettings.showDebugLogs);
+    static_cast<wxSpinCtrl*>(dialog->FindWindow(IDC_SPIN_MAX_THREADS))->SetValue(tempSettings.maxThreads);
 }
 
 NavKitSettings::NavKitSettings() :
@@ -72,11 +78,11 @@ void NavKitSettings::showNavKitSettingsDialog() {
         hSettingsDialog->Raise();
         return;
     }
-    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "NavKit Settings", wxDefaultPosition, wxSize(640, 330));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "NavKit Settings", wxDefaultPosition, wxSize(640, 380));
     hSettingsDialog = dialog;
-    auto settings = std::make_shared<DialogSettings>(
-        DialogSettings{backgroundColor, hitmanFolder, outputFolder, blenderPath, showDebugLogs});
-    auto* layout = new wxFlexGridSizer(5, 3, 10, 8);
+    auto settings = std::make_shared<DialogSettings>(DialogSettings{
+        backgroundColor, hitmanFolder, outputFolder, blenderPath, showDebugLogs, Threading::getMaxThreads()});
+    auto* layout = new wxFlexGridSizer(6, 3, 10, 8);
     layout->Add(new wxStaticText(dialog, wxID_ANY, "Background Color:"), 0, wxALIGN_CENTER_VERTICAL);
     layout->Add(new wxSlider(dialog, IDC_SLIDER_BG_COLOR, 0, 0, 100), 1, wxEXPAND);
     layout->AddSpacer(1);
@@ -92,6 +98,12 @@ void NavKitSettings::showNavKitSettingsDialog() {
     }
     layout->Add(new wxStaticText(dialog, wxID_ANY, "Show Debug logs:"), 0, wxALIGN_CENTER_VERTICAL);
     layout->Add(new wxCheckBox(dialog, IDC_CHECK_SHOW_DEBUG_LOGS, "Show Debug logs"), 0, wxALIGN_CENTER_VERTICAL);
+    layout->AddSpacer(1);
+    layout->Add(new wxStaticText(dialog, wxID_ANY, "Maximum Worker Threads:"), 0, wxALIGN_CENTER_VERTICAL);
+    auto* threads = new wxSpinCtrl(dialog, IDC_SPIN_MAX_THREADS);
+    threads->SetRange(1, std::numeric_limits<int>::max());
+    threads->SetToolTip("Maximum threads per parallel operation. 1 runs work sequentially. Applies to new operations.");
+    layout->Add(threads, 1, wxEXPAND);
     layout->AddSpacer(1);
     layout->AddGrowableCol(1, 1);
     auto* buttons = new wxBoxSizer(wxHORIZONTAL);
@@ -136,7 +148,14 @@ void NavKitSettings::showNavKitSettingsDialog() {
             settings->showDebugLogs = event.IsChecked();
             Logger::log(NK_INFO, "Show Debug logs set to %s.", settings->showDebugLogs ? "true" : "false");
         });
-    const auto saveSettings = [this, settings] {
+    threads->Bind(wxEVT_SPINCTRL,
+        [settings](wxSpinEvent& event) { settings->maxThreads = static_cast<unsigned int>(event.GetValue()); });
+    threads->Bind(wxEVT_TEXT, [settings, threads](wxCommandEvent&) {
+        settings->maxThreads = static_cast<unsigned int>(threads->GetValue());
+    });
+    const auto saveSettings = [this, settings, threads] {
+        settings->maxThreads = static_cast<unsigned int>(threads->GetValue());
+        Threading::setMaxThreads(settings->maxThreads);
         backgroundColor = settings->backgroundColor;
         setHitmanFolder(settings->hitmanFolder);
         setOutputFolder(settings->outputFolder);
@@ -148,6 +167,7 @@ void NavKitSettings::showNavKitSettingsDialog() {
         persisted.setValue("NavKit", "output", settings->outputFolder);
         persisted.setValue("NavKit", "blender", settings->blenderPath);
         persisted.setValue("NavKit", "showDebugLogs", settings->showDebugLogs ? "true" : "false");
+        persisted.setValue("NavKit", "maxThreads", std::to_string(settings->maxThreads));
         persisted.save();
     };
     ok->Bind(wxEVT_BUTTON, [dialog, saveSettings](wxCommandEvent&) {
@@ -169,6 +189,14 @@ void NavKitSettings::showNavKitSettingsDialog() {
 
 void NavKitSettings::loadSettings() {
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    const std::string threadSetting = persistedSettings.getValue("NavKit", "maxThreads", "");
+    unsigned int threadCount = Threading::defaultMaxThreads();
+    unsigned int parsed = 0;
+    const auto result = std::from_chars(threadSetting.data(), threadSetting.data() + threadSetting.size(), parsed);
+    if (result.ec == std::errc{} && result.ptr == threadSetting.data() + threadSetting.size() && parsed > 0 &&
+        parsed <= static_cast<unsigned int>(std::numeric_limits<int>::max()))
+        threadCount = parsed;
+    Threading::setMaxThreads(threadCount);
     backgroundColor = static_cast<float>(atof(persistedSettings.getValue("NavKit", "backgroundColor", "0.16f")));
     const std::string hitmanFolder = persistedSettings.getValue("NavKit", "hitman", "");
     const std::string outputFolder = persistedSettings.getValue("NavKit", "output", defaultOutputFolder());

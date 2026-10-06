@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <unordered_map>
+#include "../../include/NavKit/util/Threading.h"
 
 void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, const Vec4&)>& unblocked,
     const float lowHeight, const float highHeight, const std::function<void(size_t, size_t)>& progress) {
@@ -20,8 +22,13 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
         throw std::invalid_argument("Invalid AIRG visibility generation settings.");
     }
     using Cell = std::pair<int, int>;
-    std::map<Cell, std::map<int32_t, size_t>> cells;
+    const auto cellKey = [](int x, int y) {
+        return (static_cast<uint64_t>(static_cast<uint32_t>(x)) << 32) | static_cast<uint32_t>(y);
+    };
+    std::unordered_map<uint64_t, std::map<int32_t, size_t>> cells;
+    cells.reserve(m_WaypointList.size());
     std::vector<Cell> waypointCells;
+    waypointCells.reserve(m_WaypointList.size());
     for (size_t i = 0; i < m_WaypointList.size(); ++i) {
         const auto& waypoint = m_WaypointList[i];
         const auto coordinate = [&](float value, float minimum) {
@@ -39,13 +46,28 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
             coordinate(waypoint.vPos.x, m_Properties.vMin.x), coordinate(waypoint.vPos.y, m_Properties.vMin.y)};
         waypointCells.push_back(cell);
         // The first waypoint in list order represents duplicate cells on the same layer.
-        cells[cell].try_emplace(waypoint.nLayerIndex, i);
+        cells[cellKey(cell.first, cell.second)].try_emplace(waypoint.nLayerIndex, i);
     }
+    struct CellEntry {
+        int x;
+        const std::map<int32_t, size_t>* layers;
+    };
+    std::unordered_map<int, std::vector<CellEntry>> rows;
+    for (const auto& [key, layers] : cells) {
+        const int x = std::bit_cast<int32_t>(static_cast<uint32_t>(key >> 32));
+        const int y = std::bit_cast<int32_t>(static_cast<uint32_t>(key));
+        rows[y].push_back({x, &layers});
+    }
+    for (auto& [y, row] : rows)
+        std::ranges::sort(row, {}, &CellEntry::x);
+    const auto& indexedRows = rows;
     const int range = static_cast<int>(m_Properties.nVisibilityRange);
     const size_t width = 2 * static_cast<size_t>(range) + 1;
-    std::vector<uint8_t> data;
-    std::vector<uint32_t> offsets;
-    for (size_t source = 0; source < m_WaypointList.size(); ++source) {
+    std::vector<std::vector<uint8_t>> records(m_WaypointList.size());
+    std::mutex progressMutex;
+    size_t completed = 0;
+    Threading::parallelFor(m_WaypointList.size(), [&](size_t source) {
+        auto& data = records[source];
         const auto& from = m_WaypointList[source];
         const auto [cx, cy] = waypointCells[source];
         std::map<int32_t, size_t> layers;
@@ -55,12 +77,14 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
         };
         std::vector<Target> targets;
         for (int dy = -range; dy <= range; ++dy) {
-            for (int dx = -range; dx <= range; ++dx) {
-                const auto cell = cells.find({cx + dx, cy + dy});
-                if (cell == cells.end())
-                    continue;
-                for (const auto& [layer, index] : cell->second) {
-                    targets.push_back({dx, dy, index});
+            const auto row = indexedRows.find(cy + dy);
+            if (row == indexedRows.end())
+                continue;
+            auto cell = std::lower_bound(row->second.begin(), row->second.end(), cx - range,
+                [](const CellEntry& entry, int x) { return entry.x < x; });
+            for (; cell != row->second.end() && cell->x <= cx + range; ++cell) {
+                for (const auto& [layer, index] : *cell->layers) {
+                    targets.push_back({cell->x - cx, dy, index});
                     if (layer != from.nLayerIndex)
                         layers.try_emplace(layer, 0);
                 }
@@ -71,7 +95,6 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
         if (data.size() > UINT32_MAX || headerSize + byteCount > UINT32_MAX - data.size()) {
             throw std::length_error("AIRG visibility data exceeds 32-bit offsets.");
         }
-        offsets.push_back(static_cast<uint32_t>(data.size()));
         const size_t start = data.size();
         data.push_back(static_cast<uint8_t>(layers.size()));
         data.push_back(static_cast<uint8_t>(layers.size() >> 8));
@@ -98,10 +121,27 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
                 }
             }
         }
-        const size_t completed = source + 1;
-        if (progress && (completed % 100 == 0 || completed == m_WaypointList.size())) {
-            progress(completed, m_WaypointList.size());
+        if (progress) {
+            std::lock_guard lock(progressMutex);
+            ++completed;
+            if (completed % 100 == 0 || completed == m_WaypointList.size())
+                progress(completed, m_WaypointList.size());
         }
+    });
+    std::vector<uint32_t> offsets;
+    offsets.reserve(records.size());
+    size_t totalSize = 0;
+    for (const auto& record : records) {
+        if (record.size() > UINT32_MAX - totalSize)
+            throw std::length_error("AIRG visibility data exceeds 32-bit offsets.");
+        offsets.push_back(static_cast<uint32_t>(totalSize));
+        totalSize += record.size();
+    }
+    std::vector<uint8_t> data;
+    data.reserve(totalSize);
+    for (auto& record : records) {
+        data.insert(data.end(), record.begin(), record.end());
+        std::vector<uint8_t>().swap(record);
     }
     // Publish only after all rays and bounds checks succeeded.
     m_pVisibilityData = std::move(data);
