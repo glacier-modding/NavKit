@@ -7,9 +7,105 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+
+void ReasoningGrid::generateVisionData(
+    const std::function<bool(const Vec4&, const Vec4&)>& unblocked, const float lowHeight, const float highHeight) {
+    if (!unblocked || !std::isfinite(m_Properties.fGridSpacing) || m_Properties.fGridSpacing <= 0 ||
+        m_Properties.nVisibilityRange > 512 || !std::isfinite(lowHeight) || !std::isfinite(highHeight) ||
+        lowHeight <= 0 || highHeight <= 0) {
+        throw std::invalid_argument("Invalid AIRG visibility generation settings.");
+    }
+    using Cell = std::pair<int, int>;
+    std::map<Cell, std::map<int32_t, size_t>> cells;
+    std::vector<Cell> waypointCells;
+    for (size_t i = 0; i < m_WaypointList.size(); ++i) {
+        const auto& waypoint = m_WaypointList[i];
+        const auto coordinate = [&](float value, float minimum) {
+            const double cell = std::floor((static_cast<double>(value) - minimum) / m_Properties.fGridSpacing);
+            if (!std::isfinite(cell) || cell < std::numeric_limits<int>::min() + 512.0 ||
+                cell > std::numeric_limits<int>::max() - 512.0) {
+                throw std::invalid_argument("Invalid AIRG waypoint position.");
+            }
+            return static_cast<int>(cell);
+        };
+        if (!std::isfinite(waypoint.vPos.z) || waypoint.nLayerIndex < INT16_MIN || waypoint.nLayerIndex > INT16_MAX) {
+            throw std::invalid_argument("Invalid AIRG waypoint layer or height.");
+        }
+        const Cell cell{
+            coordinate(waypoint.vPos.x, m_Properties.vMin.x), coordinate(waypoint.vPos.y, m_Properties.vMin.y)};
+        waypointCells.push_back(cell);
+        // The first waypoint in list order represents duplicate cells on the same layer.
+        cells[cell].try_emplace(waypoint.nLayerIndex, i);
+    }
+    const int range = static_cast<int>(m_Properties.nVisibilityRange);
+    const size_t width = 2 * static_cast<size_t>(range) + 1;
+    std::vector<uint8_t> data;
+    std::vector<uint32_t> offsets;
+    for (size_t source = 0; source < m_WaypointList.size(); ++source) {
+        const auto& from = m_WaypointList[source];
+        const auto [cx, cy] = waypointCells[source];
+        std::map<int32_t, size_t> layers;
+        struct Target {
+            int dx, dy;
+            size_t index;
+        };
+        std::vector<Target> targets;
+        for (int dy = -range; dy <= range; ++dy) {
+            for (int dx = -range; dx <= range; ++dx) {
+                const auto cell = cells.find({cx + dx, cy + dy});
+                if (cell == cells.end())
+                    continue;
+                for (const auto& [layer, index] : cell->second) {
+                    targets.push_back({dx, dy, index});
+                    if (layer != from.nLayerIndex)
+                        layers.try_emplace(layer, 0);
+                }
+            }
+        }
+        const size_t headerSize = 2 + 2 * layers.size();
+        const size_t byteCount = (width * width * 2 * (layers.size() + 1) + 7) / 8;
+        if (data.size() > UINT32_MAX || headerSize + byteCount > UINT32_MAX - data.size()) {
+            throw std::length_error("AIRG visibility data exceeds 32-bit offsets.");
+        }
+        offsets.push_back(static_cast<uint32_t>(data.size()));
+        const size_t start = data.size();
+        data.push_back(static_cast<uint8_t>(layers.size()));
+        data.push_back(static_cast<uint8_t>(layers.size() >> 8));
+        size_t layerIndex = 1;
+        for (auto& [layer, index] : layers) {
+            index = layerIndex++;
+            const auto id = static_cast<uint16_t>(layer);
+            data.push_back(static_cast<uint8_t>(id));
+            data.push_back(static_cast<uint8_t>(id >> 8));
+        }
+        data.resize(start + headerSize + byteCount, 0);
+        for (const auto& target : targets) {
+            const auto& to = m_WaypointList[target.index];
+            const size_t layer = to.nLayerIndex == from.nLayerIndex ? 0 : layers.at(to.nLayerIndex);
+            for (size_t channel = 0; channel < 2; ++channel) {
+                Vec4 a = from.vPos, b = to.vPos;
+                const float height = channel == 0 ? highHeight : lowHeight;
+                a.z += height;
+                b.z += height;
+                if (unblocked(a, b)) {
+                    const size_t bit = static_cast<size_t>(target.dx + range) +
+                        width * (static_cast<size_t>(target.dy + range) + width * (channel + 2 * layer));
+                    data[start + headerSize + bit / 8] |= static_cast<uint8_t>(1u << (bit % 8));
+                }
+            }
+        }
+    }
+    // Publish only after all rays and bounds checks succeeded.
+    m_pVisibilityData = std::move(data);
+    for (size_t i = 0; i < offsets.size(); ++i)
+        m_WaypointList[i].nVisionDataOffset = offsets[i];
+    m_HighVisibilityBits = {};
+    m_LowVisibilityBits = {};
+}
 
 namespace {
     template <typename T> void writeLittleEndian(std::vector<uint8_t>& bytes, const size_t offset, const T value) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <vector>
 #include "../../NavWeakness/NavPower.h"
@@ -86,6 +87,10 @@ public:
     std::vector<uint8_t> getWaypointVisionData(int waypointIndex) const;
 
     std::optional<WaypointVisibility> getVisibility(int fromWaypointIndex, int toWaypointIndex) const;
+
+    // Rays use game coordinates (Z up). Heights are policy defaults, not recovered engine constants.
+    void generateVisionData(const std::function<bool(const Vec4&, const Vec4&)>& unblocked, float lowHeight = 0.6f,
+        float highHeight = 1.6f);
 
     static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, float spacing, float zSpacing, float tolerance,
         float zTolerance);

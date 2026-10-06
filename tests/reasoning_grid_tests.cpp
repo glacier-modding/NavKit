@@ -226,6 +226,60 @@ namespace {
         require(grid.m_WaypointList[0].nLayerIndex == -26, "BIN1 waypoint layer index was not read");
     }
 
+    void testGeneratedVisionData() {
+        ReasoningGrid grid;
+        grid.m_Properties.fGridSpacing = 1;
+        grid.m_Properties.nVisibilityRange = 1;
+        for (const auto pos : {Vec4{0.25f, 0.25f, 0, 1}, Vec4{1.25f, 0.25f, 0, 1}, Vec4{1.25f, 1.25f, 2, 1},
+                 Vec4{3.25f, 0.25f, 0, 1}, Vec4{1.3f, 0.3f, 8, 1}}) {
+            Waypoint waypoint;
+            waypoint.vPos = pos;
+            grid.m_WaypointList.push_back(waypoint);
+        }
+        grid.m_WaypointList[2].nLayerIndex = -7;
+        grid.m_nNodeCount = static_cast<uint32_t>(grid.m_WaypointList.size());
+        int rays = 0;
+        grid.generateVisionData([&](const Vec4& a, const Vec4& b) {
+            ++rays;
+            // A short wall at x=0.75 blocks the low ray but lets the high ray pass.
+            if ((a.x < 0.75f) == (b.x < 0.75f))
+                return true;
+            const float t = (0.75f - a.x) / (b.x - a.x);
+            return a.z + t * (b.z - a.z) > 1;
+        });
+        require(rays > 0, "visibility generation did not cast rays");
+        const auto visible = grid.getVisibility(0, 1);
+        require(visible && !visible->low && visible->high, "low/high ray heights or channels are wrong");
+        const auto duplicate = grid.getVisibility(0, 4);
+        require(duplicate && !duplicate->low && duplicate->high, "duplicate representative policy changed");
+        const auto crossLayer = grid.getVisibility(0, 2);
+        require(crossLayer && crossLayer->low && crossLayer->high, "cross-layer corner visibility is wrong");
+        require(!grid.getVisibility(0, 3), "out-of-range waypoint has visibility");
+        const auto record = grid.getWaypointVisionData(0);
+        require(record.size() == 9 && record[0] == 1 && record[1] == 0 && record[2] == 0xf9 && record[3] == 0xff,
+            "layer count/IDs or record size are wrong");
+        // Cell (+1,0), channel 0 is bit 5. Channel 1 is bit 14. Empty (-1,-1) is bit 0.
+        require((record[4] & 0x20) && !(record[5] & 0x40) && !(record[4] & 1),
+            "visibility packing is not LSB-first or missing cells are set");
+        const auto path = std::filesystem::temp_directory_path() / "NavKitGeneratedVision.airg";
+        grid.writeAirg(path);
+        ReasoningGrid loaded;
+        loaded.readAirg(path);
+        std::filesystem::remove(path);
+        require(loaded.m_pVisibilityData == grid.m_pVisibilityData, "generated vision did not round trip");
+        require(loaded.getVisibility(0, 2)->high, "generated layer lookup failed after serialization");
+        const auto original = grid.m_pVisibilityData;
+        bool failed = false;
+        try {
+            grid.generateVisionData([](const Vec4&, const Vec4&) -> bool { throw std::runtime_error("ray failure"); });
+        } catch (const std::runtime_error&) {
+            failed = true;
+        }
+        require(failed && grid.m_pVisibilityData == original, "ray failure published incomplete vision data");
+        grid.m_WaypointList[1].nVisionDataOffset = 1;
+        require(!grid.getVisibility(0, 1), "truncated generated record was accepted");
+    }
+
     void testEmptyArrayRoundTrip() {
         ReasoningGrid expected;
         const std::filesystem::path path =
@@ -260,6 +314,7 @@ int main(const int argc, char** argv) {
         testTruncatedFile();
         testBin1Airg();
         testEmptyArrayRoundTrip();
+        testGeneratedVisionData();
         const std::filesystem::path realAirgPath =
             argc > 1 ? std::filesystem::path(argv[1]) : "tests/resources/intro.airg";
         testRealBin1Airg(realAirgPath);

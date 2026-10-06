@@ -171,15 +171,14 @@ namespace {
     void testAirgVisibilityDefaults() {
         ReasoningGrid grid;
         grid.m_nNodeCount = 2;
-        GridGenerator::addVisibilityData(&grid);
-
-        require(grid.m_pVisibilityData.size() == 1112, "visibility data should reserve 556 bytes per waypoint");
-        require(std::ranges::all_of(grid.m_pVisibilityData, [](const uint8_t value) { return value == 255; }),
-            "new visibility data should be initialized as visible");
-        require(grid.m_HighVisibilityBits.m_nSize == 0, "high visibility bit count should start empty");
-        require(grid.m_LowVisibilityBits.m_nSize == 0, "low visibility bit count should start empty");
-        require(grid.m_deadEndData.m_nSize == 2 && grid.m_deadEndData.m_aBytes.empty(),
-            "dead-end data should be initialized for all waypoints");
+        bool rejected = false;
+        try {
+            GridGenerator::addVisibilityData(&grid);
+        } catch (const std::runtime_error&) {
+            rejected = true;
+        }
+        require(rejected, "vision generation should require scene collision geometry");
+        require(grid.m_pVisibilityData.empty(), "missing geometry should not publish visibility data");
     }
 
     void testAirgWaypointConnections() {

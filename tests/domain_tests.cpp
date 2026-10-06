@@ -7,6 +7,7 @@
 #include "../include/NavKit/module/NavKitSettings.h"
 #include "../include/NavKit/module/Navp.h"
 #include "../include/NavKit/module/Rpkg.h"
+#include "../include/NavKit/module/Renderer.h"
 #include "../include/NavKit/module/Scene.h"
 #include "../include/NavKit/module/SceneMesh.h"
 #include "../include/NavKit/render/Mesh.h"
@@ -747,6 +748,25 @@ namespace {
         checkNear(adapter.inputGeom->getMesh()->getVerts()[0], 100.0f);
         checkNear(adapter.inputGeom->getMesh()->getVerts()[1], 5.0f);
         checkNear(adapter.inputGeom->getMesh()->getVerts()[2], 7.0f);
+        ReasoningGrid vision;
+        vision.m_Properties.fGridSpacing = 1;
+        vision.m_Properties.nVisibilityRange = 1;
+        vision.m_Properties.vMin = {100, -7, 0, 1};
+        Waypoint below, above;
+        below.vPos = {100.5f, -6.5f, 4, 1};
+        above.vPos = {101.0f, -6.5f, 6, 1};
+        above.nLayerIndex = 1;
+        vision.m_WaypointList = {below, above};
+        GridGenerator::addVisibilityData(&vision);
+        const auto forward = vision.getVisibility(0, 1), reverse = vision.getVisibility(1, 0);
+        check(forward && !forward->low && forward->high, "collision floor should block only the low ray");
+        check(reverse && !reverse->low && reverse->high, "collision must block from either triangle side");
+        float rayStart[3] = {100.5f, 4.6f, 6.5f}, rayEnd[3] = {101.0f, 6.6f, 6.5f};
+        float hitTime = 1;
+        const bool directHit = adapter.inputGeom->raycastMesh(rayStart, rayEnd, hitTime) != -1;
+        std::swap_ranges(rayStart, rayStart + 3, rayEnd);
+        const bool reverseHit = adapter.inputGeom->raycastMesh(rayStart, rayEnd, hitTime) != -1;
+        check(directHit || reverseHit, "generated blocked bit must agree with direct collision raycast");
         std::error_code removeError;
         std::filesystem::remove(geometryPath, removeError);
 
@@ -755,6 +775,42 @@ namespace {
         adapter.setMeshBBox(minimum, maximum);
         check(adapter.sample->m_maxTiles > 0 && adapter.sample->m_maxPolysPerTile > 0,
             "tile settings should remain valid after setting a mesh bound");
+    }
+
+    void testMarkerObjectNames() {
+        auto& adapter = RecastAdapter::getInstance();
+        auto& scene = Scene::getInstance();
+        auto& ranges = SceneMesh::getInstance().objectTriangleRanges;
+        const auto savedRanges = ranges;
+        const bool loaded = scene.sceneLoaded;
+        const auto selected = adapter.selectedObject;
+        const bool markerSet = adapter.markerPositionSet;
+        const std::array<float, 3> marker = {
+            adapter.markerPosition[0], adapter.markerPosition[1], adapter.markerPosition[2]};
+        scene.sceneLoaded = true;
+        SceneMeshHitTestResult hit;
+        hit.hitIndex = 0;
+        hit.hitTime = 0.5f;
+        hit.rayEnd[0] = 2;
+        for (const std::string name : {"", "Mesh 1", "0123456789ABCDEF", "0123456789ABCDEF_",
+                 "0123456789ABCDEF_0123456789ABCDEF", "0123456789ABCDEF_0123456789ABCDEF.001"}) {
+            ranges = {{name, {0, 1}}};
+            adapter.setMarker(hit);
+            check(adapter.selectedObject == name, "marker should retain arbitrary mesh names safely");
+            checkNear(adapter.markerPosition[0], 1);
+        }
+        ranges.clear();
+        adapter.setMarker(hit);
+        check(adapter.selectedObject.empty(), "unmatched triangle should clear stale selected object");
+        hit.hitIndex = -1;
+        hit.rayEnd[0] = 10;
+        adapter.setMarker(hit);
+        checkNear(adapter.markerPosition[0], 1);
+        ranges = savedRanges;
+        scene.sceneLoaded = loaded;
+        adapter.selectedObject = selected;
+        adapter.markerPositionSet = markerSet;
+        std::copy(marker.begin(), marker.end(), adapter.markerPosition);
     }
 
     void testNavpBinaryLoading() {
@@ -853,7 +909,10 @@ namespace {
         check(!airg.canSave(), "Airg save should be unavailable without loaded data");
         check(!airg.canBuildAirg(), "Airg build should require a loaded Navp");
         navp.navpLoaded = true;
-        check(airg.canBuildAirg(), "Airg build should be enabled for a loaded Navp");
+        sceneMesh.glbLoaded = false;
+        check(!airg.canBuildAirg(), "Airg build should require loaded collision geometry");
+        sceneMesh.glbLoaded = true;
+        check(airg.canBuildAirg(), "Airg build should be enabled with Navp and collision geometry");
         airg.airgBuilding = true;
         check(!airg.canBuildAirg(), "Airg build should be disabled while already building");
         airg.airgBuilding = false;
@@ -941,6 +1000,7 @@ void runDomainTests() {
     run("Render model mesh batching", testModelMeshBatching);
     run("Recast adapter geometry loading and coordinate conversion", testRecastAdapterGeometrySurface);
     run("Navp binary fixture loading", testNavpBinaryLoading);
+    run("Marker handles arbitrary mesh names", testMarkerObjectNames);
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
 }

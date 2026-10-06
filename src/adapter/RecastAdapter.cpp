@@ -964,10 +964,14 @@ dtPolyRef RecastAdapter::getAdjacentPoly(const dtPolyRef polyRef, const int edge
 }
 
 void RecastAdapter::setMarker(const SceneMeshHitTestResult& result) {
+    if (result.hitIndex < 0) {
+        return;
+    }
     markerPositionSet = true;
     markerPosition[0] = result.rayStart[0] + (result.rayEnd[0] - result.rayStart[0]) * result.hitTime;
     markerPosition[1] = result.rayStart[1] + (result.rayEnd[1] - result.rayStart[1]) * result.hitTime;
     markerPosition[2] = result.rayStart[2] + (result.rayEnd[2] - result.rayStart[2]) * result.hitTime;
+    selectedObject.clear();
     for (const auto& [object, vertexRange] : SceneMesh::getInstance().objectTriangleRanges) {
         if (result.hitIndex >= vertexRange.first && result.hitIndex < vertexRange.second) {
             selectedObject = object;
@@ -976,7 +980,15 @@ void RecastAdapter::setMarker(const SceneMeshHitTestResult& result) {
     }
     std::string meshNameString;
     std::string roomString;
-    if (Scene::getInstance().sceneLoaded) {
+    // Generic GLBs and generated navmeshes can have arbitrary mesh names.
+    // Only Glacier2Glb's hash_entityId names carry scene lookup metadata.
+    const auto isHex = [](const char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    };
+    const bool hasSceneIdentity = selectedObject.size() >= 33 && selectedObject[16] == '_' &&
+        std::all_of(selectedObject.begin(), selectedObject.begin() + 16, isHex) &&
+        std::all_of(selectedObject.begin() + 17, selectedObject.begin() + 33, isHex);
+    if (Scene::getInstance().sceneLoaded && hasSceneIdentity) {
         if (const auto mesh = Scene::getInstance().findMeshByHashAndIdAndPos(
                 selectedObject.substr(0, 16), selectedObject.substr(17, 16), markerPosition);
             mesh != nullptr) {

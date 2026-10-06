@@ -220,7 +220,8 @@ bool Airg::canSave() const {
 
 bool Airg::canBuildAirg() const {
     const Navp& navp = Navp::getInstance();
-    return navp.navpLoaded && !airgLoading && airgSaveState.empty() && !airgBuilding;
+    return navp.navpLoaded && SceneMesh::getInstance().glbLoaded && !airgLoading && airgSaveState.empty() &&
+        !airgBuilding;
 }
 
 void Airg::handleBuildAirgClicked() {
