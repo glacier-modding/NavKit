@@ -106,7 +106,7 @@ int InputHandler::handleInput() {
                     navp.doNavpExclusionBoxHitTest = true;
                     navp.doNavpPfSeedPointHitTest = true;
                     airg.doAirgHitTest = true;
-                    obj.doObjHitTest = true;
+                    obj.doGlbHitTest = true;
                 }
             }
 
@@ -202,9 +202,9 @@ void InputHandler::hitTest() const {
             (navp.doNavpExclusionBoxHitTest && navp.showPfExclusionBoxes) ||
             (navp.doNavpPfSeedPointHitTest && navp.showPfSeedPoints) ||
             (airg.doAirgHitTest && airg.airgLoaded && airg.showAirg) ||
-            (sceneMesh.doObjHitTest && sceneMesh.objLoaded && sceneMesh.showObj)) {
+            (sceneMesh.doGlbHitTest && sceneMesh.glbLoaded && sceneMesh.showGlb)) {
             SceneMeshHitTestResult sceneMeshHitResult;
-            if (sceneMesh.showObj && sceneMesh.objLoaded && sceneMesh.doObjHitTest) {
+            if (sceneMesh.showGlb && sceneMesh.glbLoaded && sceneMesh.doGlbHitTest) {
                 sceneMeshHitResult = recastAdapter.doHitTest(mousePos[0], mousePos[1]);
             }
 
@@ -255,7 +255,7 @@ void InputHandler::hitTest() const {
             navp.doNavpExclusionBoxHitTest = false;
             navp.doNavpPfSeedPointHitTest = false;
             airg.doAirgHitTest = false;
-            sceneMesh.doObjHitTest = false;
+            sceneMesh.doGlbHitTest = false;
         }
     }
     Menu::updateMenuState();

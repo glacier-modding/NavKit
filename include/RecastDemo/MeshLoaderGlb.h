@@ -16,16 +16,16 @@
 // 3. This notice may not be removed or altered from any source distribution.
 //
 
-#ifndef MESHLOADER_OBJ
-#define MESHLOADER_OBJ
+#ifndef MESHLOADER_GLB
+#define MESHLOADER_GLB
 
 #include <string>
 
-class rcMeshLoaderObj
+class rcMeshLoaderGlb
 {
 public:
-	rcMeshLoaderObj();
-	~rcMeshLoaderObj();
+	rcMeshLoaderGlb();
+	~rcMeshLoaderGlb();
 	
 	bool load(const std::string& fileName);
 
@@ -37,8 +37,8 @@ public:
 	const std::string& getFileName() const { return m_filename; }
 
 	// Explicitly disabled copy constructor and copy assignment operator.
-	rcMeshLoaderObj(const rcMeshLoaderObj&);
-	rcMeshLoaderObj& operator=(const rcMeshLoaderObj&);
+	rcMeshLoaderGlb(const rcMeshLoaderGlb&);
+	rcMeshLoaderGlb& operator=(const rcMeshLoaderGlb&);
 	
 	void addVertex(float x, float y, float z, int& cap);
 	void addTriangle(int a, int b, int c, int& cap);
@@ -52,4 +52,4 @@ public:
 	int m_triCount;
 };
 
-#endif // MESHLOADER_OBJ
+#endif // MESHLOADER_GLB

@@ -363,7 +363,7 @@ char* Navp::openSaveNavpFileDialog() {
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {
-    if (SceneMesh::getInstance().objLoaded) {
+    if (SceneMesh::getInstance().glbLoaded) {
         if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             recastAdapter.clearConvexVolumes();
             for (Json::PfBox exclusionBox : Scene::getInstance().exclusionBoxes) {
@@ -1018,7 +1018,7 @@ bool Navp::canBuildNavp() const {
     const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
     const SceneMesh& obj = SceneMesh::getInstance();
     const Scene& scene = Scene::getInstance();
-    return !navpBuildDone && !building && recastAdapter.inputGeom && obj.objLoaded &&
+    return !navpBuildDone && !building && recastAdapter.inputGeom && obj.glbLoaded &&
         !Airg::getInstance().airgBuilding && scene.sceneLoaded;
 }
 

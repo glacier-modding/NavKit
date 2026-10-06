@@ -21,7 +21,7 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
     1. Output directory (e.g., C:\NavKit\Output)
     1. Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 4.3\blender.exe)
 1. On the "Extract menu" of NavKit, click the "Extract scene from game and build all" button. It may take up to around 10 minutes depending on the complexity of the mission being extracted, and whether the alocs have already been extracted from the rpkg files.  
-1. When the OBJ finishes generating, you can save it to an OBJ file so you can load it later if you'd like by clicking "File > Save Obj" on the menu bar 
+1. When the GLB finishes generating, you can save it as a GLB file so you can load it later if you'd like by clicking "File > Save GLB" on the menu bar.
 1. When the NAVP finishes generating, click on "File > Save Navp" on the menu bar
 1. When the AIRG finishes generating, click on "File > Save Airg" on the menu bar
 
@@ -86,8 +86,8 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 NavKit performs the following series of steps to be able to generate Navp files.
 1. Connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's ZGeomEntities, PFBox entities, and PFSeedPoint entities and send their data back to NavKit, where they are saved to `output.nav.json` in the specified output folder.
 1. Extract all the necessary Aloc or Prim files from the rpkg files to the `aloc` or `prim` folder of the specified output folder using navkit-rpkg-lib (A rust library included in the installer).
-1. Open the blender cli and run the `glacier2obj.py` script to generate an obj by importing all the Aloc or Prim files, copy them the number if times they are used in the scene, and transform each one according to what was sent by the game, and save it to `output.obj` and / or `output.blend` in the specified output folder.
-1. Load `output.obj` from the specified output folder or another specified Obj file.
+1. Open the Blender CLI and run the `Glacier2Glb.py` script to generate a GLB by importing the ALOC or PRIM files, copying and transforming them as specified by the game, then save it to `output.glb` and/or `output.blend` in the specified output folder.
+1. Load `output.glb` from the specified output folder or another GLB file.
 1. At this point, the build Navp section of the menu will be available. You can customize the parameters with "Settings > Recast Settings" on the menu bar, then press "Build > Build Navp" on the menu bar to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
 1. At this point, the build Airg section of the menu will be available, and you can customize the parameters, then press build to generate the Airg.
 # Disclaimer
@@ -107,7 +107,7 @@ NavKit performs the following series of steps to be able to generate Navp files.
 
 # 🧪 Manually running the integration test
 
-`NavKitIntegrationTests` is an opt-in end-to-end test and is not registered with CTest, so it does not run in the release test gate. It connects to the live HITMAN editor socket, scans and extracts ALOC resources from the installed RPKG files with `navkit-rpkg-lib`, invokes the repository's `Glacier2Obj.py` script using Blender, then builds and validates a NAVP and AIRG.
+`NavKitIntegrationTests` is an opt-in end-to-end test and is not registered with CTest, so it does not run in the release test gate. It connects to the live HITMAN editor socket, scans and extracts ALOC resources from the installed RPKG files with `navkit-rpkg-lib`, invokes the repository's `Glacier2Glb.py` script using Blender, then builds and validates a NAVP and AIRG.
 The test logs each editor-socket open, scene-entity request, and close call. On Windows it also attempts to widen a real console window to 240 columns to reduce line wrapping.
 
 Before running it:
@@ -138,7 +138,7 @@ To override all three paths at the command line:
 .\build\x64-debug-integration\tests\Debug\NavKitIntegrationTests.exe "C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3" "C:\Program Files\Blender Foundation\Blender 4.3\blender.exe" "C:\NavKit\IntegrationOutput" --gameversion steam
 ```
 
-The test keeps each run's extracted scene, assets, OBJ, NAVP, and AIRG in a uniquely named `integration-*` directory under the output directory. A nonzero exit code or `[fail]` message indicates that a stage failed.
+The test keeps each run's extracted scene, assets, GLB, NAVP, and AIRG in a uniquely named `integration-*` directory under the output directory. A nonzero exit code or `[fail]` message indicates that a stage failed.
 
 # 🛠️ Pre-commit Hooks
 

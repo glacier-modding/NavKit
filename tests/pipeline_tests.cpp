@@ -434,14 +434,14 @@ namespace {
             "The active mission returned no mesh entities, or scene extraction failed, within 2 minutes.");
     }
 
-    void extractAssetsAndBuildObj(const std::filesystem::path& hitmanDirectory,
+    void extractAssetsAndBuildGlb(const std::filesystem::path& hitmanDirectory,
         const std::filesystem::path& blenderExecutable, const std::filesystem::path& outputDirectory) {
         const std::filesystem::path sceneFile = outputDirectory / Scene::OUTPUT_SCENE_FILE_NAME;
         const std::filesystem::path runtimeDirectory = hitmanDirectory / "Runtime";
         const std::filesystem::path alocDirectory = outputDirectory / "aloc";
-        const std::filesystem::path generatedObj = outputDirectory / "output.obj";
+        const std::filesystem::path generatedGlb = outputDirectory / "output.glb";
         const std::filesystem::path scriptFile =
-            std::filesystem::u8path(NAVKIT_TEST_SOURCE_DIR) / "src" / "resource" / "Glacier2Obj.py";
+            std::filesystem::u8path(NAVKIT_TEST_SOURCE_DIR) / "src" / "resource" / "Glacier2Glb.py";
         std::filesystem::create_directories(alocDirectory);
 
         require(Rpkg::extractionDataInitComplete && Rpkg::partitionManager != nullptr,
@@ -458,7 +458,7 @@ namespace {
             "RPKG extraction produced no ALOC files.");
 
         const std::vector<wxString> blenderArguments = {pathToWxString(blenderExecutable), "-b", "--factory-startup",
-            "-P", pathToWxString(scriptFile), "--", pathToWxString(sceneFile), pathToWxString(generatedObj), "ALOC",
+            "-P", pathToWxString(scriptFile), "--", pathToWxString(sceneFile), pathToWxString(generatedGlb), "ALOC",
             "11111111", "copy", "true", "false"};
         std::vector<const wxChar*> blenderArgumentPointers;
         blenderArgumentPointers.reserve(blenderArguments.size() + 1);
@@ -467,13 +467,13 @@ namespace {
         }
         blenderArgumentPointers.push_back(nullptr);
         require(wxExecute(blenderArgumentPointers.data(), wxEXEC_SYNC) == 0,
-            "Blender failed while running the repository's Glacier2Obj.py script.");
-        requireNonEmptyFile(generatedObj, "Blender-generated OBJ");
+            "Blender failed while running the repository's Glacier2Glb.py script.");
+        requireNonEmptyFile(generatedGlb, "Blender-generated GLB");
 
         RecastAdapter& adapter = RecastAdapter::getInstance();
         adapter.resetCommonSettings();
         adapter.cleanup();
-        require(adapter.loadInputGeom(generatedObj.string()), "Recast could not load the Blender-generated OBJ.");
+        require(adapter.loadInputGeom(generatedGlb.string()), "Recast could not load the Blender-generated GLB.");
         adapter.handleMeshChanged();
     }
 
@@ -486,7 +486,7 @@ namespace {
             scene.bBoxPos[2] + scene.bBoxScale[2] / 2};
         adapter.setMeshBBox(bboxMin, bboxMax);
         Navp::updateExclusionBoxConvexVolumes();
-        require(adapter.handleBuild(), "Recast failed to build a NAVP from the generated OBJ.");
+        require(adapter.handleBuild(), "Recast failed to build a NAVP from the generated GLB.");
         adapter.findPfSeedPointAreas();
         adapter.excludeNonReachableAreas();
 
@@ -626,8 +626,8 @@ namespace {
         std::cout << "[integration] Extracting the active mission from HITMAN...\n";
         extractSceneFromRunningGame(outputDirectory, deadline);
         closeHitmanGame(hitmanDirectory);
-        std::cout << "[integration] Extracting ALOC resources and running Glacier2Obj.py...\n";
-        extractAssetsAndBuildObj(hitmanDirectory, blenderExecutable, outputDirectory);
+        std::cout << "[integration] Extracting ALOC resources and running Glacier2Glb.py...\n";
+        extractAssetsAndBuildGlb(hitmanDirectory, blenderExecutable, outputDirectory);
         std::cout << "[integration] Building and validating NAVP...\n";
         buildNavp(outputDirectory);
         std::cout << "[integration] Building and validating AIRG...\n";

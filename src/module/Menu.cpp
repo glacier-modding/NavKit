@@ -25,14 +25,14 @@ wxMenuBar* Menu::createMenuBar() {
     auto* bar = new wxMenuBar();
     auto* file = new wxMenu();
     file->Append(IDM_FILE_OPEN_SCENE, "Open &Scene");
-    file->Append(IDM_FILE_OPEN_OBJ, "Open &Obj");
+    file->Append(IDM_FILE_OPEN_GLB, "Open &GLB");
     file->Append(IDM_FILE_OPEN_NAVP, "Open &Navp");
     file->Append(IDM_FILE_OPEN_NAVP_FROM_RPKG, "Open Navp from &Rpkg");
     file->Append(IDM_FILE_OPEN_AIRG, "Open &Airg");
     file->Append(IDM_FILE_OPEN_AIRG_FROM_RPKG, "Open Airg from &Rpkg");
     file->AppendSeparator();
     file->Append(IDM_FILE_SAVE_SCENE, "Save &Scene");
-    file->Append(IDM_FILE_SAVE_OBJ, "Save &Obj and Mtl");
+    file->Append(IDM_FILE_SAVE_GLB, "Save &GLB");
     file->Append(IDM_FILE_SAVE_BLEND, "Save &Blend");
     file->Append(IDM_FILE_SAVE_NAVP, "Save &Navp");
     file->Append(IDM_FILE_SAVE_AIRG, "Save &Airg");
@@ -76,24 +76,24 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, "Airg Cell: Vision Data");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_LAYER, "Airg Cell: Layer");
     view->AppendSeparator();
-    view->AppendCheckItem(IDM_VIEW_OBJ_SHOW_OBJ, "Show &Obj")->Check();
+    view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_LOG_SHOW_LOG, "Show &Log")->Check();
     bar->Append(view, "&View");
 
     auto* extract = new wxMenu();
     extract->Append(IDM_EXTRACT_SCENE, "Extract &Scene from game");
-    extract->Append(IDM_EXTRACT_SCENE_AND_BUILD_OBJ, "Extract Scene from game and build &Obj");
+    extract->Append(IDM_EXTRACT_SCENE_AND_BUILD_GLB, "Extract Scene from game and build &GLB");
     extract->Append(IDM_EXTRACT_SCENE_AND_BUILD_ALL, "Extract Scene, build &navp and airg");
     bar->Append(extract, "&Extract");
 
     auto* build = new wxMenu();
-    build->Append(IDM_BUILD_OBJ_FROM_SCENE, "Build Obj from &Scene");
-    build->Append(IDM_BUILD_OBJ_FROM_NAVP, "Build Obj from &Navp");
-    build->Append(IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE, "Build Obj and Blend from &Scene");
+    build->Append(IDM_BUILD_GLB_FROM_SCENE, "Build GLB from &Scene");
+    build->Append(IDM_BUILD_GLB_FROM_NAVP, "Build GLB from &Navp");
+    build->Append(IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, "Build GLB and Blend from &Scene");
     build->Append(IDM_BUILD_BLEND_FROM_SCENE, "Build Blend from &Scene");
     build->AppendSeparator();
-    build->Append(IDM_BUILD_NAVP, "Build &Navp from Obj and Scene");
+    build->Append(IDM_BUILD_NAVP, "Build &Navp from GLB and Scene");
     build->AppendSeparator();
     build->Append(IDM_BUILD_AIRG, "Build &Airg from Navp");
     bar->Append(build, "&Build");
@@ -168,17 +168,17 @@ void Menu::updateMenuState() {
     const SceneMesh& obj = SceneMesh::getInstance();
     const bool isSceneLoaded = scene.sceneLoaded;
     const bool isNavpLoaded = navp.navpLoaded;
-    const bool isObjLoaded = obj.objLoaded;
+    const bool isGlbLoaded = obj.glbLoaded;
     const bool isAreaSelected = isNavpLoaded && navp.selectedNavpAreaIndex != -1;
 
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG, airg.canLoad());
-    setMenuItemEnabled(IDM_FILE_OPEN_OBJ, obj.canLoad());
+    setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
-    setMenuItemEnabled(IDM_FILE_SAVE_OBJ, isObjLoaded);
+    setMenuItemEnabled(IDM_FILE_SAVE_GLB, isGlbLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_BLEND, obj.canSaveBlend());
 
     setMenuItemEnabled(IDM_EDIT_NAVP_STAIRS, isAreaSelected);
@@ -187,13 +187,13 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
     setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
-    setMenuItemEnabled(IDM_BUILD_OBJ_FROM_SCENE, obj.canBuildObjFromScene());
-    setMenuItemEnabled(IDM_BUILD_OBJ_FROM_NAVP, obj.canBuildObjFromNavp());
+    setMenuItemEnabled(IDM_BUILD_GLB_FROM_SCENE, obj.canBuildGlbFromScene());
+    setMenuItemEnabled(IDM_BUILD_GLB_FROM_NAVP, obj.canBuildGlbFromNavp());
     setMenuItemEnabled(IDM_BUILD_BLEND_FROM_SCENE, obj.canBuildBlendFromScene());
-    setMenuItemEnabled(IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE, obj.canBuildBlendAndObjFromScene());
+    setMenuItemEnabled(IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, obj.canBuildBlendAndGlbFromScene());
 
     setMenuItemEnabled(IDM_EXTRACT_SCENE, sceneExtract.canExtractFromGame());
-    setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_OBJ, sceneExtract.canExtractFromGameAndBuildObj());
+    setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_GLB, sceneExtract.canExtractFromGameAndBuildGlb());
     setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_ALL, sceneExtract.canExtractFromGameAndBuildAll());
 
     bool isStairs = false;
@@ -223,9 +223,9 @@ int Menu::handleMenuClicked(const int menuId) {
         Scene::getInstance().handleOpenSceneClicked();
         Logger::log(NK_DEBUG, "File -> Open Scene clicked");
         break;
-    case IDM_FILE_OPEN_OBJ:
-        SceneMesh::getInstance().handleOpenObjClicked();
-        Logger::log(NK_DEBUG, "File -> Open Obj clicked");
+    case IDM_FILE_OPEN_GLB:
+        SceneMesh::getInstance().handleOpenGlbClicked();
+        Logger::log(NK_DEBUG, "File -> Open GLB clicked");
         break;
     case IDM_FILE_OPEN_NAVP:
         Navp::getInstance().handleOpenNavpClicked();
@@ -247,9 +247,9 @@ int Menu::handleMenuClicked(const int menuId) {
         Scene::getInstance().handleSaveSceneClicked();
         Logger::log(NK_DEBUG, "File -> Save Scene clicked");
         break;
-    case IDM_FILE_SAVE_OBJ:
-        SceneMesh::getInstance().handleSaveObjClicked();
-        Logger::log(NK_DEBUG, "File -> Save Obj and Mtl clicked");
+    case IDM_FILE_SAVE_GLB:
+        SceneMesh::getInstance().handleSaveGlbClicked();
+        Logger::log(NK_DEBUG, "File -> Save GLB clicked");
         break;
     case IDM_FILE_SAVE_BLEND:
         SceneMesh::getInstance().handleSaveBlendClicked();
@@ -317,8 +317,8 @@ int Menu::handleMenuClicked(const int menuId) {
         handleCheckboxMenuItem(
             IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO, Navp::getInstance().showRecastDebugInfo, "Show Recast Debug Info");
         break;
-    case IDM_VIEW_OBJ_SHOW_OBJ:
-        handleCheckboxMenuItem(IDM_VIEW_OBJ_SHOW_OBJ, SceneMesh::getInstance().showObj, "Show Obj");
+    case IDM_VIEW_GLB_SHOW_GLB:
+        handleCheckboxMenuItem(IDM_VIEW_GLB_SHOW_GLB, SceneMesh::getInstance().showGlb, "Show GLB");
         break;
     case IDM_VIEW_AIRG_SHOW_AIRG:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg, "Show Airg");
@@ -343,17 +343,17 @@ int Menu::handleMenuClicked(const int menuId) {
         handleCellColorDataRadioMenuItem(menuId);
         break;
 
-    case IDM_BUILD_OBJ_FROM_NAVP:
-        obj.handleBuildObjFromNavpClicked();
+    case IDM_BUILD_GLB_FROM_NAVP:
+        obj.handleBuildGlbFromNavpClicked();
         break;
     case IDM_BUILD_BLEND_FROM_SCENE:
         obj.handleBuildBlendFromSceneClicked();
         break;
-    case IDM_BUILD_BLEND_AND_OBJ_FROM_SCENE:
-        obj.handleBuildBlendAndObjFromSceneClicked();
+    case IDM_BUILD_BLEND_AND_GLB_FROM_SCENE:
+        obj.handleBuildBlendAndGlbFromSceneClicked();
         break;
-    case IDM_BUILD_OBJ_FROM_SCENE:
-        obj.handleBuildObjFromSceneClicked();
+    case IDM_BUILD_GLB_FROM_SCENE:
+        obj.handleBuildGlbFromSceneClicked();
         break;
     case IDM_BUILD_NAVP:
         navp.handleBuildNavpClicked();
@@ -365,8 +365,8 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_EXTRACT_SCENE:
         sceneExtract.handleExtractFromGameClicked();
         break;
-    case IDM_EXTRACT_SCENE_AND_BUILD_OBJ:
-        sceneExtract.handleExtractFromGameAndBuildObjClicked();
+    case IDM_EXTRACT_SCENE_AND_BUILD_GLB:
+        sceneExtract.handleExtractFromGameAndBuildGlbClicked();
         break;
     case IDM_EXTRACT_SCENE_AND_BUILD_ALL:
         sceneExtract.handleExtractFromGameAndBuildAllClicked();

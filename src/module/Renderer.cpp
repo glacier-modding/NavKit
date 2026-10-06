@@ -323,11 +323,11 @@ void Renderer::renderFrame() {
     shader.setFloat("fogEnd", camr * 1.25f);
     glUseProgram(0);
 
-    if (const SceneMesh& obj = SceneMesh::getInstance(); obj.objLoaded && obj.showObj) {
+    if (const SceneMesh& obj = SceneMesh::getInstance(); obj.glbLoaded && obj.showGlb) {
         GLboolean blendEnabled;
         glGetBooleanv(GL_BLEND, &blendEnabled);
         glPolygonOffset(-1.0f, -1.0f);
-        obj.renderObj();
+        obj.renderGlb();
         glPolygonOffset(0.0f, 0.0f);
 
         glUseProgram(0);
@@ -589,7 +589,7 @@ HitTestResult Renderer::hitTestRender(const int mx, const int my) const {
     Navp::getInstance().renderExclusionBoxesForHitTest();
     Airg::getInstance().renderAirgForHitTest();
     const SceneMesh& sceneMesh = SceneMesh::getInstance();
-    if (sceneMesh.showObj && sceneMesh.objLoaded) {
+    if (sceneMesh.showGlb && sceneMesh.glbLoaded) {
         RecastAdapter::getInstance().renderRecastNavmesh(false);
     }
     GLubyte pixel[4];

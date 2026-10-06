@@ -26,8 +26,6 @@ public:
     void draw(const Shader& shader, const glm::mat4& viewProj) const;
 
 private:
-    std::vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName);
-
     static std::vector<Texture> loadMaterialTexturesStatic(aiMaterial* mat, aiTextureType type, std::string typeName,
-        const std::string& directory, std::vector<Texture>& texturesLoaded);
+        const aiScene* scene, const std::string& directory, std::vector<Texture>& texturesLoaded);
 };

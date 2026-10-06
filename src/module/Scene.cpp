@@ -84,7 +84,7 @@ void Scene::loadPfBoxes(
     }
     pfBoxes.readPathfindingBBoxes();
     if (includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
-        if (SceneMesh::getInstance().objLoaded) {
+        if (SceneMesh::getInstance().glbLoaded) {
             RecastAdapter::getInstance().setSceneBBoxToMesh();
         }
     } else {

@@ -3,7 +3,7 @@ configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit
 set(RECAST_DEMO_SOURCES
         extern/RecastDemo/ChunkyTriMesh.cpp
         extern/RecastDemo/InputGeom.cpp
-        extern/RecastDemo/MeshLoaderObj.cpp
+        extern/RecastDemo/MeshLoaderGlb.cpp
         extern/RecastDemo/PerfTimer.cpp
         extern/RecastDemo/Sample.cpp
         extern/RecastDemo/SampleInterfaces.cpp
@@ -136,7 +136,7 @@ if (WIN32)
 elseif (APPLE)
     set(NAVKIT_BUNDLE_RESOURCES
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/DroidSans.ttf"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resource/Glacier2Obj.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resource/Glacier2Glb.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/hash_list_filtered.txt"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/res.blend"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/vertex.glsl"
@@ -171,7 +171,7 @@ set(RUNTIME_TARGET_DEPENDENCIES ${RUNTIME_TARGET_DEPENDENCIES} PARENT_SCOPE)
 set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/DroidSans.ttf"
         "${NavKit_SOURCE_DIR}/src/resource/NavKit.ini"
-        "${NavKit_SOURCE_DIR}/src/resource/Glacier2Obj.py"
+        "${NavKit_SOURCE_DIR}/src/resource/Glacier2Glb.py"
         "${NavKit_SOURCE_DIR}/src/resource/hash_list_filtered.txt"
         "${NavKit_SOURCE_DIR}/src/resource/res.blend"
         "${NavKit_SOURCE_DIR}/src/resource/vertex.glsl"

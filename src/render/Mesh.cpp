@@ -36,12 +36,14 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>&
     for (const auto& t : textures) {
         if (t.uploadFormat == GL_RGBA) {
             isTransparent = true;
-            break;
+            isBlended = isBlended || t.hasBlendedAlpha;
         }
     }
 }
 
 void Mesh::draw(const Shader& shader) const {
+    shader.use();
+
     unsigned int diffuseNr = 1;
     unsigned int specularNr = 1;
     unsigned int normalNr = 1;
@@ -68,7 +70,6 @@ void Mesh::draw(const Shader& shader) const {
         shader.setBool("useFlatColor", false);
     }
 
-    shader.use();
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);

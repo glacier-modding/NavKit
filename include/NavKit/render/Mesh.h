@@ -26,6 +26,7 @@ struct Texture {
     unsigned int internalFormat = 0;
     unsigned int uploadFormat = 0;
     bool loaded = false;
+    bool hasBlendedAlpha = false;
 };
 
 class Mesh {

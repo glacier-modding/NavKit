@@ -27,24 +27,24 @@
 class Scene;
 
 bool GridGenerator::initRecastAirgAdapter() {
-    Logger::log(NK_INFO, "Generating Obj from current navmesh...");
+    Logger::log(NK_INFO, "Generating GLB from current navmesh...");
     Airg& airg = Airg::getInstance();
     airg.airgLoading = true;
     airg.airgLoaded = false;
     Menu::updateMenuState();
     SceneMesh& obj = SceneMesh::getInstance();
-    obj.buildObjFromNavp(false);
+    obj.buildGlbFromNavp(false);
     const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    const std::string objFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.obj").string();
-    Logger::log(NK_INFO, "Loading navmesh Obj into Recast...");
-    if (!recastAirgAdapter.loadInputGeom(objFileName)) {
+    const std::string glbFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.glb").string();
+    Logger::log(NK_INFO, "Loading navmesh GLB into Recast...");
+    if (!recastAirgAdapter.loadInputGeom(glbFileName)) {
         airg.airgLoaded = false;
         airg.airgLoading = false;
         airg.airgBuilding = false;
         Menu::updateMenuState();
-        Logger::log(NK_ERROR, "Error loading navmesh Obj into Recast...");
+        Logger::log(NK_ERROR, "Error loading navmesh GLB into Recast...");
         return false;
     }
     recastAirgAdapter.handleMeshChanged();
@@ -55,14 +55,14 @@ bool GridGenerator::initRecastAirgAdapter() {
     const float bBoxMax[3] = {scene.bBoxPos[0] + scene.bBoxScale[0] / 2, scene.bBoxPos[1] + scene.bBoxScale[1] / 2,
         scene.bBoxPos[2] + scene.bBoxScale[2] / 2};
     recastAirgAdapter.setMeshBBox(bBoxMin, bBoxMax);
-    Logger::log(NK_INFO, "Building Recast detour navmesh from navmesh Obj...");
+    Logger::log(NK_INFO, "Building Recast detour navmesh from navmesh GLB...");
     if (!recastAirgAdapter.handleBuildForAirg()) {
         airg.airgLoading = false;
         airg.airgLoaded = false;
         airg.airgBuilding = false;
         Menu::updateMenuState();
 
-        Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh Obj...");
+        Logger::log(NK_ERROR, "Error building Recast detour navmesh from navmesh GLB...");
         return false;
     }
     const std::string outputNavpFilename =

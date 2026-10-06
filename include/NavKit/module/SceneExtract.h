@@ -21,15 +21,15 @@ public:
 
     bool canExtractFromGame() const;
 
-    bool canExtractFromGameAndBuildObj() const;
+    bool canExtractFromGameAndBuildGlb() const;
 
     bool canExtractFromGameAndBuildAll() const;
 
-    void handleExtractFromGameAndBuildObjClicked();
+    void handleExtractFromGameAndBuildGlbClicked();
 
     void handleExtractFromGameAndBuildAllClicked();
 
-    bool alsoBuildObj;
+    bool alsoBuildGlb;
     bool alsoBuildAll;
 
     static char* openHitmanFolderDialog(char* lastHitmanFolder);

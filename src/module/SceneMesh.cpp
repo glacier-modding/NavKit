@@ -10,7 +10,9 @@
 #include <thread>
 #include <vector>
 #include <future>
+#include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
+#include <memory>
 
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -36,12 +38,12 @@
 #include "../../include/NavWeakness/NavPower.h"
 
 SceneMesh::SceneMesh() :
-    loadObjName("Load Obj"), saveObjName("Save Obj"), lastObjFileName("Load Obj"), lastSaveObjFileName("Save Obj"),
-    objLoaded(false), showObj(true), loadObj(false), startedSceneMeshGeneration(false),
+    loadGlbName("Load GLB"), saveGlbName("Save GLB"), lastGlbFileName("Load GLB"), lastSaveGlbFileName("Save GLB"),
+    glbLoaded(false), showGlb(true), loadGlb(false), startedSceneMeshGeneration(false),
     blenderSceneMeshBuildStarted(false), blenderSceneMeshGenerationDone(false), blendFileOnlyBuild(false),
-    blendFileAndObjBuild(false), filterToIncludeBox(true), onlyCollidable(true), errorBuilding(false),
+    blendFileAndGlbBuild(false), filterToIncludeBox(true), onlyCollidable(true), errorBuilding(false),
     skipExtractingAlocsOrPrims(false), errorExtracting(false), extractingResources(false),
-    doneExtractingAlocsOrPrims(false), doObjHitTest(false), meshTypeForBuild(ALOC), sceneMeshBuildType(COPY),
+    doneExtractingAlocsOrPrims(false), doGlbHitTest(false), meshTypeForBuild(ALOC), sceneMeshBuildType(COPY),
     primLods{true, true, true, true, true, true, true, true}, blendFileBuilt(false), extractTextures(false),
     applyTextures(false) {}
 
@@ -78,7 +80,7 @@ void SceneMesh::loadTileTexture() {
     }
 }
 
-void SceneMesh::updateObjDialogControls(wxDialog* dialog) {
+void SceneMesh::updateSceneMeshDialogControls(wxDialog* dialog) {
     const SceneMesh& obj = getInstance();
     static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_MESH_TYPE_ALOC))->SetValue(obj.meshTypeForBuild == ALOC);
     static_cast<wxRadioButton*>(dialog->FindWindow(IDC_RADIO_MESH_TYPE_PRIM))->SetValue(obj.meshTypeForBuild == PRIM);
@@ -119,7 +121,7 @@ void SceneMesh::showSceneMeshDialog() {
     content->Add(meshType, 0, wxEXPAND | wxALL, 6);
 
     auto* lodGroup = new wxStaticBoxSizer(wxVERTICAL, dialog, "Prim Level of Detail");
-    auto* lodGrid = new wxGridSizer(2, 4, 4, 10);
+    auto* lodGrid = new wxFlexGridSizer(2, 4, 4, 10);
     for (int i = 0; i < 8; ++i) {
         const wxString label = i == 0 ? wxString("LOD 1 (Highest)") : wxString::Format("LOD %d", i + 1);
         lodGrid->Add(new wxCheckBox(dialog, IDC_CHECK_PRIM_LOD_1 + i, label));
@@ -151,7 +153,7 @@ void SceneMesh::showSceneMeshDialog() {
     auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
     content->Add(reset, 0, wxALIGN_RIGHT | wxALL, 8);
     dialog->SetSizer(content);
-    updateObjDialogControls(dialog);
+    updateSceneMeshDialogControls(dialog);
 
     auto& sceneMesh = getInstance();
     const auto saveCheckbox = [dialog, &sceneMesh](const int id, bool& setting, const char* name) {
@@ -179,7 +181,7 @@ void SceneMesh::showSceneMeshDialog() {
                 sceneMesh.sceneMeshBuildType == COPY ? "Copy" : "Instance");
         }
         sceneMesh.saveSceneMeshSettings();
-        updateObjDialogControls(dialog);
+        updateSceneMeshDialogControls(dialog);
     });
     saveCheckbox(IDC_CHECK_SKIP_RPKG_EXTRACT, sceneMesh.skipExtractingAlocsOrPrims, "Skip Extracting ALOCs or PRIMs");
     saveCheckbox(IDC_CHECK_FILTER_TO_INCLUDE_BOX, sceneMesh.filterToIncludeBox, "Filter to include box");
@@ -204,7 +206,7 @@ void SceneMesh::showSceneMeshDialog() {
                 lod = check;
             }
             sceneMesh.saveSceneMeshSettings();
-            updateObjDialogControls(dialog);
+            updateSceneMeshDialogControls(dialog);
             Logger::log(NK_INFO, "Prim LODs %s.", check ? "all selected" : "all deselected");
         },
         IDC_BUTTON_SELECT_ALL_LODS);
@@ -215,13 +217,13 @@ void SceneMesh::showSceneMeshDialog() {
                 lod = false;
             }
             sceneMesh.saveSceneMeshSettings();
-            updateObjDialogControls(dialog);
+            updateSceneMeshDialogControls(dialog);
             Logger::log(NK_INFO, "Prim LODs all deselected.");
         },
         IDC_BUTTON_DESELECT_ALL_LODS);
     reset->Bind(wxEVT_BUTTON, [&sceneMesh, dialog](wxCommandEvent&) {
         sceneMesh.resetDefaults();
-        updateObjDialogControls(dialog);
+        updateSceneMeshDialogControls(dialog);
         sceneMesh.saveSceneMeshSettings();
     });
     dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
@@ -235,13 +237,13 @@ void SceneMesh::showSceneMeshDialog() {
     dialog->Show();
 }
 
-void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
+void SceneMesh::buildGlbFromNavp(const bool alsoLoadIntoUi) {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-    const std::string fileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.obj").string();
+    const std::string fileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.glb").string();
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
 
-    Logger::log(NK_INFO, ("Building obj from loaded navp. Saving to: " + fileName).c_str());
+    Logger::log(NK_INFO, ("Building GLB from loaded navp. Saving to: " + fileName).c_str());
     const Navp& navp = Navp::getInstance();
     std::vector<Vec3> vertices;
     std::vector<std::vector<int>> faces;
@@ -263,28 +265,51 @@ void SceneMesh::buildObjFromNavp(const bool alsoLoadIntoUi) {
             }
         }
     }
-    std::ofstream f(fileName);
-    f.clear();
-    for (const auto v : vertices) {
-        f << "v " << v.X << " " << v.Z << " " << -v.Y << "\n";
+    auto scene = std::make_unique<aiScene>();
+    scene->mRootNode = new aiNode();
+    scene->mRootNode->mName = "NavMesh";
+    scene->mNumMaterials = 1;
+    scene->mMaterials = new aiMaterial*[1]{new aiMaterial()};
+    scene->mNumMeshes = 1;
+    scene->mMeshes = new aiMesh*[1]{new aiMesh()};
+    aiMesh* mesh = scene->mMeshes[0];
+    mesh->mName = "NavMesh";
+    mesh->mMaterialIndex = 0;
+    mesh->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
+    mesh->mNumVertices = static_cast<unsigned int>(vertices.size());
+    mesh->mVertices = new aiVector3D[mesh->mNumVertices];
+    for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
+        const Vec3& vertex = vertices[i];
+        mesh->mVertices[i] = aiVector3D(vertex.X, vertex.Z, -vertex.Y);
     }
-    for (auto face : faces) {
-        f << "f ";
-        for (const auto vi : face) {
-            f << vi;
-            if (vi != face.back()) {
-                f << " ";
-            }
+    std::vector<std::array<unsigned int, 3>> triangles;
+    for (const auto& face : faces) {
+        for (size_t i = 2; i < face.size(); ++i) {
+            triangles.push_back({static_cast<unsigned int>(face[0] - 1), static_cast<unsigned int>(face[i - 1] - 1),
+                static_cast<unsigned int>(face[i] - 1)});
         }
-        f << "\n";
     }
-    f.close();
-    Logger::log(NK_INFO, "Done Building obj from loaded navp.");
+    mesh->mNumFaces = static_cast<unsigned int>(triangles.size());
+    mesh->mFaces = new aiFace[mesh->mNumFaces];
+    for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
+        aiFace& face = mesh->mFaces[i];
+        face.mNumIndices = 3;
+        face.mIndices = new unsigned int[3]{triangles[i][0], triangles[i][1], triangles[i][2]};
+    }
+    scene->mRootNode->mNumMeshes = 1;
+    scene->mRootNode->mMeshes = new unsigned int[1]{0};
+    Assimp::Exporter exporter;
+    if (exporter.Export(scene.get(), "glb2", fileName) != AI_SUCCESS) {
+        Logger::log(NK_ERROR, "Failed to export Navp GLB: %s", exporter.GetErrorString());
+        errorBuilding = true;
+        return;
+    }
+    Logger::log(NK_INFO, "Done building GLB from loaded Navp.");
     if (alsoLoadIntoUi) {
-        generatedObjName = "outputNavp.obj";
-        objLoaded = false;
+        generatedGlbName = "outputNavp.glb";
+        glbLoaded = false;
         blenderSceneMeshGenerationDone = true;
-        loadObj = true;
+        loadGlb = true;
         Menu::updateMenuState();
     }
 }
@@ -293,15 +318,15 @@ void SceneMesh::buildSceneMeshFromScene() {
     const auto start = std::chrono::high_resolution_clock::now();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Scene& scene = Scene::getInstance();
-    objLoaded = false;
+    glbLoaded = false;
     Menu::updateMenuState();
     startedSceneMeshGeneration = true;
-    std::string buildOutputFileType = blendFileAndObjBuild ? "both" : blendFileOnlyBuild ? "blend" : "obj";
+    std::string buildOutputFileType = blendFileAndGlbBuild ? "both" : blendFileOnlyBuild ? "blend" : "glb";
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
     command += navKitSettings.blenderPath;
     command += "\" -b --factory-startup -P \"";
-    command += FileUtil::getApplicationResourcePath("Glacier2Obj.py").string();
+    command += FileUtil::getApplicationResourcePath("Glacier2Glb.py").string();
     command += "\" -- \""; //--debug-all
     command += scene.lastLoadSceneFile;
     command += "\" \"";
@@ -337,17 +362,17 @@ void SceneMesh::buildSceneMeshFromScene() {
     blenderSceneMeshBuildStarted = true;
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
-    generatedObjName = "output.obj";
+    generatedGlbName = "output.glb";
 
     backgroundWorker.emplace(
-        &CommandRunner::runCommand, std::ref(CommandRunner::getInstance()), command, "Glacier2Obj.log",
+        &CommandRunner::runCommand, std::ref(CommandRunner::getInstance()), command, "Glacier2Glb.log",
         [this, buildOutputFileType, start] {
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(),
                 duration.count());
             blenderSceneMeshGenerationDone = true;
-            if (blendFileAndObjBuild || blendFileOnlyBuild) {
+            if (blendFileAndGlbBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
             }
         },
@@ -449,7 +474,7 @@ void SceneMesh::finalizeExtractResources() {
         extractingResources = false;
         SceneExtract& sceneExtract = SceneExtract::getInstance();
         sceneExtract.alsoBuildAll = false;
-        sceneExtract.alsoBuildObj = false;
+        sceneExtract.alsoBuildGlb = false;
     }
     if (doneExtractingAlocsOrPrims) {
         doneExtractingAlocsOrPrims = false;
@@ -472,12 +497,12 @@ void SceneMesh::finalizeSceneMeshBuild() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     if (blenderSceneMeshGenerationDone) {
         startedSceneMeshGeneration = false;
-        objToLoad = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedObjName).string();
-        loadObj = !blendFileOnlyBuild;
-        lastObjFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedObjName).string();
+        glbToLoad = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedGlbName).string();
+        loadGlb = !blendFileOnlyBuild;
+        lastGlbFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedGlbName).string();
         blenderSceneMeshBuildStarted = false;
         blenderSceneMeshGenerationDone = false;
-        sceneExtract.alsoBuildObj = false;
+        sceneExtract.alsoBuildGlb = false;
         blendFileOnlyBuild = false;
     }
     if (errorBuilding) {
@@ -485,9 +510,9 @@ void SceneMesh::finalizeSceneMeshBuild() {
         startedSceneMeshGeneration = false;
         blenderSceneMeshBuildStarted = false;
         blenderSceneMeshGenerationDone = false;
-        objLoaded = false;
+        glbLoaded = false;
         sceneExtract.alsoBuildAll = false;
-        sceneExtract.alsoBuildObj = false;
+        sceneExtract.alsoBuildGlb = false;
         blendFileOnlyBuild = false;
     }
     Menu::updateMenuState();
@@ -510,68 +535,50 @@ void SceneMesh::copyFile(const std::string& from, const std::string& to, const s
     } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
     }
-
-    if (filetype == "Obj" && !getInstance().model.texturesLoaded.empty()) {
-        if (const std::string mtlFromFileName = from.substr(0, from.size() - 3) + "mtl";
-            std::filesystem::exists(mtlFromFileName)) {
-            const std::string mtlToFileName = to.substr(0, from.size() - 3) + "mtl";
-            start = std::chrono::high_resolution_clock::now();
-            Logger::log(NK_INFO, "Copying Mtl from '%s' to '%s'...", from.c_str(), to.c_str());
-            try {
-                std::filesystem::copy(
-                    mtlFromFileName, mtlToFileName, std::filesystem::copy_options::overwrite_existing);
-                const auto end = std::chrono::high_resolution_clock::now();
-                const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-                Logger::log(NK_INFO, "Finished saving Mtl in %lld ms.", duration.count());
-            } catch (const std::filesystem::filesystem_error& e) {
-                Logger::log(NK_ERROR, "Error copying Mtl file: %s", e.what());
-            }
-        }
-    }
 }
 
-void SceneMesh::saveObjMesh(char* objToCopy, char* newFileName) {
+void SceneMesh::saveGlbMesh(char* glbToCopy, char* newFileName) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Saving Obj to file at ";
+    std::string msg = "Saving GLB to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    backgroundWorker.emplace(&SceneMesh::copyFile, objToCopy, newFileName, "Obj");
+    backgroundWorker.emplace(&SceneMesh::copyFile, glbToCopy, newFileName, "GLB");
 }
 
-void SceneMesh::saveBlendMesh(std::string objToCopy, std::string newFileName) {
+void SceneMesh::saveBlendMesh(std::string blendToCopy, std::string newFileName) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string msg = "Saving Blend to file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
-    backgroundWorker.emplace(&SceneMesh::copyFile, objToCopy, newFileName, "Blend");
+    backgroundWorker.emplace(&SceneMesh::copyFile, blendToCopy, newFileName, "Blend");
 }
 
-void SceneMesh::loadObjMesh() {
+void SceneMesh::loadGlbMesh() {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Loading Obj from file at ";
+    std::string msg = "Loading GLB from file at ";
     msg += std::ctime(&start_time);
     Logger::log(NK_INFO, msg.data());
     const auto start = std::chrono::high_resolution_clock::now();
 
     auto recastFuture = std::async(std::launch::async, [this]() {
-        Logger::log(NK_INFO, "Loading Obj model data to Recast...");
+        Logger::log(NK_INFO, "Loading GLB model data to Recast...");
         const RecastAdapter& recastAdapter = RecastAdapter::getInstance();
-        const int result = recastAdapter.loadInputGeom(objToLoad) && recastAdapter.getVertCount() != 0;
-        Logger::log(NK_INFO, "Done loading Obj model data to Recast.");
+        const int result = recastAdapter.loadInputGeom(glbToLoad) && recastAdapter.getVertCount() != 0;
+        Logger::log(NK_INFO, "Done loading GLB model data to Recast.");
         return result;
     });
 
     const auto modelFuture = std::async(std::launch::async, [this]() {
-        Logger::log(NK_INFO, "Loading Obj model data to rendering system...");
-        model.loadModelData(objToLoad);
-        Logger::log(NK_INFO, "Done loading Obj model data to rendering system.");
+        Logger::log(NK_INFO, "Loading GLB model data to rendering system...");
+        model.loadModelData(glbToLoad);
+        Logger::log(NK_INFO, "Done loading GLB model data to rendering system.");
     });
 
     if (recastFuture.get()) {
         modelFuture.wait();
-        if (objLoadDone.empty()) {
-            objLoadDone.push_back(true);
-            // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the obj.
+        if (glbLoadDone.empty()) {
+            glbLoadDone.push_back(true);
+            // Disabling for now. Maybe would be good to add a button to resize the scene bbox to the GLB.
             // But it's pretty rare for there to not be an include box in the scene, so don't want to override
             // a bbox that has been manually set.
             // if (scene.includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND) {
@@ -590,21 +597,21 @@ void SceneMesh::loadObjMesh() {
             // }
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-            msg = "Finished loading Obj in ";
+            msg = "Finished loading GLB in ";
             msg += std::to_string(duration.count());
             msg += " seconds";
             Logger::log(NK_INFO, msg.data());
         }
     } else {
         modelFuture.wait();
-        Logger::log(NK_ERROR, "Error loading obj. Obj may have too many vertices or have 0 vertices.");
+        Logger::log(NK_ERROR, "Error loading GLB. It may be invalid, too large, or contain no triangles.");
         model.meshes.clear();
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();
     }
 }
 
-void SceneMesh::renderObj() const {
+void SceneMesh::renderGlb() const {
     const Renderer& renderer = Renderer::getInstance();
 
     glEnable(GL_DEPTH_TEST);
@@ -630,18 +637,18 @@ void SceneMesh::renderObj() const {
     model.draw(renderer.shader, renderer.projection * renderer.view);
 }
 
-void SceneMesh::renderObjUsingRecast() {
+void SceneMesh::renderGlbUsingRecast() {
     RecastAdapter::getInstance().drawInputGeom();
 }
 
-char* SceneMesh::openLoadObjFileDialog() {
-    nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
+char* SceneMesh::openLoadGlbFileDialog() {
+    nfdu8filteritem_t filters[1] = {{"glTF Binary files", "glb"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
-char* SceneMesh::openSaveObjFileDialog() {
-    nfdu8filteritem_t filters[1] = {{"Obj files", "obj"}};
-    return FileUtil::openNfdSaveDialog(filters, 1, "output");
+char* SceneMesh::openSaveGlbFileDialog() {
+    nfdu8filteritem_t filters[1] = {{"glTF Binary files", "glb"}};
+    return FileUtil::openNfdSaveDialog(filters, 1, "output.glb");
 }
 
 char* SceneMesh::openSaveBlendFileDialog() {
@@ -651,33 +658,37 @@ char* SceneMesh::openSaveBlendFileDialog() {
 
 void SceneMesh::setLastLoadFileName(const char* fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
-        loadObjName = fileName;
-        lastObjFileName = loadObjName;
-        loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
+        loadGlbName = fileName;
+        lastGlbFileName = loadGlbName;
+        loadGlbName = loadGlbName.substr(loadGlbName.find_last_of("/\\") + 1);
     }
 }
 
 void SceneMesh::setLastSaveFileName(const char* fileName) {
-    lastSaveObjFileName = fileName;
-    loadObjName = loadObjName.substr(loadObjName.find_last_of("/\\") + 1);
+    lastSaveGlbFileName = fileName;
+    loadGlbName = loadGlbName.substr(loadGlbName.find_last_of("/\\") + 1);
 }
 
-void SceneMesh::handleOpenObjClicked() {
-    if (const char* fileName = openLoadObjFileDialog()) {
+void SceneMesh::handleOpenGlbClicked() {
+    if (const char* fileName = openLoadGlbFileDialog()) {
         setLastLoadFileName(fileName);
-        objLoaded = false;
-        objToLoad = fileName;
-        loadObj = true;
+        glbLoaded = false;
+        glbToLoad = fileName;
+        loadGlb = true;
         Menu::updateMenuState();
     }
 }
 
-void SceneMesh::handleSaveObjClicked() {
-    if (const char* fileName = openSaveObjFileDialog()) {
-        loadObjName = fileName;
-        setLastSaveFileName(fileName);
-        saveObjMesh(lastObjFileName.data(), lastSaveObjFileName.data());
-        saveObjName = loadObjName;
+void SceneMesh::handleSaveGlbClicked() {
+    if (const char* fileName = openSaveGlbFileDialog()) {
+        std::filesystem::path outputPath = std::filesystem::u8path(fileName);
+        if (outputPath.extension() != ".glb") {
+            outputPath.replace_extension(".glb");
+        }
+        loadGlbName = outputPath.string();
+        setLastSaveFileName(loadGlbName.c_str());
+        saveGlbMesh(lastGlbFileName.data(), lastSaveGlbFileName.data());
+        saveGlbName = loadGlbName;
     }
 }
 
@@ -692,16 +703,16 @@ void SceneMesh::handleSaveBlendClicked() {
 }
 
 bool SceneMesh::canLoad() const {
-    return objToLoad.empty();
+    return glbToLoad.empty();
 }
 
-bool SceneMesh::canBuildObjFromNavp() {
+bool SceneMesh::canBuildGlbFromNavp() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Navp& navp = Navp::getInstance();
-    return navKitSettings.outputSet && navKitSettings.blenderSet && navp.navpLoaded;
+    return navKitSettings.outputSet && navp.navpLoaded;
 }
 
-bool SceneMesh::canBuildObjFromScene() const {
+bool SceneMesh::canBuildGlbFromScene() const {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const Scene& scene = Scene::getInstance();
     return navKitSettings.hitmanSet && navKitSettings.outputSet && !extractingResources && navKitSettings.blenderSet &&
@@ -714,16 +725,14 @@ bool SceneMesh::canSaveBlend() const {
 }
 
 bool SceneMesh::canBuildBlendFromScene() const {
-    // Currently this is the same as Obj::canBuildObjFromScene.
-    // Its expected this may change if the blend export includes features OBJ can't handle - like lights.
-    return canBuildObjFromScene();
+    return canBuildGlbFromScene();
 }
 
-bool SceneMesh::canBuildBlendAndObjFromScene() const {
-    return canBuildObjFromScene();
+bool SceneMesh::canBuildBlendAndGlbFromScene() const {
+    return canBuildGlbFromScene();
 }
 
-void SceneMesh::handleBuildObjFromSceneClicked() {
+void SceneMesh::handleBuildGlbFromSceneClicked() {
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
@@ -732,30 +741,30 @@ void SceneMesh::handleBuildBlendFromSceneClicked() {
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
-void SceneMesh::handleBuildBlendAndObjFromSceneClicked() {
-    blendFileAndObjBuild = true;
+void SceneMesh::handleBuildBlendAndGlbFromSceneClicked() {
+    blendFileAndGlbBuild = true;
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
-void SceneMesh::handleBuildObjFromNavpClicked() {
-    return buildObjFromNavp(true);
+void SceneMesh::handleBuildGlbFromNavpClicked() {
+    return buildGlbFromNavp(true);
 }
 
 void SceneMesh::finalizeLoad() {
-    if (loadObj) {
-        lastObjFileName = objToLoad;
+    if (loadGlb) {
+        lastGlbFileName = glbToLoad;
         RecastAdapter& recastAdapter = RecastAdapter::getInstance();
         recastAdapter.selectedObject = "";
         recastAdapter.markerPositionSet = false;
-        std::string msg = "Loading Obj file: '";
-        msg += objToLoad;
+        std::string msg = "Loading GLB file: '";
+        msg += glbToLoad;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&SceneMesh::loadObjMesh, this);
-        loadObj = false;
+        backgroundWorker.emplace(&SceneMesh::loadGlbMesh, this);
+        loadGlb = false;
     }
 
-    if (!objLoadDone.empty()) {
+    if (!glbLoadDone.empty()) {
         if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             Logger::log(NK_INFO, "Creating OpenGL buffers for model...");
             loadTileTexture();
@@ -765,11 +774,11 @@ void SceneMesh::finalizeLoad() {
             recastAdapter.handleMeshChanged();
             Navp::updateExclusionBoxConvexVolumes();
         }
-        objLoaded = true;
-        objLoadDone.clear();
-        objToLoad.clear();
+        glbLoaded = true;
+        glbLoadDone.clear();
+        glbToLoad.clear();
         Menu::updateMenuState();
-        Logger::log(NK_INFO, "Obj load complete.");
+        Logger::log(NK_INFO, "GLB load complete.");
         if (Navp& navp = Navp::getInstance(); SceneExtract::getInstance().alsoBuildAll && navp.canBuildNavp()) {
             Logger::log(NK_INFO, "Building Navp...");
             navp.handleBuildNavpClicked();

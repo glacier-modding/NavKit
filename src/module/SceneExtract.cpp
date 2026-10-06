@@ -17,7 +17,7 @@
 SceneExtract::SceneExtract() {
     doneExtractingFromGame = false;
     extractingFromGame = false;
-    alsoBuildObj = false;
+    alsoBuildGlb = false;
     alsoBuildAll = false;
 }
 
@@ -26,7 +26,7 @@ SceneExtract::~SceneExtract() = default;
 void SceneExtract::handleExtractFromGameClicked() {
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
-    alsoBuildObj = false;
+    alsoBuildGlb = false;
     alsoBuildAll = false;
     extractScene();
 }
@@ -35,7 +35,7 @@ bool SceneExtract::canExtractFromGame() const {
     return !extractingFromGame && !Rpkg::unknownGameVersion;
 }
 
-bool SceneExtract::canExtractFromGameAndBuildObj() const {
+bool SceneExtract::canExtractFromGameAndBuildGlb() const {
     const SceneMesh& obj = SceneMesh::getInstance();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     return canExtractFromGame() && navKitSettings.blenderSet && !obj.blenderSceneMeshBuildStarted &&
@@ -49,11 +49,11 @@ bool SceneExtract::canExtractFromGameAndBuildAll() const {
         !obj.blenderSceneMeshGenerationDone;
 }
 
-void SceneExtract::handleExtractFromGameAndBuildObjClicked() {
+void SceneExtract::handleExtractFromGameAndBuildGlbClicked() {
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
-    alsoBuildObj = true;
-    SceneMesh::getInstance().objLoaded = false;
+    alsoBuildGlb = true;
+    SceneMesh::getInstance().glbLoaded = false;
     extractScene();
 }
 
@@ -61,7 +61,7 @@ void SceneExtract::handleExtractFromGameAndBuildAllClicked() {
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
     alsoBuildAll = true;
-    SceneMesh::getInstance().objLoaded = false;
+    SceneMesh::getInstance().glbLoaded = false;
     extractScene();
 }
 
@@ -120,7 +120,7 @@ void SceneExtract::finalizeExtractScene() {
                 sceneScoped.sceneLoaded = true;
                 const std::string& fileNameString = sceneFile;
                 sceneScoped.lastLoadSceneFile = sceneFile;
-                if ((alsoBuildObj || alsoBuildAll) && !obj.startedSceneMeshGeneration) {
+                if ((alsoBuildGlb || alsoBuildAll) && !obj.startedSceneMeshGeneration) {
                     obj.extractResourcesAndStartSceneMeshBuild();
                 }
                 Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameString + "'.").c_str());
@@ -132,7 +132,7 @@ void SceneExtract::finalizeExtractScene() {
                 objScoped.startedSceneMeshGeneration = false;
                 extractingFromGame = false;
                 alsoBuildAll = false;
-                alsoBuildObj = false;
+                alsoBuildGlb = false;
                 Menu::updateMenuState();
             });
     }

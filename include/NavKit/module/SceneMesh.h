@@ -23,7 +23,7 @@ class SceneMesh {
 
     static void loadTileTexture();
 
-    static void updateObjDialogControls(wxDialog* dialog);
+    static void updateSceneMeshDialogControls(wxDialog* dialog);
 
 public:
     static SceneMesh& getInstance() {
@@ -31,22 +31,22 @@ public:
         return instance;
     }
 
-    std::string loadObjName;
-    std::string saveObjName;
-    std::string lastObjFileName;
-    std::string lastSaveObjFileName;
-    std::string generatedObjName;
-    bool objLoaded;
-    bool showObj;
-    bool loadObj;
+    std::string loadGlbName;
+    std::string saveGlbName;
+    std::string lastGlbFileName;
+    std::string lastSaveGlbFileName;
+    std::string generatedGlbName;
+    bool glbLoaded;
+    bool showGlb;
+    bool loadGlb;
     std::vector<std::string> files;
-    std::string objToLoad;
-    std::vector<bool> objLoadDone;
+    std::string glbToLoad;
+    std::vector<bool> glbLoadDone;
     bool startedSceneMeshGeneration;
     bool blenderSceneMeshBuildStarted;
     bool blenderSceneMeshGenerationDone;
     bool blendFileOnlyBuild;
-    bool blendFileAndObjBuild;
+    bool blendFileAndGlbBuild;
     bool filterToIncludeBox;
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
@@ -54,7 +54,7 @@ public:
     bool extractingResources;
     bool doneExtractingAlocsOrPrims;
     std::map<std::string, std::pair<int, int>> objectTriangleRanges;
-    bool doObjHitTest;
+    bool doGlbHitTest;
     MeshType meshTypeForBuild;
     SceneMeshBuildType sceneMeshBuildType;
     bool onlyCollidable = true;
@@ -69,29 +69,29 @@ public:
 
     void loadSettings();
 
-    void loadObjMesh();
+    void loadGlbMesh();
 
-    void handleBuildBlendAndObjFromSceneClicked();
+    void handleBuildBlendAndGlbFromSceneClicked();
 
     static void copyFile(const std::string& from, const std::string& to, const std::string& filetype);
 
-    void saveObjMesh(char* objToCopy, char* newFileName);
+    void saveGlbMesh(char* glbToCopy, char* newFileName);
 
-    void saveBlendMesh(std::string objToCopy, std::string newFileName);
+    void saveBlendMesh(std::string blendToCopy, std::string newFileName);
 
-    void buildObjFromNavp(bool alsoLoadIntoUi);
+    void buildGlbFromNavp(bool alsoLoadIntoUi);
 
     void buildSceneMeshFromScene();
 
     void finalizeSceneMeshBuild();
 
-    void renderObj() const;
+    void renderGlb() const;
 
-    static void renderObjUsingRecast();
+    static void renderGlbUsingRecast();
 
-    static char* openLoadObjFileDialog();
+    static char* openLoadGlbFileDialog();
 
-    static char* openSaveObjFileDialog();
+    static char* openSaveGlbFileDialog();
 
     static char* openSaveBlendFileDialog();
 
@@ -99,29 +99,29 @@ public:
 
     void setLastSaveFileName(const char* fileName);
 
-    void handleOpenObjClicked();
+    void handleOpenGlbClicked();
 
-    void handleSaveObjClicked();
+    void handleSaveGlbClicked();
 
     void handleSaveBlendClicked();
 
     [[nodiscard]] bool canLoad() const;
 
-    static bool canBuildObjFromNavp();
+    static bool canBuildGlbFromNavp();
 
-    [[nodiscard]] bool canBuildObjFromScene() const;
+    [[nodiscard]] bool canBuildGlbFromScene() const;
 
     bool canSaveBlend() const;
 
     [[nodiscard]] bool canBuildBlendFromScene() const;
 
-    [[nodiscard]] bool canBuildBlendAndObjFromScene() const;
+    [[nodiscard]] bool canBuildBlendAndGlbFromScene() const;
 
-    void handleBuildObjFromSceneClicked();
+    void handleBuildGlbFromSceneClicked();
 
     void handleBuildBlendFromSceneClicked();
 
-    void handleBuildObjFromNavpClicked();
+    void handleBuildGlbFromNavpClicked();
 
     void finalizeLoad();
 

@@ -15,14 +15,14 @@ from bpy.types import (
     Context,
 )
 
-glacier2obj_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "TRACE", "DEBUG", "INFO", "WARNING", "ERROR"
+glacier2glb_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "TRACE", "DEBUG", "INFO", "WARNING", "ERROR"
 
 
 # General
 
 
 def log(level: str, msg: str, filter_field: str):
-    if level in glacier2obj_enabled_log_levels:  # and filter_field == "007573591BE1BE69":
+    if level in glacier2glb_enabled_log_levels:  # and filter_field == "007573591BE1BE69":
         # print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
         if level != "INFO":
             print("[" + str(level) + "] " + str(filter_field) + ": " + str(msg), flush=True)
@@ -2566,7 +2566,7 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def glacier2obj(path_to_nav_json: str, path_to_output_obj_file: str, mesh_type: str, lod_mask: str, build_type: str,
+def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: str, lod_mask: str, build_type: str,
                 filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool):
     start = timer()
     log("INFO", "Loading scenario.", "glacier2obj")
@@ -2682,7 +2682,7 @@ def glacier2obj(path_to_nav_json: str, path_to_output_obj_file: str, mesh_type: 
             room_names[mesh_hash] = []
         transforms[mesh_hash].append(transform)
         room_names[mesh_hash].append(room_name)
-    output_dir = os.path.abspath(os.path.dirname(path_to_output_obj_file))
+    output_dir = os.path.abspath(os.path.dirname(path_to_output_glb_file))
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
     log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2obj")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
@@ -2947,7 +2947,7 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
 
 def main():
     log("TRACE",
-        "Usage: blender -b -P glacier2obj.py -- <nav.json path> <output.obj path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textyres (true | false)> <debug logs enabled (true | false)>",
+        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.glb path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <debug logs enabled (true | false)>",
         "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
@@ -2961,8 +2961,8 @@ def main():
     apply_textures = argv[6] == "true"
     if len(argv) > 7 and argv[7] == "true":
         log("INFO", "Enabling debug logs", "main"),
-        glacier2obj_enabled_log_levels.append("TRACE")
-        glacier2obj_enabled_log_levels.append("TRACE")
+        glacier2glb_enabled_log_levels.append("TRACE")
+        glacier2glb_enabled_log_levels.append("TRACE")
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
@@ -2970,19 +2970,19 @@ def main():
     # Ensure the render engine is set to EEVEE so transparency properties are active
     # In 4.2+, EEVEE Next is 'BLENDER_EEVEE_NEXT'
     bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
-    output_to_blend = output_path[-4:] == 'both' or output_path[-5:] == 'blend'
-    scenario = glacier2obj(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
+    output_to_blend = output_path.endswith('.both') or output_path.endswith('.blend')
+    scenario = glacier2glb(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
                              apply_textures, output_to_blend)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path, "main")
         return 1
-    if output_path[-4:] == 'both':
+    if output_path.endswith('.both'):
         save_blend_file(output_path[:-4] + "blend")
-        save_obj_file(output_path[:-4] + "obj")
-    elif output_path[-5:] == 'blend':
+        save_glb_file(output_path[:-4] + "glb")
+    elif output_path.endswith('.blend'):
         save_blend_file(output_path)
     else:
-        save_obj_file(output_path)
+        save_glb_file(output_path)
 
     log("INFO", "Script finished, waiting...", "main")
     try:
@@ -2993,26 +2993,58 @@ def main():
     return None
 
 
-def save_obj_file(output_path: str):
-    log("INFO", "Attempting to save obj file to :" + output_path, "main")
-    if bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2:
-        bpy.ops.wm.obj_export(
-            filepath=output_path,
-            export_materials=True,
-            path_mode='ABSOLUTE'
-        )
-    elif bpy.app.version[0] == 3:
-        bpy.ops.export_scene.obj(
-            filepath=output_path,
-            use_selection=False,
-            ext_materials=True,
-            path_mode='ABSOLUTE'
-        )
-    else:
-        bpy.ops.export_scene.obj(
-            filepath=output_path,
-            path_mode='ABSOLUTE'
-        )
+def bake_geometry_node_instances():
+    node_group_copies = {}
+    geometry_node_objects = []
+    source_objects = set()
+    for obj in bpy.context.scene.objects:
+        for modifier in obj.modifiers:
+            if modifier.type != 'NODES' or modifier.node_group is None:
+                continue
+            geometry_node_objects.append(obj)
+            source_object = modifier.get('Socket_2')
+            if source_object is not None:
+                source_objects.add(source_object)
+            original_group = modifier.node_group
+            node_group = node_group_copies.get(original_group)
+            if node_group is None:
+                node_group = original_group.copy()
+                node_group_copies[original_group] = node_group
+                for output_node in (node for node in node_group.nodes if node.bl_idname == 'NodeGroupOutput'):
+                    geometry_input = output_node.inputs.get('Geometry')
+                    if geometry_input is None:
+                        continue
+                    for link in list(geometry_input.links):
+                        if link.from_node.bl_idname == 'GeometryNodeRealizeInstances':
+                            continue
+                        from_socket = link.from_socket
+                        to_socket = link.to_socket
+                        node_group.links.remove(link)
+                        realize = node_group.nodes.new('GeometryNodeRealizeInstances')
+                        node_group.links.new(from_socket, realize.inputs['Geometry'])
+                        node_group.links.new(realize.outputs['Geometry'], to_socket)
+            modifier.node_group = node_group
+
+    if not geometry_node_objects:
+        return
+
+    bpy.context.view_layer.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for obj in geometry_node_objects:
+        evaluated_obj = obj.evaluated_get(depsgraph)
+        baked_mesh = bpy.data.meshes.new_from_object(evaluated_obj, depsgraph=depsgraph)
+        obj.data = baked_mesh
+        for modifier in list(obj.modifiers):
+            obj.modifiers.remove(modifier)
+
+    for source_object in source_objects:
+        bpy.data.objects.remove(source_object, do_unlink=True)
+
+
+def save_glb_file(output_path: str):
+    log("INFO", "Attempting to save GLB file to :" + output_path, "main")
+    bake_geometry_node_instances()
+    bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLB', export_apply=True)
 
 
 def save_blend_file(output_path: str):

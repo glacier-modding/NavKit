@@ -14,8 +14,11 @@
 #include "../include/NavKit/util/GridGenerator.h"
 #include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Pathfinding.h"
+#include "../include/RecastDemo/InputGeom.h"
 #include <GL/glew.h>
+#include <assimp/Exporter.hpp>
 #include <assimp/mesh.h>
+#include <assimp/postprocess.h>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -581,6 +584,18 @@ namespace {
         check(alphaTexture.isTransparent, "RGBA texture should mark mesh transparent");
         check(!alphaTexture.isBlended, "RGBA texture alone should not classify vertex blending");
 
+        rgba.data = {255, 255, 255, 255, 255, 255, 255, 128};
+        rgba.hasBlendedAlpha = true;
+        Mesh blendedTexture({}, {}, {rgba});
+        check(blendedTexture.isTransparent, "RGBA texture should mark mesh transparent");
+        check(blendedTexture.isBlended, "texture alpha should mark mesh blended");
+
+        rgba.data = {255, 255, 255, 0, 255, 255, 255, 25};
+        rgba.hasBlendedAlpha = false;
+        Mesh cutoutTexture({}, {}, {rgba});
+        check(cutoutTexture.isTransparent, "cutout texture should mark mesh transparent");
+        check(!cutoutTexture.isBlended, "fully transparent texels should not mark mesh blended");
+
         Mesh opaque({{{0.0f, 0.0f, 0.0f}, {}, {1.0f, 1.0f, 1.0f, 1.0f}, {}}}, {}, {});
         check(!opaque.isTransparent && !opaque.isBlended, "opaque vertex should remain opaque");
     }
@@ -627,9 +642,72 @@ namespace {
         check(adapter.getClosestPolys(nullptr, {}, 5).empty(), "polygon query without a query object should be empty");
         check(adapter.getClosestReachablePolys(nullptr, {}, 1, 5).empty(),
             "reachable polygon query without a query object should be empty");
-        check(adapter.loadInputGeom("tests/resources/rectangles.obj"), "Recast adapter should load test geometry");
+        auto scene = std::make_unique<aiScene>();
+        scene->mRootNode = new aiNode();
+        scene->mRootNode->mTransformation.a4 = 100.0f;
+        scene->mRootNode->mTransformation.b4 = 5.0f;
+        scene->mRootNode->mTransformation.c4 = 7.0f;
+        scene->mRootNode->mNumMeshes = 1;
+        scene->mRootNode->mMeshes = new unsigned int[1]{0};
+        scene->mNumMaterials = 1;
+        scene->mMaterials = new aiMaterial*[1]{new aiMaterial()};
+        scene->mNumTextures = 1;
+        scene->mTextures = new aiTexture*[1]{new aiTexture()};
+        constexpr std::array<unsigned char, 70> pngData = {0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00,
+            0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+            0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf,
+            0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+            0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+        scene->mTextures[0]->mWidth = static_cast<unsigned int>(pngData.size());
+        scene->mTextures[0]->mHeight = 0;
+        scene->mTextures[0]->pcData = new aiTexel[(pngData.size() + sizeof(aiTexel) - 1) / sizeof(aiTexel)];
+        std::copy(pngData.begin(), pngData.end(), reinterpret_cast<unsigned char*>(scene->mTextures[0]->pcData));
+        std::copy_n("png", 3, scene->mTextures[0]->achFormatHint);
+        aiString embeddedTexturePath;
+        embeddedTexturePath.Set("*0");
+        scene->mMaterials[0]->AddProperty(&embeddedTexturePath, AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE, 0));
+        scene->mNumMeshes = 1;
+        scene->mMeshes = new aiMesh*[1]{new aiMesh()};
+        aiMesh* mesh = scene->mMeshes[0];
+        mesh->mMaterialIndex = 0;
+        mesh->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
+        const std::array<aiVector3D, 10> vertices = {{{0, 0, 0}, {3, 0, 0}, {3, 0, -3}, {0, 0, -3}, {4, 0, -3},
+            {4, 0, 0}, {7, 0, 0}, {7, 0, -3}, {10, 0, 0}, {10, 0, -3}}};
+        mesh->mNumVertices = static_cast<unsigned int>(vertices.size());
+        mesh->mVertices = new aiVector3D[vertices.size()];
+        std::copy(vertices.begin(), vertices.end(), mesh->mVertices);
+        mesh->mTextureCoords[0] = new aiVector3D[vertices.size()]{};
+        constexpr std::array<std::array<unsigned int, 3>, 6> faces = {
+            {{0, 1, 2}, {0, 2, 3}, {4, 5, 6}, {4, 6, 7}, {7, 6, 8}, {7, 8, 9}}};
+        mesh->mNumFaces = static_cast<unsigned int>(faces.size());
+        mesh->mFaces = new aiFace[faces.size()];
+        for (size_t i = 0; i < faces.size(); ++i) {
+            mesh->mFaces[i].mNumIndices = 3;
+            mesh->mFaces[i].mIndices = new unsigned int[3]{faces[i][0], faces[i][1], faces[i][2]};
+        }
+        const std::filesystem::path geometryPath = std::filesystem::temp_directory_path() /
+            ("NavKitTestGeometry_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                ".glb");
+        Assimp::Exporter exporter;
+        check(exporter.Export(scene.get(), "glb2", geometryPath.string()) == AI_SUCCESS,
+            "Assimp should export test geometry as GLB");
+        Model loadedModel;
+        loadedModel.loadModelData(geometryPath.string());
+        check(!loadedModel.texturesLoaded.empty(), "GLB loader should discover its embedded material texture");
+        check(loadedModel.texturesLoaded[0].loaded, "GLB loader should load its embedded material texture");
+        check(!loadedModel.meshes.empty() && !loadedModel.meshes[0].vertices.empty(),
+            "GLB loader should load mesh vertices");
+        checkNear(loadedModel.meshes[0].vertices[0].position.x, 100.0f);
+        checkNear(loadedModel.meshes[0].vertices[0].position.y, 5.0f);
+        checkNear(loadedModel.meshes[0].vertices[0].position.z, 7.0f);
+        check(adapter.loadInputGeom(geometryPath.string()), "Recast adapter should load test GLB geometry");
         check(adapter.getVertCount() == 10, "Recast adapter loaded the wrong vertex count");
         check(adapter.getTriCount() == 6, "Recast adapter loaded the wrong triangle count");
+        checkNear(adapter.inputGeom->getMesh()->getVerts()[0], 100.0f);
+        checkNear(adapter.inputGeom->getMesh()->getVerts()[1], 5.0f);
+        checkNear(adapter.inputGeom->getMesh()->getVerts()[2], 7.0f);
+        std::error_code removeError;
+        std::filesystem::remove(geometryPath, removeError);
 
         const float minimum[3] = {-2.0f, -1.0f, -4.0f};
         const float maximum[3] = {12.0f, 3.0f, 2.0f};
@@ -644,6 +722,21 @@ namespace {
         check(navp.navpLoaded, "valid test NAVP should mark the module loaded");
         check(Navp::getTotalAreaCount(navp.navMesh) > 0, "binary NAVP should expose test areas");
         check(!navp.canSave() || (!navp.loading && !navp.building), "Navp load should finish its loading state");
+
+        NavKitSettings& settings = NavKitSettings::getInstance();
+        const std::string originalOutputFolder = settings.outputFolder;
+        const std::filesystem::path outputDirectory = std::filesystem::temp_directory_path() /
+            ("NavKitNavpGlb_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::create_directories(outputDirectory);
+        settings.outputFolder = outputDirectory.string();
+        SceneMesh::getInstance().buildGlbFromNavp(false);
+        const std::filesystem::path generatedGlb = outputDirectory / "outputNavp.glb";
+        check(std::filesystem::exists(generatedGlb), "building a GLB from Navp should create the output file");
+        RecastAdapter& adapter = RecastAdapter::getInstance();
+        check(adapter.loadInputGeom(generatedGlb.string()), "Recast should load a GLB exported from Navp");
+        check(adapter.getTriCount() > 0, "Navp GLB export should contain triangles");
+        std::filesystem::remove_all(outputDirectory);
+        settings.outputFolder = originalOutputFolder;
         navp.navpLoaded = false;
     }
 
@@ -698,9 +791,9 @@ namespace {
         NavKitSettings& settings = NavKitSettings::getInstance();
 
         check(sceneMesh.canLoad(), "scene mesh should load when no path is pending");
-        sceneMesh.objToLoad = "pending.obj";
+        sceneMesh.glbToLoad = "pending.glb";
         check(!sceneMesh.canLoad(), "scene mesh should not load while another path is pending");
-        sceneMesh.objToLoad.clear();
+        sceneMesh.glbToLoad.clear();
 
         for (int i = 0; i < 8; ++i) {
             sceneMesh.primLods[i] = (i % 2) == 0;
@@ -762,12 +855,12 @@ namespace {
         sceneMesh.blenderSceneMeshBuildStarted = false;
         sceneMesh.blenderSceneMeshGenerationDone = false;
         Rpkg::extractionDataInitComplete = true;
-        check(sceneMesh.canBuildObjFromScene(), "scene mesh build should be enabled when prerequisites are ready");
+        check(sceneMesh.canBuildGlbFromScene(), "scene mesh build should be enabled when prerequisites are ready");
         sceneMesh.extractingResources = true;
-        check(!sceneMesh.canBuildObjFromScene(), "scene mesh build should wait for resource extraction");
+        check(!sceneMesh.canBuildGlbFromScene(), "scene mesh build should wait for resource extraction");
         sceneMesh.extractingResources = false;
         sceneMesh.blenderSceneMeshBuildStarted = true;
-        check(!sceneMesh.canBuildObjFromScene(), "scene mesh build should not start twice");
+        check(!sceneMesh.canBuildGlbFromScene(), "scene mesh build should not start twice");
 
         settings.hitmanSet = oldHitmanSet;
         settings.outputSet = oldOutputSet;

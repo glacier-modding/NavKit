@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <vector>
 #include <future>
+#include <limits>
 #include <map>
 #include <GL/glew.h>
 #include <SDL.h>
@@ -19,6 +20,15 @@
 #include <ranges>
 
 static std::mutex g_TextureMutex;
+
+static bool hasBlendedAlpha(const std::vector<unsigned char>& data) {
+    for (size_t alphaIndex = 3; alphaIndex < data.size(); alphaIndex += 4) {
+        if (data[alphaIndex] > 25 && data[alphaIndex] < 255) {
+            return true;
+        }
+    }
+    return false;
+}
 
 Texture loadTextureDataFromFile(const char* path, const std::string& directory) {
     Texture texture;
@@ -34,22 +44,17 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
     const std::string filename = texturePath.string();
 
     int width, height, nrChannels;
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrChannels, STBI_rgb_alpha);
 
     if (data) {
         texture.width = width;
         texture.height = height;
-        texture.bpp = nrChannels * 8;
-        int size = width * height * nrChannels;
+        texture.bpp = 32;
+        const int size = width * height * 4;
         texture.data.assign(data, data + size);
-
-        if (nrChannels == 3) {
-            texture.internalFormat = GL_RGB8;
-            texture.uploadFormat = GL_RGB;
-        } else if (nrChannels == 4) {
-            texture.internalFormat = GL_RGBA8;
-            texture.uploadFormat = GL_RGBA;
-        }
+        texture.internalFormat = GL_RGBA8;
+        texture.uploadFormat = GL_RGBA;
+        texture.hasBlendedAlpha = hasBlendedAlpha(texture.data);
 
         texture.loaded = true;
         stbi_image_free(data);
@@ -58,6 +63,54 @@ Texture loadTextureDataFromFile(const char* path, const std::string& directory) 
             NK_ERROR, "Texture failed to load at path: %s. Reason: %s", filename.c_str(), stbi_failure_reason());
     }
 
+    return texture;
+}
+
+static Texture loadTextureDataFromEmbedded(const aiTexture& embedded, const aiString& path) {
+    Texture texture;
+    texture.id = 0;
+    texture.loaded = false;
+    texture.path = path;
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    unsigned char* data = nullptr;
+    if (embedded.mHeight == 0 && embedded.mWidth <= static_cast<unsigned int>(std::numeric_limits<int>::max())) {
+        data = stbi_load_from_memory(reinterpret_cast<const unsigned char*>(embedded.pcData),
+            static_cast<int>(embedded.mWidth), &width, &height, &channels, STBI_rgb_alpha);
+    } else if (embedded.mHeight > 0) {
+        width = static_cast<int>(embedded.mWidth);
+        height = static_cast<int>(embedded.mHeight);
+        texture.data.resize(static_cast<size_t>(width) * height * 4);
+        for (size_t i = 0; i < static_cast<size_t>(width) * height; ++i) {
+            texture.data[i * 4] = embedded.pcData[i].r;
+            texture.data[i * 4 + 1] = embedded.pcData[i].g;
+            texture.data[i * 4 + 2] = embedded.pcData[i].b;
+            texture.data[i * 4 + 3] = embedded.pcData[i].a;
+        }
+        texture.width = width;
+        texture.height = height;
+        texture.bpp = 32;
+        texture.internalFormat = GL_RGBA8;
+        texture.uploadFormat = GL_RGBA;
+        texture.hasBlendedAlpha = hasBlendedAlpha(texture.data);
+        texture.loaded = true;
+        return texture;
+    }
+    if (data) {
+        texture.width = width;
+        texture.height = height;
+        texture.bpp = 32;
+        texture.data.assign(data, data + static_cast<size_t>(width) * height * 4);
+        texture.internalFormat = GL_RGBA8;
+        texture.uploadFormat = GL_RGBA;
+        texture.hasBlendedAlpha = hasBlendedAlpha(texture.data);
+        texture.loaded = true;
+        stbi_image_free(data);
+    } else {
+        Logger::log(NK_ERROR, "Embedded texture failed to load: %s. Reason: %s", path.C_Str(), stbi_failure_reason());
+    }
     return texture;
 }
 
@@ -130,29 +183,29 @@ Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScen
 
     if (!batch.empty() && scene) {
         aiMaterial* material = scene->mMaterials[batch[0]->mMaterialIndex];
+        const aiTextureType diffuseType =
+            material->GetTextureCount(aiTextureType_BASE_COLOR) > 0 ? aiTextureType_BASE_COLOR : aiTextureType_DIFFUSE;
         std::vector<Texture> diffuseMaps =
-            loadMaterialTexturesStatic(material, aiTextureType_DIFFUSE, "texture_diffuse", directory, texturesLoaded);
+            loadMaterialTexturesStatic(material, diffuseType, "texture_diffuse", scene, directory, texturesLoaded);
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-        std::vector<Texture> specularMaps =
-            loadMaterialTexturesStatic(material, aiTextureType_SPECULAR, "texture_specular", directory, texturesLoaded);
+        std::vector<Texture> specularMaps = loadMaterialTexturesStatic(
+            material, aiTextureType_SPECULAR, "texture_specular", scene, directory, texturesLoaded);
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+        const aiTextureType normalType =
+            material->GetTextureCount(aiTextureType_NORMALS) > 0 ? aiTextureType_NORMALS : aiTextureType_HEIGHT;
         std::vector<Texture> normalMaps =
-            loadMaterialTexturesStatic(material, aiTextureType_HEIGHT, "texture_normal", directory, texturesLoaded);
+            loadMaterialTexturesStatic(material, normalType, "texture_normal", scene, directory, texturesLoaded);
         textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-        std::vector<Texture> heightMaps =
-            loadMaterialTexturesStatic(material, aiTextureType_AMBIENT, "texture_height", directory, texturesLoaded);
+        std::vector<Texture> heightMaps = loadMaterialTexturesStatic(
+            material, aiTextureType_AMBIENT, "texture_height", scene, directory, texturesLoaded);
         textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
     }
 
     return Mesh(vertices, indices, textures);
 }
 
-std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName) {
-    return loadMaterialTexturesStatic(mat, type, typeName, directory, texturesLoaded);
-}
-
 std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextureType type, std::string typeName,
-    const std::string& directory, std::vector<Texture>& texturesLoaded) {
+    const aiScene* scene, const std::string& directory, std::vector<Texture>& texturesLoaded) {
     std::vector<Texture> textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); ++i) {
         aiString str;
@@ -170,7 +223,9 @@ std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextur
         }
 
         if (!skip) {
-            Texture texture = loadTextureDataFromFile(str.C_Str(), directory);
+            const aiTexture* embedded = scene ? scene->GetEmbeddedTexture(str.C_Str()) : nullptr;
+            Texture texture = embedded ? loadTextureDataFromEmbedded(*embedded, str)
+                                       : loadTextureDataFromFile(str.C_Str(), directory);
             texture.type = typeName;
             texture.path = str;
             textures.push_back(texture);
@@ -178,6 +233,8 @@ std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextur
                 std::lock_guard lock(g_TextureMutex);
                 texturesLoaded.push_back(texture);
             }
+        } else {
+            textures.back().type = typeName;
         }
     }
     return textures;
@@ -185,8 +242,9 @@ std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextur
 
 void Model::loadModelData(std::string const& path) {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(
-        path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
+    const aiScene* scene = importer.ReadFile(path,
+        aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipWindingOrder | aiProcess_FlipUVs |
+            aiProcess_PreTransformVertices);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         Logger::log(NK_ERROR, "ERROR::ASSIMP::%s", importer.GetErrorString());
@@ -212,8 +270,8 @@ void Model::loadModelData(std::string const& path) {
     }
 
     std::vector<std::future<Mesh>> meshFutures;
-    for (auto& batch : batches | std::views::values) {
-        meshFutures.push_back(std::async(std::launch::async, [this, &batch, scene]() {
+    for (const auto& batch : batches | std::views::values) {
+        meshFutures.push_back(std::async(std::launch::async, [this, batch, scene]() {
             return processBatchedMeshes(batch, scene, this->directory, this->texturesLoaded);
         }));
     }
