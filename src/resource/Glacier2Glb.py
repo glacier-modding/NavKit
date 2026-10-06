@@ -2524,9 +2524,14 @@ def load_volume_boxes(json_data, volume_types):
                 pos += center
                 create_volume(vol["name"], rooms_coll.name, pos, rot, scale)
         elif volt == "aiArea":
+            # Blender collection names are display labels, not entity identities.
+            # Different logical parents can have the same name (or be truncated
+            # to the same Blender name), so keep their IDs when resolving them.
+            parent_collections = {}
             for ai_area_world in json_data["aiAreaWorld"]:
                 area_world_coll = bpy.data.collections.new(ai_area_world["name"])
                 volume_boxes_coll.children.link(area_world_coll)
+                parent_collections[ai_area_world["id"]] = area_world_coll
             # Go through the volumes and prepare the hashmap
             id_to_trigger_volume = {}
             for trig_vol in json_data["volumeBoxes"]:
@@ -2536,11 +2541,17 @@ def load_volume_boxes(json_data, volume_types):
             for ai_area in json_data[volt]:
                 area_coll = bpy.data.collections.new(ai_area["name"])
                 prev_coll = area_coll
-                for parent_coll_name in ai_area["logicalParent"]:
-                    parent_coll_name = parent_coll_name.split("(")[0][:-1]
-                    parent_coll = bpy.data.collections.get(parent_coll_name)
+                for parent_reference in ai_area["logicalParent"]:
+                    parent_coll_name, separator, parent_id = parent_reference.rpartition(" (")
+                    if separator and parent_id.endswith(")"):
+                        parent_id = parent_id[:-1]
+                    else:
+                        parent_coll_name = parent_reference
+                        parent_id = parent_reference
+                    parent_coll = parent_collections.get(parent_id)
                     if parent_coll is None:
                         parent_coll = bpy.data.collections.new(parent_coll_name)
+                        parent_collections[parent_id] = parent_coll
                     if prev_coll.name not in parent_coll.children:
                         parent_coll.children.link(prev_coll)
                     prev_coll = parent_coll
