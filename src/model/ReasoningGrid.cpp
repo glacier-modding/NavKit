@@ -12,8 +12,8 @@
 #include <type_traits>
 #include <utility>
 
-void ReasoningGrid::generateVisionData(
-    const std::function<bool(const Vec4&, const Vec4&)>& unblocked, const float lowHeight, const float highHeight) {
+void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, const Vec4&)>& unblocked,
+    const float lowHeight, const float highHeight, const std::function<void(size_t, size_t)>& progress) {
     if (!unblocked || !std::isfinite(m_Properties.fGridSpacing) || m_Properties.fGridSpacing <= 0 ||
         m_Properties.nVisibilityRange > 512 || !std::isfinite(lowHeight) || !std::isfinite(highHeight) ||
         lowHeight <= 0 || highHeight <= 0) {
@@ -97,6 +97,10 @@ void ReasoningGrid::generateVisionData(
                     data[start + headerSize + bit / 8] |= static_cast<uint8_t>(1u << (bit % 8));
                 }
             }
+        }
+        const size_t completed = source + 1;
+        if (progress && (completed % 100 == 0 || completed == m_WaypointList.size())) {
+            progress(completed, m_WaypointList.size());
         }
     }
     // Publish only after all rays and bounds checks succeeded.

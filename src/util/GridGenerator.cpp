@@ -123,48 +123,53 @@ void GridGenerator::addVisibilityData(ReasoningGrid* grid) {
     const auto* chunks = geometry->getChunkyMesh();
     // Size for every node: a long ray must never silently drop overlapping chunks.
     std::vector<int> ids(chunks->nnodes);
-    grid->generateVisionData([&](const Vec4& from, const Vec4& to) {
-        const Vec3 a = RecastAdapter::convertFromNavPowerToRecast({from.x, from.y, from.z});
-        const Vec3 b = RecastAdapter::convertFromNavPowerToRecast({to.x, to.y, to.z});
-        const glm::vec3 origin(a.X, a.Y, a.Z), end(b.X, b.Y, b.Z);
-        const glm::vec3 direction = end - origin;
-        const float length = glm::length(direction);
-        if (length < 0.0001f)
-            return true;
-        float p[2] = {a.X, a.Z}, q[2] = {b.X, b.Z};
-        const int count = rcGetChunksOverlappingSegment(chunks, p, q, ids.data(), static_cast<int>(ids.size()));
-        const auto vertex = [&](int index) {
-            const float* v = mesh->getVerts() + 3 * index;
-            return glm::vec3(v[0], v[1], v[2]);
-        };
-        for (int i = 0; i < count; ++i) {
-            const auto& node = chunks->nodes[ids[i]];
-            for (int j = 0; j < node.n; ++j) {
-                const int* triangle = chunks->tris + 3 * (node.i + j);
-                const auto v0 = vertex(triangle[0]);
-                const auto e1 = vertex(triangle[1]) - v0, e2 = vertex(triangle[2]) - v0;
-                const auto h = glm::cross(direction, e2);
-                const float det = glm::dot(e1, h);
-                // Two-sided collision: winding must not affect visibility.
-                if (std::abs(det) < 1e-8f)
-                    continue;
-                const auto s = origin - v0;
-                const float u = glm::dot(s, h) / det;
-                if (u < 0 || u > 1)
-                    continue;
-                const auto cross = glm::cross(s, e1);
-                const float v = glm::dot(direction, cross) / det;
-                if (v < 0 || u + v > 1)
-                    continue;
-                const float t = glm::dot(e2, cross) / det;
-                // Ignore only 0.1 mm at either endpoint, avoiding floor/self contacts.
-                const float epsilon = 0.0001f / length;
-                if (t > epsilon && t < 1 - epsilon)
-                    return false;
+    grid->generateVisionData(
+        [&](const Vec4& from, const Vec4& to) {
+            const Vec3 a = RecastAdapter::convertFromNavPowerToRecast({from.x, from.y, from.z});
+            const Vec3 b = RecastAdapter::convertFromNavPowerToRecast({to.x, to.y, to.z});
+            const glm::vec3 origin(a.X, a.Y, a.Z), end(b.X, b.Y, b.Z);
+            const glm::vec3 direction = end - origin;
+            const float length = glm::length(direction);
+            if (length < 0.0001f)
+                return true;
+            float p[2] = {a.X, a.Z}, q[2] = {b.X, b.Z};
+            const int count = rcGetChunksOverlappingSegment(chunks, p, q, ids.data(), static_cast<int>(ids.size()));
+            const auto vertex = [&](int index) {
+                const float* v = mesh->getVerts() + 3 * index;
+                return glm::vec3(v[0], v[1], v[2]);
+            };
+            for (int i = 0; i < count; ++i) {
+                const auto& node = chunks->nodes[ids[i]];
+                for (int j = 0; j < node.n; ++j) {
+                    const int* triangle = chunks->tris + 3 * (node.i + j);
+                    const auto v0 = vertex(triangle[0]);
+                    const auto e1 = vertex(triangle[1]) - v0, e2 = vertex(triangle[2]) - v0;
+                    const auto h = glm::cross(direction, e2);
+                    const float det = glm::dot(e1, h);
+                    // Two-sided collision: winding must not affect visibility.
+                    if (std::abs(det) < 1e-8f)
+                        continue;
+                    const auto s = origin - v0;
+                    const float u = glm::dot(s, h) / det;
+                    if (u < 0 || u > 1)
+                        continue;
+                    const auto cross = glm::cross(s, e1);
+                    const float v = glm::dot(direction, cross) / det;
+                    if (v < 0 || u + v > 1)
+                        continue;
+                    const float t = glm::dot(e2, cross) / det;
+                    // Ignore only 0.1 mm at either endpoint, avoiding floor/self contacts.
+                    const float epsilon = 0.0001f / length;
+                    if (t > epsilon && t < 1 - epsilon)
+                        return false;
+                }
             }
-        }
-        return true;
-    });
+            return true;
+        },
+        0.6f, 1.6f,
+        [](size_t completed, size_t total) {
+            Logger::log(NK_INFO, "Added visibility data for %zu/%zu waypoints", completed, total);
+        });
 }
 
 void GridGenerator::GenerateGrid() {

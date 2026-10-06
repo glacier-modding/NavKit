@@ -90,7 +90,7 @@ public:
 
     // Rays use game coordinates (Z up). Heights are policy defaults, not recovered engine constants.
     void generateVisionData(const std::function<bool(const Vec4&, const Vec4&)>& unblocked, float lowHeight = 0.6f,
-        float highHeight = 1.6f);
+        float highHeight = 1.6f, const std::function<void(size_t, size_t)>& progress = {});
 
     static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, float spacing, float zSpacing, float tolerance,
         float zTolerance);
