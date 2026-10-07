@@ -17,3 +17,5 @@
 *.pdf binary
 *.zip binary
 *.tar binary
+*.airg binary
+*.AIRG binary

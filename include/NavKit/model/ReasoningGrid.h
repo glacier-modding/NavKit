@@ -95,4 +95,8 @@ public:
 
     static void build(ReasoningGrid* airg, NavPower::NavMesh* navMesh, float spacing, float zSpacing, float tolerance,
         float zTolerance);
+
+private:
+    bool m_alignedBin1 = true;
+    std::vector<uint8_t> m_bin1Extensions;
 };

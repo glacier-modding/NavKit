@@ -374,6 +374,35 @@ namespace {
         require(actual.m_pVisibilityData.empty(), "empty BIN1 visibility array did not round trip");
     }
 
+    std::vector<uint8_t> fileBytes(const std::filesystem::path& path) {
+        std::ifstream stream(path, std::ios::binary);
+        require(static_cast<bool>(stream), "Could not open AIRG fixture");
+        return {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+    }
+
+    void testExactBin1RoundTrip(const std::filesystem::path& source) {
+        const auto original = fileBytes(source);
+        const auto output = std::filesystem::temp_directory_path() / "NavKitExactBin1.airg";
+        ReasoningGrid grid;
+        grid.readAirg(source);
+        grid.writeAirg(output);
+        require(fileBytes(output) == original, "BIN1 round trip differs from original bytes");
+
+        // Verify writing uses the current model, including floats with nontrivial
+        // mantissas, rather than returning a cached copy of the input file.
+        grid.m_WaypointList[0].vPos.z = std::bit_cast<float>(uint32_t{0x3f800001});
+        grid.m_WaypointList[0].nLayerIndex = -7;
+        grid.m_deadEndData.m_aBytes.push_back(0x5a);
+        grid.writeAirg(output);
+        ReasoningGrid edited;
+        edited.readAirg(output);
+        require(
+            std::bit_cast<uint32_t>(edited.m_WaypointList[0].vPos.z) == 0x3f800001, "BIN1 waypoint float bits changed");
+        require(edited.m_WaypointList[0].nLayerIndex == -7, "BIN1 layer edit was lost");
+        require(edited.m_deadEndData.m_aBytes == grid.m_deadEndData.m_aBytes, "BIN1 array resize was lost");
+        std::filesystem::remove(output);
+    }
+
     void testRealBin1Airg(const std::filesystem::path& path) {
         ReasoningGrid grid;
         grid.readAirg(path);
@@ -388,15 +417,27 @@ namespace {
 
 int main(const int argc, char** argv) {
     try {
+        // CLion may append Catch-style runner options to this standalone test
+        // executable. Only AIRG arguments override the fixture paths.
+        std::vector<std::filesystem::path> fixtures;
+        for (int i = 1; i < argc; ++i) {
+            const std::filesystem::path argument(argv[i]);
+            const auto extension = argument.extension();
+            if (extension == ".airg" || extension == ".AIRG") {
+                fixtures.push_back(argument);
+            }
+        }
+        const std::filesystem::path resourceDir = NAVKIT_REASONING_GRID_RESOURCE_DIR;
         testRoundTrip();
         testTruncatedFile();
         testBin1Airg();
         testEmptyArrayRoundTrip();
         testGeneratedVisionData();
         testParallelVision();
-        const std::filesystem::path realAirgPath =
-            argc > 1 ? std::filesystem::path(argv[1]) : "tests/resources/intro.airg";
+        const std::filesystem::path realAirgPath = fixtures.empty() ? resourceDir / "intro.airg" : fixtures[0];
         testRealBin1Airg(realAirgPath);
+        testExactBin1RoundTrip(realAirgPath);
+        testExactBin1RoundTrip(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo.airg");
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

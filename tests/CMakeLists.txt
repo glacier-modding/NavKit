@@ -4,8 +4,12 @@ add_executable(ReasoningGridTests
         reasoning_grid_tests.cpp
         ../src/model/ReasoningGrid.cpp
 )
+target_compile_definitions(ReasoningGridTests PRIVATE
+        NAVKIT_REASONING_GRID_RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
+)
 add_test(NAME ReasoningGridTests
         COMMAND ReasoningGridTests "${CMAKE_CURRENT_SOURCE_DIR}/resources/intro.airg"
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/intelcpudemo.airg"
 )
 set_tests_properties(ReasoningGridTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
