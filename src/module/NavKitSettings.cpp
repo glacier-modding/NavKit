@@ -53,6 +53,7 @@ void NavKitSettings::resetDefaults(DialogSettings& settings) {
     settings.outputFolder = defaultOutputFolder();
     settings.blenderPath.clear();
     settings.showDebugLogs = false;
+    settings.darkMode = true;
     settings.maxThreads = Threading::defaultMaxThreads();
 }
 
@@ -66,11 +67,14 @@ void NavKitSettings::setDialogInputs(wxDialog* dialog, const DialogSettings& tem
     static_cast<wxTextCtrl*>(dialog->FindWindow(IDC_EDIT_BLENDER_PATH))
         ->ChangeValue(wxString::FromUTF8(tempSettings.blenderPath));
     static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_SHOW_DEBUG_LOGS))->SetValue(tempSettings.showDebugLogs);
+#ifdef __WXMSW__
+    static_cast<wxCheckBox*>(dialog->FindWindow(IDC_CHECK_DARK_MODE))->SetValue(tempSettings.darkMode);
+#endif
     static_cast<wxSpinCtrl*>(dialog->FindWindow(IDC_SPIN_MAX_THREADS))->SetValue(tempSettings.maxThreads);
 }
 
 NavKitSettings::NavKitSettings() :
-    backgroundColor(0.30f), hitmanSet(false), outputSet(false), blenderSet(false), showDebugLogs(false),
+    backgroundColor(0.30f), hitmanSet(false), outputSet(false), blenderSet(false), showDebugLogs(false), darkMode(true),
     shouldOpenSettingsDialog(false) {}
 
 void NavKitSettings::showNavKitSettingsDialog() {
@@ -81,8 +85,15 @@ void NavKitSettings::showNavKitSettingsDialog() {
     auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "NavKit Settings", wxDefaultPosition, wxSize(640, 380));
     hSettingsDialog = dialog;
     auto settings = std::make_shared<DialogSettings>(DialogSettings{
-        backgroundColor, hitmanFolder, outputFolder, blenderPath, showDebugLogs, Threading::getMaxThreads()});
-    auto* layout = new wxFlexGridSizer(6, 3, 10, 8);
+        backgroundColor, hitmanFolder, outputFolder, blenderPath, showDebugLogs, Threading::getMaxThreads(), darkMode});
+    auto* layout = new wxFlexGridSizer(0, 3, 10, 8);
+#ifdef __WXMSW__
+    layout->Add(new wxStaticText(dialog, wxID_ANY, "Appearance:"), 0, wxALIGN_CENTER_VERTICAL);
+    auto* darkModeCheck = new wxCheckBox(dialog, IDC_CHECK_DARK_MODE, "Dark mode (requires restart)");
+    layout->Add(darkModeCheck, 0, wxALIGN_CENTER_VERTICAL);
+    layout->AddSpacer(1);
+    darkModeCheck->Bind(wxEVT_CHECKBOX, [settings](wxCommandEvent& event) { settings->darkMode = event.IsChecked(); });
+#endif
     layout->Add(new wxStaticText(dialog, wxID_ANY, "Background Color:"), 0, wxALIGN_CENTER_VERTICAL);
     layout->Add(new wxSlider(dialog, IDC_SLIDER_BG_COLOR, 0, 0, 100), 1, wxEXPAND);
     layout->AddSpacer(1);
@@ -161,6 +172,7 @@ void NavKitSettings::showNavKitSettingsDialog() {
         setOutputFolder(settings->outputFolder);
         setBlenderFile(settings->blenderPath);
         showDebugLogs = settings->showDebugLogs;
+        darkMode = settings->darkMode;
         PersistedSettings& persisted = PersistedSettings::getInstance();
         persisted.setValue("NavKit", "backgroundColor", std::to_string(backgroundColor));
         persisted.setValue("NavKit", "hitman", settings->hitmanFolder);
@@ -168,6 +180,7 @@ void NavKitSettings::showNavKitSettingsDialog() {
         persisted.setValue("NavKit", "blender", settings->blenderPath);
         persisted.setValue("NavKit", "showDebugLogs", settings->showDebugLogs ? "true" : "false");
         persisted.setValue("NavKit", "maxThreads", std::to_string(settings->maxThreads));
+        persisted.setValue("NavKit", "darkMode", darkMode ? "true" : "false");
         persisted.save();
     };
     ok->Bind(wxEVT_BUTTON, [dialog, saveSettings](wxCommandEvent&) {
@@ -205,6 +218,7 @@ void NavKitSettings::loadSettings() {
     setOutputFolder(outputFolder);
     setBlenderFile(blenderPath);
     showDebugLogs = strcmp(persistedSettings.getValue("NavKit", "showDebugLogs", "false"), "true") == 0;
+    darkMode = strcmp(persistedSettings.getValue("NavKit", "darkMode", "true"), "true") == 0;
 }
 
 void NavKitSettings::setHitmanFolder(const std::string& folderName) {

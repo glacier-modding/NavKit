@@ -14,6 +14,7 @@
 #endif
 
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Renderer.h"
@@ -31,6 +32,14 @@ namespace {
 } // namespace
 
 bool NavKitApp::OnInit() {
+#ifdef __WXMSW__
+    // Native menus inherit the theme selected before creating any windows.
+    PersistedSettings& settings = PersistedSettings::getInstance();
+    settings.loadFile();
+    if (std::string(settings.getValue("NavKit", "darkMode", "true")) == "true") {
+        MSWEnableDarkMode(DarkMode_Always);
+    }
+#endif
     mainFrame = new MainFrame();
     SetTopWindow(mainFrame);
     return true;

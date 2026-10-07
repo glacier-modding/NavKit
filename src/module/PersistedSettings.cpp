@@ -26,6 +26,14 @@ PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {
 }
 
 void PersistedSettings::load() {
+    loadFile();
+    NavKitSettings::getInstance().loadSettings();
+    Renderer::getInstance().loadSettings();
+    SceneMesh::getInstance().loadSettings();
+    RecastAdapter::getInstance().loadSettings();
+}
+
+void PersistedSettings::loadFile() {
     ini.SetUnicode();
 
     if (std::filesystem::exists(oldIniPath)) {
@@ -83,11 +91,6 @@ void PersistedSettings::load() {
     } else {
         Logger::log(NK_INFO, "No NavKit.ini found, using default settings.");
     }
-
-    NavKitSettings::getInstance().loadSettings();
-    Renderer::getInstance().loadSettings();
-    SceneMesh::getInstance().loadSettings();
-    RecastAdapter::getInstance().loadSettings();
 }
 
 bool PersistedSettings::save() const {

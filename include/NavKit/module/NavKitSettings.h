@@ -9,6 +9,7 @@ struct DialogSettings {
     std::string blenderPath;
     bool showDebugLogs;
     unsigned int maxThreads;
+    bool darkMode;
 };
 
 class NavKitSettings {
@@ -32,6 +33,7 @@ public:
     std::string outputFolder;
     std::string blenderPath;
     bool showDebugLogs;
+    bool darkMode;
     bool shouldOpenSettingsDialog;
     static wxDialog* hSettingsDialog;
 

@@ -23,4 +23,6 @@ public:
     bool save() const;
 
     void load();
+
+    void loadFile();
 };
