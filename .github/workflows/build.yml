@@ -119,7 +119,7 @@ jobs:
               f"Full Changelog: https://github.com/glacier-modding/NavKit/compare/{previous_tag}...{tag}",
               "",
               "_Note: As of the time of this release you will need to use at least this version of the ZHMModSDK:_",
-              "https://github.com/OrfeasZ/ZHMModSDK/actions/runs/34685865082",
+              "https://github.com/OrfeasZ/ZHMModSDK/actions/runs/37060962617",
               "",
           ])
 
