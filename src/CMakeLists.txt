@@ -85,12 +85,33 @@ if (WIN32)
             IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/navkit_rpkg_lib.dll"
     )
 elseif (APPLE)
+    set(NAVKIT_RPKG_LIB_DIR "${CMAKE_BINARY_DIR}/lib/navkit-rpkg-lib")
+    set(NAVKIT_RPKG_LIB_FIXED_FILES)
+    foreach (config Debug Release)
+        set(NAVKIT_RPKG_LIB_SRC "${NavKit_SOURCE_DIR}/lib/${config}/libnavkit_rpkg_lib.dylib")
+        set(NAVKIT_RPKG_LIB_DST "${NAVKIT_RPKG_LIB_DIR}/${config}/libnavkit_rpkg_lib.dylib")
+        add_custom_command(OUTPUT "${NAVKIT_RPKG_LIB_DST}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${NAVKIT_RPKG_LIB_DIR}/${config}"
+                COMMAND ${CMAKE_COMMAND} -E copy "${NAVKIT_RPKG_LIB_SRC}" "${NAVKIT_RPKG_LIB_DST}"
+                COMMAND install_name_tool -id "@rpath/libnavkit_rpkg_lib.dylib" "${NAVKIT_RPKG_LIB_DST}"
+                COMMAND codesign --force --sign - "${NAVKIT_RPKG_LIB_DST}"
+                DEPENDS "${NAVKIT_RPKG_LIB_SRC}"
+                COMMENT "Setting an @rpath install name on the ${config} libnavkit_rpkg_lib.dylib"
+                VERBATIM
+        )
+        list(APPEND NAVKIT_RPKG_LIB_FIXED_FILES "${NAVKIT_RPKG_LIB_DST}")
+    endforeach ()
+    add_custom_target(navkit-rpkg-lib-fixup DEPENDS ${NAVKIT_RPKG_LIB_FIXED_FILES})
+
     add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
             include/navkit-rpkg-lib/navkit-rpkg-lib.h)
     set_target_properties(navkit-rpkg-lib PROPERTIES
-            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/libnavkit_rpkg_lib.dylib"
-            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/libnavkit_rpkg_lib.dylib"
+            IMPORTED_LOCATION_DEBUG "${NAVKIT_RPKG_LIB_DIR}/Debug/libnavkit_rpkg_lib.dylib"
+            IMPORTED_LOCATION_RELEASE "${NAVKIT_RPKG_LIB_DIR}/Release/libnavkit_rpkg_lib.dylib"
+            IMPORTED_SONAME_DEBUG "@rpath/libnavkit_rpkg_lib.dylib"
+            IMPORTED_SONAME_RELEASE "@rpath/libnavkit_rpkg_lib.dylib"
     )
+    add_dependencies(navkit-rpkg-lib navkit-rpkg-lib-fixup)
 else ()
     message(FATAL_ERROR "navkit-rpkg-lib has no native library for this platform.")
 endif ()
@@ -231,6 +252,7 @@ elseif (APPLE)
         )
     endif()
     list(APPEND NAVKIT_BUNDLE_SEARCH_DIRS
+            "${NAVKIT_RPKG_LIB_DIR}/$<CONFIG>"
             "${NavKit_SOURCE_DIR}/lib/Debug"
             "${NavKit_SOURCE_DIR}/lib/Release"
     )
@@ -241,6 +263,10 @@ elseif (APPLE)
             \"\${CMAKE_INSTALL_PREFIX}/NavKit.app/Contents/MacOS/NavKit\"
             \"\"
             \"${NAVKIT_BUNDLE_SEARCH_DIRS}\"
+        )
+        execute_process(
+            COMMAND codesign --force --deep --sign - \"\${CMAKE_INSTALL_PREFIX}/NavKit.app\"
+            COMMAND_ERROR_IS_FATAL ANY
         )
     ")
 endif ()

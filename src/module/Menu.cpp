@@ -1,5 +1,4 @@
 #include "../../include/NavKit/module/Menu.h"
-#include <SDL.h>
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
