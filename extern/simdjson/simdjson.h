@@ -82634,7 +82634,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -82644,7 +82644,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -100353,7 +100353,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -100363,7 +100363,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -118549,7 +118549,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -118559,7 +118559,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -136745,7 +136745,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -136755,7 +136755,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -155056,7 +155056,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -155066,7 +155066,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -173674,7 +173674,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -173684,7 +173684,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -191782,7 +191782,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -191792,7 +191792,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -209913,7 +209913,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -209923,7 +209923,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
@@ -228047,7 +228047,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         __m128i v   = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + b * 16));
         __m128i cmp = _mm_cmpeq_epi8(v, _mm_set1_epi8('"'));
         unsigned m  = static_cast<unsigned>(_mm_movemask_epi8(cmp));
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); } // NavKit: trailing_zeroes() has an MSVC fallback; __builtin_ctz does not (SDL defines __SSE2__ under MSVC)
     }
     return MaxKeyLen + 1;
 #elif SIMDJSON_KEY_SELECTOR_HAS_LSX
@@ -228057,7 +228057,7 @@ simdjson_really_inline std::size_t scan_key_length(const char* p) noexcept {
         // vmskltz_b gathers the per-byte sign bits (set where the byte equals '"')
         // into the low 16 bits of lane 0, the LSX equivalent of movemask.
         unsigned m  = static_cast<unsigned>(__lsx_vpickve2gr_w(__lsx_vmskltz_b(cmp), 0)) & 0xFFFFu;
-        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(__builtin_ctz(m)); }
+        if (simdjson_likely(m != 0)) { return b * 16 + std::size_t(trailing_zeroes(m)); }
     }
     return MaxKeyLen + 1;
 #else
