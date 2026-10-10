@@ -62,7 +62,7 @@ void Scene::loadMeshes(
     Json::Meshes newMeshes;
     try {
         Logger::log(NK_INFO, "Loading meshes.");
-        newMeshes = Json::Meshes(jsonDocument["meshes"]);
+        newMeshes = Json::Meshes(jsonDocument["meshes"].get_array());
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
@@ -76,7 +76,7 @@ void Scene::loadPfBoxes(
     Json::PfBoxes pfBoxes;
     try {
         Logger::log(NK_INFO, "Loading Pathfinding boxes.");
-        pfBoxes = Json::PfBoxes(jsonDocument["pfBoxes"]);
+        pfBoxes = Json::PfBoxes(jsonDocument["pfBoxes"].get_array());
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
@@ -112,7 +112,7 @@ void Scene::loadPfSeedPoints(
     Json::PfSeedPoints newPfSeedPoints;
     try {
         Logger::log(NK_INFO, "Loading Pathfinding seed points.");
-        newPfSeedPoints = Json::PfSeedPoints(jsonDocument["pfSeedPoints"]);
+        newPfSeedPoints = Json::PfSeedPoints(jsonDocument["pfSeedPoints"].get_array());
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
     } catch (...) {
@@ -125,17 +125,17 @@ void Scene::loadRoomsAndVolumes(
     const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     try {
         Logger::log(NK_INFO, "Loading Gates.");
-        gates = Json::Gates(jsonDocument["gates"]).gates;
+        gates = Json::Gates(jsonDocument["gates"].get_array()).gates;
         Logger::log(NK_INFO, "Loading Rooms.");
-        rooms = Json::Rooms(jsonDocument["rooms"]).rooms;
+        rooms = Json::Rooms(jsonDocument["rooms"].get_array()).rooms;
         Logger::log(NK_INFO, "Loading AI Area Worlds.");
-        aiAreaWorlds = Json::AiAreaWorlds(jsonDocument["aiAreaWorld"]).aiAreaWorlds;
+        aiAreaWorlds = Json::AiAreaWorlds(jsonDocument["aiAreaWorld"].get_array()).aiAreaWorlds;
         Logger::log(NK_INFO, "Loading AI Areas.");
-        aiAreas = Json::AiAreas(jsonDocument["aiArea"]).aiAreas;
+        aiAreas = Json::AiAreas(jsonDocument["aiArea"].get_array()).aiAreas;
         Logger::log(NK_INFO, "Loading Volume Boxes.");
-        volumeBoxes = Json::VolumeBoxes(jsonDocument["volumeBoxes"]).volumeBoxes;
+        volumeBoxes = Json::VolumeBoxes(jsonDocument["volumeBoxes"].get_array()).volumeBoxes;
         Logger::log(NK_INFO, "Loading Volume Spheres.");
-        volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"]).volumeSpheres;
+        volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"].get_array()).volumeSpheres;
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
     } catch (...) {
@@ -147,7 +147,7 @@ void Scene::loadMatis(
     const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Logger::log(NK_INFO, "Loading Matis.");
     try {
-        for (const auto matiVec = Json::Matis(jsonDocument["matis"]).matis; const auto& mati : matiVec) {
+        for (const auto matiVec = Json::Matis(jsonDocument["matis"].get_array()).matis; const auto& mati : matiVec) {
             matis[mati.hash] = mati;
         }
     } catch (const std::exception& e) {
@@ -161,7 +161,7 @@ void Scene::loadPrimMatis(
     const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Logger::log(NK_INFO, "Loading Prim Matis.");
     try {
-        for (const auto& primMati : Json::PrimMatis(jsonDocument["primMatis"]).primMatis) {
+        for (const auto& primMati : Json::PrimMatis(jsonDocument["primMatis"].get_array()).primMatis) {
             primMatis[primMati.primHash] = primMati;
         }
     } catch (const std::exception& e) {
