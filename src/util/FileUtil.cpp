@@ -1,6 +1,9 @@
 #include "../../include/NavKit/util/FileUtil.h"
 
 #include <filesystem>
+#include <sstream>
+#include <string>
+#include <vector>
 #include <wx/stdpaths.h>
 
 namespace FileUtil {
@@ -9,14 +12,61 @@ namespace FileUtil {
             const wxScopedCharBuffer utf8 = value.ToUTF8();
             return utf8 ? utf8.data() : "";
         }
+
+        struct DialogFilters {
+            std::vector<std::string> specs;
+            std::vector<nfdu8filteritem_t> items;
+
+            DialogFilters(const nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
+#ifdef __APPLE__
+                // nfd's Cocoa backend maps every extension to a UTType and asserts if a filter list
+                // yields none. Compound extensions such as "nav.json" have no UTType, so keep only
+                // the final component of each extension ("nav.json" -> "json").
+                specs.reserve(filterCount);
+                items.reserve(filterCount);
+                for (nfdfiltersize_t i = 0; i < filterCount; ++i) {
+                    std::string spec;
+                    std::stringstream specStream(filters[i].spec);
+                    std::string extension;
+                    while (std::getline(specStream, extension, ',')) {
+                        if (const size_t lastDot = extension.find_last_of('.'); lastDot != std::string::npos) {
+                            extension.erase(0, lastDot + 1);
+                        }
+                        if (extension.empty()) {
+                            continue;
+                        }
+                        if (!spec.empty()) {
+                            spec += ',';
+                        }
+                        spec += extension;
+                    }
+                    if (spec.empty()) {
+                        continue;
+                    }
+                    specs.push_back(std::move(spec));
+                    items.push_back({.name = filters[i].name, .spec = specs.back().c_str()});
+                }
+#else
+                items.assign(filters, filters + filterCount);
+#endif
+            }
+
+            nfdu8filteritem_t* data() {
+                return items.empty() ? nullptr : items.data();
+            }
+            nfdfiltersize_t count() const {
+                return static_cast<nfdfiltersize_t>(items.size());
+            }
+        };
     } // namespace
 
-    char* openNfdLoadDialog(nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
+    char* openNfdLoadDialog(const nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
         nfdu8char_t* outPath;
 
+        DialogFilters dialogFilters(filters, filterCount);
         const nfdopendialogu8args_t args = {
-            .filterList = filters,
-            .filterCount = filterCount,
+            .filterList = dialogFilters.data(),
+            .filterCount = dialogFilters.count(),
         };
 
         const nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
@@ -29,12 +79,14 @@ namespace FileUtil {
         return nullptr;
     }
 
-    char* openNfdSaveDialog(nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName) {
+    char* openNfdSaveDialog(
+        const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName) {
         nfdu8char_t* outPath;
 
+        DialogFilters dialogFilters(filters, filterCount);
         const nfdsavedialogu8args_t args = {
-            .filterList = filters,
-            .filterCount = filterCount,
+            .filterList = dialogFilters.data(),
+            .filterCount = dialogFilters.count(),
             .defaultName = defaultName,
         };
         const nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);

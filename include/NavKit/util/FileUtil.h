@@ -5,9 +5,10 @@
 #include <string>
 
 namespace FileUtil {
-    char* openNfdLoadDialog(nfdu8filteritem_t* filters, nfdfiltersize_t filterCount);
+    char* openNfdLoadDialog(const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount);
 
-    char* openNfdSaveDialog(nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName);
+    char* openNfdSaveDialog(
+        const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName);
 
     char* openNfdFolderDialog(char* defaultPath = nullptr);
 
