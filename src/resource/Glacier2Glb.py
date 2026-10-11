@@ -1939,7 +1939,7 @@ class Physics:
         file_size = os.path.getsize(filepath)
         if file_size == 19:
             log("TRACE", "Skipping header only ALOC: " + aloc_name, aloc_name)
-            return -1
+            return -2
 
         fp = os.fsencode(filepath)
         file = open(fp, "rb")
@@ -2746,6 +2746,11 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
         try:
             if mesh_type == "ALOC":
                 aloc, submeshes = load_aloc(aloc_or_prim_path)
+                if aloc == -2:
+                    log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
+                        mesh_hash) + " ================", "glacier2obj")
+                    error_alocs.append(mesh_hash)
+                    continue
                 if aloc == -1:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
                         mesh_hash) + " ================", "glacier2obj")
