@@ -11,7 +11,44 @@
 #include "../../include/RecastDemo/imgui.h"
 
 #include <algorithm>
+#include <iterator>
 #include <SDL.h>
+#include <wx/utils.h>
+
+namespace {
+    enum MovementAction { MOVE_FRONT, MOVE_BACK, MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN };
+
+    struct MovementKey {
+        int keyCode;
+        MovementAction action;
+    };
+
+    // Every key that moves the camera. InputHandler::pressedMovementKeys holds one bit per entry, in table order.
+    constexpr MovementKey MOVEMENT_KEYS[] = {
+        {'W', MOVE_FRONT},
+        {WXK_UP, MOVE_FRONT},
+        {'S', MOVE_BACK},
+        {WXK_DOWN, MOVE_BACK},
+        {'A', MOVE_LEFT},
+        {WXK_LEFT, MOVE_LEFT},
+        {'D', MOVE_RIGHT},
+        {WXK_RIGHT, MOVE_RIGHT},
+        {'Q', MOVE_UP},
+        {WXK_PAGEUP, MOVE_UP},
+        {'E', MOVE_DOWN},
+        {WXK_PAGEDOWN, MOVE_DOWN},
+    };
+    static_assert(std::size(MOVEMENT_KEYS) <= 32, "pressedMovementKeys needs one bit per movement key");
+
+    int movementKeyIndex(const int keyCode) {
+        for (int i = 0; i < static_cast<int>(std::size(MOVEMENT_KEYS)); ++i) {
+            if (MOVEMENT_KEYS[i].keyCode == keyCode) {
+                return i;
+            }
+        }
+        return -1;
+    }
+} // namespace
 
 InputHandler::InputHandler() {
     mouseButtonMask = 0;
@@ -22,16 +59,18 @@ InputHandler::InputHandler() {
     scrollZoom = 0;
     movedDuringRotate = false;
     rotate = false;
+    pendingMouseScroll = 0;
+    wheelNotches = 0.0f;
+    modifierKeyDown = false;
+    pressedMovementKeys = 0;
 }
 
 int InputHandler::handleInput() {
+    // Mouse and keyboard events go to the wxWidgets render canvas (see MainFrame), not to SDL: wxWidgets owns the
+    // native view, and on macOS it consumes the events before SDL's responder ever sees them. SDL only reports
+    // window and quit events here.
     SDL_Event event;
-    mouseScroll = 0;
-    const Gui& gui = Gui::getInstance();
     Renderer& renderer = Renderer::getInstance();
-    Airg& airg = Airg::getInstance();
-    Navp& navp = Navp::getInstance();
-    SceneMesh& obj = SceneMesh::getInstance();
     bool done = false;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -52,81 +91,6 @@ int InputHandler::handleInput() {
             }
             break;
 
-        case SDL_KEYDOWN:
-            // Handle any key presses here.
-            if (event.key.keysym.sym == SDLK_TAB) {
-                Gui::getInstance().showMenu = !gui.showMenu;
-            }
-            if (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)) {
-                if (getMainFrame()->IsFullScreen()) {
-                    renderer.handleFullscreen(Renderer::WINDOWED);
-                } else {
-                    renderer.handleFullscreen(Renderer::BORDERLESS_FULLSCREEN);
-                }
-            }
-            break;
-
-        case SDL_MOUSEWHEEL:
-            if (event.wheel.y < 0) {
-                // wheel down
-                if (gui.mouseOverMenu) {
-                    mouseScroll++;
-                } else {
-                    scrollZoom += 1.0f;
-                }
-            } else {
-                if (gui.mouseOverMenu) {
-                    mouseScroll--;
-                } else {
-                    scrollZoom -= 1.0f;
-                }
-            }
-            break;
-        case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == SDL_BUTTON_RIGHT) {
-                if (!gui.mouseOverMenu) {
-                    // Rotate view
-                    rotate = true;
-                    movedDuringRotate = false;
-                    origMousePos[0] = mousePos[0];
-                    origMousePos[1] = mousePos[1];
-                    renderer.origCameraEulers[0] = renderer.cameraEulers[0];
-                    renderer.origCameraEulers[1] = renderer.cameraEulers[1];
-                }
-            }
-            break;
-
-        case SDL_MOUSEBUTTONUP:
-            // Handle mouse clicks here.
-            if (event.button.button == SDL_BUTTON_RIGHT) {
-                rotate = false;
-            } else if (event.button.button == SDL_BUTTON_LEFT) {
-                if (!gui.mouseOverMenu) {
-                    navp.doNavpHitTest = true;
-                    navp.doNavpExclusionBoxHitTest = true;
-                    navp.doNavpPfSeedPointHitTest = true;
-                    airg.doAirgHitTest = true;
-                    obj.doGlbHitTest = true;
-                }
-            }
-
-            break;
-
-        case SDL_MOUSEMOTION:
-            mousePos[0] = event.motion.x;
-            mousePos[1] = renderer.height - event.motion.y;
-
-            if (rotate) {
-                const auto dx = static_cast<float>(mousePos[0] - origMousePos[0]);
-                const auto dy = static_cast<float>(mousePos[1] - origMousePos[1]);
-                renderer.cameraEulers[0] = renderer.origCameraEulers[0] - dy * CAMERA_ROTATION_SENSITIVITY;
-                renderer.cameraEulers[1] = renderer.origCameraEulers[1] + dx * CAMERA_ROTATION_SENSITIVITY;
-                if (dx * dx + dy * dy > 3 * 3) {
-                    movedDuringRotate = true;
-                }
-            }
-            break;
-
         case SDL_QUIT:
             done = true;
             break;
@@ -134,20 +98,27 @@ int InputHandler::handleInput() {
             break;
         }
     }
+
+    mouseScroll = pendingMouseScroll;
+    pendingMouseScroll = 0;
+
+    const wxMouseState mouseState = wxGetMouseState();
     mouseButtonMask = 0;
-    const Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
-    if (mouseState & SDL_BUTTON_LMASK) {
+    if (mouseState.LeftIsDown()) {
         mouseButtonMask |= IMGUI_MBUT_LEFT;
     }
-    if (mouseState & SDL_BUTTON_RMASK) {
+    if (mouseState.RightIsDown()) {
         mouseButtonMask |= IMGUI_MBUT_RIGHT;
     }
+    modifierKeyDown = mouseState.ShiftDown() || mouseState.ControlDown() || mouseState.RawControlDown() ||
+        mouseState.AltDown() || mouseState.MetaDown();
 
     keybSpeed = BASE_KEYBOARD_SPEED;
-    if (SDL_GetModState() & KMOD_SHIFT) {
+    if (mouseState.ShiftDown()) {
         keybSpeed *= SHIFT_SPEED_MULTIPLIER;
     }
-    if (SDL_GetModState() & KMOD_CTRL) {
+    // RawControlDown is the physical Ctrl key on every platform (ControlDown means Cmd on macOS).
+    if (mouseState.RawControlDown()) {
         keybSpeed /= CTRL_SPEED_DIVISOR;
     }
     if (done) {
@@ -156,23 +127,138 @@ int InputHandler::handleInput() {
     return 0;
 }
 
+void InputHandler::handleMouseMove(const int x, const int y) {
+    Renderer& renderer = Renderer::getInstance();
+    mousePos[0] = x;
+    mousePos[1] = renderer.height - y;
+
+    if (rotate) {
+        const auto dx = static_cast<float>(mousePos[0] - origMousePos[0]);
+        const auto dy = static_cast<float>(mousePos[1] - origMousePos[1]);
+        renderer.cameraEulers[0] = renderer.origCameraEulers[0] - dy * CAMERA_ROTATION_SENSITIVITY;
+        renderer.cameraEulers[1] = renderer.origCameraEulers[1] + dx * CAMERA_ROTATION_SENSITIVITY;
+        if (dx * dx + dy * dy > 3 * 3) {
+            movedDuringRotate = true;
+        }
+    }
+}
+
+void InputHandler::handleMouseButtonDown(const MouseButton button) {
+    if (button != RIGHT_MOUSE_BUTTON) {
+        return;
+    }
+    if (const Gui& gui = Gui::getInstance(); gui.mouseOverMenu) {
+        return;
+    }
+    // Rotate view
+    Renderer& renderer = Renderer::getInstance();
+    rotate = true;
+    movedDuringRotate = false;
+    origMousePos[0] = mousePos[0];
+    origMousePos[1] = mousePos[1];
+    renderer.origCameraEulers[0] = renderer.cameraEulers[0];
+    renderer.origCameraEulers[1] = renderer.cameraEulers[1];
+}
+
+void InputHandler::handleMouseButtonUp(const MouseButton button) {
+    if (button == RIGHT_MOUSE_BUTTON) {
+        rotate = false;
+        return;
+    }
+    if (const Gui& gui = Gui::getInstance(); gui.mouseOverMenu) {
+        return;
+    }
+    Navp& navp = Navp::getInstance();
+    Airg& airg = Airg::getInstance();
+    SceneMesh& obj = SceneMesh::getInstance();
+    navp.doNavpHitTest = true;
+    navp.doNavpExclusionBoxHitTest = true;
+    navp.doNavpPfSeedPointHitTest = true;
+    airg.doAirgHitTest = true;
+    obj.doGlbHitTest = true;
+}
+
+void InputHandler::handleMouseWheel(const int rotation, const int delta) {
+    if (delta <= 0) {
+        return;
+    }
+    wheelNotches += static_cast<float>(rotation) / static_cast<float>(delta);
+    const int notches = static_cast<int>(wheelNotches);
+    if (notches == 0) {
+        return;
+    }
+    wheelNotches -= static_cast<float>(notches);
+    // Wheel down (negative rotation) scrolls the menu down and moves the camera back.
+    if (Gui::getInstance().mouseOverMenu) {
+        pendingMouseScroll -= notches;
+    } else {
+        scrollZoom -= static_cast<float>(notches);
+    }
+}
+
+bool InputHandler::handleKeyDown(const int keyCode, const bool altDown) {
+    // Movement keys are tracked from the canvas's own key events rather than polled: polling the keyboard state
+    // needs the Input Monitoring permission on macOS.
+    if (const int index = movementKeyIndex(keyCode); index != -1) {
+        pressedMovementKeys |= 1u << index;
+        return true;
+    }
+    switch (keyCode) {
+    case WXK_TAB: {
+        Gui& gui = Gui::getInstance();
+        gui.showMenu = !gui.showMenu;
+        return true;
+    }
+    case WXK_RETURN:
+    case WXK_NUMPAD_ENTER:
+        if (!altDown) {
+            return false;
+        }
+        Renderer::getInstance().handleFullscreen(
+            getMainFrame()->IsFullScreen() ? Renderer::WINDOWED : Renderer::BORDERLESS_FULLSCREEN);
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool InputHandler::handleKeyUp(const int keyCode) {
+    const int index = movementKeyIndex(keyCode);
+    if (index == -1) {
+        return false;
+    }
+    pressedMovementKeys &= ~(1u << index);
+    return true;
+}
+
+void InputHandler::handleKeyboardFocusLost() {
+    pressedMovementKeys = 0;
+}
+
 void InputHandler::handleMovement(const float dt, const double* modelviewMatrix) {
     // Handle keyboard movement.
-    const Uint8* keyState = SDL_GetKeyboardState(nullptr);
+    auto isPressed = [this](const MovementAction action) {
+        for (size_t i = 0; i < std::size(MOVEMENT_KEYS); ++i) {
+            if (MOVEMENT_KEYS[i].action == action && (pressedMovementKeys & (1u << i)) != 0) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     // A helper lambda makes the movement logic reusable and easier to read.
-    auto calculateMovement = [&](const float currentValue, const bool isPressed) {
+    auto calculateMovement = [&](const float currentValue, const bool pressed) {
         constexpr float accelerationFactor = 4.0f; // Give the magic number a name
-        const float direction = isPressed ? 1.0f : -1.0f;
+        const float direction = pressed ? 1.0f : -1.0f;
         return std::clamp(currentValue + dt * accelerationFactor * direction, 0.0f, 1.0f);
     };
 
-    moveFront = calculateMovement(moveFront, keyState[SDL_SCANCODE_W] || keyState[SDL_SCANCODE_UP]);
-    moveBack = calculateMovement(moveBack, keyState[SDL_SCANCODE_S] || keyState[SDL_SCANCODE_DOWN]);
-    moveLeft = calculateMovement(moveLeft, keyState[SDL_SCANCODE_A] || keyState[SDL_SCANCODE_LEFT]);
-    moveRight = calculateMovement(moveRight, keyState[SDL_SCANCODE_D] || keyState[SDL_SCANCODE_RIGHT]);
-    moveUp = calculateMovement(moveUp, keyState[SDL_SCANCODE_Q] || keyState[SDL_SCANCODE_PAGEUP]);
-    moveDown = calculateMovement(moveDown, keyState[SDL_SCANCODE_E] || keyState[SDL_SCANCODE_PAGEDOWN]);
+    moveFront = calculateMovement(moveFront, isPressed(MOVE_FRONT));
+    moveBack = calculateMovement(moveBack, isPressed(MOVE_BACK));
+    moveLeft = calculateMovement(moveLeft, isPressed(MOVE_LEFT));
+    moveRight = calculateMovement(moveRight, isPressed(MOVE_RIGHT));
+    moveUp = calculateMovement(moveUp, isPressed(MOVE_UP));
+    moveDown = calculateMovement(moveDown, isPressed(MOVE_DOWN));
 
     const float moveX = (moveRight - moveLeft) * keybSpeed * dt;
     const float moveY = (moveBack - moveFront) * keybSpeed * dt + scrollZoom * 2.0f;

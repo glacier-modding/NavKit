@@ -20,6 +20,14 @@ private:
     void onClose(wxCloseEvent& event);
     void onMove(wxMoveEvent& event);
     void onSize(wxSizeEvent& event);
+    void onCanvasMouseMove(wxMouseEvent& event);
+    void onCanvasMouseDown(wxMouseEvent& event);
+    void onCanvasMouseUp(wxMouseEvent& event);
+    void onCanvasMouseCaptureLost(wxMouseCaptureLostEvent& event);
+    void onCanvasMouseWheel(wxMouseEvent& event);
+    void onCanvasKeyDown(wxKeyEvent& event);
+    void onCanvasKeyUp(wxKeyEvent& event);
+    void onCanvasKillFocus(wxFocusEvent& event);
 
     wxGLCanvas* panel;
 };
