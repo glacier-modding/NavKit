@@ -6,6 +6,7 @@
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/model/Json.h"
+#include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
@@ -25,7 +26,6 @@
 #include <queue>
 #include <array>
 #include <algorithm>
-#include <SDL_keyboard.h>
 #include <sstream>
 
 #include "../../include/NavKit/module/PersistedSettings.h"
@@ -1033,7 +1033,7 @@ SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
         return result;
     }
     result.hitIndex = -1;
-    if (SDL_GetModState()) {
+    if (InputHandler::getInstance().isModifierKeyDown()) {
         markerPositionSet = false;
     }
     return result;
