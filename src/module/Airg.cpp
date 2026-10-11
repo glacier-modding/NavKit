@@ -6,7 +6,6 @@
 #include <stdexcept>
 
 #include <iomanip>
-#include <SDL.h>
 #include <sstream>
 #include <string>
 #include "../../include/NavKit/UiIds.h"

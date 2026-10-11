@@ -1,5 +1,4 @@
 #pragma once
-#include <SDL_syswm.h>
 
 class InputHandler {
     explicit InputHandler();

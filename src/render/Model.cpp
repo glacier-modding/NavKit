@@ -10,7 +10,6 @@
 #include <limits>
 #include <map>
 #include <GL/glew.h>
-#include <SDL.h>
 #include <mutex>
 
 #include <stb_image.h>
