@@ -199,7 +199,7 @@ jobs:
 
   validate_macos:
     name: Validate universal macOS build
-    runs-on: macos-15
+    runs-on: macos-latest
     # Keep macOS validation advisory until the universal dependency build is fixed.
     continue-on-error: true
     outputs:
