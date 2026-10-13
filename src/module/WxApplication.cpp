@@ -64,7 +64,6 @@ MainFrame::MainFrame() :
     SetSizer(sizer);
     Bind(wxEVT_MENU, &MainFrame::onMenu, this);
     Bind(wxEVT_CLOSE_WINDOW, &MainFrame::onClose, this);
-    Bind(wxEVT_MOVE, &MainFrame::onMove, this);
     Bind(wxEVT_SIZE, &MainFrame::onSize, this);
 }
 
@@ -81,6 +80,7 @@ void MainFrame::onMenu(wxCommandEvent& event) {
 }
 
 void MainFrame::onClose(wxCloseEvent& event) {
+    Renderer::getInstance().persistWindowSettings();
     SDL_Event quitEvent{};
     quitEvent.type = SDL_QUIT;
     SDL_PushEvent(&quitEvent);
@@ -100,16 +100,6 @@ void MainFrame::onSize(wxSizeEvent& event) {
         Renderer::getInstance().handleResize();
     }
 }
-
-#ifdef __WXMSW__
-WXLRESULT MainFrame::MSWWindowProc(const WXUINT message, const WXWPARAM wParam, const WXLPARAM lParam) {
-    const WXLRESULT result = wxFrame::MSWWindowProc(message, wParam, lParam);
-    if (message == WM_EXITSIZEMOVE && Renderer::getInstance().window) {
-        Renderer::getInstance().handleResizeFinished();
-    }
-    return result;
-}
-#endif
 
 bool initializeWx(int& argc, char** argv) {
     if (!wxEntryStart(argc, argv)) {

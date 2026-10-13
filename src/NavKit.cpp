@@ -103,20 +103,20 @@ int SDL_main(const int argc, char** argv) {
         return error ? 1 : 0;
     }
 
-    CPPTRACE_TRY {
-        int wxArgc = argc;
-        if (!initializeWx(wxArgc, argv)) {
-            std::cerr << "Could not initialize wxWidgets.\n";
-            return -1;
-        }
-        Logger::getInstance().start();
+    int wxArgc = argc;
+    if (!initializeWx(wxArgc, argv)) {
+        std::cerr << "Could not initialize wxWidgets.\n";
+        return -1;
+    }
+    Logger::getInstance().start();
 
-        PersistedSettings::getInstance().load();
-        Renderer& renderer = Renderer::getInstance();
-        if (!renderer.initWindowAndRenderer()) {
-            shutdownWx();
-            return -1;
-        }
+    PersistedSettings::getInstance().load();
+    Renderer& renderer = Renderer::getInstance();
+    if (!renderer.initWindowAndRenderer()) {
+        shutdownWx();
+        return -1;
+    }
+    CPPTRACE_TRY {
         renderer.initShaders();
 
         UpdateChecker& updateChecker = UpdateChecker::getInstance();
@@ -141,7 +141,6 @@ int SDL_main(const int argc, char** argv) {
         updateChecker.waitForUpdateCheck();
         Logger::getInstance().stop();
         shutdownWx();
-        return 0;
     }
     CPPTRACE_CATCH(const std::exception& e) {
         ErrorHandler::openErrorDialog("An unexpected error occurred: " + std::string(e.what()) + "\n\nStack Trace:\n" +

@@ -68,7 +68,7 @@ public:
 
     void handleResize();
 
-    void handleResizeFinished();
+    void persistWindowSettings();
 
     void handleFullscreen(FullscreenMode mode) const;
 
@@ -87,6 +87,8 @@ public:
     unsigned int depth_rb;
     int width;
     int height;
+    int windowX;
+    int windowY;
     float frameRate;
     float initialFrameRate;
     float cameraEulers[2];

@@ -82,7 +82,7 @@ void Renderer::updateFrameRate() {
             frameRate = 60.0f;
         }
     }
-    Logger::log(NK_INFO, ("Setting framerate to " + std::to_string(frameRate)).c_str());
+    Logger::log(NK_DEBUG, ("Setting framerate to " + std::to_string(frameRate)).c_str());
 }
 
 bool Renderer::initWindowAndRenderer() {
@@ -180,14 +180,9 @@ void Renderer::handleMoved() {
     if (getMainFrame()->IsFullScreen() || getMainFrame()->IsMaximized()) {
         return;
     }
-    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     const wxPoint position = getMainFrame()->GetPosition();
-    const int x = position.x;
-    const int y = position.y;
-    persistedSettings.setValue("Renderer", "windowX", std::to_string(x));
-    persistedSettings.setValue("Renderer", "windowY", std::to_string(y));
-    persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
-    persistedSettings.save();
+    windowX = position.x;
+    windowY = position.y;
 }
 
 void Renderer::handleFullscreen(const FullscreenMode mode) const {
@@ -248,16 +243,18 @@ void Renderer::handleResize() {
         const wxSize size = renderPanel->GetClientSize();
         width = size.GetWidth();
         height = size.GetHeight();
+        Logger::log(NK_DEBUG,
+            ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
     }
 }
 
-void Renderer::handleResizeFinished() {
-    handleResize();
-    Logger::log(
-        NK_INFO, ("Window resized. New dimensions: " + std::to_string(width) + "x" + std::to_string(height)).c_str());
+void Renderer::persistWindowSettings() {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     persistedSettings.setValue("Renderer", "windowWidth", std::to_string(width));
     persistedSettings.setValue("Renderer", "windowHeight", std::to_string(height));
+    persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
+    persistedSettings.setValue("Renderer", "windowX", std::to_string(windowX));
+    persistedSettings.setValue("Renderer", "windowY", std::to_string(windowY));
     persistedSettings.setValue("Renderer", "frameRate", std::to_string(frameRate));
     persistedSettings.save();
 }
