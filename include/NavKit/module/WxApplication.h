@@ -20,9 +20,6 @@ private:
     void onClose(wxCloseEvent& event);
     void onMove(wxMoveEvent& event);
     void onSize(wxSizeEvent& event);
-#ifdef __WXMSW__
-    WXLRESULT MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
-#endif
 
     wxGLCanvas* panel;
 };

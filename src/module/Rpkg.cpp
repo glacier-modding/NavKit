@@ -28,15 +28,19 @@ std::mutex Rpkg::hashMapsMutex;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
 void Rpkg::initExtractionData() {
+    const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
+    const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
+    if (!exists(hitmanPath)) {
+        Logger::log(NK_ERROR, "Invalid hitman path.");
+        return;
+    }
+    const std::string retailFolder = (hitmanPath / "Retail").string();
+    Logger::log(NK_INFO, "Checking Hitman Platform.");
+    checkHitmanVersion();
+    if (unknownGameVersion) {
+        return;
+    }
     CPPTRACE_TRY {
-        const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
-        const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
-        const std::string retailFolder = (hitmanPath / "Retail").string();
-        Logger::log(NK_INFO, "Checking Hitman Platform.");
-        checkHitmanVersion();
-        if (unknownGameVersion) {
-            return;
-        }
         Logger::log(NK_INFO, "Scanning resource packages.");
 
         const unsigned int threadLimit = Threading::getMaxThreads();
