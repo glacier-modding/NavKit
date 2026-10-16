@@ -15,6 +15,11 @@ if(PORT STREQUAL "libpng")
     list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DPNG_ARM_NEON=off")
 endif()
 
+# libwebp's architecture-specific SIMD cannot serve both slices of a universal build.
+if(PORT STREQUAL "libwebp")
+    list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DWEBP_ENABLE_SIMD=OFF")
+endif()
+
 # OpenSSL selects assembly for VCPKG_TARGET_ARCHITECTURE, which cannot be
 # compiled for both slices of a universal binary. Use its portable C code.
 if(PORT STREQUAL "openssl")
