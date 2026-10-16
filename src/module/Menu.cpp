@@ -74,6 +74,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_BITMAP, "Airg Cell: Area Bitmap");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, "Airg Cell: Vision Data");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_LAYER, "Airg Cell: Layer");
+    view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_DEAD_END, "Airg Cell: Dead End");
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
     view->AppendSeparator();
@@ -121,7 +122,7 @@ void Menu::handleCheckboxMenuItem(const int menuId, bool& stateVariable, const c
 
 void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
     const std::vector<int> menuGroupIds = {IDM_VIEW_AIRG_CELL_COLOR_OFF, IDM_VIEW_AIRG_CELL_COLOR_BITMAP,
-        IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, IDM_VIEW_AIRG_CELL_COLOR_LAYER};
+        IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, IDM_VIEW_AIRG_CELL_COLOR_LAYER, IDM_VIEW_AIRG_CELL_COLOR_DEAD_END};
     if (wxFrame* frame = getMainFrame(); frame && frame->GetMenuBar()) {
         for (const int menuId : menuGroupIds) {
             frame->GetMenuBar()->Check(menuId, selectedMenuId == menuId);
@@ -145,6 +146,10 @@ void Menu::handleCellColorDataRadioMenuItem(const int selectedMenuId) {
     case IDM_VIEW_AIRG_CELL_COLOR_LAYER:
         itemName = "Layer";
         selectedCellColorDataSource = LAYER;
+        break;
+    case IDM_VIEW_AIRG_CELL_COLOR_DEAD_END:
+        itemName = "Dead End";
+        selectedCellColorDataSource = DEAD_END;
         break;
     default:
         return;
@@ -339,6 +344,7 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_VIEW_AIRG_CELL_COLOR_BITMAP:
     case IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA:
     case IDM_VIEW_AIRG_CELL_COLOR_LAYER:
+    case IDM_VIEW_AIRG_CELL_COLOR_DEAD_END:
         handleCellColorDataRadioMenuItem(menuId);
         break;
 

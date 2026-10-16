@@ -496,6 +496,22 @@ void Airg::renderAirg() {
                     triVerts.push_back({p1, glm::vec3(0, 1, 0), color});
                     triVerts.push_back({p3, glm::vec3(0, 1, 0), color});
                     triVerts.push_back({p4, glm::vec3(0, 1, 0), color});
+                } else if (cellColorSource == DEAD_END) {
+                    bool isDeadEnd = false;
+                    const size_t byteIndex = i / 8;
+                    const size_t bitIndex = i % 8;
+                    if (byteIndex < reasoningGrid->m_deadEndData.m_aBytes.size()) {
+                        isDeadEnd = (reasoningGrid->m_deadEndData.m_aBytes[byteIndex] & (1 << bitIndex)) != 0;
+                    }
+                    const glm::vec4 color =
+                        isDeadEnd ? glm::vec4(0.85f, 0.15f, 0.15f, 0.65f) : glm::vec4(0.15f, 0.85f, 0.15f, 0.65f);
+
+                    triVerts.push_back({p1, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({p2, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({p3, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({p1, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({p3, glm::vec3(0, 1, 0), color});
+                    triVerts.push_back({p4, glm::vec3(0, 1, 0), color});
                 } else if (cellColorSource == VISION_DATA) {
                     constexpr std::array<glm::vec4, 4> visibilityColors = {glm::vec4(0.08f, 0.08f, 0.08f, 0.55f),
                         glm::vec4(0.13f, 0.75f, 0.32f, 0.55f), glm::vec4(0.95f, 0.72f, 0.12f, 0.55f),
