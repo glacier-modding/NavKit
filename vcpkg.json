@@ -8,7 +8,7 @@
     },
     {
       "name": "brotli",
-      "version>=": "1.1.0#1"
+      "version>=": "1.2.0"
     },
     {
       "name": "bzip2",
@@ -16,11 +16,11 @@
     },
     {
       "name": "cpptrace",
-      "version>=": "0.8.1#0"
+      "version>=": "1.0.4"
     },
     {
       "name": "freetype",
-      "version>=": "2.13.3"
+      "version>=": "2.14.3"
     },
     {
       "name": "ftgl",
@@ -28,7 +28,7 @@
     },
     {
       "name": "glew",
-      "version>=": "2.2.0#3"
+      "version>=": "2.3.1"
     },
     {
       "name": "glm",
@@ -36,16 +36,16 @@
     },
     {
       "name": "cpp-httplib",
-      "version>=": "0.26.0",
+      "version>=": "0.59.0",
       "features": [ "openssl", "brotli" ]
     },
     {
       "name": "libpng",
-      "version>=": "1.6.50"
+      "version>=": "1.6.59"
     },
     {
       "name": "nativefiledialog-extended",
-      "version>=": "1.2.1"
+      "version>=": "1.4.1"
     },
     {
       "name": "recastnavigation",
@@ -53,7 +53,7 @@
     },
     {
       "name": "sdl2",
-      "version>=": "2.30.3#1"
+      "version>=": "2.32.10#1"
     },
     {
       "name": "simdjson",
@@ -61,15 +61,15 @@
     },
     {
       "name": "simpleini",
-      "version>=": "4.22"
+      "version>=": "4.27"
     },
     {
       "name": "zlib",
-      "version>=": "1.3.1"
+      "version>=": "1.3.2"
     },
     {
       "name": "wxwidgets",
-      "version>=": "3.3.1"
+      "version>=": "3.3.3"
     }
   ],
   "overrides": [
