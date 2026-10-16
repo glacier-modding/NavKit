@@ -199,7 +199,7 @@ jobs:
 
   validate_macos:
     name: Validate universal macOS build
-    runs-on: macos-15
+    runs-on: macos-latest
     # Keep macOS validation advisory until the universal dependency build is fixed.
     continue-on-error: true
     outputs:
@@ -225,7 +225,7 @@ jobs:
           path: |
             ${{ env.VCPKG_CACHE_DIR }}
             build/macos-release/vcpkg_installed/
-          key: vcpkg-${{ runner.os }}-universal-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'triplets/arm64-universal-osx.cmake', 'ports/libjpeg-turbo/**') }}
+          key: vcpkg-${{ runner.os }}-universal-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'triplets/arm64-universal-osx.cmake', 'ports/**') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-universal-
 

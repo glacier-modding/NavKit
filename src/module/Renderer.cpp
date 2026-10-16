@@ -90,6 +90,12 @@ bool Renderer::initWindowAndRenderer() {
         printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
         return false;
     }
+#ifdef __APPLE__
+    // SDL turns text input on by default and, on macOS, backs it with a hidden field editor that it makes the first
+    // responder of the window each time the window becomes key. That takes the keyboard away from the wxWidgets
+    // render canvas, which is where NavKit reads its input, so turn SDL's text input off before attaching the window.
+    SDL_StopTextInput();
+#endif
 
     SDL_DisplayMode displayMode;
     SDL_GetCurrentDisplayMode(0, &displayMode);
