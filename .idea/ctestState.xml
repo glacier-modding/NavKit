@@ -4,6 +4,8 @@
     <ctestState>
       <lineNumber testId="path:null test:NavKitTests" value="54" />
       <lineNumber testId="path:null test:ReasoningGridTests" value="6" />
+      <lineNumber testId="path:tests/CMakeLists.txt test:NavKitTests" value="60" />
+      <lineNumber testId="path:tests/CMakeLists.txt test:ReasoningGridTests" value="9" />
     </ctestState>
   </component>
 </project>

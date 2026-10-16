@@ -9,7 +9,7 @@ target_compile_definitions(ReasoningGridTests PRIVATE
 )
 add_test(NAME ReasoningGridTests
         COMMAND ReasoningGridTests "${CMAKE_CURRENT_SOURCE_DIR}/resources/intro.airg"
-                "${CMAKE_CURRENT_SOURCE_DIR}/resources/intelcpudemo.airg"
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/intelcpudemo_official.airg"
 )
 set_tests_properties(ReasoningGridTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 

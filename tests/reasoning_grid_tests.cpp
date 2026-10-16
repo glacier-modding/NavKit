@@ -437,7 +437,7 @@ int main(const int argc, char** argv) {
         const std::filesystem::path realAirgPath = fixtures.empty() ? resourceDir / "intro.airg" : fixtures[0];
         testRealBin1Airg(realAirgPath);
         testExactBin1RoundTrip(realAirgPath);
-        testExactBin1RoundTrip(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo.airg");
+        testExactBin1RoundTrip(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo_official.airg");
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;
