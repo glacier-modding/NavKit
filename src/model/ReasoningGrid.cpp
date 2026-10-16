@@ -151,11 +151,14 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
     m_LowVisibilityBits = {};
 }
 
-void ReasoningGrid::generateDeadEndData() {
+void ReasoningGrid::generateDeadEndData(const std::function<void(size_t, size_t)>& progress) {
     const size_t nodeCount = m_WaypointList.size();
     m_deadEndData.m_nSize = static_cast<uint32_t>(nodeCount);
     m_deadEndData.m_aBytes.assign((nodeCount + 7) / 8, 0);
     if (nodeCount <= 2) {
+        if (progress) {
+            progress(nodeCount, nodeCount);
+        }
         return;
     }
 
@@ -195,8 +198,6 @@ void ReasoningGrid::generateDeadEndData() {
         }
     }
 
-    std::vector<bool> isDeadEnd(nodeCount, false);
-
     // Candidate cuts are sets of 1 or 2 adjacent nodes
     std::vector<std::vector<int>> cuts;
     for (size_t i = 0; i < nodeCount; ++i) {
@@ -209,7 +210,12 @@ void ReasoningGrid::generateDeadEndData() {
         }
     }
 
-    for (const auto& cut : cuts) {
+    std::vector<uint8_t> deadEndFlags(nodeCount, 0);
+    std::mutex progressMutex;
+    size_t completed = 0;
+
+    Threading::parallelFor(cuts.size(), [&](size_t cutIdx) {
+        const auto& cut = cuts[cutIdx];
         std::vector<bool> inCut(nodeCount, false);
         for (const int k : cut) {
             if (k >= 0 && static_cast<size_t>(k) < nodeCount) {
@@ -289,15 +295,23 @@ void ReasoningGrid::generateDeadEndData() {
 
                 if (onlyToCut) {
                     for (const int u : comps[c]) {
-                        isDeadEnd[u] = true;
+                        deadEndFlags[u] = 1;
                     }
                 }
             }
         }
-    }
+
+        if (progress) {
+            std::lock_guard lock(progressMutex);
+            ++completed;
+            if (completed % 100 == 0 || completed == cuts.size()) {
+                progress(completed, cuts.size());
+            }
+        }
+    });
 
     for (size_t i = 0; i < nodeCount; ++i) {
-        if (isDeadEnd[i]) {
+        if (deadEndFlags[i]) {
             m_deadEndData.m_aBytes[i / 8] |= static_cast<uint8_t>(1 << (i % 8));
         }
     }
