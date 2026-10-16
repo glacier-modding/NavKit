@@ -13,7 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
-#include <vector>
+#include <set>
 
 namespace {
     template <typename T> T readLittle(const std::vector<uint8_t>& bytes, const size_t offset) {
@@ -403,6 +403,19 @@ namespace {
         std::filesystem::remove(output);
     }
 
+    void testOfficialIntelDeadEnd(const std::filesystem::path& path) {
+        ReasoningGrid officialGrid;
+        officialGrid.readAirg(path);
+
+        ReasoningGrid generatedGrid = officialGrid;
+        generatedGrid.generateDeadEndData();
+
+        require(generatedGrid.m_deadEndData.m_nSize == officialGrid.m_deadEndData.m_nSize,
+            "generated dead-end size did not match official size");
+        require(generatedGrid.m_deadEndData.m_aBytes == officialGrid.m_deadEndData.m_aBytes,
+            "generated dead-end bytes did not match official bytes");
+    }
+
     void testRealBin1Airg(const std::filesystem::path& path) {
         ReasoningGrid grid;
         grid.readAirg(path);
@@ -438,6 +451,7 @@ int main(const int argc, char** argv) {
         testRealBin1Airg(realAirgPath);
         testExactBin1RoundTrip(realAirgPath);
         testExactBin1RoundTrip(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo_official.airg");
+        testOfficialIntelDeadEnd(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo_official.airg");
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

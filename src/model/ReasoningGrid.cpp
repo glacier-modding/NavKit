@@ -151,6 +151,158 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
     m_LowVisibilityBits = {};
 }
 
+void ReasoningGrid::generateDeadEndData() {
+    const size_t nodeCount = m_WaypointList.size();
+    m_deadEndData.m_nSize = static_cast<uint32_t>(nodeCount);
+    m_deadEndData.m_aBytes.assign((nodeCount + 7) / 8, 0);
+    if (nodeCount <= 2) {
+        return;
+    }
+
+    // Identify ramp / slope / connector nodes:
+    // A node is on a ramp/slope if its neighbors have significantly different z (e.g. |z - nb.z| > 0.3)
+    // or it connects across height levels.
+    std::vector<bool> isRamp(nodeCount, false);
+    for (size_t i = 0; i < nodeCount; ++i) {
+        for (int d = 0; d < 8; ++d) {
+            const int nb = m_WaypointList[i].nNeighbors[d];
+            if (nb != 65535 && static_cast<size_t>(nb) < nodeCount) {
+                if (std::abs(m_WaypointList[i].vPos.z - m_WaypointList[nb].vPos.z) > 0.3f) {
+                    isRamp[i] = true;
+                    isRamp[nb] = true;
+                }
+            }
+        }
+    }
+
+    // Propagate ramp along connected slope nodes
+    bool rampProp = true;
+    while (rampProp) {
+        rampProp = false;
+        for (size_t i = 0; i < nodeCount; ++i) {
+            if (isRamp[i])
+                continue;
+            for (int d = 0; d < 8; ++d) {
+                const int nb = m_WaypointList[i].nNeighbors[d];
+                if (nb != 65535 && static_cast<size_t>(nb) < nodeCount && isRamp[nb]) {
+                    if (std::abs(m_WaypointList[i].vPos.z - m_WaypointList[nb].vPos.z) > 0.05f) {
+                        isRamp[i] = true;
+                        rampProp = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    std::vector<bool> isDeadEnd(nodeCount, false);
+
+    // Candidate cuts are sets of 1 or 2 adjacent nodes
+    std::vector<std::vector<int>> cuts;
+    for (size_t i = 0; i < nodeCount; ++i) {
+        cuts.push_back({static_cast<int>(i)});
+        for (int d = 0; d < 8; ++d) {
+            const int v = m_WaypointList[i].nNeighbors[d];
+            if (v != 65535 && static_cast<size_t>(v) < nodeCount && v > static_cast<int>(i)) {
+                cuts.push_back({static_cast<int>(i), v});
+            }
+        }
+    }
+
+    for (const auto& cut : cuts) {
+        std::vector<bool> inCut(nodeCount, false);
+        for (const int k : cut) {
+            if (k >= 0 && static_cast<size_t>(k) < nodeCount) {
+                inCut[k] = true;
+            }
+        }
+
+        std::vector<bool> visited(nodeCount, false);
+        for (const int k : cut) {
+            if (k >= 0 && static_cast<size_t>(k) < nodeCount) {
+                visited[k] = true;
+            }
+        }
+
+        std::vector<std::vector<int>> comps;
+        for (size_t i = 0; i < nodeCount; ++i) {
+            if (visited[i])
+                continue;
+            std::vector<int> comp;
+            std::vector<int> q = {static_cast<int>(i)};
+            visited[i] = true;
+            size_t qh = 0;
+            while (qh < q.size()) {
+                const int curr = q[qh++];
+                comp.push_back(curr);
+                for (int dir = 0; dir < 8; ++dir) {
+                    const int nxt = m_WaypointList[curr].nNeighbors[dir];
+                    if (nxt != 65535 && static_cast<size_t>(nxt) < nodeCount && !visited[nxt]) {
+                        visited[nxt] = true;
+                        q.push_back(nxt);
+                    }
+                }
+            }
+            comps.push_back(comp);
+        }
+
+        if (comps.size() > 1) {
+            size_t maxIdx = 0;
+            for (size_t c = 1; c < comps.size(); ++c) {
+                if (comps[c].size() > comps[maxIdx].size()) {
+                    maxIdx = c;
+                }
+            }
+
+            for (size_t c = 0; c < comps.size(); ++c) {
+                if (c == maxIdx)
+                    continue;
+                // Ramp/stair connectors are not dead ends
+                bool hasRamp = false;
+                for (const int u : comps[c]) {
+                    if (isRamp[u]) {
+                        hasRamp = true;
+                        break;
+                    }
+                }
+                if (hasRamp)
+                    continue;
+
+                std::vector<bool> inComp(nodeCount, false);
+                for (const int u : comps[c])
+                    inComp[u] = true;
+
+                bool onlyToCut = true;
+                for (const int u : comps[c]) {
+                    for (int dir = 0; dir < 8; ++dir) {
+                        const int nxt = m_WaypointList[u].nNeighbors[dir];
+                        if (nxt != 65535 && static_cast<size_t>(nxt) < nodeCount && !inComp[nxt]) {
+                            if (!inCut[nxt]) {
+                                onlyToCut = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!onlyToCut)
+                        break;
+                }
+
+                if (onlyToCut) {
+                    for (const int u : comps[c]) {
+                        isDeadEnd[u] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    for (size_t i = 0; i < nodeCount; ++i) {
+        if (isDeadEnd[i]) {
+            m_deadEndData.m_aBytes[i / 8] |= static_cast<uint8_t>(1 << (i % 8));
+        }
+    }
+}
+
 namespace {
     template <typename T> void writeLittleEndian(std::vector<uint8_t>& bytes, const size_t offset, const T value) {
         static_assert(std::is_arithmetic_v<T>);

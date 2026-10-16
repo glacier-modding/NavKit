@@ -1142,8 +1142,7 @@ void GridGenerator::buildVisionAndDeadEndData() {
     ReasoningGrid* grid = airg.reasoningGrid;
 
     addVisibilityData(grid);
-    grid->m_deadEndData.m_aBytes.clear();
-    grid->m_deadEndData.m_nSize = grid->m_nNodeCount;
+    grid->generateDeadEndData();
 
     Logger::log(NK_INFO, "Built Vision and Dead End data.");
 
