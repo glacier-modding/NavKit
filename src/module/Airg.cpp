@@ -367,7 +367,7 @@ char* Airg::openSaveAirgFileDialog() {
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
     const Waypoint& waypoint, const bool selected, const glm::vec4& color, const bool forceFan) {
     constexpr float r = 0.1f;
-    constexpr float zRenderOffset = 0.53f;
+    constexpr float zRenderOffset = 0.54f;
     const float z = waypoint.vPos.z + zRenderOffset;
     const glm::vec3 center(waypoint.vPos.x, z, -waypoint.vPos.y);
     constexpr glm::vec3 normal(0.0f, 1.0f, 0.0f);
@@ -883,6 +883,17 @@ void Airg::loadAirg(Airg* airg, const std::string& fileName) {
             std::to_string(airg->reasoningGrid->m_pVisibilityData.size()) + ", Visibility Data points per waypoint: " +
             std::to_string(static_cast<double>(airg->reasoningGrid->m_pVisibilityData.size()) /
                 static_cast<double>(airg->reasoningGrid->m_WaypointList.size())))
+            .c_str());
+    Logger::log(NK_INFO,
+        ("Airg properties: fGridSpacing: " + std::to_string(airg->reasoningGrid->m_Properties.fGridSpacing) +
+            " nGridWidth: " + std::to_string(airg->reasoningGrid->m_Properties.nGridWidth) +
+            " nVisibilityRange: " + std::to_string(airg->reasoningGrid->m_Properties.nVisibilityRange) +
+            " vMin.x: " + std::to_string(airg->reasoningGrid->m_Properties.vMin.x) +
+            " vMin.y: " + std::to_string(airg->reasoningGrid->m_Properties.vMin.y) +
+            " vMin.z: " + std::to_string(airg->reasoningGrid->m_Properties.vMin.z) +
+            " vMax.x: " + std::to_string(airg->reasoningGrid->m_Properties.vMax.x) +
+            " vMax.y: " + std::to_string(airg->reasoningGrid->m_Properties.vMax.y) +
+            " vMax.z: " + std::to_string(airg->reasoningGrid->m_Properties.vMax.z))
             .c_str());
     airg->airgLoading = false;
     airg->airgLoaded = true;

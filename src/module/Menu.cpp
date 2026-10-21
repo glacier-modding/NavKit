@@ -67,7 +67,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_AIRG_SHOW_AIRG, "Show &Airg")->Check();
     view->AppendCheckItem(IDM_VIEW_AIRG_SHOW_INDICES, "Show Airg &Indices");
-    view->AppendCheckItem(IDM_VIEW_AIRG_SHOW_GRID, "Show &Grid")->Check();
+    view->AppendCheckItem(IDM_VIEW_AIRG_SHOW_GRID, "Show &Grid");
     view->AppendCheckItem(IDM_VIEW_AIRG_SHOW_RECAST_DEBUG_INFO, "Show &Recast Debug Info");
     view->AppendSeparator();
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_OFF, "Airg Cell: None")->Check();
