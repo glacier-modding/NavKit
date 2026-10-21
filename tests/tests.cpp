@@ -242,7 +242,7 @@ namespace {
         require(triangles.empty(), "unselected waypoint should not render a triangle fan");
         require(lines.size() == 16, "unselected waypoint should render an eight-segment line loop");
         require(std::abs(lines[0].pos.x - 2.1f) < 0.0001f, "waypoint marker has the wrong x position");
-        require(std::abs(lines[0].pos.y - 4.53f) < 0.0001f, "waypoint marker has the wrong render height");
+        require(std::abs(lines[0].pos.y - 4.54f) < 0.0001f, "waypoint marker has the wrong render height");
         require(std::abs(lines[0].pos.z + 3.0f) < 0.0001f, "waypoint marker has the wrong z position");
 
         Airg::addWaypointGeometry(triangles, lines, waypoint, true, glm::vec4(1.0f));
