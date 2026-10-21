@@ -753,7 +753,9 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
         }
         // Logger::log(RC_LOG_PROGRESS, ("  " + waypointVisibilityDataString).c_str());
         const unsigned int colorRgb = (waypoint.nLayerIndex << 6) | 0xC0000000;
-        const std::string hexColor = std::format("{:x}", colorRgb);
+        std::stringstream ss;
+        ss << std::hex << colorRgb;
+        const std::string hexColor = ss.str();
         Logger::log(NK_INFO, ("Layer Index RGB " + hexColor).c_str());
     }
     Menu::updateMenuState();
