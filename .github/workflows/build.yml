@@ -256,7 +256,7 @@ jobs:
               if not path.is_file():
                   continue
               description = subprocess.check_output(
-                  ["file", "-b", str(path)], text=True
+                  ["file", "-b", str(path)], text=True, errors="replace"
               )
               if "Mach-O" in description:
                   subprocess.run(
