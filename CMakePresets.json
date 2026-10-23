@@ -132,7 +132,8 @@
     {
       "name": "x64-release-installer",
       "configurePreset": "x64-release-installer",
-      "configuration": "Release"
+      "configuration": "Release",
+      "targets": [ "installer" ]
     },
     {
       "name": "macos-debug",

@@ -14,7 +14,7 @@
 struct Vec3;
 class ReasoningGrid;
 
-enum CellColorDataSource { OFF, AIRG_BITMAP, VISION_DATA, LAYER };
+enum CellColorDataSource { OFF, AIRG_BITMAP, VISION_DATA, LAYER, DEAD_END };
 
 struct AirgVertex {
     glm::vec3 pos;

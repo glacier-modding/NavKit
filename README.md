@@ -96,14 +96,12 @@ NavKit performs the following series of steps to be able to generate Navp files.
 * Faster Scene generation
 * Linux and macOS support
 * More planned features are on the Issues tab
-# 🛠️ Building instructions (CLion or Visual Studio)
+# 🛠️ Building instructions on Windows (CLion or Visual Studio)
 1. Clone this repository with the `--recurse-submodules` option
 1. Open in Visual Studio or CLion
 1. Cmake should load
-1. In the x64 command prompt make a build folder, cd into it, and run:  
-`cmake -B . -S ..`
-1. Then change back to the main directory and run  
-`cmake --preset x64-debug`
+1. Load presets
+1. Run x64-debug or x64-release preset. 
 
 # 🧪 Manually running the integration test
 

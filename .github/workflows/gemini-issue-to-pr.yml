@@ -1,0 +1,234 @@
+name: "Gemini 3.5 Flash-Lite: C++ Test & PR Agent"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  agent-cpp-triage:
+    if: |
+      !github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '@agy') || contains(github.event.comment.body, '@gemini-cli')) &&
+      (contains(github.event.comment.body, '/fix') || contains(github.event.comment.body, '/create-pr'))
+    runs-on: windows-2022
+
+    permissions:
+      contents: write       # Essential for committing code fixes
+      issues: read          # Essential for reading issue contexts
+      pull-requests: write  # Essential for initializing a pull request via GitHub CLI
+
+    env:
+      GEMINI_MODEL: gemini-3.5-flash-lite
+      VCPKG_CACHE_DIR: ${{ github.workspace }}\vcpkg_cache
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg_cache,readwrite"
+
+    steps:
+      # 1. Pull down the repository contents
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive # NavKit depends on external components (like recast/rpkg libs)
+
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      # 2. Re-use the existing vcpkg cache footprint mapped by your other workflows
+      - name: Restore vcpkg Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/*/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-release-
+
+      - name: Set Antigravity CLI Path
+        id: agy_path
+        shell: pwsh
+        run: |
+          $agyBin = Join-Path $env:LOCALAPPDATA 'agy/bin'
+          "bin=$agyBin" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $agyBin | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Cache Antigravity CLI
+        id: agy_cache
+        uses: actions/cache@v4
+        with:
+          # Cache only the executable; settings and credentials are recreated per run.
+          path: ${{ steps.agy_path.outputs.bin }}/agy.exe
+          # Bump v1 to force a fresh installation.
+          key: agy-${{ runner.os }}-${{ runner.arch }}-v1
+
+      - name: Install Antigravity CLI
+        if: steps.agy_cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'install-agy.ps1'
+          Invoke-WebRequest -Uri 'https://antigravity.google/cli/install.ps1' -OutFile $installer
+          & $installer --skip-aliases --skip-path
+
+      - name: Configure Antigravity CLI
+        shell: pwsh
+        run: |
+          agy --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # API key authentication requires modelProvider as well as GEMINI_API_KEY.
+          # Keep settings outside the checkout so they cannot enter the generated PR.
+          $settingsDir = Join-Path $HOME '.gemini/antigravity-cli'
+          New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+          @{
+            modelProvider = 'gemini'
+            trustedWorkspaces = @($env:GITHUB_WORKSPACE)
+          } | ConvertTo-Json | Set-Content -Path (Join-Path $settingsDir 'settings.json') -Encoding utf8
+
+      # 3. Package the targeted issue details for the LLM context envelope
+      - name: Extract Issue Context
+        id: context
+        shell: pwsh
+        run: |
+          "ISSUE_TITLE=$($env:ISSUE_TITLE_INPUT)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "ISSUE_BODY<<$delimiter`n$($env:ISSUE_BODY_INPUT)`n$delimiter" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BRANCH_NAME=agy-fix-issue-${{ github.event.issue.number }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        env:
+          ISSUE_TITLE_INPUT: ${{ github.event.issue.title }}
+          ISSUE_BODY_INPUT: ${{ github.event.issue.body }}
+
+      # ROUND 1: Antigravity parses the codebase structure and applies the modification
+      - name: "Antigravity Agent: Write C++ Source Modification"
+        id: agent_fix
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGY_PROMPT: |
+            You are an expert autonomous C++ software architecture agent.
+            Analyze the project directory and implement a native fix for this specific issue:
+            Title: ${{ env.ISSUE_TITLE }}
+            Description: ${{ env.ISSUE_BODY }}
+
+            Modify the C++ files directly (.cpp, .h, .hpp). Adhere closely to existing code patterns.
+        run: |
+          agy --model $env:GEMINI_MODEL --mode accept-edits --print $env:AGY_PROMPT --disable-slash-commands
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: "Retry Antigravity Agent: Write C++ Source Modification"
+        if: steps.agent_fix.outcome == 'failure'
+        shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGY_PROMPT: |
+            You are an expert autonomous C++ software architecture agent.
+            Analyze the project directory and implement a native fix for this specific issue:
+            Title: ${{ env.ISSUE_TITLE }}
+            Description: ${{ env.ISSUE_BODY }}
+
+            Modify the C++ files directly (.cpp, .h, .hpp). Adhere closely to existing code patterns.
+        run: |
+          Write-Host "Agent failed after its internal retries; retrying in 60 seconds."
+          Start-Sleep -Seconds 60
+          agy --model $env:GEMINI_MODEL --mode accept-edits --print $env:AGY_PROMPT --disable-slash-commands
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # COMPILATION & TEST SUITE VERIFICATION
+      - name: Compile and Test C++ Codebase
+        id: build_and_test
+        shell: bash
+        run: |
+          if ! cmake --preset x64-release -D BUILD_TESTING=ON; then
+            echo "COMPILE_PASSED=false" >> $GITHUB_ENV
+            echo "BUILD_STAGE=configure" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          if ! cmake --build --preset x64-release --parallel 8; then
+            echo "COMPILE_PASSED=false" >> $GITHUB_ENV
+            echo "BUILD_STAGE=build" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          if ctest --test-dir build/x64-release -C Release --output-on-failure; then
+            echo "COMPILE_PASSED=true" >> $GITHUB_ENV
+          else
+            echo "COMPILE_PASSED=false" >> $GITHUB_ENV
+            echo "BUILD_STAGE=test" >> $GITHUB_ENV
+            echo "TEST_ERRORS<<EOF" >> $GITHUB_ENV
+            ctest --test-dir build/x64-release -C Release --output-on-failure | tail -n 40 || true
+            echo "EOF" >> $GITHUB_ENV
+          fi
+        continue-on-error: true
+
+      # ROUND 2 (Self-Healing Loop): If compilation or tests fail, Antigravity gets the compiler logs
+      - name: "Antigravity Agent: Self-Repair C++ Errors"
+        if: env.COMPILE_PASSED == 'false'
+        id: agent_repair
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGY_PROMPT: |
+            Your previous C++ alterations failed during the "${{ env.BUILD_STAGE }}" stage.
+            Review your modifications alongside the compiler/test error logs output here:
+            ${{ env.TEST_ERRORS }}
+            Correct the code and re-write the source files inside the workspace directory.
+        run: |
+          agy --model $env:GEMINI_MODEL --mode accept-edits --continue --print $env:AGY_PROMPT --disable-slash-commands
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: "Retry Antigravity Agent: Self-Repair C++ Errors"
+        if: steps.agent_repair.outcome == 'failure'
+        shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGY_PROMPT: |
+            Your previous C++ alterations failed during the "${{ env.BUILD_STAGE }}" stage.
+            Review your modifications alongside the compiler/test error logs output here:
+            ${{ env.TEST_ERRORS }}
+            Correct the code and re-write the source files inside the workspace directory.
+        run: |
+          Write-Host "Agent failed after its internal retries; retrying in 60 seconds."
+          Start-Sleep -Seconds 60
+          agy --model $env:GEMINI_MODEL --mode accept-edits --continue --print $env:AGY_PROMPT --disable-slash-commands
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # VERIFY HEALED BUILD: Compile one final time to guarantee the fix works
+      - name: Re-Compile and Re-Test Post-Heal
+        if: env.COMPILE_PASSED == 'false'
+        shell: bash
+        run: |
+          cmake --build --preset x64-release --parallel 8
+          ctest --test-dir build/x64-release -C Release --output-on-failure
+
+      # PUSH TO REPOSITORY: Format branch, commit changes, and open PR
+      - name: Commit Fixes and Push Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -z "$(git status --porcelain | grep -v 'vcpkg_cache/')" ]; then
+            echo "No structural code modifications detected. Skipping PR creation."
+            exit 0
+          fi
+
+          git checkout -b ${{ env.BRANCH_NAME }}
+          git add -u
+          git commit -m "chore(agent): autonomous fix for issue #${{ github.event.issue.number }}"
+          git push origin ${{ env.BRANCH_NAME }} --force
+
+          gh pr create \
+            --title "Antigravity Agentic Fix: ${{ env.ISSUE_TITLE }}" \
+            --body "This pull request was automatically compiled, self-healed, and fully verified by the Antigravity CLI in response to issue #${{ github.event.issue.number }}." \
+            --base main \
+            --head ${{ env.BRANCH_NAME }}

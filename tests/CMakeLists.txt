@@ -9,7 +9,7 @@ target_compile_definitions(ReasoningGridTests PRIVATE
 )
 add_test(NAME ReasoningGridTests
         COMMAND ReasoningGridTests "${CMAKE_CURRENT_SOURCE_DIR}/resources/intro.airg"
-                "${CMAKE_CURRENT_SOURCE_DIR}/resources/intelcpudemo.airg"
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/intelcpudemo_official.airg"
 )
 set_tests_properties(ReasoningGridTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
@@ -35,7 +35,7 @@ if (NAVKIT_BUILD_INTEGRATION_TESTS)
 endif ()
 
 set(TEST_DLLS)
-set(TEST_TARGETS NavKitTests)
+set(TEST_TARGETS NavKitTests ReasoningGridTests)
 if (WIN32)
     set(TEST_DLLS
             ${THIRD_PARTY_DLL_PATHS}
@@ -51,7 +51,7 @@ if (TEST_DLLS)
                 TARGET ${TEST_TARGET} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${TEST_DLLS}
-                $<TARGET_FILE_DIR:${TEST_TARGET}>/
+                $<TARGET_FILE_DIR:${TEST_TARGET}>
                 COMMENT "Copying runtime dependencies for ${TEST_TARGET}..."
                 VERBATIM
         )

@@ -93,13 +93,14 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:simdjson::simdjson>"
         "$<TARGET_FILE:unofficial::brotli::brotlicommon>"
         "$<TARGET_FILE:unofficial::brotli::brotlidec>"
+        "$<TARGET_FILE:unofficial::brotli::brotlienc>"
         "$<TARGET_FILE_DIR:assimp::assimp>/poly2tri.dll"
         "$<TARGET_FILE_DIR:assimp::assimp>/pugixml.dll"
         "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2d.dll,$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2.dll>"
         "$<TARGET_FILE_DIR:OpenSSL::Crypto>/../bin/libcrypto-3-x64.dll"
         "$<TARGET_FILE_DIR:OpenSSL::SSL>/../bin/libssl-3-x64.dll"
         "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:PNG::PNG>/../bin/libpng16d.dll,$<TARGET_FILE_DIR:PNG::PNG>/../bin/libpng16.dll>"
-        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlibd1.dll,$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zlib1.dll>"
+        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/zd.dll,$<TARGET_FILE_DIR:ZLIB::ZLIB>/../bin/z.dll>"
 )
 if (BUILD_TESTING)
     enable_testing()
@@ -225,12 +226,16 @@ if(BUILD_INSTALLER)
         set(HARVESTED_COMPONENTS_FILE "${CMAKE_CURRENT_BINARY_DIR}/HarvestedComponents.wxs")
         add_custom_command(
                 OUTPUT ${HARVESTED_COMPONENTS_FILE}
-                COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target install --config $<CONFIG>
+                COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --config $<CONFIG>
                 COMMAND ${WIX_HEAT_EXECUTABLE} dir "${CMAKE_BINARY_DIR}/installer_layout"
                 -ag -srd -sreg -cg NavKit_Components -dr INSTALLFOLDER
                 -t "${CMAKE_SOURCE_DIR}/wix/heat_exclude_navkit.xslt"
                 -o ${HARVESTED_COMPONENTS_FILE}
-                DEPENDS NavKit
+                DEPENDS NavKit ${THIRD_PARTY_DLL_PATHS} ${RUNTIME_FILE_DEPENDENCIES}
+                        $<TARGET_FILE:navkit-rpkg-lib>
+                        "${CMAKE_BINARY_DIR}/cmake_install.cmake"
+                        "${CMAKE_SOURCE_DIR}/wix/heat_exclude_navkit.xslt"
+                VERBATIM
                 COMMENT "Harvesting staged files with WiX heat.exe..."
         )
         add_custom_target(HarvestWixComponents DEPENDS ${HARVESTED_COMPONENTS_FILE})
@@ -241,22 +246,26 @@ if(BUILD_INSTALLER)
                 COMMAND ${WIX_EXECUTABLE} build
                 -ext WixToolset.UI.wixext
                 -b "${CMAKE_BINARY_DIR}/installer_layout"
-                -d ProductName="${PROJECT_NAME}"
-                -d ProductVersion="${PROJECT_VERSION}"
-                -d ProductManufacturer="${COMPANY_NAME}"
-                -d ProductContact="${CONTACT_INFO}"
-                -d UpgradeCode="${WIX_UPGRADE_CODE}"
-                -d LicenseFile="${WIX_LICENSE_FILE}"
-                -d ProductIcon="${WIX_PRODUCT_ICON}"
-                -d LayoutDir="${CMAKE_BINARY_DIR}/installer_layout"
-                -d InstallScope="perUser"
-                -d PerUserInstall="1"
+                -d "ProductName=${PROJECT_NAME}"
+                -d "ProductVersion=${PROJECT_VERSION}"
+                -d "ProductManufacturer=${COMPANY_NAME}"
+                -d "ProductContact=${CONTACT_INFO}"
+                -d "UpgradeCode=${WIX_UPGRADE_CODE}"
+                -d "LicenseFile=${WIX_LICENSE_FILE}"
+                -d "ProductIcon=${WIX_PRODUCT_ICON}"
+                -d "LayoutDir=${CMAKE_BINARY_DIR}/installer_layout"
+                -d "InstallScope=perUser"
+                -d "PerUserInstall=1"
                 -o "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
                 "${CMAKE_SOURCE_DIR}/wix/Package.wxs"
                 "${HARVESTED_COMPONENTS_FILE}"
-                DEPENDS HarvestWixComponents
+                DEPENDS HarvestWixComponents "${HARVESTED_COMPONENTS_FILE}"
+                        "${CMAKE_SOURCE_DIR}/wix/Package.wxs"
+                        "${WIX_LICENSE_FILE}" "${WIX_PRODUCT_ICON}"
+                VERBATIM
                 COMMENT "Building installer from staged files..."
         )
-        add_custom_target(installer DEPENDS "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}")
+        # Installer profiles also produce the MSI when CLion builds ALL_BUILD.
+        add_custom_target(installer ALL DEPENDS "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}")
     endif()
 endif()
