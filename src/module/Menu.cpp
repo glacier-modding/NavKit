@@ -23,6 +23,12 @@
 wxMenuBar* Menu::createMenuBar() {
     auto* bar = new wxMenuBar();
     auto* file = new wxMenu();
+    file->Append(IDM_FILE_NEW_PROJECT, "New &Project");
+    file->Append(IDM_FILE_NEW_SCENE, "New &Scene");
+    file->Append(IDM_FILE_NEW_SCENE_MESH, "New Scene &Mesh");
+    file->Append(IDM_FILE_NEW_NAVP, "New &Navp");
+    file->Append(IDM_FILE_NEW_AIRG, "New &Airg");
+    file->AppendSeparator();
     file->Append(IDM_FILE_OPEN_SCENE, "Open &Scene");
     file->Append(IDM_FILE_OPEN_GLB, "Open &GLB");
     file->Append(IDM_FILE_OPEN_NAVP, "Open &Navp");
@@ -223,6 +229,34 @@ int Menu::handleMenuClicked(const int menuId) {
     Airg& airg = Airg::getInstance();
     SceneExtract& sceneExtract = SceneExtract::getInstance();
     switch (menuId) {
+    case IDM_FILE_NEW_PROJECT:
+        Scene::getInstance().clear();
+        SceneMesh::getInstance().clear();
+        Navp::getInstance().clear();
+        Airg::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New Project clicked");
+        break;
+    case IDM_FILE_NEW_SCENE:
+        Scene::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New Scene clicked");
+        break;
+    case IDM_FILE_NEW_SCENE_MESH:
+        SceneMesh::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New Scene Mesh clicked");
+        break;
+    case IDM_FILE_NEW_NAVP:
+        Navp::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New Navp clicked");
+        break;
+    case IDM_FILE_NEW_AIRG:
+        Airg::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New Airg clicked");
+        break;
     case IDM_FILE_OPEN_SCENE:
         Scene::getInstance().handleOpenSceneClicked();
         Logger::log(NK_DEBUG, "File -> Open Scene clicked");

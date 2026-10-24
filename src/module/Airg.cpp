@@ -1,5 +1,6 @@
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/ProcessFlow.h"
+#include "../../include/NavKit/adapter/RecastAdapter.h"
 
 #include <filesystem>
 #include <numbers>
@@ -157,6 +158,34 @@ void Airg::resetDefaults() {
     grid.spacing = 2.25;
     grid.xOffset = 0;
     grid.yOffset = 0;
+}
+
+void Airg::clear() {
+    delete reasoningGrid;
+    reasoningGrid = new ReasoningGrid();
+    airgLoaded = false;
+    airgLoading = false;
+    airgBuilding = false;
+    connectWaypointModeEnabled = false;
+    disconnectWaypointModeEnabled = false;
+    selectedWaypointIndex = -1;
+    doAirgHitTest = false;
+    buildingVisionAndDeadEndData = false;
+    airgSaveState.clear();
+    airgName = "Load Airg";
+    lastLoadAirgFile = airgName;
+    saveAirgName = "Save Airg";
+    lastSaveAirgFile = saveAirgName;
+    loadedAirgText.clear();
+    selectedRpkgAirg.clear();
+    airgTriCount = 0;
+    airgLineCount = 0;
+    airgHitTestCount = 0;
+    airgDirty = true;
+    RecastAdapter::getAirgInstance().cleanup();
+    if (hAirgDialog) {
+        UpdateDialogControls(hAirgDialog);
+    }
 }
 
 void Airg::setLastLoadFileName(const char* fileName) {

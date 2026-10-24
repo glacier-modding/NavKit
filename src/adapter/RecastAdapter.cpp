@@ -367,6 +367,9 @@ void RecastAdapter::showRecastDialog() {
 }
 
 void RecastAdapter::drawInputGeom() const {
+    if (!inputGeom || !inputGeom->getMesh()) {
+        return;
+    }
     duDebugDrawTriMesh(debugDraw, inputGeom->getMesh()->getVerts(), inputGeom->getMesh()->getVertCount(),
         inputGeom->getMesh()->getTris(), inputGeom->getMesh()->getNormals(), inputGeom->getMesh()->getTriCount(),
         nullptr, 1.0f);
@@ -422,6 +425,9 @@ std::pair<int, int> RecastAdapter::getGridSize() const {
 }
 
 void RecastAdapter::setSceneBBoxToMesh() const {
+    if (!inputGeom || !inputGeom->getMesh()) {
+        return;
+    }
     float meshBMin[3], meshBMax[3];
     rcCalcBounds(inputGeom->getMesh()->getVerts(), inputGeom->getMesh()->getVertCount(), meshBMin, meshBMax);
     const float pos[3] = {
@@ -444,6 +450,15 @@ void RecastAdapter::handleMeshChanged() const {
 
 void RecastAdapter::cleanup() const {
     sample->cleanup();
+}
+
+void RecastAdapter::resetMesh() {
+    delete inputGeom;
+    inputGeom = new InputGeom();
+    sample->handleMeshChanged(inputGeom);
+    selectedObject = "";
+    markerPositionSet = false;
+    pfSeedPointAreas.clear();
 }
 
 bool RecastAdapter::handleBuild() const {
@@ -716,10 +731,16 @@ void RecastAdapter::save(const std::string& data, bool isKnt) const {
 }
 
 int RecastAdapter::getVertCount() const {
+    if (!inputGeom || !inputGeom->getMesh()) {
+        return 0;
+    }
     return inputGeom->getMesh()->getVertCount();
 }
 
 int RecastAdapter::getTriCount() const {
+    if (!inputGeom || !inputGeom->getMesh()) {
+        return 0;
+    }
     return inputGeom->getMesh()->getTriCount();
 }
 
@@ -1021,16 +1042,18 @@ SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
     rayEnd[1] = end.y;
     rayEnd[2] = end.z;
     SceneMeshHitTestResult result;
-    if (const int hitIndex = inputGeom->raycastMesh(rayStart, rayEnd, hitTime); hitIndex != -1) {
-        result.hitIndex = hitIndex;
-        result.rayStart[0] = rayStart[0];
-        result.rayStart[1] = rayStart[1];
-        result.rayStart[2] = rayStart[2];
-        result.rayEnd[0] = rayEnd[0];
-        result.rayEnd[1] = rayEnd[1];
-        result.rayEnd[2] = rayEnd[2];
-        result.hitTime = hitTime;
-        return result;
+    if (inputGeom && inputGeom->getMesh()) {
+        if (const int hitIndex = inputGeom->raycastMesh(rayStart, rayEnd, hitTime); hitIndex != -1) {
+            result.hitIndex = hitIndex;
+            result.rayStart[0] = rayStart[0];
+            result.rayStart[1] = rayStart[1];
+            result.rayStart[2] = rayStart[2];
+            result.rayEnd[0] = rayEnd[0];
+            result.rayEnd[1] = rayEnd[1];
+            result.rayEnd[2] = rayEnd[2];
+            result.hitTime = hitTime;
+            return result;
+        }
     }
     result.hitIndex = -1;
     if (InputHandler::getInstance().isModifierKeyDown()) {

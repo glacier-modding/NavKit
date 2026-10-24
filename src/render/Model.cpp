@@ -280,6 +280,22 @@ void Model::loadModelData(std::string const& path) {
     }
 }
 
+void Model::cleanup() {
+    for (auto& mesh : meshes) {
+        mesh.cleanup();
+    }
+    meshes.clear();
+    for (auto& texture : texturesLoaded) {
+        if (texture.id != 0) {
+            glDeleteTextures(1, &texture.id);
+            texture.id = 0;
+        }
+    }
+    texturesLoaded.clear();
+    directory.clear();
+    sortContexts.erase(this);
+}
+
 void Model::initGl() {
     for (auto& texture : texturesLoaded) {
         if (texture.loaded && texture.id == 0) {

@@ -131,6 +131,8 @@ public:
 
     void resetDefaults();
 
+    void clear();
+
     void showSceneMeshDialog();
 
     std::optional<std::jthread> backgroundWorker;

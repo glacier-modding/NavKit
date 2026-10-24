@@ -352,6 +352,34 @@ void Scene::resetBBoxDefaults() {
     setBBox(pos, scale);
 }
 
+void Scene::clear() {
+    sceneLoaded = false;
+    lastLoadSceneFile.clear();
+    loadSceneName = "Load NavKit Scene";
+    saveSceneName = "Save NavKit Scene";
+    version = 2;
+    gates.clear();
+    rooms.clear();
+    aiAreaWorlds.clear();
+    aiAreas.clear();
+    volumeBoxes.clear();
+    volumeSpheres.clear();
+    meshes.clear();
+    prims.clear();
+    includeBox = {};
+    exclusionBoxes.clear();
+    pfSeedPoints.clear();
+    matis.clear();
+    primMatis.clear();
+    resetBBoxDefaults();
+    Navp& navp = Navp::getInstance();
+    navp.selectedExclusionBoxIndex = -1;
+    navp.selectedPfSeedPointIndex = -1;
+    if (hSceneDialog) {
+        updateSceneDialogControls(hSceneDialog);
+    }
+}
+
 void Scene::updateSceneDialogControls(wxDialog* dialog) const {
     const std::array<int, 6> sliders = {IDC_SLIDER_BBOX_POS_X, IDC_SLIDER_BBOX_POS_Y, IDC_SLIDER_BBOX_POS_Z,
         IDC_SLIDER_BBOX_SCALE_X, IDC_SLIDER_BBOX_SCALE_Y, IDC_SLIDER_BBOX_SCALE_Z};

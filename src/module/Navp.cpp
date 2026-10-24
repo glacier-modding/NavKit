@@ -1226,3 +1226,38 @@ void Navp::showExtractNavpDialog() {
     dialog->CentreOnParent();
     dialog->Show();
 }
+
+void Navp::clear() {
+    delete navMesh;
+    navMesh = new NavPower::NavMesh();
+    selectedNavpAreaIndex = -1;
+    selectedLeafBBox.reset();
+    selectedPfSeedPointIndex = -1;
+    selectedExclusionBoxIndex = -1;
+    navpLoaded = false;
+    loading = false;
+    building = false;
+    navpBuildDone = false;
+    stairsCheckboxValue = false;
+    doNavpHitTest = false;
+    doNavpExclusionBoxHitTest = false;
+    doNavpPfSeedPointHitTest = false;
+    binaryAreaToAreaMap.clear();
+    posToAreaMap.clear();
+    binaryAreaToAreaIndexMap.clear();
+    kdTreeNodes.clear();
+    cachedKdNodes.clear();
+    loadedNavpText.clear();
+    selectedRpkgNavp.clear();
+    loadNavpName = "Load Navp";
+    lastLoadNavpFile = loadNavpName;
+    saveNavpName = "Save Navp";
+    lastSaveNavpFile = saveNavpName;
+    navMeshTriCount = 0;
+    navMeshLineCount = 0;
+    hitTestTriCount = 0;
+    navMeshDirty = true;
+    hitTestDirty = true;
+    lastSelectedArea = -2;
+    RecastAdapter::getInstance().cleanup();
+}

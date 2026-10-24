@@ -103,3 +103,18 @@ void Mesh::setupMesh() {
 
     glBindVertexArray(0);
 }
+
+void Mesh::cleanup() {
+    if (EBO != 0) {
+        glDeleteBuffers(1, &EBO);
+        EBO = 0;
+    }
+    if (VBO != 0) {
+        glDeleteBuffers(1, &VBO);
+        VBO = 0;
+    }
+    if (VAO != 0) {
+        glDeleteVertexArrays(1, &VAO);
+        VAO = 0;
+    }
+}

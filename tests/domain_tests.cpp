@@ -1,10 +1,12 @@
 #include "../include/NavKit/util/Threading.h"
+#include "../include/NavKit/UiIds.h"
 #include "../include/NavKit/adapter/RecastAdapter.h"
 #include "../include/NavKit/model/Json.h"
 #include "../include/NavKit/model/ReasoningGrid.h"
 #include "../include/NavKit/model/VisionData.h"
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Grid.h"
+#include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/NavKitSettings.h"
 #include "../include/NavKit/module/Navp.h"
 #include "../include/NavKit/module/Rpkg.h"
@@ -980,6 +982,90 @@ namespace {
         Rpkg::extractionDataInitComplete = oldExtractionReady;
     }
 
+    void testClearAndNewProjectOptions() {
+        Scene& scene = Scene::getInstance();
+        SceneMesh& sceneMesh = SceneMesh::getInstance();
+        Navp& navp = Navp::getInstance();
+        Airg& airg = Airg::getInstance();
+
+        // 1. Test Scene::clear and Menu New Scene
+        scene.sceneLoaded = true;
+        scene.lastLoadSceneFile = "test.nav.json";
+        scene.version = 3;
+        scene.gates.push_back({});
+        scene.rooms.push_back({});
+        scene.exclusionBoxes.push_back({});
+        scene.pfSeedPoints.push_back({});
+        navp.selectedExclusionBoxIndex = 0;
+        navp.selectedPfSeedPointIndex = 0;
+
+        Menu::handleMenuClicked(IDM_FILE_NEW_SCENE);
+        check(!scene.sceneLoaded, "New Scene should set sceneLoaded to false");
+        check(scene.lastLoadSceneFile.empty(), "New Scene should clear lastLoadSceneFile");
+        check(scene.gates.empty(), "New Scene should clear gates");
+        check(scene.rooms.empty(), "New Scene should clear rooms");
+        check(scene.exclusionBoxes.empty(), "New Scene should clear exclusionBoxes");
+        check(scene.pfSeedPoints.empty(), "New Scene should clear pfSeedPoints");
+        check(navp.selectedExclusionBoxIndex == -1, "New Scene should reset selectedExclusionBoxIndex");
+        check(navp.selectedPfSeedPointIndex == -1, "New Scene should reset selectedPfSeedPointIndex");
+
+        // 2. Test SceneMesh::clear and Menu New Scene Mesh
+        sceneMesh.glbLoaded = true;
+        sceneMesh.lastGlbFileName = "test.glb";
+        sceneMesh.blendFileBuilt = true;
+        RecastAdapter::getInstance().selectedObject = "SomeObject";
+        RecastAdapter::getInstance().markerPositionSet = true;
+
+        Menu::handleMenuClicked(IDM_FILE_NEW_SCENE_MESH);
+        check(!sceneMesh.glbLoaded, "New Scene Mesh should set glbLoaded to false");
+        check(!sceneMesh.blendFileBuilt, "New Scene Mesh should set blendFileBuilt to false");
+        check(sceneMesh.model.meshes.empty(), "New Scene Mesh should clear model meshes");
+        check(RecastAdapter::getInstance().selectedObject.empty(),
+            "New Scene Mesh should clear selectedObject in RecastAdapter");
+        check(!RecastAdapter::getInstance().markerPositionSet, "New Scene Mesh should clear markerPositionSet");
+
+        // 3. Test Navp::clear and Menu New Navp
+        navp.navpLoaded = true;
+        navp.selectedNavpAreaIndex = 5;
+        navp.loadedNavpText = "test.navp";
+        navp.kdTreeNodes.push_back({});
+
+        Menu::handleMenuClicked(IDM_FILE_NEW_NAVP);
+        check(!navp.navpLoaded, "New Navp should set navpLoaded to false");
+        check(navp.selectedNavpAreaIndex == -1, "New Navp should reset selectedNavpAreaIndex");
+        check(navp.loadedNavpText.empty(), "New Navp should clear loadedNavpText");
+        check(navp.kdTreeNodes.empty(), "New Navp should clear kdTreeNodes");
+
+        // 4. Test Airg::clear and Menu New Airg
+        airg.airgLoaded = true;
+        airg.selectedWaypointIndex = 3;
+        airg.lastLoadAirgFile = "test.airg";
+        airg.reasoningGrid->m_WaypointList.push_back({});
+
+        Menu::handleMenuClicked(IDM_FILE_NEW_AIRG);
+        check(!airg.airgLoaded, "New Airg should set airgLoaded to false");
+        check(airg.selectedWaypointIndex == -1, "New Airg should reset selectedWaypointIndex");
+        check(airg.reasoningGrid->m_WaypointList.empty(), "New Airg should reset reasoningGrid");
+
+        // 5. Test New Project clears everything
+        scene.sceneLoaded = true;
+        sceneMesh.glbLoaded = true;
+        navp.navpLoaded = true;
+        airg.airgLoaded = true;
+        scene.gates.push_back({});
+        navp.selectedNavpAreaIndex = 2;
+        airg.selectedWaypointIndex = 1;
+
+        Menu::handleMenuClicked(IDM_FILE_NEW_PROJECT);
+        check(!scene.sceneLoaded, "New Project should clear Scene");
+        check(!sceneMesh.glbLoaded, "New Project should clear SceneMesh");
+        check(!navp.navpLoaded, "New Project should clear Navp");
+        check(!airg.airgLoaded, "New Project should clear Airg");
+        check(scene.gates.empty(), "New Project should clear scene gates");
+        check(navp.selectedNavpAreaIndex == -1, "New Project should reset navp selection");
+        check(airg.selectedWaypointIndex == -1, "New Project should reset airg selection");
+    }
+
     void run(const std::string_view name, const auto& test) {
         test();
         std::cout << "[pass] " << name << std::endl;
@@ -1011,4 +1097,5 @@ void runDomainTests() {
     run("Marker handles arbitrary mesh names", testMarkerObjectNames);
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
+    run("Clear and New Project file menu options", testClearAndNewProjectOptions);
 }

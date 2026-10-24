@@ -177,6 +177,8 @@ public:
 
     void buildNavp();
 
+    void clear();
+
     static std::map<std::string, std::string> navpHashIoiStringMap;
     static std::mutex navpHashIoiStringMapMutex;
 

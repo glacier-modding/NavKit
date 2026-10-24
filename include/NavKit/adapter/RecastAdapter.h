@@ -64,6 +64,8 @@ public:
 
     void cleanup() const;
 
+    void resetMesh();
+
     bool handleBuildForAirg() const;
 
     void handleCommonSettings() const;

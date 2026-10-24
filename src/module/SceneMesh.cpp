@@ -875,3 +875,34 @@ void SceneMesh::resetDefaults() {
     filterToIncludeBox = true;
     onlyCollidable = true;
 }
+
+void SceneMesh::clear() {
+    loadGlbName = "Load GLB";
+    saveGlbName = "Save GLB";
+    lastGlbFileName = "Load GLB";
+    lastSaveGlbFileName = "Save GLB";
+    generatedGlbName.clear();
+    glbLoaded = false;
+    loadGlb = false;
+    files.clear();
+    glbToLoad.clear();
+    glbLoadDone.clear();
+    startedSceneMeshGeneration = false;
+    blenderSceneMeshBuildStarted = false;
+    blenderSceneMeshGenerationDone = false;
+    blendFileOnlyBuild = false;
+    blendFileAndGlbBuild = false;
+    blendFileBuilt = false;
+    errorBuilding = false;
+    skipExtractingAlocsOrPrims = false;
+    errorExtracting = false;
+    extractingResources = false;
+    doneExtractingAlocsOrPrims = false;
+    objectTriangleRanges.clear();
+    doGlbHitTest = false;
+    model.cleanup();
+    RecastAdapter::getInstance().resetMesh();
+    if (hSceneMeshDialog) {
+        updateSceneMeshDialogControls(hSceneMeshDialog);
+    }
+}

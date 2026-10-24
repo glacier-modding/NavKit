@@ -23,6 +23,8 @@ public:
 
     void loadModelData(std::string const& path);
 
+    void cleanup();
+
     void draw(const Shader& shader, const glm::mat4& viewProj) const;
 
 private:

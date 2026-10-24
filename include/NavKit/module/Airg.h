@@ -60,6 +60,8 @@ public:
 
     static void resetDefaults();
 
+    void clear();
+
     void finalizeSave();
 
     static int visibilityDataSize(const ReasoningGrid* reasoningGrid, int waypointIndex);

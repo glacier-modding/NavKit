@@ -54,6 +54,8 @@ public:
 
     void resetBBoxDefaults();
 
+    void clear();
+
     void updateSceneDialogControls(wxDialog* dialog) const;
 
     static Scene& getInstance() {

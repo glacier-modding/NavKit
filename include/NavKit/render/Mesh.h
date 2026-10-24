@@ -47,4 +47,6 @@ public:
     void draw(const Shader& shader) const;
 
     void setupMesh();
+
+    void cleanup();
 };
