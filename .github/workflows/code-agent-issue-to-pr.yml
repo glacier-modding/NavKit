@@ -1,0 +1,388 @@
+name: "Cascading AI C++ Test & PR Agent"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  agent-cpp-triage:
+    # Restrict execution to repository administrators/owners/members and specific comment strings
+    if: |
+      !github.event.issue.pull_request &&
+      (github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER') &&
+      (contains(github.event.comment.body, '@code-agent')) &&
+      (contains(github.event.comment.body, '/fix') || contains(github.event.comment.body, '/create-pr'))
+    runs-on: windows-2022
+
+    permissions:
+      contents: write       # Essential for committing code fixes
+      issues: read          # Essential for reading issue contexts
+      pull-requests: write  # Essential for initializing a pull request via GitHub CLI
+
+    env:
+      GEMINI_MODEL: "Gemini 3.6 Flash (Low)"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}\vcpkg_cache
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg_cache,readwrite"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+
+    steps:
+      # 1. Pull down the repository contents
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive # NavKit depends on external components (like recast/rpkg libs)
+
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 2. Re-use the existing vcpkg cache footprint mapped by your other workflows
+      - name: Restore vcpkg Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/*/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-release-
+
+      - name: Create vcpkg cache directory
+        shell: pwsh
+        run: New-Item -Path "${{ env.VCPKG_CACHE_DIR }}" -ItemType Directory -Force
+
+      # 3. Cache and configure Antigravity CLI (Track 1)
+      - name: Set Antigravity CLI Path
+        id: agy_path
+        shell: pwsh
+        run: |
+          $agyBin = Join-Path $env:LOCALAPPDATA 'agy/bin'
+          "bin=$agyBin" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $agyBin | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Cache Antigravity CLI
+        id: agy_cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.agy_path.outputs.bin }}
+          key: agy-${{ runner.os }}-${{ runner.arch }}-v1
+
+      - name: Install Antigravity CLI
+        if: steps.agy_cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'install-agy.ps1'
+          Invoke-WebRequest -Uri 'https://antigravity.google/cli/install.ps1' -OutFile $installer
+          & $installer --skip-aliases --skip-path
+
+      - name: Configure Antigravity CLI
+        shell: pwsh
+        run: |
+          agy --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $settingsDir = Join-Path $HOME '.gemini/antigravity-cli'
+          New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+          @{
+            modelProvider = 'gemini'
+            trustedWorkspaces = @($env:GITHUB_WORKSPACE)
+          } | ConvertTo-Json | Set-Content -Path (Join-Path $settingsDir 'settings.json') -Encoding utf8
+
+      # 4. Cache and Install Python-based Coding Agents: Aider & Mentat (Tracks 2 & 3)
+      - name: Cache Python Coding Agents (pip)
+        id: pip_agent_cache
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: pip-agents-${{ runner.os }}-v1
+          restore-keys: |
+            pip-agents-${{ runner.os }}-
+            pip-${{ runner.os }}-
+
+      - name: Install Aider CLI
+        run: pipx install aider-chat
+
+      - name: Install Mentat CLI
+        run: pipx install mentat
+
+      # 6. Package the targeted issue details for the LLM context envelope
+      - name: Extract Issue Context
+        id: context
+        shell: pwsh
+        run: |
+          "ISSUE_TITLE=$($env:ISSUE_TITLE_INPUT)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "ISSUE_BODY<<$delimiter`n$($env:ISSUE_BODY_INPUT)`n$delimiter" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BRANCH_NAME=agy-fix-issue-${{ github.event.issue.number }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        env:
+          ISSUE_TITLE_INPUT: ${{ github.event.issue.title }}
+          ISSUE_BODY_INPUT: ${{ github.event.issue.body }}
+
+      - name: Set Prompt Environment
+        shell: pwsh
+        run: |
+          $prompt = @"
+          You are an expert autonomous C++ software architecture agent.
+          Analyze the project directory and implement a native fix for this specific issue:
+          Title: $($env:ISSUE_TITLE)
+          Description: $($env:ISSUE_BODY)
+
+          Modify the C++ files directly (.cpp, .h, .hpp). Adhere closely to existing code patterns.
+          "@
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "AGY_PROMPT<<$delimiter`n$prompt`n$delimiter" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # TRACK 1: Antigravity CLI (Gemini 3.6 Flash)
+      - name: "Agent Execution: Track 1 (Antigravity CLI)"
+        id: track_1
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          Write-Host "Attempting code modifications with Track 1 (Antigravity CLI)..."
+          $maxAttempts = 10
+          $attempt = 1
+          $success = $false
+          $isFirstRun = $true
+
+          while (-not $success -and $attempt -le $maxAttempts) {
+              Write-Host "Execution attempt $attempt of $maxAttempts..."
+              $logFile = Join-Path $env:RUNNER_TEMP "agy_track1_attempt_$attempt.log"
+
+              if ($isFirstRun) {
+                  agy --model $env:GEMINI_MODEL --mode accept-edits --dangerously-skip-permissions --print $env:AGY_PROMPT --disable-slash-commands 2>&1 | Tee-Object -FilePath $logFile
+              } else {
+                  Write-Host "Resuming previous incomplete session..."
+                  agy --model $env:GEMINI_MODEL --mode accept-edits --dangerously-skip-permissions --continue --print "" --disable-slash-commands 2>&1 | Tee-Object -FilePath $logFile
+              }
+
+              $lastCode = $LASTEXITCODE
+              $output = if (Test-Path $logFile) { Get-Content -Path $logFile -Raw } else { "" }
+
+              if ($lastCode -eq 0) {
+                  Write-Host "Success! Code modifications completed via Track 1."
+                  $success = $true
+              } elseif ($output -match "per day limit" -or $output -match "generate_content_free_tier_requests" -or $output -match "per_day") {
+                  Write-Warning "Track 1 hit per-day quota limit. Skipping cooldown and failing over immediately to Track 2."
+                  exit 1
+              } elseif ($output -match "RESOURCE_EXHAUSTED" -or $output -match "429") {
+                  Write-Warning "Track 1 Free Tier quota limit reached. Cooling down for 60 seconds..."
+                  Start-Sleep -Seconds 60
+                  $isFirstRun = $false
+                  $attempt++
+              } else {
+                  Write-Error "Fatal non-quota error encountered inside Track 1 execution."
+                  exit $lastCode
+              }
+          }
+          if (-not $success) { throw "Track 1 completely exhausted daily or structural quota limit bounds." }
+
+      # TRACK 2: Aider CLI (OpenAI GPT-4o-Mini) - Triggers only if Track 1 fails/exceeds daily limits
+      - name: "Agent Execution: Track 2 (Aider CLI)"
+        if: always() && steps.track_1.outcome == 'failure'
+        id: track_2
+        continue-on-error: true
+        shell: pwsh
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LITELLM_NUM_RETRIES: "0"
+          OPENAI_MAX_RETRIES: "0"
+        run: |
+          Write-Host "Track 1 Failed/Exhausted. Transitioning seamlessly to Track 2 (Aider CLI)..."
+          $logFile = Join-Path $env:RUNNER_TEMP "aider_track2.log"
+          aider --model "openai/gpt-4o-mini" --message $env:AGY_PROMPT --yes --no-git 2>&1 | Tee-Object -FilePath $logFile
+          $lastCode = $LASTEXITCODE
+          $output = if (Test-Path $logFile) { Get-Content -Path $logFile -Raw } else { "" }
+          $hasError = ($lastCode -ne 0) -or `
+                      ($output -match "You have no credits remaining") -or `
+                      ($output -match "RateLimitError") -or `
+                      ($output -match "OpenAIException") -or `
+                      ($output -match "rate limited you") -or `
+                      ($output -match "check your quotas") -or `
+                      ($output -match "insufficient_quota") -or `
+                      ($output -match "quota") -or `
+                      ($output -match "Error code: 429")
+          if ($hasError) {
+              Write-Warning "Track 2 quota exceeded / rate limit / execution error. Failing over immediately to Track 3."
+              exit 1
+          }
+
+      # TRACK 3: Mentat CLI (Groq Llama 3.3) - Triggers only if Tracks 1 and 2 both fail
+      - name: "Agent Execution: Track 3 (Mentat CLI)"
+        if: always() && steps.track_1.outcome == 'failure' && steps.track_2.outcome == 'failure'
+        id: track_3
+        shell: pwsh
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          Write-Host "Tracks 1 & 2 fully exhausted. Activating Track 3 Final Failover (Mentat CLI)..."
+          mentat . --accept-all --prompt $env:AGY_PROMPT
+          if ($LASTEXITCODE -ne 0) { Write-Error "All agent processing tracks have fully expired."; exit 1 }
+
+      # COMPILATION & TEST SUITE VERIFICATION
+      - name: Compile and Test C++ Codebase
+        id: build_and_test
+        shell: bash
+        run: |
+          if ! cmake --preset x64-release -D BUILD_TESTING=ON; then
+            echo "COMPILE_PASSED=false" >> $GITHUB_ENV
+            echo "BUILD_STAGE=configure" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          if ! cmake --build --preset x64-release --parallel 8; then
+            echo "COMPILE_PASSED=false" >> $GITHUB_ENV
+            echo "BUILD_STAGE=build" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          if ctest --test-dir build/x64-release -C Release --output-on-failure; then
+            echo "COMPILE_PASSED=true" >> $GITHUB_ENV
+          else
+            echo "COMPILE_PASSED=false" >> $GITHUB_ENV
+            echo "BUILD_STAGE=test" >> $GITHUB_ENV
+            echo "TEST_ERRORS<<EOF" >> $GITHUB_ENV
+            ctest --test-dir build/x64-release -C Release --output-on-failure | tail -n 40 || true
+            echo "EOF" >> $GITHUB_ENV
+          fi
+        continue-on-error: true
+
+      # ROUND 2 SELF-REPAIR: Attempts to heal code using Track 1, Track 2, or Track 3
+      - name: "Self-Repair Prompt Setup"
+        if: env.COMPILE_PASSED == 'false'
+        id: repair_prompt
+        shell: pwsh
+        run: |
+          $repairPrompt = @"
+          Your previous C++ alterations failed during the "$($env:BUILD_STAGE)" stage.
+          Review your modifications alongside the compiler/test error logs output here:
+          $($env:TEST_ERRORS)
+          Correct the code and re-write the source files inside the workspace directory.
+          "@
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "REPAIR_PROMPT<<$delimiter`n$repairPrompt`n$delimiter" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: "Self-Repair Agent: Track 1 (Antigravity CLI)"
+        if: env.COMPILE_PASSED == 'false'
+        id: repair_track_1
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Write-Host "Pausing 60 seconds to guarantee a clear minute quota frame for self-repair initialization..."
+          Start-Sleep -Seconds 60
+          $maxAttempts = 10
+          $attempt = 1
+          $success = $false
+          $isFirstRun = $true
+          while (-not $success -and $attempt -le $maxAttempts) {
+            Write-Host "Repair attempt $attempt of $maxAttempts..."
+            $logFile = Join-Path $env:RUNNER_TEMP "agy_repair_attempt_$attempt.log"
+
+            if ($isFirstRun) {
+              agy --model $env:GEMINI_MODEL --mode accept-edits --dangerously-skip-permissions --continue --print $env:REPAIR_PROMPT --disable-slash-commands 2>&1 | Tee-Object -FilePath $logFile
+            } else {
+              Write-Host "Resuming previous incomplete repair execution context..."
+              agy --model $env:GEMINI_MODEL --mode accept-edits --dangerously-skip-permissions --continue --print "" --disable-slash-commands 2>&1 | Tee-Object -FilePath $logFile
+            }
+
+            $lastCode = $LASTEXITCODE
+            $output = if (Test-Path $logFile) { Get-Content -Path $logFile -Raw } else { "" }
+            if ($lastCode -eq 0) {
+              Write-Host "Success! Code compilation errors have been successfully patched."
+              $success = $true
+            } elseif ($output -match "per day limit" -or $output -match "generate_content_free_tier_requests" -or $output -match "per_day") {
+              Write-Warning "Repair Track 1 hit per-day quota limit. Skipping cooldown and failing over immediately to Track 2."
+              exit 1
+            } elseif ($output -match "RESOURCE_EXHAUSTED" -or $output -match "429") {
+              Write-Warning "Free Tier 429 Limit reached during repair sequence. Halting execution loop for 60 seconds..."
+              Start-Sleep -Seconds 60
+              $isFirstRun = $false
+              $attempt++
+            } else {
+              Write-Error "Fatal non-quota error encountered inside agy repair loop sequence."
+              exit $lastCode
+            }
+          }
+          if (-not $success) { throw "Repair Track 1 completely exhausted quota." }
+
+      - name: "Self-Repair Agent: Track 2 (Aider CLI)"
+        if: always() && env.COMPILE_PASSED == 'false' && steps.repair_track_1.outcome == 'failure'
+        id: repair_track_2
+        continue-on-error: true
+        shell: pwsh
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LITELLM_NUM_RETRIES: "0"
+          OPENAI_MAX_RETRIES: "0"
+        run: |
+          Write-Host "Repair Track 1 Failed/Exhausted. Transitioning to Repair Track 2 (Aider CLI)..."
+          $logFile = Join-Path $env:RUNNER_TEMP "aider_repair_track2.log"
+          aider --model "openai/gpt-4o-mini" --message $env:REPAIR_PROMPT --yes --no-git 2>&1 | Tee-Object -FilePath $logFile
+          $lastCode = $LASTEXITCODE
+          $output = if (Test-Path $logFile) { Get-Content -Path $logFile -Raw } else { "" }
+          $hasError = ($lastCode -ne 0) -or `
+                      ($output -match "You have no credits remaining") -or `
+                      ($output -match "RateLimitError") -or `
+                      ($output -match "OpenAIException") -or `
+                      ($output -match "rate limited you") -or `
+                      ($output -match "check your quotas") -or `
+                      ($output -match "insufficient_quota") -or `
+                      ($output -match "quota") -or `
+                      ($output -match "Error code: 429")
+          if ($hasError) {
+              Write-Warning "Repair Track 2 quota exceeded / rate limit / execution error. Failing over immediately to Track 3."
+              exit 1
+          }
+
+      - name: "Self-Repair Agent: Track 3 (Mentat CLI)"
+        if: always() && env.COMPILE_PASSED == 'false' && steps.repair_track_1.outcome == 'failure' && steps.repair_track_2.outcome == 'failure'
+        id: repair_track_3
+        shell: pwsh
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          Write-Host "Repair Tracks 1 & 2 fully exhausted. Activating Repair Track 3 Final Failover (Mentat CLI)..."
+          mentat . --accept-all --prompt $env:REPAIR_PROMPT
+          if ($LASTEXITCODE -ne 0) { Write-Error "All agent repair tracks have fully expired."; exit 1 }
+
+      # VERIFY HEALED BUILD: Compile one final time to guarantee the fix works
+      - name: Re-Compile and Re-Test Post-Heal
+        if: env.COMPILE_PASSED == 'false'
+        shell: bash
+        run: |
+          cmake --build --preset x64-release --parallel 8
+          ctest --test-dir build/x64-release -C Release --output-on-failure
+
+      # PUSH TO REPOSITORY: Format branch, commit changes, and open PR
+      - name: Commit Fixes and Push Pull Request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -z "$(git status --porcelain | grep -v 'vcpkg_cache/')" ]; then
+            echo "No structural code modifications detected. Skipping PR creation."
+            exit 0
+          fi
+          git checkout -b "$BRANCH_NAME"
+          git add -u
+          git commit -m "chore(agent): autonomous fix for issue #${{ github.event.issue.number }}"
+          git push origin "$BRANCH_NAME" --force
+          gh pr create \
+            --title "AI Agentic Fix: $ISSUE_TITLE" \
+            --body "This pull request was automatically compiled, self-healed, and fully verified by automated cascading terminal workspace agents in response to issue #${{ github.event.issue.number }}." \
+            --base main \
+            --head "$BRANCH_NAME"
