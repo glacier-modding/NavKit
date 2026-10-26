@@ -12,7 +12,7 @@ on:
 
 jobs:
   create_versioned_release:
-    name: Create Versioned Release
+    name: Update version
     runs-on: ubuntu-latest
     needs: [ validate_build ]
     if: >-
@@ -21,9 +21,11 @@ jobs:
       (startsWith(github.event.head_commit.message, 'feat!:') ||
       startsWith(github.event.head_commit.message, 'feat:') ||
       startsWith(github.event.head_commit.message, 'fix:'))
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.version_commit.outputs.sha }}
     permissions:
       contents: write
-      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,7 +41,6 @@ jobs:
           import os
           import re
           import subprocess
-          import tempfile
 
           def git(*args):
               return subprocess.check_output(["git", *args], text=True).strip()
@@ -123,7 +124,7 @@ jobs:
               "",
           ])
 
-          notes_path = os.path.join(tempfile.gettempdir(), "release-notes.md")
+          notes_path = "release-notes.md"
           with open(notes_path, "w", encoding="utf-8", newline="\n") as release_notes:
               release_notes.write("\n".join(notes))
 
@@ -133,20 +134,21 @@ jobs:
               output.write(f"notes_path={notes_path}\n")
           PY
 
-      - name: Commit version, tag, and publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+      - name: Commit and push version bump
+        id: version_commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add CMakeLists.txt include/NavKit/NavKitConfig.h
           git commit -m "chore: release ${{ steps.release.outputs.tag }}"
-          git tag "${{ steps.release.outputs.tag }}"
-          git push origin "HEAD:${GITHUB_REF_NAME}" "${{ steps.release.outputs.tag }}"
-          gh release create "${{ steps.release.outputs.tag }}" \
-            --title "NavKit ${{ steps.release.outputs.tag }}" \
-            --notes-file "${{ steps.release.outputs.notes_path }}"
-          gh workflow run build.yml --ref "${{ steps.release.outputs.tag }}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   validate_build:
     name: Validate Build
@@ -200,13 +202,6 @@ jobs:
             ${{ env.VCPKG_CACHE_DIR }}
             build/*/vcpkg_installed/
           key: vcpkg-${{ runner.os }}-${{ matrix.config }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Upload Release Build Artifact
-        if: matrix.config == 'release' && startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-build
-          path: build/x64-release/
 
   validate_macos:
     name: Validate universal macOS build
@@ -307,17 +302,13 @@ jobs:
           path: build/NavKit-macos-universal.dmg
 
   create_release:
-    name: Create Release with MSI
+    name: Rebuild release and package MSI
     runs-on: windows-2022
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ create_versioned_release ]
+    if: needs.create_versioned_release.result == 'success'
     env:
       VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg_cache,readwrite"
       VCPKG_CACHE_DIR: ${{ github.workspace }}\vcpkg_cache
-
-    needs: [ validate_build ]
-
-    permissions:
-      contents: write
 
     steps:
       - name: Set up CMake
@@ -328,6 +319,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.create_versioned_release.outputs.sha }}
           submodules: recursive
 
       - name: Restore vcpkg cache
@@ -346,6 +338,13 @@ jobs:
         shell: pwsh
         run: New-Item -Path "${{ env.VCPKG_CACHE_DIR }}" -ItemType Directory -Force
 
+      - name: Build release
+        shell: pwsh
+        run: |
+          cmake --preset x64-release -D BUILD_TESTING=ON
+          cmake --build --preset x64-release -j12
+          ctest --test-dir build/x64-release -C Release --output-on-failure
+
       - name: Install WiX v6 Toolset from MSI
         shell: pwsh
         run: |
@@ -359,53 +358,153 @@ jobs:
           Write-Host "Installing WiX from $msi_path..."
           Start-Process msiexec.exe -ArgumentList "/i `"$msi_path`" /quiet" -Wait
 
-      - name: Download Release Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: release-build
-          path: build/x64-release/
-
       - name: Configure and Build Installer
         shell: pwsh
         run: |
-          cmake --preset x64-release -D BUILD_INSTALLER=ON
+          cmake --preset x64-release -D BUILD_TESTING=ON -D BUILD_INSTALLER=ON
           Write-Host "Starting the installer build..."
           cmake --build build/x64-release --target installer --config Release
 
-      - name: Save vcpkg cache
-        uses: actions/cache/save@v4
-        if: always()
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-msi
+          path: build/x64-release/NavKit.msi
+          if-no-files-found: error
+
+  create_macos_release:
+    name: Rebuild universal macOS release
+    runs-on: macos-latest
+    needs: [ create_versioned_release ]
+    if: needs.create_versioned_release.result == 'success'
+    # Keep macOS packaging advisory until the universal dependency build is fixed.
+    continue-on-error: true
+    outputs:
+      artifact_uploaded: ${{ steps.upload_artifact.outcome == 'success' }}
+    env:
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}/vcpkg_cache
+    steps:
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create_versioned_release.outputs.sha }}
+          submodules: recursive
+
+      - name: Restore vcpkg cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ${{ env.VCPKG_CACHE_DIR }}
-            build/*/vcpkg_installed/
-          key: vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+            build/macos-release/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-universal-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'triplets/arm64-universal-osx.cmake', 'ports/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-universal-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'triplets/arm64-universal-osx.cmake', 'ports/**') }}-
+            vcpkg-${{ runner.os }}-universal-
+            vcpkg-${{ runner.os }}-
 
-      - name: Upload MSI to GitHub Release
-        uses: svenstaro/upload-release-action@v2
+      - name: Create vcpkg cache directory
+        run: mkdir -p "${VCPKG_CACHE_DIR}"
+
+      - name: Verify navkit-rpkg-lib universal binaries
+        run: |
+          lipo lib/Debug/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
+          lipo lib/Release/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
+
+      - name: Build universal macOS release
+        run: |
+          cmake --preset macos-release -D BUILD_TESTING=ON
+          cmake --build --preset macos-release --parallel 4
+          ctest --test-dir build/macos-release --output-on-failure
+          cmake --install build/macos-release --prefix "${GITHUB_WORKSPACE}/build/macos-stage"
+
+      - name: Verify universal app binaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          app = Path("build/macos-stage/NavKit.app")
+          binaries = []
+          for path in app.rglob("*"):
+              if not path.is_file():
+                  continue
+              description = subprocess.check_output(
+                  ["file", "-b", str(path)], text=True, errors="replace"
+              )
+              if "Mach-O" in description:
+                  subprocess.run(
+                      ["lipo", str(path), "-verify_arch", "arm64", "x86_64"],
+                      check=True,
+                  )
+                  binaries.append(path)
+
+          if not binaries:
+              raise SystemExit(f"No Mach-O binaries found in {app}")
+          print(f"Verified {len(binaries)} universal Mach-O binaries.")
+          PY
+
+      - name: Package app bundle
+        run: |
+          hdiutil create -volname NavKit \
+            -srcfolder build/macos-stage/NavKit.app \
+            -ov -format UDZO \
+            "build/NavKit-macos-universal.dmg"
+
+      - name: Upload macOS release artifact
+        id: upload_artifact
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/x64-release/NavKit.msi
-          asset_name: NavKit.msi
-          tag: ${{ github.ref }}
-          overwrite: true
+          name: release-macos
+          path: build/NavKit-macos-universal.dmg
+          if-no-files-found: error
 
-  create_macos_release:
-    name: Add universal macOS build to release
+  publish_release:
+    name: Publish release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && needs.validate_macos.outputs.artifact_uploaded == 'true'
-    needs: [ validate_macos, create_release ]
+    needs: [ create_versioned_release, create_release, create_macos_release ]
+    if: "${{ always() && !cancelled() && needs.create_versioned_release.result == 'success' && needs.create_release.result == 'success' }}"
     permissions:
       contents: write
     steps:
-      - name: Download macOS release artifacts
+      - name: Download release notes
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-*
-          path: build/macos-release/
-          merge-multiple: true
+          name: release-notes
+          path: release-notes
 
-      - name: Upload universal macOS build to GitHub Release
+      - name: Download MSI
+        uses: actions/download-artifact@v4
+        with:
+          name: release-msi
+          path: release-assets
+
+      - name: Download macOS disk image
+        if: needs.create_macos_release.outputs.artifact_uploaded == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos
+          path: release-assets
+
+      - name: Create tag and GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" build/macos-release/NavKit-macos-universal.dmg --repo "${GITHUB_REPOSITORY}" --clobber
+          TAG: ${{ needs.create_versioned_release.outputs.tag }}
+          SHA: ${{ needs.create_versioned_release.outputs.sha }}
+        run: |
+          test -f release-assets/NavKit.msi
+          assets=(release-assets/NavKit.msi)
+          if [ -f release-assets/NavKit-macos-universal.dmg ]; then
+            assets+=(release-assets/NavKit-macos-universal.dmg)
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --title "NavKit $TAG" \
+            --notes-file release-notes/release-notes.md \
+            "${assets[@]}"
