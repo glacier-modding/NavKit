@@ -76,52 +76,99 @@ void UpdateChecker::performUpdateCheck() {
     UpdateChecker& updateChecker = getInstance();
     Logger::log(NK_INFO, "Checking for updates.");
 
-    httplib::Client cli("https://api.github.com");
-    try {
-        auto res = cli.Get("/repos/glacier-modding/NavKit/releases/latest");
-        if (res == nullptr) {
-            Logger::log(NK_ERROR, "GitHub API request failed");
-            return;
-        }
-        if (res->status != 200) {
-            Logger::log(NK_ERROR, "GitHub API request failed with status: %s", std::to_string(res->status).c_str());
-            return;
-        }
-        updateChecker.responseBody = res->body;
-        simdjson::ondemand::parser parser;
-        const simdjson::padded_string json(updateChecker.responseBody);
-        simdjson::ondemand::document doc = parser.iterate(json);
+    std::string responseBody;
+    bool requestSuccess = false;
 
-        const std::string_view latestVersionSV = doc["tag_name"];
+    {
+        httplib::Client cli("https://api.github.com");
+        try {
+            auto res = cli.Get("/repos/glacier-modding/NavKit/releases/latest");
+            if (res == nullptr) {
+                Logger::log(NK_ERROR, "GitHub API request failed");
+                {
+                    std::lock_guard lock(updateChecker.mutex);
+                    updateChecker.updateCheckCompleted = true;
+                }
+                return;
+            }
+            if (res->status != 200) {
+                Logger::log(NK_ERROR, "GitHub API request failed with status: %s", std::to_string(res->status).c_str());
+                {
+                    std::lock_guard lock(updateChecker.mutex);
+                    updateChecker.updateCheckCompleted = true;
+                }
+                return;
+            }
+            responseBody = res->body;
+            requestSuccess = true;
+        } catch (const std::exception& e) {
+            Logger::log(NK_ERROR, e.what());
+            {
+                std::lock_guard lock(updateChecker.mutex);
+                updateChecker.updateCheckCompleted = true;
+            }
+            return;
+        }
+    } // httplib::Client destroyed here
+
+    if (!requestSuccess) {
+        {
+            std::lock_guard lock(updateChecker.mutex);
+            updateChecker.updateCheckCompleted = true;
+        }
+        return;
+    }
+
+    try {
+        updateChecker.responseBody = responseBody;
+        simdjson::dom::parser parser;
+        simdjson::dom::element doc = parser.parse(updateChecker.responseBody);
+
+        std::string latestVersionStr;
+        std::string platformUpdateUrl;
+        bool foundPlatformAsset = false;
+
+        std::string_view latestVersionSV = doc["tag_name"];
         if (latestVersionSV.empty()) {
             Logger::log(NK_ERROR, "Error checking for updates.");
-        }
-        const std::string latestVersionStr(latestVersionSV.substr(1));
+        } else {
+            latestVersionStr = std::string(latestVersionSV.substr(1));
 
-        const std::string currentVersionStr = std::string(NavKit_VERSION_MAJOR) + "." +
-            std::string(NavKit_VERSION_MINOR) + "." + std::string(NavKit_VERSION_PATCH);
-        Logger::log(NK_INFO, ("Current NavKit version: " + currentVersionStr).c_str());
-        Logger::log(NK_INFO, ("Latest NavKit version: " + latestVersionStr).c_str());
-        const bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
-        Logger::log(NK_INFO, std::string(updateAvailable ? "Update available." : "No update available.").c_str());
-        if (updateAvailable) {
-            for (simdjson::ondemand::object asset : doc["assets"]) {
-                if (std::string_view url_sv = asset["browser_download_url"]; isPlatformReleaseAsset(url_sv)) {
-                    {
-                        std::lock_guard lock(updateChecker.mutex);
-                        updateChecker.latestVersion = "v" + latestVersionStr;
-                        updateChecker.updateUrl = std::string(url_sv);
-                        updateChecker.updateCheckCompleted = true;
-                        updateChecker.isUpdateAvailable = true;
+            const std::string currentVersionStr = std::string(NavKit_VERSION_MAJOR) + "." +
+                std::string(NavKit_VERSION_MINOR) + "." + std::string(NavKit_VERSION_PATCH);
+            Logger::log(NK_INFO, ("Current NavKit version: " + currentVersionStr).c_str());
+            Logger::log(NK_INFO, ("Latest NavKit version: " + latestVersionStr).c_str());
+            const bool updateAvailable = isVersionGreaterThan(latestVersionStr, currentVersionStr);
+            Logger::log(NK_INFO, std::string(updateAvailable ? "Update available." : "No update available.").c_str());
+            if (updateAvailable) {
+                simdjson::dom::array assets = doc["assets"];
+                for (simdjson::dom::element asset : assets) {
+                    std::string_view url_sv = asset["browser_download_url"];
+                    if (isPlatformReleaseAsset(url_sv)) {
+                        platformUpdateUrl = std::string(url_sv);
+                        foundPlatformAsset = true;
+                        Logger::log(NK_INFO, ("Platform update URL: " + platformUpdateUrl).c_str());
+                        break;
                     }
-                    Logger::log(NK_INFO, ("Platform update URL: " + std::string(url_sv)).c_str());
-                    if (wxTheApp) {
-                        wxTheApp->CallAfter([&updateChecker] { updateChecker.renderUpdatePopup(); });
-                    }
-                    return;
+                }
+                if (!foundPlatformAsset) {
+                    Logger::log(NK_ERROR, "No update asset for this platform was found in the latest GitHub release.");
                 }
             }
-            Logger::log(NK_ERROR, "No update asset for this platform was found in the latest GitHub release.");
+        }
+
+        if (foundPlatformAsset && !latestVersionStr.empty()) {
+            {
+                std::lock_guard lock(updateChecker.mutex);
+                updateChecker.latestVersion = "v" + latestVersionStr;
+                updateChecker.updateUrl = platformUpdateUrl;
+                updateChecker.updateCheckCompleted = true;
+                updateChecker.isUpdateAvailable = true;
+            }
+            if (wxTheApp) {
+                wxTheApp->CallAfter([&updateChecker] { updateChecker.renderUpdatePopup(); });
+            }
+            return;
         }
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, e.what());
@@ -133,12 +180,22 @@ void UpdateChecker::performUpdateCheck() {
 }
 
 void UpdateChecker::renderUpdatePopup() {
-    if (updateCheckCompleted && isUpdateAvailable) {
+    std::string localLatestVersion;
+    bool localUpdateCheckCompleted;
+    bool localIsUpdateAvailable;
+    {
+        std::lock_guard lock(mutex);
+        localLatestVersion = latestVersion;
+        localUpdateCheckCompleted = updateCheckCompleted;
+        localIsUpdateAvailable = isUpdateAvailable;
+    }
+
+    if (localUpdateCheckCompleted && localIsUpdateAvailable) {
 #ifdef __APPLE__
         openUpdateDialog(
-            "A new version is available: " + latestVersion + ". Would you like to download the macOS update?");
+            "A new version is available: " + localLatestVersion + ". Would you like to download the macOS update?");
 #else
-        openUpdateDialog("A new version is available: " + latestVersion + ". Would you like to update?");
+        openUpdateDialog("A new version is available: " + localLatestVersion + ". Would you like to update?");
 #endif
     }
 }
@@ -160,11 +217,19 @@ void splitUrl(const std::string& url, std::string& domain, std::string& path) {
     }
 }
 
-void UpdateChecker::performUpdate() const {
+void UpdateChecker::performUpdate() {
 #ifdef _WIN32
     Logger::log(NK_INFO, "Preparing update...");
 
-    if (updateUrl.empty()) {
+    std::string localUpdateUrl;
+    std::string localLatestVersion;
+    {
+        std::lock_guard lock(mutex);
+        localUpdateUrl = updateUrl;
+        localLatestVersion = latestVersion;
+    }
+
+    if (localUpdateUrl.empty()) {
         Logger::log(NK_ERROR, "NavKit: No update URL available.");
         return;
     }
@@ -210,7 +275,7 @@ void UpdateChecker::performUpdate() const {
 
     const std::filesystem::path local_msi_path = temp_path / "NavKit.msi";
     std::string domain, msi_path_part;
-    splitUrl(updateUrl, domain, msi_path_part);
+    splitUrl(localUpdateUrl, domain, msi_path_part);
     httplib::Client cli("https://" + domain);
     cli.set_follow_location(true);
 
@@ -234,7 +299,7 @@ void UpdateChecker::performUpdate() const {
     }
 
     const std::vector<wxString> arguments = {pathToWxString(temp_updater_path), pathToWxString(local_msi_path),
-        std::to_string(wxGetProcessId()), wxString::FromUTF8(latestVersion.c_str()), pathToWxString(install_dir)};
+        std::to_string(wxGetProcessId()), wxString::FromUTF8(localLatestVersion.c_str()), pathToWxString(install_dir)};
     Logger::log(NK_INFO, ("Launching updater: " + temp_updater_path.string()).c_str());
     wxExecuteEnv environment;
     environment.cwd = pathToWxString(install_dir);
@@ -248,11 +313,17 @@ void UpdateChecker::performUpdate() const {
     Logger::getInstance().stop();
     exit(0);
 #elif defined(__APPLE__)
-    if (updateUrl.empty()) {
+    std::string localUpdateUrl;
+    {
+        std::lock_guard lock(mutex);
+        localUpdateUrl = updateUrl;
+    }
+
+    if (localUpdateUrl.empty()) {
         Logger::log(NK_ERROR, "NavKit: No macOS update URL available.");
         return;
     }
-    if (!wxLaunchDefaultBrowser(wxString::FromUTF8(updateUrl))) {
+    if (!wxLaunchDefaultBrowser(wxString::FromUTF8(localUpdateUrl))) {
         Logger::log(NK_ERROR, "NavKit: Could not open the macOS update download URL.");
     }
 #else

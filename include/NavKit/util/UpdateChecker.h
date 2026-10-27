@@ -32,7 +32,7 @@ public:
 private:
     static void performUpdateCheck();
 
-    void performUpdate() const;
+    void performUpdate();
 
     std::thread updateThread;
     std::mutex mutex;

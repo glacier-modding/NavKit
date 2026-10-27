@@ -153,9 +153,10 @@ void Json::Mesh::writeJson(std::ostream& f) const {
 }
 
 Json::Meshes::Meshes(simdjson::ondemand::array meshesJson) {
-    for (simdjson::ondemand::value meshJson : meshesJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> meshJsonResult : meshesJson) {
+        simdjson::ondemand::value meshJson = meshJsonResult.value();
         Mesh mesh;
-        mesh.readJson(meshJson);
+        mesh.readJson(meshJson.get_object().value());
         meshes.push_back(mesh);
     }
 }
@@ -176,9 +177,10 @@ void Json::PfBox::writeJson(std::ostream& f) const {
 }
 
 Json::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
-    for (simdjson::ondemand::value entityJson : pfBoxes) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> entityJsonResult : pfBoxes) {
+        simdjson::ondemand::value entityJson = entityJsonResult.value();
         Entity entity;
-        entity.readJson(entityJson);
+        entity.readJson(entityJson.get_object().value());
         entities.push_back(entity);
     }
 }
@@ -239,9 +241,10 @@ void Json::PfBoxes::readPathfindingBBoxes() {
 }
 
 Json::Gates::Gates(simdjson::ondemand::array gatesJson) {
-    for (simdjson::ondemand::value gateJson : gatesJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> gateJsonResult : gatesJson) {
+        simdjson::ondemand::value gateJson = gateJsonResult.value();
         Gate gate;
-        gate.readJson(gateJson);
+        gate.readJson(gateJson.get_object().value());
         gates.push_back(gate);
     }
 }
@@ -274,9 +277,10 @@ void Json::Room::readJson(simdjson::ondemand::object json) {
 }
 
 Json::Rooms::Rooms(simdjson::ondemand::array roomsJson) {
-    for (simdjson::ondemand::value roomJson : roomsJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> roomJsonResult : roomsJson) {
+        simdjson::ondemand::value roomJson = roomJsonResult.value();
         Room room;
-        room.readJson(roomJson);
+        room.readJson(roomJson.get_object().value());
         rooms.push_back(room);
     }
 }
@@ -323,9 +327,10 @@ void Json::AiAreaWorld::readJson(simdjson::ondemand::object json) {
 }
 
 Json::AiAreaWorlds::AiAreaWorlds(simdjson::ondemand::array aiAreaWorldsJson) {
-    for (simdjson::ondemand::value aiAreaWorldJson : aiAreaWorldsJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> aiAreaWorldJsonResult : aiAreaWorldsJson) {
+        simdjson::ondemand::value aiAreaWorldJson = aiAreaWorldJsonResult.value();
         AiAreaWorld aiAreaWorld;
-        aiAreaWorld.readJson(aiAreaWorldJson);
+        aiAreaWorld.readJson(aiAreaWorldJson.get_object().value());
         aiAreaWorlds.push_back(aiAreaWorld);
     }
 }
@@ -396,17 +401,19 @@ void Json::AiArea::readJson(simdjson::ondemand::object json) {
 }
 
 Json::AiAreas::AiAreas(simdjson::ondemand::array aiAreasJson) {
-    for (simdjson::ondemand::value aiAreaJson : aiAreasJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> aiAreaJsonResult : aiAreasJson) {
+        simdjson::ondemand::value aiAreaJson = aiAreaJsonResult.value();
         AiArea aiArea;
-        aiArea.readJson(aiAreaJson);
+        aiArea.readJson(aiAreaJson.get_object().value());
         aiAreas.push_back(aiArea);
     }
 }
 
 Json::VolumeBoxes::VolumeBoxes(simdjson::ondemand::array volumeBoxesJson) {
-    for (simdjson::ondemand::value volumeBoxJson : volumeBoxesJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> volumeBoxJsonResult : volumeBoxesJson) {
+        simdjson::ondemand::value volumeBoxJson = volumeBoxJsonResult.value();
         Entity volumeBox;
-        volumeBox.readJson(volumeBoxJson);
+        volumeBox.readJson(volumeBoxJson.get_object().value());
         volumeBoxes.push_back(volumeBox);
     }
 }
@@ -441,9 +448,10 @@ void Json::VolumeSphere::readJson(simdjson::ondemand::object json) {
 }
 
 Json::VolumeSpheres::VolumeSpheres(simdjson::ondemand::array volumeSpheresJson) {
-    for (simdjson::ondemand::value volumeSphereJson : volumeSpheresJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> volumeSphereJsonResult : volumeSpheresJson) {
+        simdjson::ondemand::value volumeSphereJson = volumeSphereJsonResult.value();
         VolumeSphere volumeSphere;
-        volumeSphere.readJson(volumeSphereJson);
+        volumeSphere.readJson(volumeSphereJson.get_object().value());
         volumeSpheres.push_back(volumeSphere);
     }
 }
@@ -457,9 +465,10 @@ void Json::PfSeedPoint::writeJson(std::ostream& f) const {
 }
 
 Json::PfSeedPoints::PfSeedPoints(simdjson::ondemand::array pfSeedPoints) {
-    for (simdjson::ondemand::value entityJson : pfSeedPoints) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> entityJsonResult : pfSeedPoints) {
+        simdjson::ondemand::value entityJson = entityJsonResult.value();
         Entity entity;
-        entity.readJson(entityJson);
+        entity.readJson(entityJson.get_object().value());
         entities.push_back(entity);
     }
 }
@@ -512,9 +521,10 @@ void Json::Mati::writeJson(std::ostream& f) const {
 }
 
 Json::Matis::Matis(simdjson::ondemand::array matisJson) {
-    for (simdjson::ondemand::value matiJson : matisJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> matiJsonResult : matisJson) {
+        simdjson::ondemand::value matiJson = matiJsonResult.value();
         Mati mati;
-        mati.readJsonFromScene(matiJson);
+        mati.readJsonFromScene(matiJson.get_object().value());
         matis.push_back(mati);
     }
 }
@@ -543,9 +553,10 @@ void Json::PrimMati::writeJson(std::ostream& f) const {
 }
 
 Json::PrimMatis::PrimMatis(simdjson::ondemand::array primMatisJson) {
-    for (const simdjson::ondemand::object primMatiJson : primMatisJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> primMatiJsonResult : primMatisJson) {
+        simdjson::ondemand::value primMatiJson = primMatiJsonResult.value();
         PrimMati primMati;
-        primMati.readJson(primMatiJson);
+        primMati.readJson(primMatiJson.get_object().value());
         primMatis.push_back(primMati);
     }
 }
