@@ -205,11 +205,11 @@ void Rpkg::checkHitmanVersion() {
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
     static constexpr const char* GAME_VERSION = "3.270.1";
     static std::map<std::string, std::string> gameHashes(
-        {std::pair("9b85211686e6b95bfc5f48c961992a0b", "epic"), // base game
-            std::pair("bf6b2e2c34bf76e4a9b7e23a3c519f9b", "epic"), // ansel unlock
-            std::pair("9a17c533634f4b4bdbfa2e03cc72cfaf", "steam"), // base game
-            std::pair("82484078c5a1a78e2f84e9f0ad67760f", "steam"), // ansel unlock
-            std::pair("7814483cb24ba31e9d3cc5d8c0977920", "microsoft")});
+        {std::pair("e72ee951f153bd8858f37e36d09cfaf5", "epic"), // base game
+            std::pair("a8761edd766e4016a9ccc64a8c5ed883", "epic"), // ansel unlock
+            std::pair("ceaff768215bf97014f023673f65c4c8", "steam"), // base game
+            std::pair("fa2caabd0293edab43d44e823c1f152e", "steam"), // ansel unlock
+            std::pair("a1d3d1698bc416014aad875c36957502", "microsoft")});
     const std::filesystem::path hitmanPath = std::filesystem::u8path(hitmanFolder);
     const std::filesystem::path retailPath = hitmanPath / "Retail";
     const std::filesystem::path exePath = retailPath / "HITMAN3.exe";
