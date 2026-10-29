@@ -2,7 +2,9 @@ enable_testing()
 
 add_executable(ReasoningGridTests
         reasoning_grid_tests.cpp
-        ../src/model/ReasoningGrid.cpp
+)
+target_link_libraries(ReasoningGridTests PRIVATE
+        NavKitLib
 )
 target_compile_definitions(ReasoningGridTests PRIVATE
         NAVKIT_REASONING_GRID_RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"

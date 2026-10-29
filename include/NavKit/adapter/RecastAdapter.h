@@ -99,7 +99,13 @@ public:
 
     dtPolyRef getPolyRefForLink(const dtLink& link) const;
 
-    bool pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd) const;
+    /// True when the navigation mesh allows walking between the two positions with a string-pulled path
+    /// length of at most @p maxPathCost. Wall-adjacent shortcuts are not accepted: positions whose straight
+    /// segment merely passes near an opening in a wall are only connected when the actual corridor between
+    /// them fits the budget. Pass null for @p navQuery or @p queryFilter to use the adapter's built mesh and
+    /// filter.
+    bool pfWaypointsConnected(const dtNavMeshQuery* navQuery, const dtQueryFilter* queryFilter, const Vec3& recastStart,
+        const Vec3& recastEnd, float maxPathCost) const;
 
     dtPolyRef getAdjacentPoly(dtPolyRef poly, int edgeIndex) const;
 

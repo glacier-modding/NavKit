@@ -567,9 +567,17 @@ void GridGenerator::GenerateConnections() {
                 RecastAdapter::convertFromNavPowerToRecast({waypoint.vPos.x, waypoint.vPos.y, waypoint.vPos.z});
             Vec3 neighborPosRecast =
                 RecastAdapter::convertFromNavPowerToRecast({neighbor->vPos.x, neighbor->vPos.y, neighbor->vPos.z});
-            // Check if path between waypoints is not blocked
             RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
-            if (!recastAirgAdapter.pfLineBlocked(wayPointPosRecast, neighborPosRecast)) {
+            // Check if the waypoints are connected on the navigation mesh. Waypoints can be close in a straight
+            // line yet separated by a wall, so this is not a line-of-sight test: the corridor between the
+            // waypoints is budgeted by the string-pulled path length. The largest distance between two
+            // waypoints in adjacent grid cells is the 3D diagonal spacing, accounting for height differences
+            // and sub-grid alignment offsets.
+            const float dz = std::abs(waypoint.vPos.z - neighbor->vPos.z);
+            const float maxNeighborPathCost =
+                std::sqrt(2.0f * properties->fGridSpacing * properties->fGridSpacing + dz * dz) + 0.1f;
+            if (recastAirgAdapter.pfWaypointsConnected(
+                    nullptr, nullptr, wayPointPosRecast, neighborPosRecast, maxNeighborPathCost)) {
                 // Connect waypoints and update connection count
                 waypoint.nNeighbors[direction] = neighborIndex;
                 neighbor->nNeighbors[(direction + 4) % 8] = currentWaypointCount;

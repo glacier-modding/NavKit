@@ -20,6 +20,11 @@
 #include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Pathfinding.h"
 #include "../include/RecastDemo/InputGeom.h"
+#include <DetourNavMesh.h>
+#include <DetourNavMeshBuilder.h>
+#include <DetourNavMeshQuery.h>
+#include <cfloat>
+#include <cstring>
 #include <GL/glew.h>
 #include <assimp/Exporter.hpp>
 #include <assimp/mesh.h>
@@ -1066,6 +1071,163 @@ namespace {
         check(airg.selectedWaypointIndex == -1, "New Project should reset airg selection");
     }
 
+    // Navmesh fixture for the waypoint connection tests: a walkable plane with a wall sliver between
+    // x=4.6 and x=4.7 running from z=1 to z=9, with an open corridor along the bottom (z < 1) that connects
+    // both sides of the wall. The two regions are joined exclusively through that corridor, so the path
+    // between points placed above the bottom strip walks all the way down, across, and back up.
+    struct WaypointNavFixture {
+        dtNavMesh* navMesh = nullptr;
+        dtNavMeshQuery* navQuery = nullptr;
+        dtPolyRef polyBase = 0;
+
+        dtPolyRef poly(const int index) const {
+            return polyBase | static_cast<dtPolyRef>(index);
+        }
+
+        ~WaypointNavFixture() {
+            if (navQuery != nullptr)
+                dtFreeNavMeshQuery(navQuery);
+            if (navMesh != nullptr)
+                dtFreeNavMesh(navMesh);
+        }
+    };
+
+    bool buildWaypointNavmesh(WaypointNavFixture& fixture) {
+        // Coordinates are quantized (x10) against cs = 0.1, so 46 means x = 4.6.
+        const unsigned short verts[] = {
+            0, 0, 0, // 0 (0, 0)
+            46, 0, 0, // 1 (4.6, 0)
+            46, 0, 10, // 2 (4.6, 1)
+            0, 0, 10, // 3 (0, 1)
+            90, 0, 0, // 4 (9, 0)
+            90, 0, 10, // 5 (9, 1)
+            0, 0, 90, // 6 (0, 9)
+            46, 0, 90, // 7 (4.6, 9)
+            47, 0, 90, // 8 (4.7, 9)
+            47, 0, 10, // 9 (4.7, 1)
+            90, 0, 90, // 10 (9, 9)
+        };
+        // Polygon i is followed by the neighbor indices of its four edges (0xffff = border):
+        //   0: lower left,  1: upper left,  2: lower right,  3: right.
+        // The passage between the left and right regions only exists along the bottom strip. The wall sliver
+        // edges at x = 4.6 (polygon 1) and x = 4.7 (polygon 3) are borders without links.
+        const unsigned short polyData[] = {
+            0, 1, 2, 3, 0xffff, 2, 1, 0xffff, // polygon 0 edges: bottom, right(sliver open), top(-x), left
+            3, 2, 7, 6, 0, 0xffff, 0xffff, 0xffff, // polygon 1 edges: bottom, right(sliver wall), top, left
+            1, 4, 5, 2, 0xffff, 0xffff, 3, 0, // polygon 2 edges: bottom, right, top, left(sliver open)
+            9, 5, 10, 8, 2, 0xffff, 0xffff, 0xffff, // polygon 3 edges: bottom, right, top, left(sliver wall)
+        };
+        constexpr int polyCount = 4;
+        constexpr int nvp = 4;
+
+        std::vector<unsigned short> polyFlags(polyCount, 0x01);
+        std::vector<unsigned char> polyAreas(polyCount, 0);
+
+        dtNavMeshCreateParams params;
+        memset(&params, 0, sizeof(params));
+        params.verts = const_cast<unsigned short*>(verts);
+        params.vertCount = 11;
+        params.polys = const_cast<unsigned short*>(polyData);
+        params.polyFlags = polyFlags.data();
+        params.polyAreas = polyAreas.data();
+        params.polyCount = polyCount;
+        params.nvp = nvp;
+        params.tileX = 0;
+        params.tileY = 0;
+        params.tileLayer = 0;
+        params.bmin[0] = -0.1f;
+        params.bmin[1] = -0.1f;
+        params.bmin[2] = -0.1f;
+        params.bmax[0] = 9.1f;
+        params.bmax[1] = 0.2f;
+        params.bmax[2] = 9.1f;
+        params.walkableHeight = 2.0f;
+        params.walkableRadius = 0.1f;
+        params.walkableClimb = 0.2f;
+        params.cs = 0.1f;
+        params.ch = 0.1f;
+        params.buildBvTree = true;
+
+        unsigned char* navData = nullptr;
+        int navDataSize = 0;
+        if (!dtCreateNavMeshData(&params, &navData, &navDataSize))
+            return false;
+
+        fixture.navMesh = dtAllocNavMesh();
+        if (dtStatusFailed(fixture.navMesh->init(navData, navDataSize, DT_TILE_FREE_DATA))) {
+            dtFreeNavMesh(fixture.navMesh);
+            fixture.navMesh = nullptr;
+            return false;
+        }
+
+        fixture.navQuery = dtAllocNavMeshQuery();
+        if (dtStatusFailed(fixture.navQuery->init(fixture.navMesh, 2048))) {
+            dtFreeNavMeshQuery(fixture.navQuery);
+            fixture.navQuery = nullptr;
+            dtFreeNavMesh(fixture.navMesh);
+            fixture.navMesh = nullptr;
+            return false;
+        }
+
+        const dtMeshTile* tile = fixture.navMesh->getTileAt(0, 0, 0);
+        fixture.polyBase = fixture.navMesh->getPolyRefBase(tile);
+        return true;
+    }
+
+    // Matches the RecastAdapter query filter that runs with generated areas.
+    class WaypointQueryFilter final : public dtQueryFilter {
+    public:
+        WaypointQueryFilter() {
+            setIncludeFlags(0xffff);
+            setExcludeFlags(0);
+            for (int i = 0; i < DT_MAX_AREAS; ++i)
+                setAreaCost(i, 1.0f);
+        }
+    };
+
+    void testWaypointConnectionsRespectWalls() {
+        RecastAdapter& adapter = RecastAdapter::getInstance();
+        WaypointNavFixture fixture;
+        check(buildWaypointNavmesh(fixture), "waypoint navmesh should build");
+        WaypointQueryFilter queryFilter;
+        constexpr float spacing = 2.25f;
+        constexpr float maxNeighborPathCost = spacing * 1.41421356f;
+        constexpr float unlimited = FLT_MAX;
+
+        // Start and end sit in adjacent walkable regions on opposite sides of a wall sliver and are close in
+        // a straight line, but the open connecting corridor is along the bottom of the mesh, so the walked
+        // distance is far larger than the budget.
+        const Vec3 wallStart{4.8f, 0.0f, 8.2f};
+        const Vec3 wallEnd{4.4f, 0.0f, 8.2f};
+        check(!adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, wallStart, wallEnd, maxNeighborPathCost),
+            "waypoints on opposite sides of a wall must not connect via the far away opening at the budget");
+        check(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, wallStart, wallEnd, unlimited),
+            "waypoints on opposite sides of a wall connect without a cost budget");
+
+        // Flat ground inside one large polygon: adjacent waypoints connect when the corridor matches the
+        // straight line distance.
+        const Vec3 flatStart{5.0f, 0.0f, 2.0f};
+        const Vec3 flatEnd{6.6f, 0.0f, 3.6f};
+        check(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, flatStart, flatEnd, maxNeighborPathCost),
+            "waypoints on flat ground within the diagonal spacing budget connect");
+
+        const Vec3 exactDiagStart{5.0f, 0.0f, 2.0f};
+        const Vec3 exactDiagEnd{7.25f, 0.0f, 4.25f};
+        check(adapter.pfWaypointsConnected(
+                  fixture.navQuery, &queryFilter, exactDiagStart, exactDiagEnd, maxNeighborPathCost),
+            "waypoints separated by the exact diagonal spacing connect");
+
+        // Large polygons cover multiple waypoints: positions inside one polygon can still be farther apart
+        // than the budget, and the string-pulled distance decides, not the polygon cost.
+        const Vec3 farSamePolyStart{8.8f, 0.0f, 1.5f};
+        const Vec3 farSamePolyEnd{4.8f, 0.0f, 8.5f};
+        check(!adapter.pfWaypointsConnected(
+                  fixture.navQuery, &queryFilter, farSamePolyStart, farSamePolyEnd, maxNeighborPathCost),
+            "same-polygon waypoints farther apart than the budget must not connect");
+        check(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, farSamePolyStart, farSamePolyEnd, unlimited),
+            "same-polygon waypoints connect without a cost budget");
+    }
+
     void run(const std::string_view name, const auto& test) {
         test();
         std::cout << "[pass] " << name << std::endl;
@@ -1093,6 +1255,7 @@ void runDomainTests() {
     run("Render mesh CPU properties", testMeshCpuProperties);
     run("Render model mesh batching", testModelMeshBatching);
     run("Recast adapter geometry loading and coordinate conversion", testRecastAdapterGeometrySurface);
+    run("Waypoint connections respect walls and the path budget", testWaypointConnectionsRespectWalls);
     run("Navp binary fixture loading", testNavpBinaryLoading);
     run("Marker handles arbitrary mesh names", testMarkerObjectNames);
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);

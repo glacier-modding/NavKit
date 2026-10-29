@@ -1,4 +1,9 @@
 #include "../include/NavKit/model/ReasoningGrid.h"
+#include "../include/NavKit/adapter/RecastAdapter.h"
+#include <DetourNavMesh.h>
+#include <DetourNavMeshBuilder.h>
+#include <DetourNavMeshQuery.h>
+#include <cfloat>
 
 #include "../include/NavKit/util/Threading.h"
 #include <atomic>
@@ -426,6 +431,332 @@ namespace {
         require(grid.m_pVisibilityData.size() == 360844, "intro AIRG visibility data was not read");
         require(grid.m_deadEndData.m_aBytes.empty(), "intro AIRG dead-end bytes were not read");
     }
+
+    struct NavmeshFixture {
+        dtNavMesh* navMesh = nullptr;
+        dtNavMeshQuery* navQuery = nullptr;
+        dtPolyRef polyBase = 0;
+
+        ~NavmeshFixture() {
+            if (navQuery != nullptr)
+                dtFreeNavMeshQuery(navQuery);
+            if (navMesh != nullptr)
+                dtFreeNavMesh(navMesh);
+        }
+    };
+
+    class TestQueryFilter final : public dtQueryFilter {
+    public:
+        TestQueryFilter() {
+            setIncludeFlags(0xffff);
+            setExcludeFlags(0);
+            for (int i = 0; i < DT_MAX_AREAS; ++i)
+                setAreaCost(i, 1.0f);
+        }
+    };
+
+    bool buildTriangleNavmesh(NavmeshFixture& fixture) {
+        // Coordinates are quantized (x10) against cs = 0.1, so 100 means x = 10.0.
+        const unsigned short verts[] = {
+            0, 0, 0, // 0 (0, 0, 0)
+            100, 0, 0, // 1 (10, 0, 0)
+            0, 0, 100, // 2 (0, 0, 10)
+            100, 0, 100, // 3 (10, 0, 10)
+        };
+        // 2 triangles with nvp = 3
+        // Poly 0: 0, 1, 2. Neighbors: none (0xffff), poly 1, none (0xffff)
+        // Poly 1: 1, 3, 2. Neighbors: none (0xffff), none (0xffff), poly 0
+        const unsigned short polyData[] = {
+            0,
+            1,
+            2,
+            0xffff,
+            1,
+            0xffff,
+            1,
+            3,
+            2,
+            0xffff,
+            0xffff,
+            0,
+        };
+        constexpr int polyCount = 2;
+        constexpr int nvp = 3;
+
+        std::vector<unsigned short> polyFlags(polyCount, 0x01);
+        std::vector<unsigned char> polyAreas(polyCount, 0);
+
+        dtNavMeshCreateParams params;
+        memset(&params, 0, sizeof(params));
+        params.verts = const_cast<unsigned short*>(verts);
+        params.vertCount = 4;
+        params.polys = const_cast<unsigned short*>(polyData);
+        params.polyFlags = polyFlags.data();
+        params.polyAreas = polyAreas.data();
+        params.polyCount = polyCount;
+        params.nvp = nvp;
+        params.tileX = 0;
+        params.tileY = 0;
+        params.tileLayer = 0;
+        params.bmin[0] = -0.1f;
+        params.bmin[1] = -0.1f;
+        params.bmin[2] = -0.1f;
+        params.bmax[0] = 10.1f;
+        params.bmax[1] = 0.2f;
+        params.bmax[2] = 10.1f;
+        params.walkableHeight = 2.0f;
+        params.walkableRadius = 0.1f;
+        params.walkableClimb = 0.2f;
+        params.cs = 0.1f;
+        params.ch = 0.1f;
+        params.buildBvTree = true;
+
+        unsigned char* navData = nullptr;
+        int navDataSize = 0;
+        if (!dtCreateNavMeshData(&params, &navData, &navDataSize))
+            return false;
+
+        fixture.navMesh = dtAllocNavMesh();
+        if (dtStatusFailed(fixture.navMesh->init(navData, navDataSize, DT_TILE_FREE_DATA))) {
+            dtFreeNavMesh(fixture.navMesh);
+            fixture.navMesh = nullptr;
+            return false;
+        }
+
+        fixture.navQuery = dtAllocNavMeshQuery();
+        if (dtStatusFailed(fixture.navQuery->init(fixture.navMesh, 2048))) {
+            dtFreeNavMeshQuery(fixture.navQuery);
+            fixture.navQuery = nullptr;
+            dtFreeNavMesh(fixture.navMesh);
+            fixture.navMesh = nullptr;
+            return false;
+        }
+
+        const dtMeshTile* tile = fixture.navMesh->getTileAt(0, 0, 0);
+        fixture.polyBase = fixture.navMesh->getPolyRefBase(tile);
+        return true;
+    }
+
+    void testWaypointConnectionsTriangleFarFromMidpoint() {
+        RecastAdapter& adapter = RecastAdapter::getInstance();
+        NavmeshFixture fixture;
+        require(buildTriangleNavmesh(fixture), "triangle navmesh should build");
+        TestQueryFilter queryFilter;
+        constexpr float spacing = 2.25f;
+        constexpr float maxNeighborPathCost = spacing * 1.41421356f;
+        constexpr float unlimited = FLT_MAX;
+
+        // Two waypoints in adjacent triangles, close to each other (dist = 1.0) with a clear path,
+        // but far from the shared edge midpoint (5.0, 0.0, 5.0).
+        const Vec3 nearStart{0.5f, 0.0f, 9.0f};
+        const Vec3 nearEnd{1.5f, 0.0f, 9.0f};
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, nearStart, nearEnd, maxNeighborPathCost),
+            "waypoints across shared triangle edge far from edge midpoint must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, nearStart, nearEnd, unlimited),
+            "waypoints across shared triangle edge connect with unlimited budget");
+
+        // Waypoints in the same triangle far apart (dist = 8.0 > maxCost).
+        const Vec3 farSamePolyStart{0.5f, 0.0f, 9.0f};
+        const Vec3 farSamePolyEnd{0.5f, 0.0f, 1.0f};
+        require(!adapter.pfWaypointsConnected(
+                    fixture.navQuery, &queryFilter, farSamePolyStart, farSamePolyEnd, maxNeighborPathCost),
+            "same-triangle waypoints farther apart than budget must not connect");
+        require(
+            adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, farSamePolyStart, farSamePolyEnd, unlimited),
+            "same-triangle waypoints connect with unlimited budget");
+
+        // Waypoints in adjacent triangles far apart (dist = 7.0 > maxCost).
+        const Vec3 farAdjStart{8.0f, 0.0f, 1.5f};
+        const Vec3 farAdjEnd{8.0f, 0.0f, 8.5f};
+        require(
+            !adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, farAdjStart, farAdjEnd, maxNeighborPathCost),
+            "adjacent-triangle waypoints farther apart than budget must not connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, farAdjStart, farAdjEnd, unlimited),
+            "adjacent-triangle waypoints connect with unlimited budget");
+    }
+
+    bool buildWallNavmesh(NavmeshFixture& fixture) {
+        // Coordinates are quantized (x10) against cs = 0.1, so 46 means x = 4.6.
+        const unsigned short verts[] = {
+            0, 0, 0, // 0 (0, 0)
+            46, 0, 0, // 1 (4.6, 0)
+            46, 0, 10, // 2 (4.6, 1)
+            0, 0, 10, // 3 (0, 1)
+            90, 0, 0, // 4 (9, 0)
+            90, 0, 10, // 5 (9, 1)
+            0, 0, 90, // 6 (0, 9)
+            46, 0, 90, // 7 (4.6, 9)
+            47, 0, 90, // 8 (4.7, 9)
+            47, 0, 10, // 9 (4.7, 1)
+            90, 0, 90, // 10 (9, 9)
+        };
+        // Polygon i is followed by the neighbor indices of its four edges (0xffff = border):
+        //   0: lower left,  1: upper left,  2: lower right,  3: right.
+        // The passage between the left and right regions only exists along the bottom strip. The wall sliver
+        // edges at x = 4.6 (polygon 1) and x = 4.7 (polygon 3) are borders without links.
+        const unsigned short polyData[] = {
+            0, 1, 2, 3, 0xffff, 2, 1, 0xffff, // polygon 0 edges: bottom, right(sliver open), top(-x), left
+            3, 2, 7, 6, 0, 0xffff, 0xffff, 0xffff, // polygon 1 edges: bottom, right(sliver wall), top, left
+            1, 4, 5, 2, 0xffff, 0xffff, 3, 0, // polygon 2 edges: bottom, right, top, left(sliver open)
+            9, 5, 10, 8, 2, 0xffff, 0xffff, 0xffff, // polygon 3 edges: bottom, right, top, left(sliver wall)
+        };
+        constexpr int polyCount = 4;
+        constexpr int nvp = 4;
+
+        std::vector<unsigned short> polyFlags(polyCount, 0x01);
+        std::vector<unsigned char> polyAreas(polyCount, 0);
+
+        dtNavMeshCreateParams params;
+        memset(&params, 0, sizeof(params));
+        params.verts = const_cast<unsigned short*>(verts);
+        params.vertCount = 11;
+        params.polys = const_cast<unsigned short*>(polyData);
+        params.polyFlags = polyFlags.data();
+        params.polyAreas = polyAreas.data();
+        params.polyCount = polyCount;
+        params.nvp = nvp;
+        params.tileX = 0;
+        params.tileY = 0;
+        params.tileLayer = 0;
+        params.bmin[0] = -0.1f;
+        params.bmin[1] = -0.1f;
+        params.bmin[2] = -0.1f;
+        params.bmax[0] = 9.1f;
+        params.bmax[1] = 0.2f;
+        params.bmax[2] = 9.1f;
+        params.walkableHeight = 2.0f;
+        params.walkableRadius = 0.1f;
+        params.walkableClimb = 0.2f;
+        params.cs = 0.1f;
+        params.ch = 0.1f;
+        params.buildBvTree = true;
+
+        unsigned char* navData = nullptr;
+        int navDataSize = 0;
+        if (!dtCreateNavMeshData(&params, &navData, &navDataSize))
+            return false;
+
+        fixture.navMesh = dtAllocNavMesh();
+        if (dtStatusFailed(fixture.navMesh->init(navData, navDataSize, DT_TILE_FREE_DATA))) {
+            dtFreeNavMesh(fixture.navMesh);
+            fixture.navMesh = nullptr;
+            return false;
+        }
+
+        fixture.navQuery = dtAllocNavMeshQuery();
+        if (dtStatusFailed(fixture.navQuery->init(fixture.navMesh, 2048))) {
+            dtFreeNavMeshQuery(fixture.navQuery);
+            fixture.navQuery = nullptr;
+            dtFreeNavMesh(fixture.navMesh);
+            fixture.navMesh = nullptr;
+            return false;
+        }
+
+        const dtMeshTile* tile = fixture.navMesh->getTileAt(0, 0, 0);
+        fixture.polyBase = fixture.navMesh->getPolyRefBase(tile);
+        return true;
+    }
+
+    void testWaypointConnectionsWallObstacle() {
+        RecastAdapter& adapter = RecastAdapter::getInstance();
+        NavmeshFixture fixture;
+        require(buildWallNavmesh(fixture), "wall navmesh should build");
+        TestQueryFilter queryFilter;
+        constexpr float spacing = 2.25f;
+        constexpr float maxNeighborPathCost = spacing * 1.41421356f;
+        constexpr float unlimited = FLT_MAX;
+
+        // Start and end sit on opposite sides of a wall sliver and are close in a straight line (dist = 0.4),
+        // but the open connecting passage is along the bottom, making the walkable route ~16.0 > budget.
+        const Vec3 wallStart{4.8f, 0.0f, 8.2f};
+        const Vec3 wallEnd{4.4f, 0.0f, 8.2f};
+        require(!adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, wallStart, wallEnd, maxNeighborPathCost),
+            "waypoints on opposite sides of a wall must not connect via the far away opening at the budget");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, wallStart, wallEnd, unlimited),
+            "waypoints on opposite sides of a wall connect without a cost budget");
+    }
+
+    void testWaypointConnectionsSquareDiagonals() {
+        RecastAdapter& adapter = RecastAdapter::getInstance();
+        NavmeshFixture fixture;
+        require(buildTriangleNavmesh(fixture), "triangle navmesh should build");
+        TestQueryFilter queryFilter;
+        constexpr float spacing = 2.25f;
+        constexpr float maxNeighborPathCost = spacing * 1.41421356f;
+
+        // 4 waypoints forming a connected square with valid walkable space inside:
+        // W00 (bottom-left), W10 (bottom-right), W01 (top-left), W11 (top-right).
+        const Vec3 w00{2.0f, 0.0f, 2.0f};
+        const Vec3 w10{4.25f, 0.0f, 2.0f};
+        const Vec3 w01{2.0f, 0.0f, 4.25f};
+        const Vec3 w11{4.25f, 0.0f, 4.25f};
+
+        // All 4 orthogonal edges of the square must connect.
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00, w10, maxNeighborPathCost),
+            "square orthogonal connection (w00-w10) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00, w01, maxNeighborPathCost),
+            "square orthogonal connection (w00-w01) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w10, w11, maxNeighborPathCost),
+            "square orthogonal connection (w10-w11) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w01, w11, maxNeighborPathCost),
+            "square orthogonal connection (w01-w11) must connect");
+
+        // Both diagonals across the square with valid walkable space must connect properly.
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00, w11, maxNeighborPathCost),
+            "diagonal waypoints (w00-w11) in connected square must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w10, w01, maxNeighborPathCost),
+            "diagonal waypoints (w10-w01) across triangle boundary in connected square must connect");
+
+        // Another square positioned across the upper portion of the navmesh.
+        const Vec3 w00b{4.0f, 0.0f, 4.0f};
+        const Vec3 w10b{6.25f, 0.0f, 4.0f};
+        const Vec3 w01b{4.0f, 0.0f, 6.25f};
+        const Vec3 w11b{6.25f, 0.0f, 6.25f};
+
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00b, w10b, maxNeighborPathCost),
+            "second square orthogonal connection (w00b-w10b) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00b, w01b, maxNeighborPathCost),
+            "second square orthogonal connection (w00b-w01b) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w10b, w11b, maxNeighborPathCost),
+            "second square orthogonal connection (w10b-w11b) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w01b, w11b, maxNeighborPathCost),
+            "second square orthogonal connection (w01b-w11b) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00b, w11b, maxNeighborPathCost),
+            "second square diagonal connection (w00b-w11b) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w10b, w01b, maxNeighborPathCost),
+            "second square diagonal connection (w10b-w01b) must connect");
+    }
+
+    void testWaypointConnectionsSquareBlockedByWall() {
+        RecastAdapter& adapter = RecastAdapter::getInstance();
+        NavmeshFixture fixture;
+        require(buildWallNavmesh(fixture), "wall navmesh should build");
+        TestQueryFilter queryFilter;
+        constexpr float spacing = 2.25f;
+        constexpr float maxNeighborPathCost = spacing * 1.41421356f;
+
+        // 4 waypoints straddling a wall: bottom waypoints in open area, top waypoints on opposite sides of wall.
+        const Vec3 w00{3.5f, 0.0f, 0.5f};
+        const Vec3 w10{5.75f, 0.0f, 0.5f};
+        const Vec3 w01{3.5f, 0.0f, 2.75f};
+        const Vec3 w11{5.75f, 0.0f, 2.75f};
+
+        // Open orthogonal edges connect.
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00, w10, maxNeighborPathCost),
+            "open bottom edge (w00-w10) must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00, w01, maxNeighborPathCost),
+            "left edge (w00-w01) without wall must connect");
+        require(adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w10, w11, maxNeighborPathCost),
+            "right edge (w10-w11) without wall must connect");
+
+        // Top edge and diagonals intersected by the wall must NOT connect under the budget.
+        require(!adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w01, w11, maxNeighborPathCost),
+            "top edge (w01-w11) separated by wall must not connect");
+        require(!adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w00, w11, maxNeighborPathCost),
+            "diagonal (w00-w11) crossing wall obstacle must not connect");
+        require(!adapter.pfWaypointsConnected(fixture.navQuery, &queryFilter, w10, w01, maxNeighborPathCost),
+            "diagonal (w10-w01) crossing wall obstacle must not connect");
+    }
 } // namespace
 
 int main(const int argc, char** argv) {
@@ -447,6 +778,10 @@ int main(const int argc, char** argv) {
         testEmptyArrayRoundTrip();
         testGeneratedVisionData();
         testParallelVision();
+        testWaypointConnectionsTriangleFarFromMidpoint();
+        testWaypointConnectionsWallObstacle();
+        testWaypointConnectionsSquareDiagonals();
+        testWaypointConnectionsSquareBlockedByWall();
         const std::filesystem::path realAirgPath = fixtures.empty() ? resourceDir / "intro.airg" : fixtures[0];
         testRealBin1Airg(realAirgPath);
         testExactBin1RoundTrip(realAirgPath);

@@ -848,120 +848,51 @@ dtPolyRef RecastAdapter::getPolyRefForLink(const dtLink& link) const {
     return 0;
 }
 
-bool RecastAdapter::pfLineBlocked(const Vec3& recastStart, const Vec3& recastEnd) const {
-    const dtNavMesh* mesh = sample->getNavMesh();
-    if (!mesh) {
-        return true;
+bool RecastAdapter::pfWaypointsConnected(const dtNavMeshQuery* navQuery, const dtQueryFilter* queryFilter,
+    const Vec3& recastStart, const Vec3& recastEnd, const float maxPathCost) const {
+    const dtNavMeshQuery* navMeshQuery = navQuery != nullptr ? navQuery
+        : sample != nullptr                                  ? sample->getNavMeshQuery()
+                                                             : nullptr;
+    if (!navMeshQuery) {
+        return false;
     }
-    const dtNavMeshQuery* navQuery = sample->getNavMeshQuery();
-    if (!navQuery) {
-        return true;
-    }
+    const dtQueryFilter* queryFilterUsed = queryFilter != nullptr ? queryFilter : filter;
 
-    dtPolyRef startRef;
+    dtPolyRef startRef = 0;
+    float startNearest[3];
+    // Use a search radius that scales with maxPathCost to handle large polygons.
+    // The search radius needs to be large enough to find the polygon when the waypoint
+    // is near its edge or corner. Using maxPathCost directly gives us the diagonal
+    // grid spacing, which is a reasonable scale for the search box.
+    const float searchRadius = (maxPathCost > 0.0f && maxPathCost < 100.0f) ? std::max(maxPathCost, 2.0f) : 2.0f;
+    const float halfExtents[3] = {searchRadius, searchRadius * 2.0f, searchRadius};
     const float recastStartPos[3] = {recastStart.X, recastStart.Y, recastStart.Z};
-    dtStatus result = findNearestPoly(recastStartPos, &startRef, nullptr);
-    if (result != DT_SUCCESS || startRef == 0) {
-        Logger::log(NK_ERROR,
-            ("PFLineBlocked: Could not find area for start pos (" + std::to_string(recastStartPos[0]) + ", " +
-                std::to_string(recastStartPos[1]) + ", " + std::to_string(recastStartPos[2]) + ")")
-                .c_str());
-        return true;
+    if (const dtStatus status =
+            navMeshQuery->findNearestPoly(recastStartPos, halfExtents, queryFilterUsed, &startRef, startNearest);
+        dtStatusFailed(status) || startRef == 0) {
+        return false;
     }
 
-    dtPolyRef endRef;
+    dtPolyRef endRef = 0;
+    float endNearest[3];
     const float recastEndPos[3] = {recastEnd.X, recastEnd.Y, recastEnd.Z};
-    result = findNearestPoly(recastEndPos, &endRef, nullptr);
-    if (result != DT_SUCCESS || endRef == 0) {
-        Logger::log(NK_ERROR,
-            ("PFLineBlocked: Could not find area for end pos (" + std::to_string(recastEndPos[0]) + ", " +
-                std::to_string(recastEndPos[1]) + ", " + std::to_string(recastEndPos[2]) + ")")
-                .c_str());
-        return true;
-    }
-
-    if (startRef == endRef) {
+    if (const dtStatus status =
+            navMeshQuery->findNearestPoly(recastEndPos, halfExtents, queryFilterUsed, &endRef, endNearest);
+        dtStatusFailed(status) || endRef == 0) {
         return false;
     }
 
-    const Vec3 middle = {(recastStart.X + recastEnd.X) / 2.0f, (recastStart.Y + recastEnd.Y) / 2.0f,
-        (recastStart.Z + recastEnd.Z) / 2.0f};
-    dtPolyRef middleRef;
-    const float recastMiddlePos[3] = {middle.X, middle.Y, middle.Z};
-    result = findNearestPoly(recastMiddlePos, &middleRef, nullptr);
-    if (result != DT_SUCCESS) {
+    int pathCount = 0;
+    dtPolyRef path[128];
+    // Use the actual waypoint positions for pathfinding, not the nearest points on the polygons.
+    // The nearest points can be far from the actual waypoints when they're near polygon edges,
+    // causing incorrect path cost calculations in large triangles.
+    if (const dtStatus pathStatus = navMeshQuery->findPath(
+            startRef, endRef, recastStartPos, recastEndPos, queryFilterUsed, path, &pathCount, 128, maxPathCost);
+        dtStatusSucceed(pathStatus) && pathCount > 0 && path[pathCount - 1] == endRef) {
         return true;
     }
-
-    const float middlePosRecast[3] = {middle.X, middle.Y, middle.Z};
-    constexpr float radius = 2.25f;
-
-    dtPolyRef resultRef[20];
-    dtPolyRef resultParent[20];
-    float resultCost[20];
-    int resultCount;
-    constexpr int maxResult = 20;
-
-    navQuery->findPolysAroundCircle(
-        startRef, middlePosRecast, radius, filter, resultRef, resultParent, resultCost, &resultCount, maxResult);
-    std::queue<dtPolyRef> polyQueue;
-    std::map<dtPolyRef, bool> pathFoundForPoly;
-    polyQueue.push(middleRef);
-    pathFoundForPoly[middleRef] = true;
-    const dtNavMesh* cmesh = sample->getNavMesh();
-    while (!polyQueue.empty()) {
-        const dtPolyRef currentPolyRef = polyQueue.front();
-        polyQueue.pop();
-        const unsigned int tileIndex = mesh->decodePolyIdTile(currentPolyRef);
-        const unsigned int polyIndex = mesh->decodePolyIdPoly(currentPolyRef);
-        const dtMeshTile* tile = cmesh->getTile(tileIndex);
-        const dtPoly& poly = tile->polys[polyIndex];
-        for (unsigned int linkIndex = poly.firstLink; linkIndex != DT_NULL_LINK;
-            linkIndex = tile->links[linkIndex].next) {
-            const dtLink& link = tile->links[linkIndex];
-            const dtMeshTile* targetTile = nullptr;
-            const dtPoly* targetPoly = nullptr;
-            mesh->getTileAndPolyByRef(link.ref, &targetTile, &targetPoly);
-            if (targetTile && targetPoly) {
-                int targetTileIndex = -1;
-                for (int i = 0; i < mesh->getMaxTiles(); ++i) {
-                    if (cmesh->getTile(i) == targetTile) {
-                        targetTileIndex = i;
-                        break;
-                    }
-                }
-                if (targetTileIndex != -1) {
-                    int targetPolyIndex = -1;
-                    for (int i = 0; i < targetTile->header->polyCount; ++i) {
-                        if (&targetTile->polys[i] == targetPoly) {
-                            targetPolyIndex = i;
-                            break;
-                        }
-                    }
-                    if (targetPolyIndex != -1) {
-                        const dtPolyRef adjacentPolyRef =
-                            mesh->encodePolyId(targetTile->salt, targetTileIndex, targetPolyIndex);
-                        if (!pathFoundForPoly.contains(adjacentPolyRef) && poly.flags != SAMPLE_POLYFLAGS_DISABLED) {
-                            for (int i = 0; i < resultCount; i++) {
-                                if (resultRef[i] == adjacentPolyRef) {
-                                    // if (resultCost[i] < radius * 2) {
-                                    pathFoundForPoly[adjacentPolyRef] = true;
-                                    polyQueue.push(adjacentPolyRef);
-                                    break;
-                                    // }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if (pathFoundForPoly.contains(startRef) && pathFoundForPoly.contains(endRef) && pathFoundForPoly[startRef] &&
-        pathFoundForPoly[endRef]) {
-        return false;
-    }
-    return true;
+    return false;
 }
 
 dtPolyRef RecastAdapter::getAdjacentPoly(const dtPolyRef polyRef, const int edgeIndex) const {
@@ -1313,7 +1244,7 @@ std::vector<dtPolyRef> RecastAdapter::getClosestReachablePolys(
         dtPolyRef path[128];
 
         if (const dtStatus pathStatus =
-                navQuery->findPath(start, endRef, startRecastPos, endRecastPos, filter, path, &pathCount, 128);
+                navQuery->findPath(start, endRef, startRecastPos, endRecastPos, filter, path, &pathCount, 128, 3.19f);
             dtStatusSucceed(pathStatus) && pathCount > 0 && path[pathCount - 1] == endRef) {
             polys.push_back(endRef);
         }

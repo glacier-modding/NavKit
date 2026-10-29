@@ -1,0 +1,119 @@
+diff --git a/Detour/Include/DetourNavMeshQuery.h b/Detour/Include/DetourNavMeshQuery.h
+index 101b3c8..2fc6577 100644
+--- a/Detour/Include/DetourNavMeshQuery.h
++++ b/Detour/Include/DetourNavMeshQuery.h
+@@ -21,6 +21,7 @@
+ 
+ #include "DetourNavMesh.h"
+ #include "DetourStatus.h"
++#include <float.h>
+ 
+ 
+ // Define DT_VIRTUAL_QUERYFILTER if you wish to derive a custom filter from dtQueryFilter.
+@@ -187,10 +188,11 @@ public:
+ 	///  							[(polyRef) * @p pathCount]
+ 	///  @param[out]	pathCount	The number of polygons returned in the @p path array.
+ 	///  @param[in]		maxPath		The maximum number of polygons the @p path array can hold. [Limit: >= 1]
++	///  @param[in]			maxCost		Maximum path cost. Polygons that can only be reached above this cost are never visited, and the final corridor is validated against the budget using the length of the string-pulled (funnel) path between the two positions; if the walked distance exceeds the budget, the result is demoted to a partial path ending at the closest reachable polygon. Use FLT_MAX for no limit.
+ 	dtStatus findPath(dtPolyRef startRef, dtPolyRef endRef,
+ 					  const float* startPos, const float* endPos,
+ 					  const dtQueryFilter* filter,
+-					  dtPolyRef* path, int* pathCount, const int maxPath) const;
++					  dtPolyRef* path, int* pathCount, const int maxPath, const float maxCost = FLT_MAX) const;
+ 
+ 	/// Finds the straight path from the start to the end position within the polygon corridor.
+ 	///  @param[in]		startPos			Path start position. [(x, y, z)]
+diff --git a/Detour/Source/DetourNavMeshQuery.cpp b/Detour/Source/DetourNavMeshQuery.cpp
+index cebe26b..a0f04ae 100644
+--- a/Detour/Source/DetourNavMeshQuery.cpp
++++ b/Detour/Source/DetourNavMeshQuery.cpp
+@@ -973,7 +973,7 @@ dtStatus dtNavMeshQuery::queryPolygons(const float* center, const float* halfExt
+ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
+ 								  const float* startPos, const float* endPos,
+ 								  const dtQueryFilter* filter,
+-								  dtPolyRef* path, int* pathCount, const int maxPath) const
++								  dtPolyRef* path, int* pathCount, const int maxPath, const float maxCost) const
+ {
+ 	dtAssert(m_nav);
+ 	dtAssert(m_nodePool);
+@@ -995,6 +995,13 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
+ 
+ 	if (startRef == endRef)
+ 	{
++		// A single polygon can hold two points arbitrarily far apart, so the trivial in-polygon path can
++		// still be over budget. The string-pulled path within one polygon is the straight segment between
++		// the points, so the straight distance decides the budget here as well. A small epsilon allows for
++		// floating-point precision differences when comparing diagonal grid distances.
++		constexpr float costEpsilon = 0.01f;
++		if (maxCost < FLT_MAX && dtVdist(startPos, endPos) > maxCost + costEpsilon)
++			return DT_FAILURE;
+ 		path[0] = startRef;
+ 		*pathCount = 1;
+ 		return DT_SUCCESS;
+@@ -1153,6 +1160,66 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
+ 		}
+ 	}
+ 
++	// Re-validate the goal against the cost budget. The search accumulates costs between portal edge
++	// midpoints, which walks farther than the actual walkable route when polygons are large: the search
++	// corridor consists of edge midpoints, while the string-pulled path can cover large polygons directly.
++	// The found corridor is the cheapest one to the goal and the string-pulled path along it is the shortest
++	// walkable route between the two positions, so its length decides whether the goal is within the budget.
++	// When it is not, the goal is demoted to its parent polygon, leaving a partial path as the result.
++	if (maxCost < FLT_MAX && lastBestNode->id == endRef)
++	{
++		// Collect the corridor polygon references between the start and the goal node.
++		int corridorCount = 0;
++		for (dtNode* node = lastBestNode; node; node = node->pidx ? m_nodePool->getNodeAtIdx(node->pidx) : 0)
++			corridorCount++;
++		dtPolyRef* corridor = (dtPolyRef*)dtAlloc((size_t)(corridorCount > 0 ? corridorCount : 1) * sizeof(dtPolyRef), DT_ALLOC_PERM);
++		const int maxStraightPoints = (corridorCount + 2) * 2 + 1;
++		float* straightPath = (float*)dtAlloc((size_t)maxStraightPoints * 3 * sizeof(float), DT_ALLOC_PERM);
++		if (corridor && straightPath)
++		{
++			int corridorIndex = corridorCount;
++			for (dtNode* node = lastBestNode; node && corridorIndex > 0;
++				 node = node->pidx ? m_nodePool->getNodeAtIdx(node->pidx) : 0)
++				corridor[--corridorIndex] = node->id;
++
++			int straightCount = 0;
++			const dtStatus straightStatus =
++				findStraightPath(startPos, endPos, corridor, corridorCount, straightPath, 0, 0, &straightCount,
++								 maxStraightPoints);
++			if (dtStatusSucceed(straightStatus) && straightCount >= 2)
++			{
++				float walkedPathCost = 0;
++				for (int i = 0; i < straightCount - 1; ++i)
++					walkedPathCost += dtVdist(&straightPath[i * 3], &straightPath[(i + 1) * 3]);
++
++				constexpr float costEpsilon = 0.01f;
++				// The goal cannot be demoted twice: the parent polygon of the goal is returned as the last
++				// polygon of a partial result, and the partial result status below makes callers treat it as
++				// not reaching the goal.
++				if (walkedPathCost > maxCost + costEpsilon)
++				{
++					if (lastBestNode->pidx)
++						lastBestNode = m_nodePool->getNodeAtIdx(lastBestNode->pidx);
++					else
++						lastBestNode = startNode;
++				}
++			}
++			else
++			{
++				// Without a valid string-pulled path the result cannot be validated; treat it as over budget
++				// and leave a partial result.
++				if (lastBestNode->pidx)
++					lastBestNode = m_nodePool->getNodeAtIdx(lastBestNode->pidx);
++				else
++					lastBestNode = startNode;
++			}
++		}
++		if (corridor)
++			dtFree(corridor);
++		if (straightPath)
++			dtFree(straightPath);
++	}
++
+ 	dtStatus status = getPathToNode(lastBestNode, path, pathCount, maxPath);
+ 
+ 	if (lastBestNode->id != endRef)
