@@ -101,7 +101,7 @@ wxMenuBar* Menu::createMenuBar() {
     build->AppendSeparator();
     build->Append(IDM_BUILD_NAVP, "Build &Navp from GLB and Scene");
     build->AppendSeparator();
-    build->Append(IDM_BUILD_AIRG, "Build &Airg from Navp");
+    build->Append(IDM_BUILD_AIRG, "Build &Airg from Navp and GLB");
     bar->Append(build, "&Build");
 
     auto* help = new wxMenu();

@@ -203,7 +203,7 @@ void showHelpDialog() {
                     "Creates a navigation mesh from the loaded scene geometry and GLB.",
                     "Load a scene and GLB, generate Recast input geometry (for example, by building a GLB from the "
                     "scene), and make sure no Navp or AIRG build is in progress."},
-                {"Build Airg from Navp", "Builds AIRG grid and waypoint data from a Navp.",
+                {"Build Airg from Navp and GLB", "Builds AIRG grid and waypoint data from a Navp and GLB.",
                     "Generates AIRG grid and waypoint data from the loaded Navp.",
                     "Load a Navp and make sure no AIRG load, save, or build is in progress."},
             }},
