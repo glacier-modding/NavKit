@@ -135,8 +135,19 @@ void InputHandler::handleMouseMove(const int x, const int y) {
     if (rotate) {
         const auto dx = static_cast<float>(mousePos[0] - origMousePos[0]);
         const auto dy = static_cast<float>(mousePos[1] - origMousePos[1]);
-        renderer.cameraEulers[0] = renderer.origCameraEulers[0] - dy * CAMERA_ROTATION_SENSITIVITY;
+        const float cameraEulersY = renderer.origCameraEulers[0] - dy * CAMERA_ROTATION_SENSITIVITY;
+        renderer.cameraEulers[0] = std::clamp(cameraEulersY, -89.99f, 89.99f);
         renderer.cameraEulers[1] = renderer.origCameraEulers[1] + dx * CAMERA_ROTATION_SENSITIVITY;
+        if (renderer.cameraEulers[0] != cameraEulersY) {
+            origMousePos[1] = mousePos[1];
+            renderer.origCameraEulers[0] = renderer.cameraEulers[0];
+        }
+        if (renderer.cameraEulers[1] > 180.0f) {
+            renderer.cameraEulers[1] -= 360.0f;
+        }
+        if (renderer.cameraEulers[1] < -180.0f) {
+            renderer.cameraEulers[1] += 360.0f;
+        }
         if (dx * dx + dy * dy > 3 * 3) {
             movedDuringRotate = true;
         }
