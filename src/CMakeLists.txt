@@ -22,6 +22,7 @@ set(NAVWEAKNESS_SOURCES
 )
 set(MODULE_SOURCES
         module/Airg.cpp
+        module/Crmd.cpp
         module/GameConnection.cpp
         module/Grid.cpp
         module/Gui.cpp

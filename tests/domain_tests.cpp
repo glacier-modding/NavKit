@@ -5,6 +5,7 @@
 #include "../include/NavKit/model/ReasoningGrid.h"
 #include "../include/NavKit/model/VisionData.h"
 #include "../include/NavKit/module/Airg.h"
+#include "../include/NavKit/module/Crmd.h"
 #include "../include/NavKit/module/Grid.h"
 #include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/NavKitSettings.h"
@@ -20,6 +21,7 @@
 #include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Pathfinding.h"
 #include "../include/RecastDemo/InputGeom.h"
+#include "../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
@@ -462,6 +464,25 @@ namespace {
         check(threw, "invalid AIRG input should throw a clear parse error");
         check(target.m_nNodeCount == 42, "failed AIRG load should preserve the existing grid");
         std::filesystem::remove(path);
+    }
+
+    void testCrmdFixtureLoading() {
+        Crmd crmd;
+        crmd.loadCrowdMapData("tests/resources/yacht.crmd");
+
+        check(crmd.crmdLoaded, "CRMD fixture should load successfully");
+        check(crmd.crowdMapData != nullptr, "CRMD fixture should populate crowd-map data");
+        check(crmd.crowdMapData->m_nGridSizeX == 163 && crmd.crowdMapData->m_nGridSizeY == 249,
+            "CRMD fixture should load grid dimensions");
+        check(crmd.crowdMapData->m_nCellSizeX == 162 && crmd.crowdMapData->m_nCellSizeY == 248,
+            "CRMD fixture should load cell dimensions separately from map dimensions");
+        check(crmd.crowdMapData->m_GridMap.size() == 163 * 249, "CRMD fixture should load grid map cells");
+        check(crmd.crowdMapData->m_CellFlags.size() == 314, "CRMD fixture should load cell flags");
+        check(crmd.crowdMapData->m_CellGroups.size() == 314, "CRMD fixture should load cell groups");
+        check(crmd.crowdMapData->m_aFlowChannels.size() == 6, "CRMD fixture should load flow channels");
+
+        delete crmd.crowdMapData;
+        crmd.crowdMapData = nullptr;
     }
 
     void testWaypointConnectivityMapGeneration() {
@@ -1247,6 +1268,7 @@ void runDomainTests() {
     run("Grid bounds from AIRG", testGridBoundsFromAirg);
     run("Reasoning grid AIRG persistence", testReasoningGridAirgRoundTrip);
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
+    run("CRMD binary fixture loading", testCrmdFixtureLoading);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);

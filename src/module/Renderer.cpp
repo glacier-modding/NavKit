@@ -1,5 +1,6 @@
 #include "../../include/NavKit/NavKitConfig.h"
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -359,6 +360,9 @@ void Renderer::renderFrame() {
     if (const Airg& airg = Airg::getInstance(); airg.airgLoaded && airg.showRecastDebugInfo) {
         const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
         recastAirgAdapter.renderRecastNavmesh(true);
+    }
+    if (Crmd& crmd = Crmd::getInstance(); crmd.crmdLoaded && crmd.showCrmd) {
+        crmd.renderCrowdMapData();
     }
 
     const Grid grid = Grid::getInstance();

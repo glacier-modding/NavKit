@@ -3,6 +3,7 @@
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/HelpDialog.h"
@@ -28,6 +29,7 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_NEW_SCENE_MESH, "New Scene &Mesh");
     file->Append(IDM_FILE_NEW_NAVP, "New &Navp");
     file->Append(IDM_FILE_NEW_AIRG, "New &Airg");
+    file->Append(IDM_FILE_NEW_CRMD, "New &Crmd");
     file->AppendSeparator();
     file->Append(IDM_FILE_OPEN_SCENE, "Open &Scene");
     file->Append(IDM_FILE_OPEN_GLB, "Open &GLB");
@@ -35,6 +37,8 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_OPEN_NAVP_FROM_RPKG, "Open Navp from &Rpkg");
     file->Append(IDM_FILE_OPEN_AIRG, "Open &Airg");
     file->Append(IDM_FILE_OPEN_AIRG_FROM_RPKG, "Open Airg from &Rpkg");
+    file->Append(IDM_FILE_OPEN_CRMD, "Open &Crmd");
+    file->Append(IDM_FILE_OPEN_CRMD_FROM_RPKG, "Open Crmd from &Rpkg");
     file->AppendSeparator();
     file->Append(IDM_FILE_SAVE_SCENE, "Save &Scene");
     file->Append(IDM_FILE_SAVE_GLB, "Save &GLB");
@@ -81,6 +85,8 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_VISION_DATA, "Airg Cell: Vision Data");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_LAYER, "Airg Cell: Layer");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_DEAD_END, "Airg Cell: Dead End");
+    view->AppendSeparator();
+    view->AppendCheckItem(IDM_VIEW_CRMD_SHOW_CRMD, "Show &CRMD")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
     view->AppendSeparator();
@@ -175,6 +181,7 @@ void Menu::updateMenuState() {
     const SceneExtract& sceneExtract = SceneExtract::getInstance();
     const Airg& airg = Airg::getInstance();
     const Navp& navp = Navp::getInstance();
+    const Crmd& crmd = Crmd::getInstance();
     const SceneMesh& obj = SceneMesh::getInstance();
     const bool isSceneLoaded = scene.sceneLoaded;
     const bool isNavpLoaded = navp.navpLoaded;
@@ -185,6 +192,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
@@ -257,6 +265,11 @@ int Menu::handleMenuClicked(const int menuId) {
         updateMenuState();
         Logger::log(NK_DEBUG, "File -> New Airg clicked");
         break;
+    case IDM_FILE_NEW_CRMD:
+        Crmd::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New Crmd clicked");
+        break;
     case IDM_FILE_OPEN_SCENE:
         Scene::getInstance().handleOpenSceneClicked();
         Logger::log(NK_DEBUG, "File -> Open Scene clicked");
@@ -280,6 +293,14 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_OPEN_AIRG_FROM_RPKG:
         Airg::getInstance().showExtractAirgDialog();
         Logger::log(NK_DEBUG, "File -> Open Airg from Rpkg clicked");
+        break;
+    case IDM_FILE_OPEN_CRMD:
+        Crmd::getInstance().handleOpenCrmdClicked();
+        Logger::log(NK_DEBUG, "File -> Open Crmd clicked");
+        break;
+    case IDM_FILE_OPEN_CRMD_FROM_RPKG:
+        Crmd::getInstance().showExtractCrmdDialog();
+        Logger::log(NK_DEBUG, "File -> Open Crmd from Rpkg clicked");
         break;
     case IDM_FILE_SAVE_SCENE:
         Scene::getInstance().handleSaveSceneClicked();
@@ -360,6 +381,9 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_VIEW_AIRG_SHOW_AIRG:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg, "Show Airg");
+        break;
+    case IDM_VIEW_CRMD_SHOW_CRMD:
+        handleCheckboxMenuItem(IDM_VIEW_CRMD_SHOW_CRMD, Crmd::getInstance().showCrmd, "Show Crmd");
         break;
     case IDM_VIEW_AIRG_SHOW_INDICES:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_INDICES, Airg::getInstance().showAirgIndices, "Show Airg Indices");

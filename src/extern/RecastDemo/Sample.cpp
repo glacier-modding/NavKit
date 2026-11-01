@@ -162,7 +162,7 @@ void Sample::resetCommonSettings() {
     m_cellHeight = 0.1f;
     m_agentHeight = 1.8f;
     m_agentRadius = 0.2f;
-    m_agentMaxClimb = 0.41f;
+    m_agentMaxClimb = 0.30f;
     m_agentMaxSlope = 45.0f;
     m_regionMinSize = 25;
     m_regionMergeSize = 30;

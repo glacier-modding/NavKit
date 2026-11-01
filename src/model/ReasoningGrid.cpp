@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include "../../include/NavKit/util/Threading.h"
 
-void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, const Vec4&)>& unblocked,
+void ReasoningGrid::generateVisionData(const std::function<bool(const Math::Vec4&, const Math::Vec4&)>& unblocked,
     const float lowHeight, const float highHeight, const std::function<void(size_t, size_t)>& progress) {
     if (!unblocked || !std::isfinite(m_Properties.fGridSpacing) || m_Properties.fGridSpacing <= 0 ||
         m_Properties.nVisibilityRange > 512 || !std::isfinite(lowHeight) || !std::isfinite(highHeight) ||
@@ -110,7 +110,7 @@ void ReasoningGrid::generateVisionData(const std::function<bool(const Vec4&, con
             const auto& to = m_WaypointList[target.index];
             const size_t layer = to.nLayerIndex == from.nLayerIndex ? 0 : layers.at(to.nLayerIndex);
             for (size_t channel = 0; channel < 2; ++channel) {
-                Vec4 a = from.vPos, b = to.vPos;
+                Math::Vec4 a = from.vPos, b = to.vPos;
                 const float height = channel == 0 ? highHeight : lowHeight;
                 a.z += height;
                 b.z += height;
@@ -543,8 +543,8 @@ namespace {
         }
     }
 
-    Vec4 readVec4(std::istream& stream) {
-        return Vec4{
+    Math::Vec4 readVec4(std::istream& stream) {
+        return Math::Vec4{
             readValue<float>(stream), readValue<float>(stream), readValue<float>(stream), readValue<float>(stream)};
     }
 

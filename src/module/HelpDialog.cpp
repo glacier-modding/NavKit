@@ -46,7 +46,7 @@ namespace {
 } // namespace
 
 void showHelpDialog() {
-    const std::array<HelpPage, 8> pages = {{
+    const std::array<HelpPage, 9> pages = {{
         {"General",
             "NavKit helps you inspect and create navigation data for HITMAN: World of Assassination and 007 First "
             "Light.\nLoad a scene, NAVP, or AIRG file to explore it in the viewport, edit navigation data, or build "
@@ -63,6 +63,7 @@ void showHelpDialog() {
                 {"New Navp", "Clears the loaded NavPower navigation mesh.",
                     "Clears the loaded NavPower navigation mesh.", ""},
                 {"New Airg", "Clears the loaded AIRG file.", "Clears the loaded AIRG file.", ""},
+                {"New Crmd", "Clears the loaded CRMD file.", "Clears the loaded crowd-map data.", ""},
                 {"Open Scene", "Loads a NavKit scene file.",
                     "Provides scene geometry for inspection and as input to builds.", ""},
                 {"Open GLB", "Loads a glTF binary scene mesh.",
@@ -78,6 +79,12 @@ void showHelpDialog() {
                     "An AIRG load or save must not be in progress."},
                 {"Open Airg from Rpkg", "Opens a picker to extract and load an AIRG from game resource packages.",
                     "Loads game-packaged AIRG data directly, without a separate extraction step.",
+                    "Set the HITMAN game directory in NavKit Settings and use a recognized game version so the "
+                    "package index is ready."},
+                {"Open Crmd", "Loads a CRMD crowd-map file.",
+                    "Provides crowd-map cells, group data, and flow directions for viewport inspection.", ""},
+                {"Open Crmd from Rpkg", "Opens a picker to extract and load a CRMD from game resource packages.",
+                    "Loads game-packaged crowd-map data directly, without a separate manual extraction step.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version so the "
                     "package index is ready."},
                 {"Save Scene", "Saves the currently loaded scene.", "Preserves changes made to the scene.",
@@ -148,6 +155,8 @@ void showHelpDialog() {
                     "Displays intermediate geometry used by Recast for the Navp.", ""},
                 {"Show Airg", "Shows or hides loaded AIRG data.", "Displays AIRG cells and waypoints for inspection.",
                     ""},
+                {"Show Crmd", "Shows or hides the loaded CRMD crowd map.",
+                    "Displays the CRMD map and cell layers, with flow arrows only on walkable cells.", ""},
                 {"Show Airg Indices", "Shows or hides AIRG cell and waypoint indices.",
                     "Displays indices to identify AIRG elements during inspection and editing.", ""},
                 {"Show Grid", "Shows or hides the generated grid overlay.",
@@ -206,6 +215,34 @@ void showHelpDialog() {
                 {"Build Airg from Navp and GLB", "Builds AIRG grid and waypoint data from a Navp and GLB.",
                     "Generates AIRG grid and waypoint data from the loaded Navp.",
                     "Load a Navp and make sure no AIRG load, save, or build is in progress."},
+            }},
+        {"CRMD",
+            "CRMD overlays show crowd-map grid data. Open a CRMD file and enable View > Show CRMD to display it. "
+            "Colors identify different data layers; they do not represent height or confidence.",
+            {
+                {"Blue cells", "Show the CRMD map grid.",
+                    "Brighter blue marks map points flagged as on the navigation grid; darker blue marks points not "
+                    "flagged on it.",
+                    ""},
+                {"Green cells", "Show walkable cell flags.",
+                    "Green marks cells with the WALKABLE flag. Red marks restricted cells, pink marks teleport "
+                    "entrance/exit flags, and amber marks other flagged cells.",
+                    ""},
+                {"Purple and other inset squares", "Show crowd-group membership.",
+                    "Each inset square is colored from its cell-group value. The palette repeats, so colors identify "
+                    "groups visually but are not unique group labels. They are drawn slightly above the base cells "
+                    "to keep the group overlay distinct.",
+                    ""},
+                {"Flow arrows", "Show the crowd-flow directions, colored by channel.",
+                    "Each flow channel uses a distinct repeating color. Arrow length is a fixed visual scale, not "
+                    "speed or flow cost. Arrows are hidden where the cell is not walkable; overlapping channels "
+                    "can draw multiple differently colored arrows in one walkable cell. Arrows are drawn above "
+                    "the cell-group squares.",
+                    ""},
+                {"Arrow orientation", "Shows the corrected direction.",
+                    "NavKit offsets each 8-bit flow-vector index by half a turn before drawing it. This reverses "
+                    "the encoded vector and matches the verified direction in the yacht CRMD reference image.",
+                    ""},
             }},
         {"Help", "Find help for NavKit or check the installed version.",
             {

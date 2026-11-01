@@ -13,6 +13,7 @@
 #include <DetourNavMeshQuery.h>
 
 #include "../../include/NavKit/util/GridGenerator.h"
+#include "../../include/NavKit/util/Math.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Grid.h"
@@ -138,7 +139,7 @@ void GridGenerator::addVisibilityData(ReasoningGrid* grid) {
         triangles[i] = {origin, vertex(indices[1]) - origin, vertex(indices[2]) - origin};
     });
     grid->generateVisionData(
-        [&](const Vec4& from, const Vec4& to) {
+        [&](const Math::Vec4& from, const Math::Vec4& to) {
             const Vec3 a = RecastAdapter::convertFromNavPowerToRecast({from.x, from.y, from.z});
             const Vec3 b = RecastAdapter::convertFromNavPowerToRecast({to.x, to.y, to.z});
             const glm::vec3 origin(a.X, a.Y, a.Z), end(b.X, b.Y, b.Z);
@@ -376,7 +377,7 @@ void GridGenerator::GenerateWaypointConnectivityMap() {
                 // Calculate the grid index based on waypoint position and grid spacing
                 const float fGridSpacing = airg.reasoningGrid->m_Properties.fGridSpacing;
                 const float4 vPos = {point.x, point.y, point.z, 0.0};
-                const Vec4 vMinVec4 = airg.reasoningGrid->m_Properties.vMin;
+                const Math::Vec4 vMinVec4 = airg.reasoningGrid->m_Properties.vMin;
                 const float4 vMin = {vMinVec4.x, vMinVec4.y, vMinVec4.z, 0.0};
 
                 const int x = floor((vPos.x - vMin.x) / fGridSpacing);

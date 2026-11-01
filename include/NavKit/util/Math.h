@@ -13,6 +13,14 @@ namespace Math {
         float mD;
     };
 
+    class Vec4 {
+    public:
+        float x;
+        float y;
+        float z;
+        float w;
+    };
+
     float distanceSquared(const float4& a, const float4& b);
 
     float distanceSquared(const float4& v);

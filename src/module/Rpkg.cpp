@@ -7,8 +7,9 @@
 #include <cpptrace/from_current.hpp>
 
 #include "../../include/QuickDigest/quickdigest5.hpp"
-#include "../../include/NavKit/module/Airg.h"
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
+#include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
@@ -78,6 +79,20 @@ void Rpkg::initExtractionData() {
                             Airg::airgHashIoiStringMap[airgHash] = ioiString;
                         }
                     }
+                    if (line.find(".CRMD") != std::string::npos) {
+                        if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
+                            std::string hashPart = line.substr(0, commaPos);
+                            std::string ioiString = line.substr(commaPos + 1);
+                            if (!ioiString.empty() && ioiString.back() == '\r') {
+                                ioiString.pop_back();
+                            }
+                            const size_t dotPos = hashPart.find('.');
+                            const std::string crmdHash =
+                                dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
+                            std::lock_guard lock(Crmd::crmdHashIoiStringMapMutex);
+                            Crmd::crmdHashIoiStringMap[crmdHash] = ioiString;
+                        }
+                    }
                 }
             }
             Logger::log(NK_INFO, "Done reading filtered hash list.");
@@ -142,6 +157,33 @@ void Rpkg::initExtractionData() {
             }
         });
 
+        auto crmdThread = std::async(std::launch::deferred, []() {
+            const auto crmdFilesInRpkgsRustStringList =
+                get_all_resources_hashes_by_type_from_rpkg_files(partitionManager, "CRMD", Logger::rustLogCallback);
+            std::lock_guard lock(Crmd::crmdHashIoiStringMapMutex);
+            std::set<std::string> crmdFilesInRpkgs;
+
+            for (int i = 0; i < crmdFilesInRpkgsRustStringList->length; i++) {
+                crmdFilesInRpkgs.insert(std::string(get_string_from_list(crmdFilesInRpkgsRustStringList, i)));
+            }
+            // Insert Crmd files from RPKG into map
+            for (const auto& crmdHash : crmdFilesInRpkgs) {
+                if (!Crmd::crmdHashIoiStringMap.contains(crmdHash)) {
+                    Crmd::crmdHashIoiStringMap[crmdHash] = crmdHash;
+                }
+            }
+            std::set<std::string> toErase;
+            // Remove Crmd files not in RPKG from map
+            for (const auto& crmdHash : Crmd::crmdHashIoiStringMap | std::views::keys) {
+                if (!crmdFilesInRpkgs.contains(crmdHash)) {
+                    toErase.insert(crmdHash);
+                }
+            }
+            for (const auto& crmdHash : toErase) {
+                Crmd::crmdHashIoiStringMap.erase(crmdHash);
+            }
+        });
+
         // Disabling for now since it's not actually used yet
         // std::jthread hashListThread([]() {
         //     Logger::log(NK_INFO, "Getting full hash list.");
@@ -149,6 +191,7 @@ void Rpkg::initExtractionData() {
         // });
 
         airgThread.get();
+        crmdThread.get();
         navpThread.get();
         // hashListThread.join();
 
@@ -254,6 +297,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
         const std::string resourceFolder = (std::filesystem::u8path(navKitSettings.outputFolder) /
             (type == NAVP          ? "navp"
                     : type == AIRG ? "airg"
+                    : type == CRMD ? "crmd"
                                    : "tga"))
                                                .string();
         std::vector<const char*> hashPtrs(hashes.size());
@@ -264,6 +308,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
             resourceFolder.c_str(),
             type == NAVP       ? "NAVP"
                 : type == AIRG ? "AIRG"
+                : type == CRMD ? "CRMD"
                                : "TEXT",
             Logger::rustLogCallback);
     }

@@ -5,6 +5,7 @@
 #include <DetourNavMeshQuery.h>
 #include <cfloat>
 
+#include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Threading.h"
 #include <atomic>
 #include <chrono>
@@ -238,8 +239,8 @@ namespace {
         ReasoningGrid grid;
         grid.m_Properties.fGridSpacing = 1;
         grid.m_Properties.nVisibilityRange = 1;
-        for (const auto pos : {Vec4{0.25f, 0.25f, 0, 1}, Vec4{1.25f, 0.25f, 0, 1}, Vec4{1.25f, 1.25f, 2, 1},
-                 Vec4{3.25f, 0.25f, 0, 1}, Vec4{1.3f, 0.3f, 8, 1}}) {
+        for (const auto pos : {Math::Vec4{0.25f, 0.25f, 0, 1}, Math::Vec4{1.25f, 0.25f, 0, 1},
+                 Math::Vec4{1.25f, 1.25f, 2, 1}, Math::Vec4{3.25f, 0.25f, 0, 1}, Math::Vec4{1.3f, 0.3f, 8, 1}}) {
             Waypoint waypoint;
             waypoint.vPos = pos;
             grid.m_WaypointList.push_back(waypoint);
@@ -247,7 +248,7 @@ namespace {
         grid.m_WaypointList[2].nLayerIndex = -7;
         grid.m_nNodeCount = static_cast<uint32_t>(grid.m_WaypointList.size());
         std::atomic<int> rays{0};
-        grid.generateVisionData([&](const Vec4& a, const Vec4& b) {
+        grid.generateVisionData([&](const Math::Vec4& a, const Math::Vec4& b) {
             ++rays;
             // A short wall at x=0.75 blocks the low ray but lets the high ray pass.
             if ((a.x < 0.75f) == (b.x < 0.75f))
@@ -278,7 +279,7 @@ namespace {
         require(loaded.getVisibility(0, 2)->high, "generated layer lookup failed after serialization");
         const auto original = grid.m_pVisibilityData;
         const auto savedThreads = Threading::getMaxThreads();
-        const auto ray = [](const Vec4& a, const Vec4& b) {
+        const auto ray = [](const Math::Vec4& a, const Math::Vec4& b) {
             if ((a.x < 0.75f) == (b.x < 0.75f))
                 return true;
             const float t = (0.75f - a.x) / (b.x - a.x);
@@ -292,7 +293,8 @@ namespace {
         require(grid.m_pVisibilityData == original, "parallel visibility differs");
         bool failed = false;
         try {
-            grid.generateVisionData([](const Vec4&, const Vec4&) -> bool { throw std::runtime_error("ray failure"); });
+            grid.generateVisionData(
+                [](const Math::Vec4&, const Math::Vec4&) -> bool { throw std::runtime_error("ray failure"); });
         } catch (const std::runtime_error&) {
             failed = true;
         }
@@ -315,7 +317,7 @@ namespace {
                 grid.m_WaypointList.push_back(waypoint);
             }
         }
-        const auto ray = [](const Vec4& a, const Vec4& b) { return a.x <= b.x || a.z > 1; };
+        const auto ray = [](const Math::Vec4& a, const Math::Vec4& b) { return a.x <= b.x || a.z > 1; };
         Threading::setMaxThreads(1);
         grid.generateVisionData(ray);
         const auto expected = grid.m_pVisibilityData;

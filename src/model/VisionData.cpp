@@ -42,24 +42,24 @@ VisionData VisionData::GetVisionDataType(int size) {
     }
 }
 
-Vec4 VisionData::getColor() const {
-    // return Vec4(0.0, 0.0, 1.0, 0.6);
+Math::Vec4 VisionData::getColor() const {
+    // return Math::Vec4(0.0, 0.0, 1.0, 0.6);
     switch (visionDataType) {
     case SIZE_556:
-        return Vec4(0.0, 0.0, 1.0, 0.6);
+        return Math::Vec4(0.0, 0.0, 1.0, 0.6);
     case SIZE_1110:
-        return Vec4(1.0, 0.0, 0.0, 0.6);
+        return Math::Vec4(1.0, 0.0, 0.0, 0.6);
     case SIZE_1664:
-        return Vec4(0.5, 0.0, 1.0, 0.6);
+        return Math::Vec4(0.5, 0.0, 1.0, 0.6);
     case SIZE_2218:
-        return Vec4(1.0, 1.0, 0.0, 0.6);
+        return Math::Vec4(1.0, 1.0, 0.0, 0.6);
     case SIZE_2772:
-        return Vec4(1.0, 0.0, 1.0, 0.6);
+        return Math::Vec4(1.0, 0.0, 1.0, 0.6);
     case SIZE_3326:
-        return Vec4(0.0, 1.0, 1.0, 0.6);
+        return Math::Vec4(0.0, 1.0, 1.0, 0.6);
     case SIZE_3880:
-        return Vec4(1.0, 1.0, 1.0, 0.6);
+        return Math::Vec4(1.0, 1.0, 1.0, 0.6);
     default:
-        return Vec4(0.0, 0.0, 0.0, 0.6);
+        return Math::Vec4(0.0, 0.0, 0.0, 0.6);
     }
 }

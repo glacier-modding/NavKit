@@ -1,9 +1,8 @@
 #pragma once
 
 #include <string>
+#include "../util/Math.h"
 #include "ReasoningGrid.h"
-
-class Vec4;
 
 enum VisionDataType : uint8_t {
     SIZE_556,
@@ -32,7 +31,7 @@ public:
 
     std::string getName() const;
 
-    Vec4 getColor() const;
+    Math::Vec4 getColor() const;
 
     static VisionData GetVisionDataType(int size);
 

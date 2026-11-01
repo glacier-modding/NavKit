@@ -148,3 +148,65 @@
 0081D643B02CE965.AIRG,[assembly:/_pro/scenes/missions/wet/scene_rat_basic_scene.airg].pc_airg
 00CB081640EE08C4.AIRG,[assembly:/_pro/scenes/missions/wet/scene_wet_cavelion_scene.airg].pc_airg
 00EA052D43FBD657.AIRG,[assembly:/_pro/scenes/reference/features/setupexamples/traps/traps_setupexamples_scene.airg].pc_airg
+002AC9B4AF2940DD.CRMD,[assembly:/_pro/scenes/frontend/mainmenu__crowd_italy.crmd].pc_crmd
+00642C41F5FB8534.CRMD,[assembly:/_pro/scenes/missions/ancestral/scene_smoothsnake_gardencrowd.crmd].pc_crmd
+0000CAF4C7872E11.CRMD,[assembly:/_pro/scenes/missions/ancestral/scene_smoothsnake_parking lotcrowd.crmd].pc_crmd
+009F044BD89AD681.CRMD,[assembly:/_pro/scenes/missions/caged/mission_falcon/scene_falcon_sniper_crowd_riot.crmd].pc_crmd
+00C42B4067972616.CRMD,[assembly:/_pro/scenes/missions/coastaltown/_scene_mission_copperhead__crowd_italy.crmd].pc_crmd
+0055A78978578EF7.CRMD,[assembly:/_pro/scenes/missions/coastaltown/_scene_mission_mamba__crowd_italy.crmd].pc_crmd
+00D1D24E06CCCE70.CRMD,[assembly:/_pro/scenes/missions/coastaltown/_scene_mission_mamba_crowd.crmd].pc_crmd
+005A1318721681F2.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_fox_basic_b1crowd.crmd].pc_crmd
+0021B122C3CCC4A0.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_fox_basic_crowdentrance.crmd].pc_crmd
+00E4AEEEE52E2243.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_fox_basic_f0crowd.crmd].pc_crmd
+002067E0412796A8.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_fox_basic_fox_rave_crowd_unique.crmd].pc_crmd
+00C66A1F048B81D2.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_fox_tomorrowland_b1crowd.crmd].pc_crmd
+00D35AAC57647557.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_fox_tomorrowland_b1tmrland crowd.crmd].pc_crmd
+00B127940FB3BDB7.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_grasssnake_crowdentrance grasssnake.crmd].pc_crmd
+000410A5342EF862.CRMD,[assembly:/_pro/scenes/missions/edgy/mission_fox/scene_grasssnake_f0 crowdgrasssnake.crmd].pc_crmd
+00D9A221886A76F1.CRMD,[assembly:/_pro/scenes/missions/elegant/scene_llama_parking lotcrowd.crmd].pc_crmd
+00B7642B16DCE27B.CRMD,[assembly:/_pro/scenes/missions/elegant/scene_llama_restaurantcrowd.crmd].pc_crmd
+00A0FF49861C2CF9.CRMD,[assembly:/_pro/scenes/missions/elegant/scene_llama_tastingcrowd.crmd].pc_crmd
+00A0D219A899BB04.CRMD,[assembly:/_pro/scenes/missions/elegant/scene_llama_terrace crowd02.crmd].pc_crmd
+004179543C750BA5.CRMD,[assembly:/_pro/scenes/missions/elegant/scene_llama_terracecrowd.crmd].pc_crmd
+00E02428ED50F2D6.CRMD,[assembly:/_pro/scenes/missions/golden/mission_gecko/scene_gecko_basic_crowd_.crmd].pc_crmd
+00E12DEACBF81108.CRMD,[assembly:/_pro/scenes/missions/golden/mission_gecko/scene_gecko_basic_crowd_lowerfloor.crmd].pc_crmd
+00B0EE7F78935B79.CRMD,[assembly:/_pro/scenes/missions/golden/mission_gecko/scene_gecko_basic_crowd_lowerfloor_01.crmd].pc_crmd
+000E5EBC0913C0E0.CRMD,[assembly:/_pro/scenes/missions/golden/mission_gecko/scene_gecko_basic_crowd_lowerfloor_02.crmd].pc_crmd
+002E8518F3205F15.CRMD,[assembly:/_pro/scenes/missions/golden/mission_gecko/scene_gecko_basic_crowd_upperfloor.crmd].pc_crmd
+00D16DFBEF7ECD3E.CRMD,[assembly:/_pro/scenes/missions/hawk/scene_hawk_crowd.crmd].pc_crmd
+009275C207217E6E.CRMD,[assembly:/_pro/scenes/missions/hawk/scene_hawk_crowd2.crmd].pc_crmd
+008422F7151C8CEC.CRMD,[assembly:/_pro/scenes/missions/hawk/scene_hawk_crowd3.crmd].pc_crmd
+00B54F5F9B2FCDFB.CRMD,[assembly:/_pro/scenes/missions/hawk/scene_hawk_crowd4.crmd].pc_crmd
+00F9C61A1ED917E3.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_python_crowd_marketplace.crmd].pc_crmd
+00B67C40B03D0866.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_python_crowd_marrakesh_market.crmd].pc_crmd
+00AC6C3B0E7DB04B.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_python_crowd_plaza.crmd].pc_crmd
+0074C84201319D3B.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_spider_crowd_marketplace.crmd].pc_crmd
+0008B30F5998FCEC.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_spider_crowd_marrakesh_demonstration.crmd].pc_crmd
+00C993A647AEB73A.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_spider_crowd_marrakesh_market.crmd].pc_crmd
+0013CF6825D30B56.CRMD,[assembly:/_pro/scenes/missions/marrakesh/_scene_mission_spider_crowd_plaza.crmd].pc_crmd
+00069EED6F062D96.CRMD,[assembly:/_pro/scenes/missions/miami/flamingo_intel_project_navmeshscene_crowd_intel.crmd].pc_crmd
+005EC5054153DD70.CRMD,[assembly:/_pro/scenes/missions/miami/scene_cottonmouth_paddock.crmd].pc_crmd
+00980AE308B4F002.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_benchmark_intel_boardwalk.crmd].pc_crmd
+0080DF90F8454657.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_benchmark_intel_center.crmd].pc_crmd
+00E54E270401C16C.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_benchmark_intel_crowdpitbuilding.crmd].pc_crmd
+0003B0816C564D99.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_benchmark_intel_crowd_intel.crmd].pc_crmd
+0004B9503699194C.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_benchmark_intel_crowd_startingarea.crmd].pc_crmd
+00C3BFA92CB56BA6.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_benchmark_intel_paddock.crmd].pc_crmd
+00111D9EBAC7FDCA.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_boardwalk.crmd].pc_crmd
+00F694A4AD419A32.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_center.crmd].pc_crmd
+008E37C80599C035.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_crowdpitbuilding.crmd].pc_crmd
+009EB60D7DDB492C.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_crowd_startingarea.crmd].pc_crmd
+00C809B60C0358B2.CRMD,[assembly:/_pro/scenes/missions/miami/scene_flamingo_paddock.crmd].pc_crmd
+0055FF2698F3CD95.CRMD,[assembly:/_pro/scenes/missions/mumbai/scene_kingcobra_crowdstreets.crmd].pc_crmd
+000CAA3DBDDBDD28.CRMD,[assembly:/_pro/scenes/missions/mumbai/scene_mongoose_crowdstreets.crmd].pc_crmd
+0006FAFD95E3BF1C.CRMD,[assembly:/_pro/scenes/missions/mumbai/scene_mongoose_trainyard.crmd].pc_crmd
+00B13BA2511B12B6.CRMD,[assembly:/_pro/scenes/missions/opulent/scene_greentini_crowd.crmd].pc_crmd
+0061D5BF4F771B4C.CRMD,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01_crowd.crmd].pc_crmd
+00566F1EC95BF2F1.CRMD,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01_crowd_fashion.crmd].pc_crmd
+00AC758DC0E71732.CRMD,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01_crowd_street.crmd].pc_crmd
+005B70FA7D2FC9B6.CRMD,[assembly:/_pro/scenes/missions/paris/_scene_frenchmartini_crowd.crmd].pc_crmd
+00771CB39BF4ADAF.CRMD,[assembly:/_pro/scenes/missions/paris/_scene_frenchmartini_crowd_street.crmd].pc_crmd
+002C9D62B4E14CD3.CRMD,[assembly:/_pro/scenes/missions/theark/scene_magpie_crowd.crmd].pc_crmd
+007F0F79E621781F.CRMD,[assembly:/_pro/scenes/missions/theark/scene_penicillin_crowd.crmd].pc_crmd
+004838004E8322AE.CRMD,[assembly:/_pro/scenes/missions/theark/scene_pomada_crowd.crmd].pc_crmd
+00F8C27069101320.CRMD,[assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_module_002_crowd.crmd].pc_crmd

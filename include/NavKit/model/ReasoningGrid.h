@@ -5,19 +5,12 @@
 #include <optional>
 #include <vector>
 #include "../../NavWeakness/NavPower.h"
-
-class Vec4 {
-public:
-    float x;
-    float y;
-    float z;
-    float w;
-};
+#include "../util/Math.h"
 
 class Properties {
 public:
-    Vec4 vMin;
-    Vec4 vMax;
+    Math::Vec4 vMin;
+    Math::Vec4 vMax;
     uint32_t nGridWidth;
     float fGridSpacing;
     uint32_t nVisibilityRange;
@@ -41,7 +34,7 @@ public:
         nLayerIndex(0), cellBitmap{false}, xi(-1), yi(-1), zi(-1) {}
 
     std::vector<uint16_t> nNeighbors;
-    Vec4 vPos;
+    Math::Vec4 vPos;
     uint32_t nVisionDataOffset;
     int32_t nLayerIndex;
     bool cellBitmap[25];
@@ -90,8 +83,8 @@ public:
 
     // The ray callback must support concurrent calls; progress calls are serialized.
     // Rays use game coordinates (Z up). Heights are policy defaults, not recovered engine constants.
-    void generateVisionData(const std::function<bool(const Vec4&, const Vec4&)>& unblocked, float lowHeight = 0.6f,
-        float highHeight = 1.6f, const std::function<void(size_t, size_t)>& progress = {});
+    void generateVisionData(const std::function<bool(const Math::Vec4&, const Math::Vec4&)>& unblocked,
+        float lowHeight = 0.6f, float highHeight = 1.6f, const std::function<void(size_t, size_t)>& progress = {});
 
     void generateDeadEndData(const std::function<void(size_t, size_t)>& progress = {});
 
