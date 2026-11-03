@@ -289,8 +289,11 @@ jobs:
 
       - name: Package app bundle
         run: |
+          mkdir -p build/macos-dmg
+          cp -R build/macos-stage/NavKit.app build/macos-dmg/
+          ln -s /Applications build/macos-dmg/Applications
           hdiutil create -volname NavKit \
-            -srcfolder build/macos-stage/NavKit.app \
+            -srcfolder build/macos-dmg \
             -ov -format UDZO \
             "build/NavKit-macos-universal.dmg"
 
@@ -451,8 +454,11 @@ jobs:
 
       - name: Package app bundle
         run: |
+          mkdir -p build/macos-dmg
+          cp -R build/macos-stage/NavKit.app build/macos-dmg/
+          ln -s /Applications build/macos-dmg/Applications
           hdiutil create -volname NavKit \
-            -srcfolder build/macos-stage/NavKit.app \
+            -srcfolder build/macos-dmg \
             -ov -format UDZO \
             "build/NavKit-macos-universal.dmg"
 

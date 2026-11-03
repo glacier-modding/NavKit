@@ -23,13 +23,7 @@ namespace {
 #ifdef _WIN32
         return url.ends_with(".msi");
 #elif defined(__APPLE__)
-#if defined(__arm64__) || defined(__aarch64__)
-        return url.ends_with("NavKit-macos-arm64.dmg");
-#elif defined(__x86_64__)
-        return url.ends_with("NavKit-macos-x86_64.dmg");
-#else
-        return false;
-#endif
+        return url.ends_with("NavKit-macos-universal.dmg");
 #else
         return false;
 #endif
@@ -192,8 +186,8 @@ void UpdateChecker::renderUpdatePopup() {
 
     if (localUpdateCheckCompleted && localIsUpdateAvailable) {
 #ifdef __APPLE__
-        openUpdateDialog(
-            "A new version is available: " + localLatestVersion + ". Would you like to download the macOS update?");
+        openUpdateDialog("A new version is available: " + localLatestVersion +
+            ". Would you like to download and install the macOS update?");
 #else
         openUpdateDialog("A new version is available: " + localLatestVersion + ". Would you like to update?");
 #endif
@@ -314,18 +308,71 @@ void UpdateChecker::performUpdate() {
     exit(0);
 #elif defined(__APPLE__)
     std::string localUpdateUrl;
+    std::string localLatestVersion;
     {
         std::lock_guard lock(mutex);
         localUpdateUrl = updateUrl;
+        localLatestVersion = latestVersion;
     }
 
     if (localUpdateUrl.empty()) {
         Logger::log(NK_ERROR, "NavKit: No macOS update URL available.");
         return;
     }
-    if (!wxLaunchDefaultBrowser(wxString::FromUTF8(localUpdateUrl))) {
-        Logger::log(NK_ERROR, "NavKit: Could not open the macOS update download URL.");
+
+    const std::filesystem::path executablePath = std::filesystem::u8path(FileUtil::getExecutablePath());
+    const std::filesystem::path appBundlePath = executablePath.parent_path().parent_path().parent_path();
+    const std::filesystem::path updaterPath = executablePath.parent_path() / "NavKitUpdater";
+    if (!std::filesystem::exists(updaterPath)) {
+        Logger::log(NK_ERROR, ("NavKit: macOS updater not found at " + updaterPath.string()).c_str());
+        return;
     }
+
+    const std::filesystem::path tempPath =
+        std::filesystem::u8path(wxStandardPaths::Get().GetTempDir().ToUTF8().data());
+    const std::string updateId = std::to_string(wxGetProcessId());
+    const std::filesystem::path dmgPath = tempPath / ("NavKitUpdate_" + updateId + ".dmg");
+
+    std::string domain, downloadPath;
+    splitUrl(localUpdateUrl, domain, downloadPath);
+    httplib::Client cli("https://" + domain);
+    cli.set_follow_location(true);
+    std::ofstream output(dmgPath, std::ios::binary | std::ios::trunc);
+    if (!output.is_open()) {
+        Logger::log(NK_ERROR, ("NavKit: Could not create update file " + dmgPath.string()).c_str());
+        return;
+    }
+
+    Logger::log(NK_INFO, ("Downloading macOS update " + localLatestVersion + ".").c_str());
+    const auto response = cli.Get(downloadPath, [&](const char* data, const size_t dataLength) {
+        output.write(data, static_cast<std::streamsize>(dataLength));
+        return output.good();
+    });
+    output.close();
+    if (!response || response->status != 200 || !output) {
+        std::error_code error;
+        std::filesystem::remove(dmgPath, error);
+        Logger::log(NK_ERROR,
+            ("NavKit: macOS update download failed: " +
+                (response ? std::to_string(response->status) : "connection failure"))
+                .c_str());
+        return;
+    }
+
+    const std::vector<wxString> arguments = {pathToWxString(updaterPath), pathToWxString(dmgPath),
+        std::to_string(wxGetProcessId()), pathToWxString(appBundlePath)};
+    Logger::log(NK_INFO, "Launching macOS updater.");
+    if (executeArguments(arguments, wxEXEC_ASYNC, nullptr) == 0) {
+        std::error_code error;
+        std::filesystem::remove(dmgPath, error);
+        Logger::log(NK_ERROR, "NavKit: Failed to launch the macOS updater.");
+        return;
+    }
+
+    Logger::log(NK_INFO, "Closing NavKit to allow the macOS update to proceed.");
+    wxMilliSleep(1000);
+    Logger::getInstance().stop();
+    exit(0);
 #else
     Logger::log(NK_WARN, "Automatic updates are only supported on Windows.");
 #endif

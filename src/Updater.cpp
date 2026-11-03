@@ -14,6 +14,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "../include/NavKit/util/UpdaterUtils.h"
 
 wxDECLARE_EVENT(EVT_UPDATER_LOG, wxThreadEvent);
 wxDECLARE_EVENT(EVT_UPDATER_COMPLETE, wxThreadEvent);
@@ -206,12 +207,13 @@ namespace {
         LogMessage("Updater: Target installation directory: " + install_dir.string());
 
         const std::filesystem::path log_path =
-            install_dir / ("NavKit_Update_MSI_Log_" + args->new_version_str + ".txt");
+            NavKit::Updater::windowsUpdateLogPath(install_dir, args->new_version_str);
         LogMessage("Updater: Executing MSI installer...");
-        const long msiExitCode =
-            executeArguments({"msiexec.exe", "/i", pathToWxString(args->msi_path), "/passive", "/norestart", "/L*v",
-                                 pathToWxString(log_path), "MSIRESTARTMANAGERCONTROL=Disable"},
-                wxEXEC_SYNC);
+        std::vector<wxString> installerArguments;
+        for (const std::string& argument : NavKit::Updater::windowsInstallerArguments(args->msi_path, log_path)) {
+            installerArguments.push_back(wxString::FromUTF8(argument.c_str()));
+        }
+        const long msiExitCode = executeArguments(installerArguments, wxEXEC_SYNC);
         if (msiExitCode < 0) {
             LogMessage("Updater: Failed to launch installer.");
             NotifyUpdateComplete(0);
@@ -219,8 +221,9 @@ namespace {
         }
         LogMessage("Updater: MSI installation finished with exit code " + std::to_string(msiExitCode) + ".");
 
-        const std::filesystem::path temp_settings_path = args->updater_exe_path.parent_path() / "NavKit.ini";
-        const std::filesystem::path old_settings_destination_path = install_dir / "NavKit.ini.old";
+        const std::filesystem::path temp_settings_path = NavKit::Updater::windowsSettingsSource(args->updater_exe_path);
+        const std::filesystem::path old_settings_destination_path =
+            NavKit::Updater::windowsSettingsDestination(install_dir);
 
         if (std::filesystem::exists(temp_settings_path)) {
             LogMessage("Updater: Staging previous NavKit.ini for merging by the application...");
@@ -237,7 +240,7 @@ namespace {
 
         const std::filesystem::path navkit_path = install_dir / "NavKit.exe";
         int updateStatus = 0;
-        if (msiExitCode != 0) {
+        if (!NavKit::Updater::windowsInstallerSucceeded(msiExitCode)) {
             LogMessage("Updater: MSI installation failed. Check log for details: " + log_path.string());
             LogMessage("Updater: Attempting to relaunch the previous version of NavKit...");
             LaunchNavKit(navkit_path, install_dir);

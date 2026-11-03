@@ -156,6 +156,9 @@ add_executable(NavKit
 if (WIN32)
     target_sources(NavKit PRIVATE NavKit.rc)
 elseif (APPLE)
+    add_executable(NavKitUpdater MacUpdater.cpp)
+    target_link_libraries(NavKitUpdater PRIVATE wx::core wx::base)
+
     set(NAVKIT_BUNDLE_RESOURCES
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/DroidSans.ttf"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/Glacier2Glb.py"
@@ -240,6 +243,7 @@ if (WIN32)
     set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
 elseif (APPLE)
     install(TARGETS NavKit BUNDLE DESTINATION .)
+    install(TARGETS NavKitUpdater RUNTIME DESTINATION "NavKit.app/Contents/MacOS")
 
     set(NAVKIT_BUNDLE_SEARCH_DIRS)
     foreach(prefix IN LISTS CMAKE_PREFIX_PATH)

@@ -62,3 +62,7 @@ endif ()
 
 add_test(NAME NavKitTests COMMAND NavKitTests)
 set_tests_properties(NavKitTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+
+add_executable(UpdaterTests updater_tests.cpp)
+target_include_directories(UpdaterTests PRIVATE "${PROJECT_SOURCE_DIR}/include")
+add_test(NAME UpdaterTests COMMAND UpdaterTests)

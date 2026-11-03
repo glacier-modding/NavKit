@@ -164,7 +164,7 @@ Configure and build with `cmake --preset macos-release` and `cmake --build --pre
 
 The macOS build links the native `navkit-rpkg-lib` library for RPKG scene and resource extraction. AIRG files are read and written directly by NavKit. Scene extraction also requires a compatible HITMAN installation and ZHMModSDK editor endpoint on the Mac. For Blender mesh generation, set the Blender executable path in NavKit settings to the executable inside the Blender app bundle.
 
-Tagged releases are packaged as separate Apple Silicon (`arm64`) and Intel (`x86_64`) DMGs. These CI-built app bundles are not code-signed or notarized, so macOS may ask users to approve opening them.
+Tagged releases are packaged as a universal DMG with an Applications shortcut for drag-and-drop installation. NavKit checks for updates on startup and can download and install a newer release automatically. These CI-built app bundles are not code-signed or notarized, so macOS may ask users to approve opening them.
 
 # Credits
 2kpr  
