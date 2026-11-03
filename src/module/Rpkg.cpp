@@ -246,12 +246,12 @@ void Rpkg::initExtractionData() {
 void Rpkg::checkHitmanVersion() {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
-    static constexpr const char* GAME_VERSION = "3.270.1";
+    static constexpr const char* GAME_VERSION = "3.290.1 hotfix 1";
     static std::map<std::string, std::string> gameHashes(
-        {std::pair("e72ee951f153bd8858f37e36d09cfaf5", "epic"), // base game
-            std::pair("a8761edd766e4016a9ccc64a8c5ed883", "epic"), // ansel unlock
-            std::pair("ceaff768215bf97014f023673f65c4c8", "steam"), // base game
-            std::pair("fa2caabd0293edab43d44e823c1f152e", "steam"), // ansel unlock
+        {std::pair("76e9afcb3863527cb491add07d772587", "epic"), // base game
+            std::pair("f267bc41f9677710fbfdcd01d53ba674", "epic"), // ansel unlock
+            std::pair("a56f59157f2ac0cb0254164bb0676661", "steam"), // base game
+            std::pair("53e2cfc62c0cdda9ba572665e3213389", "steam"), // ansel unlock
             std::pair("a1d3d1698bc416014aad875c36957502", "microsoft")});
     const std::filesystem::path hitmanPath = std::filesystem::u8path(hitmanFolder);
     const std::filesystem::path retailPath = hitmanPath / "Retail";
