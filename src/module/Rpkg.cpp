@@ -248,8 +248,8 @@ void Rpkg::checkHitmanVersion() {
     const std::string hitmanFolder = navKitSettings.hitmanFolder;
     static constexpr const char* GAME_VERSION = "3.290.1 hotfix 1";
     static std::map<std::string, std::string> gameHashes(
-        {std::pair("76e9afcb3863527cb491add07d772587", "epic"), // base game
-            std::pair("f267bc41f9677710fbfdcd01d53ba674", "epic"), // ansel unlock
+        {std::pair("9eeae97c841b81e0077ba9e1d401ac94", "epic"), // base game
+            std::pair("bae6182412109eabc94d335bb38f08f1", "epic"), // ansel unlock
             std::pair("a56f59157f2ac0cb0254164bb0676661", "steam"), // base game
             std::pair("53e2cfc62c0cdda9ba572665e3213389", "steam"), // ansel unlock
             std::pair("a1d3d1698bc416014aad875c36957502", "microsoft")});
