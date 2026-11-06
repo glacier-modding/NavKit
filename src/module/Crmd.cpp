@@ -320,9 +320,12 @@ void Crmd::renderCrowdMapData() const {
         const float x = static_cast<float>(xIndex) * cellWidth;
         const float y = static_cast<float>(yIndex) * cellHeight;
         const uint8_t onNavGrid = data.m_GridMap[i].m_nOnNavGrid;
+        if (onNavGrid == 0) {
+            continue;
+        }
         const glm::vec4 mapColor =
             onNavGrid != 0 ? glm::vec4(0.2f, 0.45f, 0.9f, 0.3f) : glm::vec4(0.12f, 0.2f, 0.35f, 0.22f);
-        addCellRectangle(rectangles, x, y, cellWidth, cellHeight, mapColor);
+        addCellRectangle(rectangles, x, y, cellWidth, cellHeight, mapColor, -0.2);
     }
 
     for (size_t i = 0; i < renderCellCount; ++i) {
@@ -344,6 +347,8 @@ void Crmd::renderCrowdMapData() const {
                 flagColor = glm::vec4(0.95f, 0.25f, 0.2f, 0.48f);
             } else if ((flags & static_cast<uint8_t>(CrowdMapImpl_CellFlags::CELLFLAG_WALKABLE)) != 0) {
                 flagColor = glm::vec4(0.2f, 0.9f, 0.35f, 0.35f);
+            } else {
+                continue;
             }
             addCellRectangle(rectangles, x, y, cellWidth, cellHeight, flagColor);
         }
