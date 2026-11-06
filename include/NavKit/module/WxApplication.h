@@ -20,6 +20,7 @@ private:
     void onClose(wxCloseEvent& event);
     void onMove(wxMoveEvent& event);
     void onSize(wxSizeEvent& event);
+    void onQuit(wxCommandEvent& event);
     void onCanvasMouseMove(wxMouseEvent& event);
     void onCanvasMouseDown(wxMouseEvent& event);
     void onCanvasMouseUp(wxMouseEvent& event);

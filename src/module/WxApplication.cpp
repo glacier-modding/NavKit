@@ -64,6 +64,7 @@ MainFrame::MainFrame() :
     sizer->Add(panel, 1, wxEXPAND);
     SetSizer(sizer);
     Bind(wxEVT_MENU, &MainFrame::onMenu, this);
+    Bind(wxEVT_MENU, &MainFrame::onQuit, this, wxID_EXIT);
     Bind(wxEVT_CLOSE_WINDOW, &MainFrame::onClose, this);
     Bind(wxEVT_SIZE, &MainFrame::onSize, this);
     // Mouse and keyboard input for the 3D view. wxWidgets owns the canvas's native view, so it is what receives the
@@ -112,6 +113,10 @@ void MainFrame::onSize(wxSizeEvent& event) {
     if (Renderer::getInstance().window) {
         Renderer::getInstance().handleResize();
     }
+}
+
+void MainFrame::onQuit(wxCommandEvent& event) {
+    Close();
 }
 
 void MainFrame::onCanvasMouseMove(wxMouseEvent& event) {
