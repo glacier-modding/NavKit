@@ -48,9 +48,12 @@ namespace {
             std::filesystem::temp_directory_path() / "NavKit Downloads" / "NavKit.msi";
         const std::filesystem::path logPath =
             std::filesystem::temp_directory_path() / "NavKit Install" / "NavKit_Update_MSI_Log_v3.19.1.txt";
-        const auto arguments = NavKit::Updater::windowsInstallerArguments(msiPath, logPath);
+        const std::filesystem::path installDirectory =
+            std::filesystem::temp_directory_path() / "Custom Install" / "NavKit";
+        const auto arguments = NavKit::Updater::windowsInstallerArguments(msiPath, logPath, installDirectory);
         const std::vector<std::string> expected = {"msiexec.exe", "/i", NavKit::Updater::pathToUtf8(msiPath),
-            "/passive", "/norestart", "/L*v", NavKit::Updater::pathToUtf8(logPath), "MSIRESTARTMANAGERCONTROL=Disable"};
+            "/passive", "/norestart", "/L*v", NavKit::Updater::pathToUtf8(logPath), "MSIRESTARTMANAGERCONTROL=Disable",
+            "INSTALLFOLDER=" + NavKit::Updater::pathToUtf8(installDirectory)};
         require(arguments == expected, "Windows MSI arguments changed or paths with spaces were split");
     }
 

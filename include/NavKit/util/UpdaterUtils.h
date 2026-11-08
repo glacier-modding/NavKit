@@ -11,10 +11,10 @@ namespace NavKit::Updater {
         return {reinterpret_cast<const char*>(utf8Path.data()), utf8Path.size()};
     }
 
-    inline std::vector<std::string> windowsInstallerArguments(
-        const std::filesystem::path& msiPath, const std::filesystem::path& logPath) {
+    inline std::vector<std::string> windowsInstallerArguments(const std::filesystem::path& msiPath,
+        const std::filesystem::path& logPath, const std::filesystem::path& installDirectory) {
         return {"msiexec.exe", "/i", pathToUtf8(msiPath), "/passive", "/norestart", "/L*v", pathToUtf8(logPath),
-            "MSIRESTARTMANAGERCONTROL=Disable"};
+            "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=" + pathToUtf8(installDirectory)};
     }
 
     inline std::filesystem::path windowsUpdateLogPath(

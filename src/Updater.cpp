@@ -210,7 +210,8 @@ namespace {
             NavKit::Updater::windowsUpdateLogPath(install_dir, args->new_version_str);
         LogMessage("Updater: Executing MSI installer...");
         std::vector<wxString> installerArguments;
-        for (const std::string& argument : NavKit::Updater::windowsInstallerArguments(args->msi_path, log_path)) {
+        for (const std::string& argument :
+            NavKit::Updater::windowsInstallerArguments(args->msi_path, log_path, install_dir)) {
             installerArguments.push_back(wxString::FromUTF8(argument.c_str()));
         }
         const long msiExitCode = executeArguments(installerArguments, wxEXEC_SYNC);
