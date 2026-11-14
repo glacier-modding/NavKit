@@ -76,6 +76,7 @@ public:
     std::vector<Json::Mesh> prims;
     Json::PfBox includeBox;
     std::vector<Json::PfBox> exclusionBoxes;
+    std::vector<Json::PfBox> plannerExcludedBridgeBoxes;
     std::vector<Json::PfSeedPoint> pfSeedPoints;
     std::map<std::string, Json::Mati> matis;
     std::map<std::string, Json::PrimMati> primMatis;

@@ -37,20 +37,18 @@ SOFTWARE.
 
 #include "../../../include/NavKit/module/Logger.h"
 
-uint32_t RangeCheck(uint32_t val, uint32_t min, uint32_t max)
-{
-    if (val > max) return max;
-    if (val < min) return min;
+uint32_t RangeCheck(uint32_t val, uint32_t min, uint32_t max) {
+    if (val > max)
+        return max;
+    if (val < min)
+        return min;
     return val;
 }
 
-namespace NavPower
-{
+namespace NavPower {
 
-    std::string AxisToString(Axis axis)
-    {
-        switch (axis)
-        {
+    std::string AxisToString(Axis axis) {
+        switch (axis) {
         case Axis::X:
             return "X-Axis";
         case Axis::Y:
@@ -64,55 +62,43 @@ namespace NavPower
         }
     }
 
-    Axis AxisStringToEnumValue(auto p_Axis)
-    {
-        if (p_Axis.compare("X-Axis") == 0)
-        {
+    Axis AxisStringToEnumValue(auto p_Axis) {
+        if (p_Axis.compare("X-Axis") == 0) {
             return Axis::X;
-        }
-        else if (p_Axis.compare("Y-Axis") == 0)
-        {
+        } else if (p_Axis.compare("Y-Axis") == 0) {
             return Axis::Y;
-        }
-        else
-        {
+        } else {
             return Axis::Z;
         }
     };
 
-    std::string AreaUsageFlagToString(AreaUsageFlags p_AreaUsageFlag)
-    {
-        switch (p_AreaUsageFlag)
-        {
+    std::string AreaUsageFlagToString(AreaUsageFlags p_AreaUsageFlag) {
+        switch (p_AreaUsageFlag) {
         case AreaUsageFlags::AREA_FLAT:
             return "Flat";
         case AreaUsageFlags::AREA_STEPS:
             return "Steps";
+        case AreaUsageFlags::AREA_PLANNER_EXCLUDED:
+            return "PlannerExcluded";
         default:
             return "UNKNOWN!";
         }
     };
 
-    AreaUsageFlags AreaUsageFlagStringToEnumValue(auto p_AreaUsageFlag)
-    {
-        if (p_AreaUsageFlag.compare("Flat") == 0)
-        {
+    AreaUsageFlags AreaUsageFlagStringToEnumValue(auto p_AreaUsageFlag) {
+        if (p_AreaUsageFlag.compare("Flat") == 0) {
             return AreaUsageFlags::AREA_FLAT;
-        }
-        else if (p_AreaUsageFlag.compare("Steps") == 0)
-        {
+        } else if (p_AreaUsageFlag.compare("Steps") == 0) {
             return AreaUsageFlags::AREA_STEPS;
-        }
-        else
-        {
+        } else if (p_AreaUsageFlag.compare("PlannerExcluded") == 0) {
+            return AreaUsageFlags::AREA_PLANNER_EXCLUDED;
+        } else {
             return AreaUsageFlags::AREA_FLAT;
         }
     };
 
-    std::string EdgeTypeToString(EdgeType p_EdgeType)
-    {
-        switch (p_EdgeType)
-        {
+    std::string EdgeTypeToString(EdgeType p_EdgeType) {
+        switch (p_EdgeType) {
         case EdgeType::EDGE_NORMAL:
             return "Normal";
         case EdgeType::EDGE_PORTAL:
@@ -122,26 +108,20 @@ namespace NavPower
         }
     };
 
-    EdgeType EdgeTypeStringToEnumValue(auto p_EdgeType)
-    {
-        if (p_EdgeType.compare("Normal") == 0)
-        {
+    EdgeType EdgeTypeStringToEnumValue(auto p_EdgeType) {
+        if (p_EdgeType.compare("Normal") == 0) {
             return EdgeType::EDGE_NORMAL;
-        }
-        else
-        {
+        } else {
             return EdgeType::EDGE_PORTAL;
         }
     }
 
-    void BBox::writeBinary(std::ostream& f)
-    {
+    void BBox::writeBinary(std::ostream& f) {
         m_min.writeBinary(f);
         m_max.writeBinary(f);
     }
 
-    void BBox::copy(BBox o)
-    {
+    void BBox::copy(BBox o) {
         m_min.X = o.m_min.X;
         m_min.Y = o.m_min.Y;
         m_min.Z = o.m_min.Z;
@@ -151,8 +131,7 @@ namespace NavPower
     }
 
     namespace Binary {
-        void Binary::Header::writeBinary(std::ostream& f)
-        {
+        void Binary::Header::writeBinary(std::ostream& f) {
             f.write((char*)&m_endianFlag, sizeof(m_endianFlag));
             f.write((char*)&m_version, sizeof(m_version));
             f.write((char*)&m_imageSize, sizeof(m_imageSize));
@@ -161,22 +140,19 @@ namespace NavPower
             f.write((char*)&m_constantFlags, sizeof(m_constantFlags));
         }
 
-        void Binary::SectionHeader::writeBinary(std::ostream& f)
-        {
+        void Binary::SectionHeader::writeBinary(std::ostream& f) {
             f.write((char*)&m_id, sizeof(m_id));
             f.write((char*)&m_size, sizeof(m_size));
             f.write((char*)&m_pointerSize, sizeof(m_pointerSize));
         }
 
-        void Binary::NavSetHeader::writeBinary(std::ostream& f)
-        {
+        void Binary::NavSetHeader::writeBinary(std::ostream& f) {
             f.write((char*)&m_endianFlag, sizeof(m_endianFlag));
             f.write((char*)&m_version, sizeof(m_version));
             f.write((char*)&m_numGraphs, sizeof(m_numGraphs));
         }
 
-        void NavGraphHeaderBase::writeBinary(std::ostream& f)
-        {
+        void NavGraphHeaderBase::writeBinary(std::ostream& f) {
             f.write((char*)&m_version, sizeof(m_version));
             f.write((char*)&m_layer, sizeof(m_layer));
             f.write((char*)&m_areaBytes, sizeof(m_areaBytes));
@@ -193,8 +169,7 @@ namespace NavPower
             f.write((char*)&m_pad, sizeof(m_pad));
         }
 
-        void NavGraphHeaderBase::readBinary(std::istream& f)
-        {
+        void NavGraphHeaderBase::readBinary(std::istream& f) {
             f.read((char*)&m_version, sizeof(m_version));
             f.read((char*)&m_layer, sizeof(m_layer));
             f.read((char*)&m_areaBytes, sizeof(m_areaBytes));
@@ -216,18 +191,15 @@ namespace NavPower
             f.read((char*)&m_pad, sizeof(m_pad));
         }
 
-        void Binary::NavGraphHeaderHm::writeBinary(std::ostream& f)
-        {
+        void Binary::NavGraphHeaderHm::writeBinary(std::ostream& f) {
             NavGraphHeaderBase::writeBinary(f);
         }
 
-        void Binary::NavGraphHeaderHm::readBinary(std::istream& f)
-        {
+        void Binary::NavGraphHeaderHm::readBinary(std::istream& f) {
             NavGraphHeaderBase::readBinary(f);
         }
 
-        void Binary::NavGraphHeaderKnt::writeBinary(std::ostream& f)
-        {
+        void Binary::NavGraphHeaderKnt::writeBinary(std::ostream& f) {
             f.write((char*)&m_version, sizeof(m_version));
             f.write((char*)&m_layer, sizeof(m_layer));
             f.write((char*)&m_areaBytes, sizeof(m_areaBytes));
@@ -248,8 +220,7 @@ namespace NavPower
             f.write((char*)&m_pad, sizeof(m_pad));
         }
 
-        void Binary::NavGraphHeaderKnt::readBinary(std::istream& f)
-        {
+        void Binary::NavGraphHeaderKnt::readBinary(std::istream& f) {
             f.read((char*)&m_version, sizeof(m_version));
             f.read((char*)&m_layer, sizeof(m_layer));
             f.read((char*)&m_areaBytes, sizeof(m_areaBytes));
@@ -275,15 +246,13 @@ namespace NavPower
             f.read((char*)&m_pad, sizeof(m_pad));
         }
 
-        void Binary::AreaFlags::writeBinary(std::ostream& f)
-        {
+        void Binary::AreaFlags::writeBinary(std::ostream& f) {
             f.write((char*)&m_flags1, sizeof(m_flags1));
             f.write((char*)&m_flags2, sizeof(m_flags2));
             f.write((char*)&m_flags3, sizeof(m_flags3));
             f.write((char*)&m_flags4, sizeof(m_flags4));
         }
-        bool Binary::AreaFlags::operator==(AreaFlags const& other) const
-        {
+        bool Binary::AreaFlags::operator==(AreaFlags const& other) const {
             bool eq = true;
             eq &= m_flags1 == other.m_flags1;
             eq &= m_flags2 == other.m_flags2;
@@ -292,26 +261,21 @@ namespace NavPower
             return eq;
         }
 
-        void Binary::Area::writeJson(std::ostream& f, uint64_t s_areaIndex)
-        {
+        void Binary::Area::writeJson(std::ostream& f, uint64_t s_areaIndex) {
             f << "{";
             f << "\"Index\":" << s_areaIndex;
-            if (m_usageFlags != AreaUsageFlags::AREA_FLAT)
-            {
+            if (m_usageFlags != AreaUsageFlags::AREA_FLAT) {
                 f << ",\"Type\":";
                 f << "\"" << AreaUsageFlagToString(m_usageFlags) << "\"";
             }
             f << "}";
         }
 
-        void Binary::Area::readJson(auto p_Json)
-        {
+        void Binary::Area::readJson(auto p_Json) {
             auto result = p_Json.find_field("Type");
             if (result.error() == simdjson::SUCCESS) {
-                m_usageFlags = AreaUsageFlagStringToEnumValue(std::string{ std::string_view(p_Json["Type"]) });
-            }
-            else
-            {
+                m_usageFlags = AreaUsageFlagStringToEnumValue(std::string{std::string_view(p_Json["Type"])});
+            } else {
                 m_usageFlags = AreaUsageFlags::AREA_FLAT;
             }
             m_flags.m_flags1 = 0x1FC0000;
@@ -324,8 +288,7 @@ namespace NavPower
             m_flags.m_flags4 = 0;
         }
 
-        void Binary::Area::writeBinary(std::ostream& f)
-        {
+        void Binary::Area::writeBinary(std::ostream& f) {
             f.write((char*)&m_pProxy, sizeof(m_pProxy));
             f.write((char*)&m_dynAreaData, sizeof(m_dynAreaData));
             f.write((char*)&m_pFirstLink, sizeof(m_pFirstLink));
@@ -337,8 +300,7 @@ namespace NavPower
             m_flags.writeBinary(f);
         }
 
-        bool Binary::Area::operator==(Binary::Area const& other) const
-        {
+        bool Binary::Area::operator==(Binary::Area const& other) const {
             bool eq = true;
             eq &= m_pProxy == other.m_pProxy;
             eq &= m_dynAreaData == other.m_dynAreaData;
@@ -352,16 +314,14 @@ namespace NavPower
             return eq;
         }
 
-        void Binary::Edge::writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap)
-        {
+        void Binary::Edge::writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap) {
             f << "{";
-            if (m_pAdjArea != NULL)
-            {
+            if (m_pAdjArea != NULL) {
                 f << "\"Adjacent Area\":";
                 // Replace pointer to adjacent area with index of adjacent area + 1, with 0 being null
-                std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition = p_AreaPointerToIndexMap->find(m_pAdjArea);
-                if (s_MapPosition == p_AreaPointerToIndexMap->end())
-                {
+                std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition =
+                    p_AreaPointerToIndexMap->find(m_pAdjArea);
+                if (s_MapPosition == p_AreaPointerToIndexMap->end()) {
                     throw std::runtime_error("Area pointer not found in AreaPointerToIndexMap.");
                 }
                 uint32_t s_AdjAreaIndex = s_MapPosition->second;
@@ -369,23 +329,19 @@ namespace NavPower
             }
             f << "\"Position\":";
             m_pos.writeJson(f);
-            if (GetType() != EDGE_NORMAL)
-            {
+            if (GetType() != EDGE_NORMAL) {
                 f << ",\"Type\":\"" << EdgeTypeToString(GetType()) << "\"";
             }
             f << "}";
         }
 
-        void Binary::Edge::readJson(simdjson::ondemand::object p_Json)
-        {
+        void Binary::Edge::readJson(simdjson::ondemand::object p_Json) {
             auto adjacentAreaResult = p_Json.find_field("Adjacent Area");
             if (adjacentAreaResult.error() == simdjson::SUCCESS) {
                 int64_t m_pAdjAreaJson = int64_t(p_Json["Adjacent Area"]);
                 // Store index of adjacent area + 1 in m_pAdjArea until the area addresses are calculated
                 m_pAdjArea = reinterpret_cast<Binary::Area*>(m_pAdjAreaJson);
-            }
-            else
-            {
+            } else {
                 m_pAdjArea = 0;
             }
             simdjson::ondemand::object m_posJson = p_Json["Position"];
@@ -395,10 +351,8 @@ namespace NavPower
             SetObID(0);
             auto result = p_Json.find_field("Type");
             if (result.error() == simdjson::SUCCESS) {
-                SetType(EdgeTypeStringToEnumValue(std::string{ std::string_view(p_Json["Type"]) }));
-            }
-            else
-            {
+                SetType(EdgeTypeStringToEnumValue(std::string{std::string_view(p_Json["Type"])}));
+            } else {
                 SetType(EDGE_NORMAL);
             }
         }
@@ -406,33 +360,26 @@ namespace NavPower
         void Edge::updateAdjacentDistances(const Area* m_pParentArea) {
             if (m_pAdjArea != nullptr) {
                 m_flags2 = CalcScaledDistBetweenAreaCenters(m_pAdjArea->m_pos, m_pParentArea->m_pos);
-            }
-            else
-            {
+            } else {
                 m_flags2 = 0;
             }
         }
 
-        void Binary::Edge::writeBinary(std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap)
-        {
-            if (m_pAdjArea != NULL)
-            {
+        void Binary::Edge::writeBinary(
+            std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap) {
+            if (m_pAdjArea != NULL) {
                 // Convert adjacent Area pointer to Area file offset
                 Area* s_pAdjAreaFixed;
-                std::map<Binary::Area*, Binary::Area*>::const_iterator s_MapPosition = s_AreaPointerToOffsetPointerMap->find(m_pAdjArea);
-                if (s_MapPosition == s_AreaPointerToOffsetPointerMap->end())
-                {
+                std::map<Binary::Area*, Binary::Area*>::const_iterator s_MapPosition =
+                    s_AreaPointerToOffsetPointerMap->find(m_pAdjArea);
+                if (s_MapPosition == s_AreaPointerToOffsetPointerMap->end()) {
                     throw std::runtime_error("Area pointer not found in s_AreaPointerToOffsetPointerMap.");
-                }
-                else {
+                } else {
                     s_pAdjAreaFixed = reinterpret_cast<Binary::Area*>(s_MapPosition->second);
                 }
 
-
                 f.write((char*)&s_pAdjAreaFixed, sizeof(m_pAdjArea));
-            }
-            else
-            {
+            } else {
                 f.write((char*)&m_pAdjArea, sizeof(m_pAdjArea));
             }
             m_pos.writeBinary(f);
@@ -441,8 +388,7 @@ namespace NavPower
             f.write((char*)&m_pad, sizeof(m_pad));
         }
 
-        bool Binary::Edge::operator==(Binary::Edge const& other) const
-        {
+        bool Binary::Edge::operator==(Binary::Edge const& other) const {
             bool eq = true;
             eq &= m_pAdjArea == other.m_pAdjArea;
             eq &= m_pos == other.m_pos;
@@ -451,17 +397,16 @@ namespace NavPower
             return eq;
         }
 
-        void Binary::KDTreeData::writeBinary(std::ostream& f)
-        {
+        void Binary::KDTreeData::writeBinary(std::ostream& f) {
             m_bbox.writeBinary(f);
             f.write((char*)&m_size, sizeof(m_size));
         }
 
-        std::pair<uint32_t, NavPower::Area> Binary::KDLeaf::GetArea(std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap, std::vector<NavPower::Area>& s_NavMeshAreas)
-        {
-            std::map<uint32_t, uint32_t>::const_iterator s_MapPosition = s_AreaNavGraphOffsetToIndexMap.find(GetPrimOffset());
-            if (s_MapPosition == s_AreaNavGraphOffsetToIndexMap.end())
-            {
+        std::pair<uint32_t, NavPower::Area> Binary::KDLeaf::GetArea(
+            std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap, std::vector<NavPower::Area>& s_NavMeshAreas) {
+            std::map<uint32_t, uint32_t>::const_iterator s_MapPosition =
+                s_AreaNavGraphOffsetToIndexMap.find(GetPrimOffset());
+            if (s_MapPosition == s_AreaNavGraphOffsetToIndexMap.end()) {
                 throw std::runtime_error("Area not found");
             }
             uint32_t index = s_MapPosition->second - 1;
@@ -469,25 +414,24 @@ namespace NavPower
             return std::make_pair(index, area);
         }
 
-        std::vector<std::pair<uint32_t, NavPower::Area>> Binary::KDNode::GetAreas(std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap, std::vector<NavPower::Area>& s_NavMeshAreas)
-        {
+        std::vector<std::pair<uint32_t, NavPower::Area>> Binary::KDNode::GetAreas(
+            std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap, std::vector<NavPower::Area>& s_NavMeshAreas) {
             std::vector<std::pair<uint32_t, NavPower::Area>> s_indexAreaPairs;
-            if (!IsLeaf())
-            {
+            if (!IsLeaf()) {
                 KDNode* s_Left = GetLeft();
-                for (std::pair<uint32_t, NavPower::Area>& indexAreaPair : s_Left->GetAreas(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas))
-                {
+                for (std::pair<uint32_t, NavPower::Area>& indexAreaPair :
+                    s_Left->GetAreas(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas)) {
                     s_indexAreaPairs.push_back(indexAreaPair);
                 }
                 KDNode* s_Right = GetRight();
-                for (std::pair<uint32_t, NavPower::Area>& indexAreaPair : s_Right->GetAreas(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas))
-                {
+                for (std::pair<uint32_t, NavPower::Area>& indexAreaPair :
+                    s_Right->GetAreas(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas)) {
                     s_indexAreaPairs.push_back(indexAreaPair);
                 }
-            }
-            else {
+            } else {
                 KDLeaf* p_thisLeaf = reinterpret_cast<KDLeaf*>(this);
-                std::pair<uint32_t, NavPower::Area> indexAreaPair = p_thisLeaf->GetArea(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas);
+                std::pair<uint32_t, NavPower::Area> indexAreaPair =
+                    p_thisLeaf->GetArea(s_AreaNavGraphOffsetToIndexMap, s_NavMeshAreas);
                 std::vector<std::pair<uint32_t, NavPower::Area>> pairs;
                 pairs.push_back(indexAreaPair);
                 return pairs;
@@ -495,16 +439,13 @@ namespace NavPower
             return s_indexAreaPairs;
         }
 
-        void Binary::KDNode::writeBinary(std::ostream& f, uintptr_t p_KdTreeEnd)
-        {
+        void Binary::KDNode::writeBinary(std::ostream& f, uintptr_t p_KdTreeEnd) {
             f.write((char*)&m_data, sizeof(m_data));
-            if (!IsLeaf())
-            {
+            if (!IsLeaf()) {
                 f.write((char*)&m_dLeft, sizeof(m_dLeft));
                 f.write((char*)&m_dRight, sizeof(m_dRight));
                 KDNode* s_Left = GetLeft();
-                if (reinterpret_cast<uintptr_t>(s_Left) == p_KdTreeEnd)
-                {
+                if (reinterpret_cast<uintptr_t>(s_Left) == p_KdTreeEnd) {
                     return;
                 }
                 s_Left->writeBinary(f, p_KdTreeEnd);
@@ -512,27 +453,23 @@ namespace NavPower
                 s_Right->writeBinary(f, p_KdTreeEnd);
             }
         }
-    }
+    } // namespace Binary
 
     bool isKnt(const uint32_t version) {
         return version == 0x30;
     }
 
-    void Area::writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap)
-    {
+    void Area::writeJson(std::ostream& f, std::map<Binary::Area*, uint32_t>* p_AreaPointerToIndexMap) {
         f << "{\"Area\":";
         std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition = p_AreaPointerToIndexMap->find(m_area);
-        if (s_MapPosition == p_AreaPointerToIndexMap->end())
-        {
+        if (s_MapPosition == p_AreaPointerToIndexMap->end()) {
             throw std::runtime_error("Area not found");
         }
         m_area->writeJson(f, s_MapPosition->second);
         f << ",\"Edges\":[";
         bool first = true;
-        for (auto& edge : m_edges)
-        {
-            if (!first)
-            {
+        for (auto& edge : m_edges) {
+            if (!first) {
                 f << ",";
             }
             edge->writeJson(f, p_AreaPointerToIndexMap);
@@ -541,14 +478,12 @@ namespace NavPower
         f << "]}";
     }
 
-    void Area::readJson(auto p_Json)
-    {
+    void Area::readJson(auto p_Json) {
         simdjson::ondemand::object m_areaJson = p_Json["Area"];
         m_area = new Binary::Area;
         m_area->readJson(m_areaJson);
         simdjson::ondemand::array m_edgesJson = p_Json["Edges"];
-        for (auto edgeJson : m_edgesJson)
-        {
+        for (auto edgeJson : m_edgesJson) {
             Binary::Edge* edge = new Binary::Edge;
             edge->readJson(edgeJson);
             m_edges.push_back(edge);
@@ -558,17 +493,14 @@ namespace NavPower
         m_area->m_flags.SetBasisVert(CalculateBasisVert());
     }
 
-    void Area::writeBinary(std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap)
-    {
+    void Area::writeBinary(std::ostream& f, std::map<Binary::Area*, Binary::Area*>* s_AreaPointerToOffsetPointerMap) {
         m_area->writeBinary(f);
-        for (auto& edge : m_edges)
-        {
+        for (auto& edge : m_edges) {
             edge->writeBinary(f, s_AreaPointerToOffsetPointerMap);
         }
     }
 
-    Vec3 Area::CalculateCentroid()
-    {
+    Vec3 Area::CalculateCentroid() {
         Vec3 normal = CalculateNormal();
         Vec3 v0 = m_edges.at(0)->m_pos;
         Vec3 v1 = m_edges.at(1)->m_pos;
@@ -577,8 +509,7 @@ namespace NavPower
         Vec3 v = u.Cross(normal).GetUnitVec();
 
         std::vector<Vec3> mappedPoints;
-        for (Binary::Edge* edge : m_edges) 
-        {
+        for (Binary::Edge* edge : m_edges) {
             Vec3 relativePos = edge->m_pos - v0;
             float uCoord = relativePos.Dot(u);
             float vCoord = relativePos.Dot(v);
@@ -586,22 +517,17 @@ namespace NavPower
             mappedPoints.push_back(uvv);
         }
         float sum = 0;
-        for (int i = 0; i < mappedPoints.size(); i++)
-        {
+        for (int i = 0; i < mappedPoints.size(); i++) {
             int nextI = (i + 1) % mappedPoints.size();
             sum += mappedPoints[i].X * mappedPoints[nextI].Y - mappedPoints[nextI].X * mappedPoints[i].Y;
         }
 
         constexpr float areaEpsilon = 1e-9f;
-        if (std::abs(sum) < areaEpsilon * 2.0f)
-        {
-            Logger::log(
-                NK_WARN,
-                "CalculateCentroid: Polygon has near-zero area. Returning average of vertices.");
+        if (std::abs(sum) < areaEpsilon * 2.0f) {
+            Logger::log(NK_WARN, "CalculateCentroid: Polygon has near-zero area. Returning average of vertices.");
 
             Vec3 averagePos(0.0f, 0.0f, 0.0f);
-            for (const auto& edge : m_edges)
-            {
+            for (const auto& edge : m_edges) {
                 averagePos = averagePos + edge->m_pos;
             }
 
@@ -637,46 +563,39 @@ namespace NavPower
         return Vec3(x, y, z);
     }
 
-    bool Area::operator==(Area const& other) const
-    {
+    bool Area::operator==(Area const& other) const {
         bool eq = true;
         eq &= m_area == other.m_area;
-        if (m_edges.size() != other.m_edges.size())
-        {
+        if (m_edges.size() != other.m_edges.size()) {
             return false;
         }
-        for (int i = 0; i < m_edges.size(); i++)
-        {
+        for (int i = 0; i < m_edges.size(); i++) {
             eq &= m_edges[i] == other.m_edges[i];
         }
 
         return eq;
     }
 
-    bool Area::operator<(Area const& other) const
-    {
+    bool Area::operator<(Area const& other) const {
         return m_area->m_pos.X < other.m_area->m_pos.X;
     }
 
     void Area::updateAdjacentDistances() const {
-        for (auto& edge : m_edges)
-        {
+        for (auto& edge : m_edges) {
             edge->updateAdjacentDistances(m_area);
         }
     }
 
-    BBox generateBbox(const std::vector<Area>& s_areas)
-    {
+    BBox generateBbox(const std::vector<Area>& s_areas) {
         BBox bbox;
         bbox.m_min.X = bbox.m_min.Y = bbox.m_min.Z = std::numeric_limits<float>::max();
         bbox.m_max.X = bbox.m_max.Y = bbox.m_max.Z = -std::numeric_limits<float>::max();
 
-        if (s_areas.empty()) return bbox;
+        if (s_areas.empty())
+            return bbox;
 
-        for (auto& area : s_areas)
-        {
-            for (auto& edge : area.m_edges)
-            {
+        for (auto& area : s_areas) {
+            for (auto& edge : area.m_edges) {
                 bbox.m_min.X = std::min(bbox.m_min.X, edge->m_pos.X);
                 bbox.m_min.Y = std::min(bbox.m_min.Y, edge->m_pos.Y);
                 bbox.m_min.Z = std::min(bbox.m_min.Z, edge->m_pos.Z);
@@ -688,28 +607,23 @@ namespace NavPower
         return bbox;
     }
 
-    bool compareX(Area& a1, Area& a2)
-    {
+    bool compareX(Area& a1, Area& a2) {
         return a1.m_area->m_pos.X < a2.m_area->m_pos.X;
     }
 
-    bool compareY(Area& a1, Area& a2)
-    {
+    bool compareY(Area& a1, Area& a2) {
         return a1.m_area->m_pos.Y < a2.m_area->m_pos.Y;
     }
 
-    bool compareZ(Area& a1, Area& a2)
-    {
+    bool compareZ(Area& a1, Area& a2) {
         return a1.m_area->m_pos.Z < a2.m_area->m_pos.Z;
     }
 
     // Build m_areas pointer to index map so the pointers can be replaced with indices (+1) in the JSON file
-    std::map<Binary::Area*, uint32_t> NavGraph::AreaPointerToIndexMap()
-    {
+    std::map<Binary::Area*, uint32_t> NavGraph::AreaPointerToIndexMap() {
         std::map<Binary::Area*, uint32_t> s_AreaPointerToIndexMap;
         uint32_t s_AreaIndex = 1;
-        for (Area area : m_areas)
-        {
+        for (Area area : m_areas) {
             s_AreaPointerToIndexMap.emplace(area.m_area, s_AreaIndex);
             s_AreaIndex++;
         }
@@ -717,12 +631,10 @@ namespace NavPower
     }
 
     // Build m_areas index to pointer map so the indices (+1) in the JSON file can be replaced with pointers
-    std::map<uint64_t, Binary::Area*> NavGraph::AreaIndexToPointerMap()
-    {
+    std::map<uint64_t, Binary::Area*> NavGraph::AreaIndexToPointerMap() {
         std::map<uint64_t, Binary::Area*> s_AreaIndexToPointerMap;
         uint64_t s_AreaIndex = 1;
-        for (Area area : m_areas)
-        {
+        for (Area area : m_areas) {
             s_AreaIndexToPointerMap.emplace(s_AreaIndex, area.m_area);
             s_AreaIndex++;
         }
@@ -730,94 +642,79 @@ namespace NavPower
     }
 
     // Build m_areas area pointer to NavGraph offset map so the KD Tree can set the primoffset
-    std::map<Binary::Area*, uint32_t> NavGraph::AreaPointerToNavGraphOffsetMap()
-    {
+    std::map<Binary::Area*, uint32_t> NavGraph::AreaPointerToNavGraphOffsetMap() {
         std::map<Binary::Area*, uint32_t> s_AreaPointerToNavGraphOffsetMap;
         uint32_t s_headerSize = m_hdr->getSize();
         uint32_t s_areaOffset = s_headerSize;
         uint32_t s_maxOffset = m_hdr->getSize() + m_hdr->m_areaBytes;
-        for (auto& area : m_areas)
-        {
+        for (auto& area : m_areas) {
             if (s_areaOffset > m_hdr->getSize() + m_hdr->m_areaBytes) {
-                Logger::log(NK_ERROR, "Offset of start of area is past max allowed offset, area offset: %u, max allowed offset: %u ", s_areaOffset, s_maxOffset);
+                Logger::log(NK_ERROR,
+                    "Offset of start of area is past max allowed offset, area offset: %u, max allowed offset: %u ",
+                    s_areaOffset, s_maxOffset);
             }
-            if (s_areaOffset + sizeof(Binary::Area) + sizeof(Binary::Edge) * area.m_edges.size() > m_hdr->getSize() + m_hdr->m_areaBytes) {
-                Logger::log(NK_ERROR, "Area too large to fit in max allowed offset, area offset: %u, max allowed offset: %u ", s_areaOffset, s_maxOffset);
+            if (s_areaOffset + sizeof(Binary::Area) + sizeof(Binary::Edge) * area.m_edges.size() >
+                m_hdr->getSize() + m_hdr->m_areaBytes) {
+                Logger::log(NK_ERROR,
+                    "Area too large to fit in max allowed offset, area offset: %u, max allowed offset: %u ",
+                    s_areaOffset, s_maxOffset);
             }
             s_AreaPointerToNavGraphOffsetMap.emplace(area.m_area, s_areaOffset);
             s_areaOffset += sizeof(Binary::Area);
             s_areaOffset += sizeof(Binary::Edge) * area.m_edges.size();
         }
-        Logger::log(NK_DEBUG, "Header size: %u, Header area bytes: %u, Area offset after last area: %u, max allowed offset: %u", m_hdr->getSize(), m_hdr->m_areaBytes, s_areaOffset, s_maxOffset);
+        Logger::log(NK_DEBUG,
+            "Header size: %u, Header area bytes: %u, Area offset after last area: %u, max allowed offset: %u",
+            m_hdr->getSize(), m_hdr->m_areaBytes, s_areaOffset, s_maxOffset);
 
         return s_AreaPointerToNavGraphOffsetMap;
     }
 
-    BBox NavGraph::FindLeafBBoxForPosition(Vec3 pos)
-    {
+    BBox NavGraph::FindLeafBBoxForPosition(Vec3 pos) {
         BBox currentBBox = m_kdTreeData->m_bbox;
         Binary::KDNode* currentNode = m_rootKDNode;
 
-        while (currentNode && !currentNode->IsLeaf())
-        {
+        while (currentNode && !currentNode->IsLeaf()) {
             Axis axis = currentNode->GetSplitAxis();
 
             // Compare the position coordinate on the split axis against child boundaries.
             // m_dLeft is the maximum boundary for the left child, m_dRight is the minimum for the right.
-            if (pos[axis] <= currentNode->m_dLeft)
-            {
+            if (pos[axis] <= currentNode->m_dLeft) {
                 currentBBox.m_max[axis] = currentNode->m_dLeft;
                 currentNode = currentNode->GetLeft();
-            }
-            else
-            {
+            } else {
                 currentBBox.m_min[axis] = currentNode->m_dRight;
                 currentNode = currentNode->GetRight();
             }
         }
         return currentBBox;
     }
-    std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> NavGraph::ParseKDTree()
-    {
+    std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> NavGraph::ParseKDTree() {
         std::map<uint32_t, std::vector<std::pair<uint32_t, BBox>>> depthToSplitAndBboxMap;
         std::vector<KDTreeHelper> kdNodes;
         std::vector<std::pair<uint32_t, BBox>> newVector;
-        depthToSplitAndBboxMap.insert({ 0, newVector });
-        kdNodes.push_back(KDTreeHelper{
-            m_rootKDNode,
-            m_kdTreeData->m_bbox,
-            0,
-            0});
+        depthToSplitAndBboxMap.insert({0, newVector});
+        kdNodes.push_back(KDTreeHelper{m_rootKDNode, m_kdTreeData->m_bbox, 0, 0});
 
-        while (!kdNodes.empty())
-        {
+        while (!kdNodes.empty()) {
             KDTreeHelper parent = kdNodes.back();
             kdNodes.pop_back();
             uint32_t depth = parent.m_depth + 1;
             if (depthToSplitAndBboxMap.find(depth) == depthToSplitAndBboxMap.end()) {
                 std::vector<std::pair<uint32_t, BBox>> newNodeVector;
-                depthToSplitAndBboxMap.insert({ depth, newNodeVector });
+                depthToSplitAndBboxMap.insert({depth, newNodeVector});
             }
             depthToSplitAndBboxMap[depth].push_back(std::pair<uint32_t, BBox>(parent.m_splitAxis, BBox(parent.m_bbox)));
-            if (!parent.m_node->IsLeaf())
-            {
+            if (!parent.m_node->IsLeaf()) {
                 Axis splitAxis = parent.m_node->GetSplitAxis();
 
                 // Left Node
-                kdNodes.push_back(KDTreeHelper{
-                    parent.m_node->GetLeft(),
-                    parent.m_bbox,
-                    depth,
-                    uint32_t(splitAxis) });
+                kdNodes.push_back(KDTreeHelper{parent.m_node->GetLeft(), parent.m_bbox, depth, uint32_t(splitAxis)});
 
                 kdNodes.back().m_bbox.m_max[splitAxis] = parent.m_node->m_dLeft;
 
                 // Right Node
-                kdNodes.push_back(KDTreeHelper{
-                    parent.m_node->GetRight(),
-                    parent.m_bbox,
-                    depth,
-                    uint32_t(splitAxis) });
+                kdNodes.push_back(KDTreeHelper{parent.m_node->GetRight(), parent.m_bbox, depth, uint32_t(splitAxis)});
 
                 kdNodes.back().m_bbox.m_min[splitAxis] = parent.m_node->m_dRight;
             }
@@ -826,90 +723,65 @@ namespace NavPower
         return depthToSplitAndBboxMap;
     }
 
-    std::map<uint32_t, std::vector<KDTreeResult>> NavGraph::ParseKDTreeToKDTreeResult()
-        {
-            std::map<uint32_t, std::vector<KDTreeResult>> depthToSplitAndBboxMap;
-            std::map<uint32_t, Binary::Area*> offsetToAreaMap;
-            for (auto const& [ptr, offset] : AreaPointerToNavGraphOffsetMap())
-            {
-                offsetToAreaMap[offset] = ptr;
-            }
-
-            std::vector<KDTreeHelper> kdNodes;
-            std::vector<KDTreeResult> newVector;
-            depthToSplitAndBboxMap.insert({ 0, newVector });
-            kdNodes.push_back(KDTreeHelper{
-                m_rootKDNode,
-                m_kdTreeData->m_bbox,
-                0,
-                0});
-
-            while (!kdNodes.empty())
-            {
-                KDTreeHelper parent = kdNodes.back();
-                kdNodes.pop_back();
-                uint32_t depth = parent.m_depth + 1;
-                if (depthToSplitAndBboxMap.find(depth) == depthToSplitAndBboxMap.end()) {
-                    std::vector<KDTreeResult> newNodeVector;
-                    depthToSplitAndBboxMap.insert({ depth, newNodeVector });
-                }
-
-                // Identify if this specific node is a leaf. If so, mark it with Axis 3 (UNDEF).
-                Axis nodeAxis = parent.m_node->IsLeaf() ? Axis::UNDEF : parent.m_node->GetSplitAxis();
-
-                Binary::Area* pArea = nullptr;
-                if (parent.m_node->IsLeaf())
-                {
-                    uint32_t offset = ((Binary::KDLeaf*)parent.m_node)->GetPrimOffset();
-                    if (offsetToAreaMap.count(offset))
-                    {
-                        pArea = offsetToAreaMap[offset];
-                    }
-                }
-
-                depthToSplitAndBboxMap[depth].push_back({
-                    nodeAxis,
-                    BBox(parent.m_bbox),
-                    pArea,
-                    parent.m_node->IsLeaf(),
-                    parent.m_node
-                });
-                if (!parent.m_node->IsLeaf())
-                {
-                    Axis splitAxis = parent.m_node->GetSplitAxis();
-
-                    // Left Node
-                    kdNodes.push_back(KDTreeHelper{
-                        parent.m_node->GetLeft(),
-                        parent.m_bbox,
-                        depth,
-                        uint32_t(splitAxis) });
-
-                    kdNodes.back().m_bbox.m_max[splitAxis] = parent.m_node->m_dLeft;
-
-                    // Right Node
-                    kdNodes.push_back(KDTreeHelper{
-                        parent.m_node->GetRight(),
-                        parent.m_bbox,
-                        depth,
-                        uint32_t(splitAxis) });
-
-                    kdNodes.back().m_bbox.m_min[splitAxis] = parent.m_node->m_dRight;
-                }
-            }
-
-            return depthToSplitAndBboxMap;
+    std::map<uint32_t, std::vector<KDTreeResult>> NavGraph::ParseKDTreeToKDTreeResult() {
+        std::map<uint32_t, std::vector<KDTreeResult>> depthToSplitAndBboxMap;
+        std::map<uint32_t, Binary::Area*> offsetToAreaMap;
+        for (auto const& [ptr, offset] : AreaPointerToNavGraphOffsetMap()) {
+            offsetToAreaMap[offset] = ptr;
         }
 
+        std::vector<KDTreeHelper> kdNodes;
+        std::vector<KDTreeResult> newVector;
+        depthToSplitAndBboxMap.insert({0, newVector});
+        kdNodes.push_back(KDTreeHelper{m_rootKDNode, m_kdTreeData->m_bbox, 0, 0});
+
+        while (!kdNodes.empty()) {
+            KDTreeHelper parent = kdNodes.back();
+            kdNodes.pop_back();
+            uint32_t depth = parent.m_depth + 1;
+            if (depthToSplitAndBboxMap.find(depth) == depthToSplitAndBboxMap.end()) {
+                std::vector<KDTreeResult> newNodeVector;
+                depthToSplitAndBboxMap.insert({depth, newNodeVector});
+            }
+
+            // Identify if this specific node is a leaf. If so, mark it with Axis 3 (UNDEF).
+            Axis nodeAxis = parent.m_node->IsLeaf() ? Axis::UNDEF : parent.m_node->GetSplitAxis();
+
+            Binary::Area* pArea = nullptr;
+            if (parent.m_node->IsLeaf()) {
+                uint32_t offset = ((Binary::KDLeaf*)parent.m_node)->GetPrimOffset();
+                if (offsetToAreaMap.count(offset)) {
+                    pArea = offsetToAreaMap[offset];
+                }
+            }
+
+            depthToSplitAndBboxMap[depth].push_back(
+                {nodeAxis, BBox(parent.m_bbox), pArea, parent.m_node->IsLeaf(), parent.m_node});
+            if (!parent.m_node->IsLeaf()) {
+                Axis splitAxis = parent.m_node->GetSplitAxis();
+
+                // Left Node
+                kdNodes.push_back(KDTreeHelper{parent.m_node->GetLeft(), parent.m_bbox, depth, uint32_t(splitAxis)});
+
+                kdNodes.back().m_bbox.m_max[splitAxis] = parent.m_node->m_dLeft;
+
+                // Right Node
+                kdNodes.push_back(KDTreeHelper{parent.m_node->GetRight(), parent.m_bbox, depth, uint32_t(splitAxis)});
+
+                kdNodes.back().m_bbox.m_min[splitAxis] = parent.m_node->m_dRight;
+            }
+        }
+
+        return depthToSplitAndBboxMap;
+    }
+
     // Build m_areas NavGraph offset to index map so the KD Tree can get the area index from the primoffset
-    std::map<uint32_t, uint32_t> NavGraph::AreaNavGraphOffsetToIndexMap()
-    {
+    std::map<uint32_t, uint32_t> NavGraph::AreaNavGraphOffsetToIndexMap() {
         std::map<uint32_t, uint32_t> s_AreaNavGraphOffsetToIndexMap;
         uint32_t s_headerSize = m_hdr->getSize();
         uint32_t s_areaBytes = s_headerSize;
         uint32_t s_areaIndex = 1;
-        for (auto& area : m_areas)
-        {
+        for (auto& area : m_areas) {
             s_AreaNavGraphOffsetToIndexMap.emplace(s_areaBytes, s_areaIndex);
             s_areaBytes += sizeof(Binary::Area);
             s_areaBytes += sizeof(Binary::Edge) * area.m_edges.size();
@@ -918,22 +790,19 @@ namespace NavPower
         return s_AreaNavGraphOffsetToIndexMap;
     }
 
-
-    void NavGraph::FixAreaPointers(uintptr_t navGraphStart, size_t areaBytes)
-    {
+    void NavGraph::FixAreaPointers(uintptr_t navGraphStart, size_t areaBytes) {
         uintptr_t curIndex = navGraphStart + m_hdr->getSize();
         size_t areaEndPtr = curIndex + areaBytes;
 
-        while (curIndex != areaEndPtr)
-        {
+        while (curIndex != areaEndPtr) {
             if (curIndex > areaEndPtr) {
-                Logger::log(NK_ERROR, "Address mismatch with area pointers: curIndex: %u, areaEndPth: %u", curIndex, areaEndPtr);
+                Logger::log(NK_ERROR, "Address mismatch with area pointers: curIndex: %u, areaEndPth: %u", curIndex,
+                    areaEndPtr);
                 throw std::runtime_error("Address mismatch with area pointers");
             }
             Binary::Area* curArea = reinterpret_cast<Binary::Area*>(curIndex);
             curIndex += sizeof(Binary::Area);
-            for (uint32_t i = 0; i < curArea->m_flags.GetNumEdges(); i++)
-            {
+            for (uint32_t i = 0; i < curArea->m_flags.GetNumEdges(); i++) {
                 Binary::Edge* curEdge = (Binary::Edge*)curIndex;
                 curIndex += sizeof(Binary::Edge);
 
@@ -944,22 +813,18 @@ namespace NavPower
         }
     }
 
-    void NavGraph::writeJson(std::ostream& f)
-    {
+    void NavGraph::writeJson(std::ostream& f) {
         f << std::fixed << std::setprecision(4) << std::boolalpha;
         f << "{\"Areas\":[";
-        if (m_areas.empty())
-        {
+        if (m_areas.empty()) {
             throw std::runtime_error("Areas empty");
         }
         // Build area pointer to m_areas index map so the pointers can be replaced with indices in the JSON file
         std::map<Binary::Area*, uint32_t> s_AreaPointerToIndexMap = AreaPointerToIndexMap();
 
         bool first = true;
-        for (auto& area : m_areas)
-        {
-            if (!first)
-            {
+        for (auto& area : m_areas) {
+            if (!first) {
                 f << ",";
             }
             area.writeJson(f, &s_AreaPointerToIndexMap);
@@ -968,34 +833,27 @@ namespace NavPower
         f << "]}";
     }
 
-    NavGraph::KdTreeGenerationHelper NavGraph::splitAreas(std::vector<Area> s_originalAreas)
-    {
+    NavGraph::KdTreeGenerationHelper NavGraph::splitAreas(std::vector<Area> s_originalAreas) {
         KdTreeGenerationHelper nodeSplits;
         BBox areasBbox = generateBbox(s_originalAreas);
         nodeSplits.splitAxis = Axis::X;
         float xDiff = areasBbox.m_max.X - areasBbox.m_min.X;
         float yDiff = areasBbox.m_max.Y - areasBbox.m_min.Y;
         float zDiff = areasBbox.m_max.Z - areasBbox.m_min.Z;
-        if (yDiff >= xDiff)
-        {
+        if (yDiff >= xDiff) {
             nodeSplits.splitAxis = Axis::Y;
         }
-        if (zDiff >= xDiff && zDiff >= yDiff)
-        {
+        if (zDiff >= xDiff && zDiff >= yDiff) {
             nodeSplits.splitAxis = Axis::Z;
         }
 
         std::vector<Area> s_sortedAreas = s_originalAreas;
 
-        if (nodeSplits.splitAxis == Axis::X)
-        {
+        if (nodeSplits.splitAxis == Axis::X) {
             sort(s_sortedAreas.begin(), s_sortedAreas.end(), compareX);
-        }
-        else if (nodeSplits.splitAxis == Axis::Y)
-        {
+        } else if (nodeSplits.splitAxis == Axis::Y) {
             sort(s_sortedAreas.begin(), s_sortedAreas.end(), compareY);
-        }
-        else {
+        } else {
             sort(s_sortedAreas.begin(), s_sortedAreas.end(), compareZ);
         }
 
@@ -1004,16 +862,11 @@ namespace NavPower
         Area middleArea = s_sortedAreas[middleIndex];
         float medianValue = 0;
 
-        if (nodeSplits.splitAxis == Axis::X)
-        {
+        if (nodeSplits.splitAxis == Axis::X) {
             medianValue = middleArea.m_area->m_pos.X;
-        }
-        else if (nodeSplits.splitAxis == Axis::Y)
-        {
+        } else if (nodeSplits.splitAxis == Axis::Y) {
             medianValue = middleArea.m_area->m_pos.Y;
-        }
-        else
-        {
+        } else {
             medianValue = middleArea.m_area->m_pos.Z;
         }
 
@@ -1021,91 +874,71 @@ namespace NavPower
         //  1. Completely to the left of the median
         //  2. Split value equal to the median value
         //  3. Completely to the right of the median
-        for (int index = 0; index < s_originalAreas.size(); index++)
-        {
+        for (int index = 0; index < s_originalAreas.size(); index++) {
             float pos = 0;
-            if (nodeSplits.splitAxis == Axis::X)
-            {
+            if (nodeSplits.splitAxis == Axis::X) {
                 pos = s_originalAreas[index].m_area->m_pos.X;
-            }
-            else if (nodeSplits.splitAxis == Axis::Y)
-            {
+            } else if (nodeSplits.splitAxis == Axis::Y) {
                 pos = s_originalAreas[index].m_area->m_pos.Y;
-            }
-            else
-            {
+            } else {
                 pos = s_originalAreas[index].m_area->m_pos.Z;
             }
-            if (pos == medianValue)
-            {
+            if (pos == medianValue) {
                 s_areasWithPosEqualToMedianValue.push_back(s_originalAreas[index]);
-            }
-            else
-            {
-                if (pos < medianValue)
-                {
+            } else {
+                if (pos < medianValue) {
                     nodeSplits.left.push_back(s_originalAreas[index]);
                 }
-                if (pos > medianValue)
-                {
+                if (pos > medianValue) {
                     nodeSplits.right.push_back(s_originalAreas[index]);
                 }
             }
         }
 
         // Handle areas that have the same median split value as the median area
-        for (int index = 0; index < s_areasWithPosEqualToMedianValue.size(); index++)
-        {
-            if (nodeSplits.left.size() < s_originalAreas.size() / 2)
-            {
+        for (int index = 0; index < s_areasWithPosEqualToMedianValue.size(); index++) {
+            if (nodeSplits.left.size() < s_originalAreas.size() / 2) {
                 nodeSplits.left.push_back(s_areasWithPosEqualToMedianValue[index]);
-            }
-            else
-            {
+            } else {
                 nodeSplits.right.push_back(s_areasWithPosEqualToMedianValue[index]);
             }
         }
 
-        // Set left split based on max of split axis of left areas and right split based on min of split axis of right areas
+        // Set left split based on max of split axis of left areas and right split based on min of split axis of right
+        // areas
         BBox leftAreasBBox = generateBbox(nodeSplits.left);
         BBox rightAreasBBox = generateBbox(nodeSplits.right);
-        if (nodeSplits.splitAxis == Axis::X)
-        {
+        if (nodeSplits.splitAxis == Axis::X) {
             nodeSplits.s_LeftSplit = leftAreasBBox.m_max.X + 0.0002;
             nodeSplits.s_RightSplit = rightAreasBBox.m_min.X - 0.0002;
-        }
-        else if (nodeSplits.splitAxis == Axis::Y)
-        {
+        } else if (nodeSplits.splitAxis == Axis::Y) {
             nodeSplits.s_LeftSplit = leftAreasBBox.m_max.Y + 0.0002;
             nodeSplits.s_RightSplit = rightAreasBBox.m_min.Y - 0.0002;
-        }
-        else
-        {
+        } else {
             nodeSplits.s_LeftSplit = leftAreasBBox.m_max.Z + 0.0002;
             nodeSplits.s_RightSplit = rightAreasBBox.m_min.Z - 0.0002;
         }
         return nodeSplits;
     }
 
-    uint32_t NavGraph::generateKdTree(uintptr_t s_nodePtr, std::vector<Area>& s_areas, std::map<Binary::Area*, uint32_t>& p_AreaPointerToNavGraphOffsetMap)
-    {
-        if (s_areas.size() == 0)
-        {
+    uint32_t NavGraph::generateKdTree(uintptr_t s_nodePtr, std::vector<Area>& s_areas,
+        std::map<Binary::Area*, uint32_t>& p_AreaPointerToNavGraphOffsetMap) {
+        if (s_areas.size() == 0) {
             throw std::runtime_error("Area list empty.");
         }
-        if (s_areas.size() == 1)
-        {
-            Binary::KDLeaf* leaf = new (reinterpret_cast<Binary::KDLeaf*>(s_nodePtr))Binary::KDLeaf;
+        if (s_areas.size() == 1) {
+            Binary::KDLeaf* leaf = new (reinterpret_cast<Binary::KDLeaf*>(s_nodePtr)) Binary::KDLeaf;
             Binary::Area* p_area = s_areas[0].m_area;
 
-            std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition = p_AreaPointerToNavGraphOffsetMap.find(p_area);
-            if (s_MapPosition != p_AreaPointerToNavGraphOffsetMap.end())
-            {
+            std::map<Binary::Area*, uint32_t>::const_iterator s_MapPosition =
+                p_AreaPointerToNavGraphOffsetMap.find(p_area);
+            if (s_MapPosition != p_AreaPointerToNavGraphOffsetMap.end()) {
                 leaf->m_data = 0x80000000;
                 leaf->SetIsLeaf(true);
                 leaf->SetPrimOffset(s_MapPosition->second);
             } else {
-                Logger::log(NK_ERROR, "Area not found in area pointer to navgraph offset map, %d %d %d", p_area->m_pos.X, p_area->m_pos.Y, p_area->m_pos.Z);
+                Logger::log(NK_ERROR, "Area not found in area pointer to navgraph offset map, %d %d %d",
+                    p_area->m_pos.X, p_area->m_pos.Y, p_area->m_pos.Z);
                 // throw std::runtime_error("Area not found in area pointer to navgraph offset map.");
             }
             return sizeof(Binary::KDLeaf);
@@ -1130,8 +963,7 @@ namespace NavPower
         readJson(s_NavGraphJson, false);
     }
 
-    void NavGraph::readJson(auto s_NavGraphJson, const bool s_IsKnt)
-    {
+    void NavGraph::readJson(auto s_NavGraphJson, const bool s_IsKnt) {
         if (s_IsKnt) {
             m_hdr = new Binary::NavGraphHeaderKnt();
         } else {
@@ -1140,8 +972,7 @@ namespace NavPower
         m_isKnt = s_IsKnt;
         simdjson::ondemand::array s_AreasJson = s_NavGraphJson["Areas"];
 
-        for (auto areaJson : s_AreasJson)
-        {
+        for (auto areaJson : s_AreasJson) {
             Area a_Area;
             a_Area.readJson(areaJson);
             m_areas.push_back(a_Area);
@@ -1149,23 +980,19 @@ namespace NavPower
         uint32_t s_areaBytes = 0;
         uint64_t s_AreaIndex = 0;
         std::map<uint64_t, Binary::Area*> s_AreaIndexToPointerMap = AreaIndexToPointerMap();
-        for (auto& area : m_areas)
-        {
+        for (auto& area : m_areas) {
             s_areaBytes += sizeof(Binary::Area) + sizeof(Binary::Edge) * area.m_edges.size();
             float s_radius = -1.;
-            for (Binary::Edge* edge : area.m_edges)
-            {
+            for (Binary::Edge* edge : area.m_edges) {
                 s_radius = std::max(s_radius, area.m_area->m_pos.DistanceTo(edge->m_pos));
-                if (reinterpret_cast<uint64_t>(edge->m_pAdjArea) != 0)
-                {
+                if (reinterpret_cast<uint64_t>(edge->m_pAdjArea) != 0) {
                     // Convert index of adjacent area + 1 back to Area pointer
                     s_AreaIndex = reinterpret_cast<uint64_t>(edge->m_pAdjArea);
-                    std::map<uint64_t, Binary::Area*>::const_iterator s_MapPosition = s_AreaIndexToPointerMap.find(s_AreaIndex);
-                    if (s_MapPosition == s_AreaIndexToPointerMap.end())
-                    {
+                    std::map<uint64_t, Binary::Area*>::const_iterator s_MapPosition =
+                        s_AreaIndexToPointerMap.find(s_AreaIndex);
+                    if (s_MapPosition == s_AreaIndexToPointerMap.end()) {
                         throw std::runtime_error("Area index not found in s_AreaIndexToPointerMap.");
-                    }
-                    else {
+                    } else {
                         edge->m_pAdjArea = reinterpret_cast<Binary::Area*>(s_MapPosition->second);
                     }
                 }
@@ -1174,8 +1001,7 @@ namespace NavPower
         }
         m_hdr->m_areaBytes = s_areaBytes;
 
-        for (auto area : m_areas)
-        {
+        for (auto area : m_areas) {
             area.updateAdjacentDistances();
         }
 
@@ -1211,22 +1037,21 @@ namespace NavPower
     }
 
     void NavGraph::writeBinary(std::ostream& f) {
-        // Build m_areas area pointer to NavGraph offset pointer map so the offsets can be written instead of the memory pointers
+        // Build m_areas area pointer to NavGraph offset pointer map so the offsets can be written instead of the memory
+        // pointers
         std::map<Binary::Area*, Binary::Area*> s_AreaPointerToOffsetPointerMap;
         unsigned char* s_AreaOffset;
 
         m_hdr->writeBinary(f);
         s_AreaOffset = reinterpret_cast<unsigned char*>(m_hdr->getSize());
 
-        for (auto area : m_areas)
-        {
+        for (auto area : m_areas) {
             Binary::Area* s_areaOffsetPtr = reinterpret_cast<Binary::Area*>(s_AreaOffset);
             s_AreaPointerToOffsetPointerMap.emplace(area.m_area, s_areaOffsetPtr);
             s_AreaOffset += sizeof(Binary::Area);
             s_AreaOffset += sizeof(Binary::Edge) * area.m_edges.size();
         }
-        for (auto& area : m_areas)
-        {
+        for (auto& area : m_areas) {
             area.writeBinary(f, &s_AreaPointerToOffsetPointerMap);
         }
         m_kdTreeData->writeBinary(f);
@@ -1235,8 +1060,7 @@ namespace NavPower
         m_rootKDNode->writeBinary(f, p_KdTreeEnd);
     }
 
-    void NavGraph::read(uintptr_t& p_data, bool& p_isKnt)
-    {
+    void NavGraph::read(uintptr_t& p_data, bool& p_isKnt) {
         const uintptr_t s_startPointer = p_data;
         uintptr_t s_endPointer{};
 
@@ -1258,14 +1082,12 @@ namespace NavPower
         FixAreaPointers(s_startPointer, m_hdr->m_areaBytes);
         s_endPointer = p_data + m_hdr->m_areaBytes;
 
-        while (p_data < s_endPointer)
-        {
+        while (p_data < s_endPointer) {
             Area s_area{};
             s_area.m_area = (Binary::Area*)p_data;
             p_data += sizeof(Binary::Area);
 
-            for (uint32_t i = 0; i < s_area.m_area->m_flags.GetNumEdges(); ++i)
-            {
+            for (uint32_t i = 0; i < s_area.m_area->m_flags.GetNumEdges(); ++i) {
                 s_area.m_edges.push_back((Binary::Edge*)p_data);
                 p_data += sizeof(Binary::Edge);
             }
@@ -1285,9 +1107,11 @@ namespace NavPower
         auto mx = m_kdTreeData->m_bbox.m_min.X;
         auto my = m_kdTreeData->m_bbox.m_min.Y;
         auto mz = m_kdTreeData->m_bbox.m_min.Z;
-        auto s =  m_kdTreeData->m_size;
+        auto s = m_kdTreeData->m_size;
 
-        Logger::log(NK_DEBUG, "KD Tree Data: Memory address: %u BBox min: (%.2f, %.2f, %.2) Bbox max: (%.2f, %.2f, %.2f) Size: %u", ad, x, y, z, mx, my, mz, s);
+        Logger::log(NK_DEBUG,
+            "KD Tree Data: Memory address: %u BBox min: (%.2f, %.2f, %.2) Bbox max: (%.2f, %.2f, %.2f) Size: %u", ad, x,
+            y, z, mx, my, mz, s);
         p_data += sizeof(Binary::KDTreeData);
         ad = static_cast<unsigned int>(p_data);
         s_endPointer = p_data + m_kdTreeData->m_size;
@@ -1302,20 +1126,24 @@ namespace NavPower
         Logger::log(NK_DEBUG, "Root node: Data: %u Left: %.2f Right: %.2f", d, l, r);
         uint32_t s_leafCount = 0;
         uint32_t s_nodeCount = 0;
-        while (p_data < s_endPointer)
-        {
+        while (p_data < s_endPointer) {
             Binary::KDNode* s_KDNode = (Binary::KDNode*)p_data;
             Binary::KDLeaf* s_KDLeaf = (Binary::KDLeaf*)p_data;
             bool nearEnd = s_endPointer - p_data < 150;
             if (s_KDLeaf->m_data == 0xfdfdfdfd) {
-                Logger::log(NK_ERROR, "Invalid leaf / node, reading freed memory. Current address %u. Supposed end address %u", p_data, s_endPointer);
+                Logger::log(NK_ERROR,
+                    "Invalid leaf / node, reading freed memory. Current address %u. Supposed end address %u", p_data,
+                    s_endPointer);
                 break;
             }
             if (s_KDNode->IsLeaf()) {
                 d = s_KDLeaf->m_data;
-                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Leaf: Data: %u %x, Leaf Prim Offset %u", d, d, s_KDLeaf->GetPrimOffset());
+                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Leaf: Data: %u %x, Leaf Prim Offset %u", d, d,
+                    s_KDLeaf->GetPrimOffset());
                 if (s_KDLeaf->GetPrimOffset() > m_hdr->m_areaBytes) {
-                    Logger::log(NK_ERROR, "Leaf area offset is invalid! Data: %u %x, Leaf Prim Offset %u, Max allowed Prim Offset: %u", d, d, s_KDLeaf->GetPrimOffset(),m_hdr->m_areaBytes);
+                    Logger::log(NK_ERROR,
+                        "Leaf area offset is invalid! Data: %u %x, Leaf Prim Offset %u, Max allowed Prim Offset: %u", d,
+                        d, s_KDLeaf->GetPrimOffset(), m_hdr->m_areaBytes);
                 }
                 p_data += sizeof(Binary::KDLeaf);
                 s_leafCount++;
@@ -1324,7 +1152,8 @@ namespace NavPower
                 l = s_KDNode->m_dLeft;
                 r = s_KDNode->m_dRight;
                 std::string s_splitAxis = AxisToString(s_KDNode->GetSplitAxis());
-                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Node: Data: %u, %s Left: %.2f Right: %.2f", d, s_splitAxis.c_str(), l, r);
+                Logger::log(nearEnd ? NK_INFO : NK_DEBUG, "Node: Data: %u, %s Left: %.2f Right: %.2f", d,
+                    s_splitAxis.c_str(), l, r);
                 p_data += sizeof(Binary::KDNode);
                 s_nodeCount++;
             }
@@ -1334,12 +1163,16 @@ namespace NavPower
         Logger::log(NK_INFO, "Total number of internal nodes: %d", s_nodeCount);
         uint32_t s_expectedNodeCount = m_areas.size() - 1;
         if (s_nodeCount != s_expectedNodeCount) {
-            Logger::log(NK_INFO, "Internal node count does not equal area count - 1! Area count: %d, Internal node count: %d, Expected Internal node count: %d", m_areas.size(), s_nodeCount, s_expectedNodeCount);
+            Logger::log(NK_INFO,
+                "Internal node count does not equal area count - 1! Area count: %d, Internal node count: %d, Expected "
+                "Internal node count: %d",
+                m_areas.size(), s_nodeCount, s_expectedNodeCount);
         }
 
         Logger::log(NK_INFO, "Total number of leaves: %d", s_leafCount);
         if (m_areas.size() != s_leafCount) {
-            Logger::log(NK_INFO, "Leaf count and area count don't match! Area count: %d, Leaf count: %d", m_areas.size(), s_leafCount);
+            Logger::log(NK_INFO, "Leaf count and area count don't match! Area count: %d, Leaf count: %d",
+                m_areas.size(), s_leafCount);
         }
         Logger::log(NK_INFO, "Debugging KD Tree Depth Map");
 
@@ -1358,30 +1191,35 @@ namespace NavPower
                     s_depthNodeCount++;
                 }
             }
-            Logger::log(NK_INFO, "Depth level: %d, Leaf count: %d, Internal node count: %d, Total Leaf count: %d, Total Internal node count: %d", depth, s_depthLeafCount, s_depthNodeCount, s_leafCount, s_nodeCount);
-
+            Logger::log(NK_INFO,
+                "Depth level: %d, Leaf count: %d, Internal node count: %d, Total Leaf count: %d, Total Internal node "
+                "count: %d",
+                depth, s_depthLeafCount, s_depthNodeCount, s_leafCount, s_nodeCount);
         }
 
         if (p_data != s_endPointer) {
             Logger::log(NK_ERROR, "KDTree - What was read does not match the total bytes!");
             // throw std::runtime_error("Data offset after reading KDTree data does not match KDTree size");
         }
-        Logger::log(NK_DEBUG, "Read KD Tree successfully. Current memory address: %u, KD Tree end memory address %u", ad, end);
+        Logger::log(
+            NK_DEBUG, "Read KD Tree successfully. Current memory address: %u, KD Tree end memory address %u", ad, end);
         auto totalGraphSize = p_data - s_startPointer;
         auto totalBytes = static_cast<unsigned long long>(m_hdr->m_totalBytes);
         ad = static_cast<unsigned int>(p_data);
         end = static_cast<unsigned int>(s_startPointer + totalBytes);
-        if (totalGraphSize != totalBytes)
-        {
-            Logger::log(NK_ERROR, "NavGraph - What was read does not match the total bytes. Current memory address: %u, end memory address: %u", ad, end);
+        if (totalGraphSize != totalBytes) {
+            Logger::log(NK_ERROR,
+                "NavGraph - What was read does not match the total bytes. Current memory address: %u, end memory "
+                "address: %u",
+                ad, end);
             // throw std::runtime_error("Data offset after reading NavGraph does not match total bytes");
         }
-        Logger::log(NK_DEBUG, "Read NavGraph successfully. Current memory address: %u, end memory address: %u", ad, end);
+        Logger::log(
+            NK_DEBUG, "Read NavGraph successfully. Current memory address: %u, end memory address: %u", ad, end);
     }
 
     // This function was made by github.com/OrfeasZ aka NoFaTe
-    uint32_t CalculateChecksum(void* p_Data, uint32_t p_Size)
-    {
+    uint32_t CalculateChecksum(void* p_Data, uint32_t p_Size) {
         uint32_t s_BytesToCheck = p_Size;
 
         // Looks like this checksum algorithm will skip a few bytes at the end
@@ -1407,12 +1245,12 @@ namespace NavPower
         return s_Checksum;
     }
 
-    void Section::read(uintptr_t& p_data, bool& p_isKnt)
-    {
+    void Section::read(uintptr_t& p_data, bool& p_isKnt) {
         m_hdr = (Binary::SectionHeader*)p_data;
         p_data += sizeof(Binary::SectionHeader);
 
-        if (m_hdr->m_size == 0) return;
+        if (m_hdr->m_size == 0)
+            return;
 
         // Sectionheader->m_size excludes the header.
         uintptr_t s_startPointer = p_data;
@@ -1427,19 +1265,16 @@ namespace NavPower
             m_aNavGraphs.push_back(s_Graph);
         }
 
-        if ((p_data - s_startPointer) != m_hdr->m_size)
-        {
+        if ((p_data - s_startPointer) != m_hdr->m_size) {
             printf("[WARNING] Section - What we read does not match the section size!\n");
             // throw std::runtime_error("Data offset after reading Section does not match section size");
         }
     }
 
-    void Section::writeJson(std::ofstream& f)
-    {
+    void Section::writeJson(std::ofstream& f) {
         f << "{\"NavGraphs\":[";
         bool first = true;
-        for (auto s_NavGraph : m_aNavGraphs)
-        {
+        for (auto s_NavGraph : m_aNavGraphs) {
             if (!first) {
                 f << ",";
             }
@@ -1449,8 +1284,7 @@ namespace NavPower
         f << "]}";
     }
 
-    void Section::writeBinary(std::ostream& f)
-    {
+    void Section::writeBinary(std::ostream& f) {
         m_hdr->writeBinary(f);
         m_setHdr->writeBinary(f);
         for (auto& s_NavGraph : m_aNavGraphs) {
@@ -1458,8 +1292,7 @@ namespace NavPower
         }
     }
 
-    void Section::readJson(auto p_SectionJson, bool s_IsKnt)
-    {
+    void Section::readJson(auto p_SectionJson, bool s_IsKnt) {
         m_hdr = new Binary::SectionHeader();
         m_setHdr = new Binary::NavSetHeader();
         m_hdr->m_size = sizeof(Binary::NavSetHeader);
@@ -1481,7 +1314,7 @@ namespace NavPower
         for (auto section : navMesh->m_aSections) {
             size += sizeof(Binary::SectionHeader);
             size += sizeof(Binary::NavSetHeader);
-            for (auto graph: section.m_aNavGraphs) {
+            for (auto graph : section.m_aNavGraphs) {
                 size += graph.m_hdr->getSize();
                 size += sizeof(Binary::Area) * graph.m_areas.size();
                 for (auto area : graph.m_areas) {
@@ -1494,8 +1327,7 @@ namespace NavPower
         return size;
     }
 
-    void NavMesh::read(uintptr_t p_data, uint32_t p_filesize)
-    {
+    void NavMesh::read(uintptr_t p_data, uint32_t p_filesize) {
         uintptr_t s_startPointer = p_data;
 
         m_hdr = (Binary::Header*)p_data;
@@ -1512,28 +1344,33 @@ namespace NavPower
         unsigned int size = CalculateNavMeshSize(this);
         unsigned int filesize = p_filesize;
         unsigned int ad = p_data;
-        Logger::log(NK_DEBUG, "Done reading Navp file. Current memory address: %u, Total size read: %u, Total calculated size: %u, Total file size: %u", ad, totalRead, size, filesize);
+        Logger::log(NK_DEBUG,
+            "Done reading Navp file. Current memory address: %u, Total size read: %u, Total calculated size: %u, Total "
+            "file size: %u",
+            ad, totalRead, size, filesize);
         if (totalRead != filesize) {
             // throw std::runtime_error("Data offset after reading from navp file does not match filesize");
             Logger::log(NK_ERROR, "Data offset after reading from navp file does not match filesize");
-            Logger::log(NK_ERROR, "Start memory address: %u, Current memory address: %u, Total size read: %u, Total calculated size: %u, Total file size: %u", sp, ad, totalRead, size, filesize);
+            Logger::log(NK_ERROR,
+                "Start memory address: %u, Current memory address: %u, Total size read: %u, Total calculated size: %u, "
+                "Total file size: %u",
+                sp, ad, totalRead, size, filesize);
         }
     }
 
-    void NavMesh::readJson(const char* p_NavGraphJsonPath)
-    {
+    void NavMesh::readJson(const char* p_NavGraphJsonPath) {
         simdjson::ondemand::parser s_Parser;
         simdjson::padded_string s_Json = simdjson::padded_string::load(p_NavGraphJsonPath);
         simdjson::ondemand::document s_NavMeshDocument = s_Parser.iterate(s_Json);
-        auto s_NavpJsonVersion = std::string{ std::string_view(s_NavMeshDocument["NavpJsonVersion"]) };
-        if (s_NavpJsonVersion != "0.3")
-        {
-            std::cerr << "This version of NavWeakness only supports version 0.3. NavpJsonVersion " << s_NavpJsonVersion << std::endl;
+        auto s_NavpJsonVersion = std::string{std::string_view(s_NavMeshDocument["NavpJsonVersion"])};
+        if (s_NavpJsonVersion != "0.3") {
+            std::cerr << "This version of NavWeakness only supports version 0.3. NavpJsonVersion " << s_NavpJsonVersion
+                      << std::endl;
             throw std::runtime_error("This version of NavWeakness only supports version 0.3");
         }
         m_hdr = new Binary::Header();
         m_hdr->m_imageSize = 0;
-        auto s_Game = std::string{ std::string_view(s_NavMeshDocument["Game"]) };
+        auto s_Game = std::string{std::string_view(s_NavMeshDocument["Game"])};
         m_isKnt = s_Game == "Knt";
 
         auto s_SectionsJson = s_NavMeshDocument["Sections"];
@@ -1544,7 +1381,6 @@ namespace NavPower
             // Set size fields
             m_hdr->m_imageSize += sizeof(Binary::SectionHeader) + s_Section.m_hdr->m_size;
         }
-
 
         // Recalculate the checksum in case the JSON file was manually edited
         // Write the Navmesh to a temporary NAVP binary file
@@ -1566,7 +1402,8 @@ namespace NavPower
         s_FileStream.close();
         std::filesystem::remove(p_ChecksumCalculationTempPath);
         const auto s_FileStartPtr = reinterpret_cast<uintptr_t>(s_FileData);
-        const uint32_t s_Checksum = CalculateChecksum(reinterpret_cast<void*>(s_FileStartPtr + sizeof(Binary::Header)), (s_FileSize - sizeof(Binary::Header)));
+        const uint32_t s_Checksum = CalculateChecksum(
+            reinterpret_cast<void*>(s_FileStartPtr + sizeof(Binary::Header)), (s_FileSize - sizeof(Binary::Header)));
         m_hdr->m_checksum = s_Checksum;
     }
 
@@ -1585,11 +1422,10 @@ namespace NavPower
         f << "]}";
     }
 
-    void NavMesh::writeBinary(std::ostream& f)
-    {
+    void NavMesh::writeBinary(std::ostream& f) {
         m_hdr->writeBinary(f);
         for (auto s_Section : m_aSections) {
             s_Section.writeBinary(f);
         }
     }
-}
+} // namespace NavPower
