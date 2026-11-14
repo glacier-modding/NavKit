@@ -38,7 +38,7 @@ bool GridGenerator::initRecastAirgAdapter() {
     airg.airgLoaded = false;
     Menu::updateMenuState();
     SceneMesh& obj = SceneMesh::getInstance();
-    obj.buildGlbFromNavp(false);
+    obj.buildGlbFromNavp(false, false);
     const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
     recastAirgAdapter.cleanup();
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();

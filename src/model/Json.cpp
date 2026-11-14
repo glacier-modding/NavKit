@@ -188,8 +188,14 @@ Json::PfBoxes::PfBoxes(simdjson::ondemand::array pfBoxes) {
 void Json::PfBoxes::readPathfindingBBoxes() {
     Scene& scene = Scene::getInstance();
     scene.exclusionBoxes.clear();
+    scene.plannerExcludedBridgeBoxes.clear();
     bool includeBoxFound = false;
     for (Entity& entity : entities) {
+        if (entity.name.starts_with(PLANNER_EXCLUDED_BRIDGE_NAME_PREFIX)) {
+            scene.plannerExcludedBridgeBoxes.emplace_back(
+                entity.id, entity.name, entity.position, entity.scale.data, entity.rotation, entity.type);
+            continue;
+        }
         if (entity.id == "48b22d0153942122" && abs(entity.position.x - -26.9811001) < 0.1) {
             entity.type.data = INCLUDE_TYPE; // Workaround for bug in Sapienza's include box
         }

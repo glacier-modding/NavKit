@@ -46,6 +46,7 @@ RecastAdapter::RecastAdapter() {
     filter->setAreaCost(SAMPLE_POLYAREA_DOOR, 1.0f);
     filter->setAreaCost(SAMPLE_POLYAREA_GRASS, 2.0f);
     filter->setAreaCost(SAMPLE_POLYAREA_JUMP, 1.5f);
+    filter->setAreaCost(SAMPLE_POLYAREA_BRIDGE_PAD, 1.0f);
     filterWithExcluded = new dtQueryFilter();
     filterWithExcluded->setIncludeFlags(SAMPLE_POLYFLAGS_ALL);
     filterWithExcluded->setExcludeFlags(0);
@@ -55,6 +56,7 @@ RecastAdapter::RecastAdapter() {
     filterWithExcluded->setAreaCost(SAMPLE_POLYAREA_DOOR, 1.0f);
     filterWithExcluded->setAreaCost(SAMPLE_POLYAREA_GRASS, 2.0f);
     filterWithExcluded->setAreaCost(SAMPLE_POLYAREA_JUMP, 1.5f);
+    filterWithExcluded->setAreaCost(SAMPLE_POLYAREA_BRIDGE_PAD, 1.0f);
     markerPositionSet = false;
     markerPosition[0] = 0;
     markerPosition[1] = 0;
@@ -744,8 +746,7 @@ int RecastAdapter::getTriCount() const {
     return inputGeom->getMesh()->getTriCount();
 }
 
-void RecastAdapter::addConvexVolume(Json::PfBox& pfBox) const {
-    float verts[4 * 3];
+void RecastAdapter::pfBoxFootprintToRecast(const Json::PfBox& pfBox, float* verts) {
     verts[0] = -pfBox.scale.x / 2;
     verts[1] = -pfBox.scale.y / 2;
     verts[2] = -pfBox.scale.z / 2;
@@ -798,8 +799,12 @@ void RecastAdapter::addConvexVolume(Json::PfBox& pfBox) const {
         verts[i * 3 + 1] = recastY;
         verts[i * 3 + 2] = recastZ;
     }
-    inputGeom->addConvexVolume(verts, 4, pfBox.pos.z - pfBox.scale.z / 2 - 0.5, pfBox.pos.z + pfBox.scale.z / 2,
-        1); // areaType 1 is water
+}
+
+void RecastAdapter::addConvexVolume(const Json::PfBox& pfBox, const unsigned char area) const {
+    float verts[4 * 3];
+    pfBoxFootprintToRecast(pfBox, verts);
+    inputGeom->addConvexVolume(verts, 4, pfBox.pos.z - pfBox.scale.z / 2 - 0.5, pfBox.pos.z + pfBox.scale.z / 2, area);
 }
 
 const ConvexVolume* RecastAdapter::getConvexVolumes() const {

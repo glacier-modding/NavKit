@@ -79,7 +79,7 @@ public:
 
     void saveBlendMesh(std::string blendToCopy, std::string newFileName);
 
-    void buildGlbFromNavp(bool alsoLoadIntoUi);
+    void buildGlbFromNavp(bool alsoLoadIntoUi, bool includePlannerExcludedAreas);
 
     void buildSceneMeshFromScene();
 

@@ -17,10 +17,13 @@
 #include "../include/NavKit/render/Mesh.h"
 #include "../include/NavKit/render/Model.h"
 #include "../include/NavKit/util/UpdateChecker.h"
+#include "../include/NavKit/util/BridgeJoiner.h"
 #include "../include/NavKit/util/GridGenerator.h"
 #include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Pathfinding.h"
+#include "../include/RecastDemo/UnpartitionedAreaRegions.h"
 #include "../include/RecastDemo/InputGeom.h"
+#include <Recast.h>
 #include "../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
@@ -313,6 +316,201 @@ namespace {
         check(scene.exclusionBoxes.empty(), "reading an empty box list should clear old exclusions");
         scene.includeBox = originalInclude;
         scene.exclusionBoxes = originalExclusions;
+    }
+
+    void testPlannerExcludedBridgeBoxParsing() {
+        Scene& scene = Scene::getInstance();
+        const Json::PfBox originalInclude = scene.includeBox;
+        const std::vector<Json::PfBox> originalExclusions = scene.exclusionBoxes;
+        Json::Entity bridge;
+        bridge.id = "bridge-a";
+        bridge.name = Json::PfBoxes::PLANNER_EXCLUDED_BRIDGE_NAME_PREFIX + "_Gate07";
+        bridge.scale = {"SVector3", {0.6f, 2.0f, 3.5f}};
+        bridge.type.data = Json::PfBoxes::EXCLUDE_TYPE;
+
+        Json::Entity includeTypedBridge = bridge;
+        includeTypedBridge.id = "bridge-b";
+        includeTypedBridge.type.data = Json::PfBoxes::INCLUDE_TYPE;
+
+        const simdjson::padded_string emptyArray(std::string_view("[]"));
+        simdjson::ondemand::parser parser;
+        auto document = parser.iterate(emptyArray);
+        Json::PfBoxes boxes{document.get_array().value()};
+        boxes.entities = {bridge, includeTypedBridge};
+        boxes.readPathfindingBBoxes();
+        check(scene.plannerExcludedBridgeBoxes.size() == 2, "named bridge boxes should be read whatever their type");
+        check(scene.exclusionBoxes.empty(), "a bridge box must not be read as an exclusion box");
+        check(scene.includeBox.id == Json::PfBoxes::NO_INCLUDE_BOX_FOUND, "a bridge box must not be read as include");
+
+        const std::filesystem::path path = std::filesystem::temp_directory_path() /
+            ("navkit-bridge-scene-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                ".json");
+        scene.saveScene(path.string());
+        {
+            std::ifstream savedFile(path);
+            const std::string serialized((std::istreambuf_iterator<char>(savedFile)), std::istreambuf_iterator<char>());
+            check(serialized.find(R"("id":"bridge-a")") != std::string::npos &&
+                    serialized.find(R"("id":"bridge-b")") != std::string::npos,
+                "saved scene should keep the bridge boxes");
+        }
+        std::filesystem::remove(path);
+
+        boxes.entities.clear();
+        boxes.readPathfindingBBoxes();
+        check(scene.plannerExcludedBridgeBoxes.empty(), "reading an empty box list should clear old bridge boxes");
+        scene.includeBox = originalInclude;
+        scene.exclusionBoxes = originalExclusions;
+    }
+
+    void testPlannerExcludedAreaUsage() {
+        Navp& navp = Navp::getInstance();
+        navp.loadNavMesh("tests/resources/triangles.navp", false, false, false);
+        check(Navp::getTotalAreaCount(navp.navMesh) > 0, "test NAVP should have areas");
+        for (int i = 0; i < Navp::getTotalAreaCount(navp.navMesh); ++i) {
+            Navp::getAreaByIndex(navp.navMesh, i).m_area->m_usageFlags =
+                NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED;
+        }
+        navp.setStairsFlags();
+        for (int i = 0; i < Navp::getTotalAreaCount(navp.navMesh); ++i) {
+            check(Navp::getAreaByIndex(navp.navMesh, i).m_area->m_usageFlags ==
+                    NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED,
+                "setStairsFlags must leave planner-excluded areas alone");
+        }
+
+        const std::filesystem::path path = std::filesystem::temp_directory_path() /
+            ("navkit-planner-excluded-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                ".navp.json");
+        {
+            std::ofstream navpJson(path);
+            navp.navMesh->writeJson(navpJson);
+        }
+        {
+            std::ifstream savedFile(path);
+            const std::string serialized((std::istreambuf_iterator<char>(savedFile)), std::istreambuf_iterator<char>());
+            check(serialized.find(R"("Type":"PlannerExcluded")") != std::string::npos,
+                "planner-excluded areas should be written by name");
+        }
+        const NavPower::NavMesh reloaded(path.string().c_str());
+        check(Navp::getTotalAreaCount(&reloaded) == Navp::getTotalAreaCount(navp.navMesh),
+            "reloaded NAVP should keep its areas");
+        for (int i = 0; i < Navp::getTotalAreaCount(&reloaded); ++i) {
+            check(Navp::getAreaByIndex(&reloaded, i).m_area->m_usageFlags ==
+                    NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED,
+                "planner-excluded usage should survive a .navp.json round trip");
+        }
+        std::filesystem::remove(path);
+        navp.navpLoaded = false;
+    }
+
+    void testUnpartitionedAreaRegionAssignment() {
+        rcContext context(false);
+        rcHeightfield* heightfield = rcAllocHeightfield();
+        const float bmin[3] = {0.0f, 0.0f, 0.0f};
+        const float bmax[3] = {5.0f, 10.0f, 1.0f};
+        check(rcCreateHeightfield(&context, *heightfield, 5, 1, bmin, bmax, 1.0f, 0.1f), "heightfield allocation");
+        for (int x = 0; x < 5; ++x) {
+            rcAddSpan(&context, *heightfield, x, 0, 0, 10, RC_WALKABLE_AREA, 1);
+        }
+        rcCompactHeightfield* compact = rcAllocCompactHeightfield();
+        check(rcBuildCompactHeightfield(&context, 2, 1, *heightfield, *compact), "compact heightfield build");
+        constexpr unsigned char bridgeArea = 6;
+        for (const int x : {0, 1, 3, 4}) {
+            compact->areas[compact->cells[x].index] = bridgeArea;
+        }
+        compact->spans[compact->cells[2].index].reg = 5;
+        compact->spans[compact->cells[4].index].reg = 3;
+        compact->maxRegions = 5;
+
+        assignRegionsToUnpartitionedArea(*compact, bridgeArea);
+        const auto region = [&](const int x) { return compact->spans[compact->cells[x].index].reg; };
+        check(region(0) == 6 && region(1) == 6, "a connected patch should share one new region");
+        check(region(3) == 7, "a separate patch should get its own new region");
+        check(region(2) == 5 && region(4) == 3, "spans that kept a region should be untouched");
+        check(compact->maxRegions == 7, "new regions should raise the region count");
+        rcFreeCompactHeightfield(compact);
+        rcFreeHeightField(heightfield);
+    }
+
+    NavPower::Area squareArea(const float minX, const float minY, const float size) {
+        auto* area = new NavPower::Binary::Area();
+        std::vector<NavPower::Binary::Edge*> edges;
+        for (const auto& [x, y] : std::vector<std::pair<float, float>>{
+                 {minX, minY}, {minX + size, minY}, {minX + size, minY + size}, {minX, minY + size}}) {
+            auto* edge = new NavPower::Binary::Edge();
+            edge->m_pAdjArea = nullptr;
+            edge->m_pos = Vec3(x, y, 0.0f);
+            edges.push_back(edge);
+        }
+        return {area, edges};
+    }
+
+    void checkBridgeJoinAcrossGap(const Json::Rotation& rotation, const Json::Vec3& scale, const std::string& label) {
+        NavPower::NavMesh navMesh;
+        navMesh.m_aSections.emplace_back();
+        navMesh.m_aSections[0].m_aNavGraphs.emplace_back();
+        std::vector<NavPower::Area>& areas = navMesh.m_aSections[0].m_aNavGraphs[0].m_areas;
+        areas.push_back(squareArea(0.0f, 0.0f, 1.0f));
+        areas.push_back(squareArea(0.0f, 1.5f, 1.0f));
+        const Json::PfBox box("id", "bridge", {0.5f, 1.25f, 0.0f}, scale, rotation, {});
+
+        const std::vector<BridgeJoinResult> results = joinPlannerExcludedBridges(navMesh, {box});
+        check(results.size() == 1 && results[0].joined, label + ": the facing edges should be joined");
+        check(areas.size() == 3, label + ": one bridge area should be added");
+        const NavPower::Area& bridge = areas[2];
+        check(bridge.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED,
+            label + ": the bridge should be planner-excluded");
+        const std::vector<std::pair<float, float>> expectedCorners{{0, 1}, {1, 1}, {1, 1.5f}, {0, 1.5f}};
+        for (size_t i = 0; i < 4; ++i) {
+            check(bridge.m_edges[i]->m_pos.X == expectedCorners[i].first &&
+                    bridge.m_edges[i]->m_pos.Y == expectedCorners[i].second,
+                label + ": bridge corners should reuse the facing edge endpoints in order");
+        }
+        check(bridge.m_edges[0]->m_pAdjArea == areas[0].m_area && bridge.m_edges[1]->m_pAdjArea == nullptr &&
+                bridge.m_edges[2]->m_pAdjArea == areas[1].m_area && bridge.m_edges[3]->m_pAdjArea == nullptr,
+            label + ": bridge ends should link to both floors and its sides to nothing");
+        check(areas[0].m_edges[2]->m_pAdjArea == bridge.m_area && areas[1].m_edges[0]->m_pAdjArea == bridge.m_area,
+            label + ": both floor edges should link back to the bridge");
+        check(areas[0].m_edges[1]->m_pAdjArea == nullptr && areas[0].m_edges[3]->m_pAdjArea == nullptr,
+            label + ": side edges inside the box should stay unlinked");
+    }
+
+    void testBridgeJoinAcrossGap() {
+        checkBridgeJoinAcrossGap({0, 0, 0, 1}, {1.2f, 2.0f, 2.0f}, "unrotated box");
+        const float halfTurn = std::sqrt(0.5f);
+        checkBridgeJoinAcrossGap({0, 0, halfTurn, halfTurn}, {2.0f, 1.2f, 2.0f}, "box turned 90 degrees");
+    }
+
+    void testBridgeJoinFindsEdgesLongerThanTheBox() {
+        NavPower::NavMesh navMesh;
+        navMesh.m_aSections.emplace_back();
+        navMesh.m_aSections[0].m_aNavGraphs.emplace_back();
+        std::vector<NavPower::Area>& areas = navMesh.m_aSections[0].m_aNavGraphs[0].m_areas;
+        areas.push_back(squareArea(0.0f, 0.0f, 4.0f));
+        areas.push_back(squareArea(0.0f, 4.5f, 4.0f));
+        const Json::PfBox box("id", "bridge", {0.5f, 4.25f, 0.0f}, {1.0f, 2.0f, 2.0f}, {0, 0, 0, 1}, {});
+
+        const std::vector<BridgeJoinResult> results = joinPlannerExcludedBridges(navMesh, {box});
+        check(results[0].joined, "facing edges whose midpoints are outside the box should still be joined");
+        check(areas.size() == 3 && areas[0].m_edges[2]->m_pAdjArea == areas[2].m_area &&
+                areas[1].m_edges[0]->m_pAdjArea == areas[2].m_area,
+            "the edges crossing the box should be linked to the bridge");
+    }
+
+    void testBridgeJoinIgnoresEdgesTouchingTheBoxSide() {
+        NavPower::NavMesh navMesh;
+        navMesh.m_aSections.emplace_back();
+        navMesh.m_aSections[0].m_aNavGraphs.emplace_back();
+        std::vector<NavPower::Area>& areas = navMesh.m_aSections[0].m_aNavGraphs[0].m_areas;
+        areas.push_back(squareArea(0.0f, 0.0f, 1.0f));
+        areas.push_back(squareArea(0.0f, 2.0f, 1.0f));
+        areas.push_back(squareArea(1.0f, 0.5f, 1.0f));
+        areas.push_back(squareArea(1.0f, 1.8f, 1.0f));
+        const Json::PfBox box("id", "bridge", {0.5f, 1.5f, 0.0f}, {1.0f, 3.0f, 2.0f}, {0, 0, 0, 1}, {});
+
+        joinPlannerExcludedBridges(navMesh, {box});
+        check(areas.size() == 5 && areas[0].m_edges[2]->m_pAdjArea == areas[4].m_area &&
+                areas[1].m_edges[0]->m_pAdjArea == areas[4].m_area,
+            "the pads inside the box should be joined, not the closer edges that only touch its side");
     }
 
     void testUpdateVersionComparison() {
@@ -862,7 +1060,7 @@ namespace {
             ("NavKitNavpGlb_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         std::filesystem::create_directories(outputDirectory);
         settings.outputFolder = outputDirectory.string();
-        SceneMesh::getInstance().buildGlbFromNavp(false);
+        SceneMesh::getInstance().buildGlbFromNavp(false, true);
         const std::filesystem::path generatedGlb = outputDirectory / "outputNavp.glb";
         check(std::filesystem::exists(generatedGlb), "building a GLB from Navp should create the output file");
         RecastAdapter& adapter = RecastAdapter::getInstance();
@@ -1116,27 +1314,77 @@ namespace {
     bool buildWaypointNavmesh(WaypointNavFixture& fixture) {
         // Coordinates are quantized (x10) against cs = 0.1, so 46 means x = 4.6.
         const unsigned short verts[] = {
-            0, 0, 0, // 0 (0, 0)
-            46, 0, 0, // 1 (4.6, 0)
-            46, 0, 10, // 2 (4.6, 1)
-            0, 0, 10, // 3 (0, 1)
-            90, 0, 0, // 4 (9, 0)
-            90, 0, 10, // 5 (9, 1)
-            0, 0, 90, // 6 (0, 9)
-            46, 0, 90, // 7 (4.6, 9)
-            47, 0, 90, // 8 (4.7, 9)
-            47, 0, 10, // 9 (4.7, 1)
-            90, 0, 90, // 10 (9, 9)
+            0,
+            0,
+            0, // 0 (0, 0)
+            46,
+            0,
+            0, // 1 (4.6, 0)
+            46,
+            0,
+            10, // 2 (4.6, 1)
+            0,
+            0,
+            10, // 3 (0, 1)
+            90,
+            0,
+            0, // 4 (9, 0)
+            90,
+            0,
+            10, // 5 (9, 1)
+            0,
+            0,
+            90, // 6 (0, 9)
+            46,
+            0,
+            90, // 7 (4.6, 9)
+            47,
+            0,
+            90, // 8 (4.7, 9)
+            47,
+            0,
+            10, // 9 (4.7, 1)
+            90,
+            0,
+            90, // 10 (9, 9)
         };
         // Polygon i is followed by the neighbor indices of its four edges (0xffff = border):
         //   0: lower left,  1: upper left,  2: lower right,  3: right.
         // The passage between the left and right regions only exists along the bottom strip. The wall sliver
         // edges at x = 4.6 (polygon 1) and x = 4.7 (polygon 3) are borders without links.
         const unsigned short polyData[] = {
-            0, 1, 2, 3, 0xffff, 2, 1, 0xffff, // polygon 0 edges: bottom, right(sliver open), top(-x), left
-            3, 2, 7, 6, 0, 0xffff, 0xffff, 0xffff, // polygon 1 edges: bottom, right(sliver wall), top, left
-            1, 4, 5, 2, 0xffff, 0xffff, 3, 0, // polygon 2 edges: bottom, right, top, left(sliver open)
-            9, 5, 10, 8, 2, 0xffff, 0xffff, 0xffff, // polygon 3 edges: bottom, right, top, left(sliver wall)
+            0,
+            1,
+            2,
+            3,
+            0xffff,
+            2,
+            1,
+            0xffff, // polygon 0 edges: bottom, right(sliver open), top(-x), left
+            3,
+            2,
+            7,
+            6,
+            0,
+            0xffff,
+            0xffff,
+            0xffff, // polygon 1 edges: bottom, right(sliver wall), top, left
+            1,
+            4,
+            5,
+            2,
+            0xffff,
+            0xffff,
+            3,
+            0, // polygon 2 edges: bottom, right, top, left(sliver open)
+            9,
+            5,
+            10,
+            8,
+            2,
+            0xffff,
+            0xffff,
+            0xffff, // polygon 3 edges: bottom, right, top, left(sliver wall)
         };
         constexpr int polyCount = 4;
         constexpr int nvp = 4;
@@ -1263,6 +1511,12 @@ void runDomainTests() {
     run("JSON scene-record round trips", testJsonSceneRecordRoundTrips);
     run("JSON material-record round trips", testJsonMaterialRecords);
     run("Pathfinding box aggregation and fallback", testPathfindingBoxAggregation);
+    run("Planner-excluded bridge box parsing", testPlannerExcludedBridgeBoxParsing);
+    run("Planner-excluded area usage", testPlannerExcludedAreaUsage);
+    run("Unpartitioned bridge area region assignment", testUnpartitionedAreaRegionAssignment);
+    run("Bridge join across a gap", testBridgeJoinAcrossGap);
+    run("Bridge join finds edges longer than the box", testBridgeJoinFindsEdgesLongerThanTheBox);
+    run("Bridge join ignores edges touching the box side", testBridgeJoinIgnoresEdgesTouchingTheBoxSide);
     run("Update version comparison", testUpdateVersionComparison);
     run("Scene mesh lookup", testSceneMeshLookup);
     run("Grid bounds from AIRG", testGridBoundsFromAirg);

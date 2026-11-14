@@ -89,7 +89,9 @@ public:
 
     [[nodiscard]] int getTriCount() const;
 
-    void addConvexVolume(Json::PfBox& pfBox) const;
+    void addConvexVolume(const Json::PfBox& pfBox, unsigned char area) const;
+
+    static void pfBoxFootprintToRecast(const Json::PfBox& pfBox, float* verts);
 
     [[nodiscard]] const ConvexVolume* getConvexVolumes() const;
 

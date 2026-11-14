@@ -215,6 +215,11 @@ void Scene::saveScene(const std::string& fileName) const {
         separator = ",";
         pfBox.writeJson(ss);
     }
+    for (const auto& pfBox : plannerExcludedBridgeBoxes) {
+        ss << separator;
+        separator = ",";
+        pfBox.writeJson(ss);
+    }
 
     ss << R"(],"pfSeedPoints":[)";
     separator = "";
@@ -368,6 +373,7 @@ void Scene::clear() {
     prims.clear();
     includeBox = {};
     exclusionBoxes.clear();
+    plannerExcludedBridgeBoxes.clear();
     pfSeedPoints.clear();
     matis.clear();
     primMatis.clear();
