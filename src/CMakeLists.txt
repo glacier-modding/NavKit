@@ -112,6 +112,7 @@ target_link_libraries(NavKitLib PUBLIC
         glm::glm
         httplib::httplib
         nfd::nfd
+        OpenSSL::Crypto
         simdjson::simdjson
         simpleini
         wx::core

@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <httplib.h>
+#include <memory>
+#include <openssl/evp.h>
 #include <simdjson.h>
 #include <wx/process.h>
 #include <wx/stdpaths.h>
@@ -45,6 +47,87 @@ namespace {
         }
         argv.push_back(nullptr);
         return wxExecute(argv.data(), flags, nullptr, environment);
+    }
+
+    class VerifiedDownload {
+    public:
+        explicit VerifiedDownload(const std::filesystem::path& path) :
+            output(path, std::ios::binary | std::ios::trunc), hashContext(EVP_MD_CTX_new(), EVP_MD_CTX_free) {
+            hashing = hashContext && EVP_DigestInit_ex(hashContext.get(), EVP_sha256(), nullptr) == 1;
+        }
+
+        bool isOpen() const {
+            return output.is_open() && hashing;
+        }
+
+        void close() {
+            if (output.is_open()) {
+                output.close();
+            }
+        }
+
+        bool write(const char* data, const size_t length) {
+            output.write(data, static_cast<std::streamsize>(length));
+            hashing = hashing && EVP_DigestUpdate(hashContext.get(), data, length) == 1;
+            bytesWritten += length;
+            return output.good() && hashing;
+        }
+
+        std::string verify(const uint64_t expectedSize, const std::string& expectedSha256) {
+            output.close();
+            if (!output) {
+                return "could not write the update file";
+            }
+            if (bytesWritten != expectedSize) {
+                return "expected " + std::to_string(expectedSize) + " bytes but received " +
+                    std::to_string(bytesWritten);
+            }
+            unsigned char digest[EVP_MAX_MD_SIZE];
+            unsigned int digestLength = 0;
+            if (!hashing || EVP_DigestFinal_ex(hashContext.get(), digest, &digestLength) != 1) {
+                return "could not hash the update file";
+            }
+            std::string actualSha256;
+            for (unsigned int i = 0; i < digestLength; ++i) {
+                constexpr char hexDigits[] = "0123456789abcdef";
+                actualSha256 += hexDigits[digest[i] >> 4];
+                actualSha256 += hexDigits[digest[i] & 0xF];
+            }
+            if (actualSha256 != expectedSha256) {
+                return "SHA-256 mismatch: expected " + expectedSha256 + ", got " + actualSha256;
+            }
+            return {};
+        }
+
+    private:
+        std::ofstream output;
+        std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> hashContext;
+        bool hashing = false;
+        uint64_t bytesWritten = 0;
+    };
+
+    std::string downloadVerified(httplib::Client& client, const std::string& downloadPath,
+        const std::filesystem::path& destination, const uint64_t expectedSize, const std::string& expectedSha256) {
+        VerifiedDownload download(destination);
+        if (!download.isOpen()) {
+            return "could not create " + destination.string();
+        }
+        const auto response = client.Get(
+            downloadPath, [&](const char* data, const size_t dataLength) { return download.write(data, dataLength); });
+        std::string failure;
+        if (!response) {
+            failure = "connection failure";
+        } else if (response->status != 200) {
+            failure = "HTTP " + std::to_string(response->status);
+        } else {
+            failure = download.verify(expectedSize, expectedSha256);
+        }
+        if (!failure.empty()) {
+            download.close();
+            std::error_code error;
+            std::filesystem::remove(destination, error);
+        }
+        return failure;
     }
 } // namespace
 
@@ -123,6 +206,8 @@ void UpdateChecker::performUpdateCheck() {
 
         std::string latestVersionStr;
         std::string platformUpdateUrl;
+        uint64_t platformUpdateSize = 0;
+        std::string platformUpdateSha256;
         bool foundPlatformAsset = false;
 
         std::string_view latestVersionSV = doc["tag_name"];
@@ -142,6 +227,14 @@ void UpdateChecker::performUpdateCheck() {
                 for (simdjson::dom::element asset : assets) {
                     std::string_view url_sv = asset["browser_download_url"];
                     if (isPlatformReleaseAsset(url_sv)) {
+                        constexpr std::string_view sha256Prefix = "sha256:";
+                        std::string_view digest;
+                        if (asset["size"].get(platformUpdateSize) || asset["digest"].get(digest) ||
+                            !digest.starts_with(sha256Prefix)) {
+                            Logger::log(NK_ERROR, "The update asset has no size or SHA-256 digest to verify against.");
+                            break;
+                        }
+                        platformUpdateSha256 = std::string(digest.substr(sha256Prefix.size()));
                         platformUpdateUrl = std::string(url_sv);
                         foundPlatformAsset = true;
                         Logger::log(NK_INFO, ("Platform update URL: " + platformUpdateUrl).c_str());
@@ -159,6 +252,8 @@ void UpdateChecker::performUpdateCheck() {
                 std::lock_guard lock(updateChecker.mutex);
                 updateChecker.latestVersion = "v" + latestVersionStr;
                 updateChecker.updateUrl = platformUpdateUrl;
+                updateChecker.updateSize = platformUpdateSize;
+                updateChecker.updateSha256 = platformUpdateSha256;
                 updateChecker.updateCheckCompleted = true;
                 updateChecker.isUpdateAvailable = true;
             }
@@ -220,10 +315,14 @@ void UpdateChecker::performUpdate() {
 
     std::string localUpdateUrl;
     std::string localLatestVersion;
+    uint64_t localUpdateSize;
+    std::string localUpdateSha256;
     {
         std::lock_guard lock(mutex);
         localUpdateUrl = updateUrl;
         localLatestVersion = latestVersion;
+        localUpdateSize = updateSize;
+        localUpdateSha256 = updateSha256;
     }
 
     if (localUpdateUrl.empty()) {
@@ -279,21 +378,13 @@ void UpdateChecker::performUpdate() {
     Logger::log(NK_INFO, ("Downloading file: https://" + domain + msi_path_part).c_str());
     Logger::log(NK_INFO, ("Local path: " + local_msi_path.string()).c_str());
 
-    if (auto res = cli.Get(msi_path_part); res && res->status == 200) {
-        if (std::ofstream ofs(local_msi_path, std::ios::binary); ofs.is_open()) {
-            ofs << res->body;
-            ofs.close();
-            Logger::log(NK_INFO, ("File downloaded successfully to " + local_msi_path.string()).c_str());
-        } else {
-            Logger::log(
-                NK_ERROR, ("Error: Could not open local file " + local_msi_path.string() + " for writing.").c_str());
-            return;
-        }
-    } else {
-        Logger::log(NK_ERROR,
-            ("Error: HTTP error occurred: " + (res ? std::to_string(res->status) : "Connection failure")).c_str());
+    if (const std::string failure =
+            downloadVerified(cli, msi_path_part, local_msi_path, localUpdateSize, localUpdateSha256);
+        !failure.empty()) {
+        Logger::log(NK_ERROR, ("NavKit: Update download failed: " + failure).c_str());
         return;
     }
+    Logger::log(NK_INFO, ("File downloaded and verified at " + local_msi_path.string()).c_str());
 
     const std::vector<wxString> arguments = {pathToWxString(temp_updater_path), pathToWxString(local_msi_path),
         std::to_string(wxGetProcessId()), wxString::FromUTF8(localLatestVersion.c_str()), pathToWxString(install_dir)};
@@ -312,10 +403,14 @@ void UpdateChecker::performUpdate() {
 #elif defined(__APPLE__)
     std::string localUpdateUrl;
     std::string localLatestVersion;
+    uint64_t localUpdateSize;
+    std::string localUpdateSha256;
     {
         std::lock_guard lock(mutex);
         localUpdateUrl = updateUrl;
         localLatestVersion = latestVersion;
+        localUpdateSize = updateSize;
+        localUpdateSha256 = updateSha256;
     }
 
     if (localUpdateUrl.empty()) {
@@ -339,25 +434,10 @@ void UpdateChecker::performUpdate() {
     splitUrl(localUpdateUrl, domain, downloadPath);
     httplib::Client cli("https://" + domain);
     cli.set_follow_location(true);
-    std::ofstream output(dmgPath, std::ios::binary | std::ios::trunc);
-    if (!output.is_open()) {
-        Logger::log(NK_ERROR, ("NavKit: Could not create update file " + dmgPath.string()).c_str());
-        return;
-    }
-
     Logger::log(NK_INFO, ("Downloading macOS update " + localLatestVersion + ".").c_str());
-    const auto response = cli.Get(downloadPath, [&](const char* data, const size_t dataLength) {
-        output.write(data, static_cast<std::streamsize>(dataLength));
-        return output.good();
-    });
-    output.close();
-    if (!response || response->status != 200 || !output) {
-        std::error_code error;
-        std::filesystem::remove(dmgPath, error);
-        Logger::log(NK_ERROR,
-            ("NavKit: macOS update download failed: " +
-                (response ? std::to_string(response->status) : "connection failure"))
-                .c_str());
+    if (const std::string failure = downloadVerified(cli, downloadPath, dmgPath, localUpdateSize, localUpdateSha256);
+        !failure.empty()) {
+        Logger::log(NK_ERROR, ("NavKit: macOS update download failed: " + failure).c_str());
         return;
     }
 
@@ -378,10 +458,14 @@ void UpdateChecker::performUpdate() {
 #elif defined(__linux__)
     std::string localUpdateUrl;
     std::string localLatestVersion;
+    uint64_t localUpdateSize;
+    std::string localUpdateSha256;
     {
         std::lock_guard lock(mutex);
         localUpdateUrl = updateUrl;
         localLatestVersion = latestVersion;
+        localUpdateSize = updateSize;
+        localUpdateSha256 = updateSha256;
     }
 
     if (localUpdateUrl.empty()) {
@@ -405,28 +489,15 @@ void UpdateChecker::performUpdate() {
     splitUrl(localUpdateUrl, domain, downloadPath);
     httplib::Client cli("https://" + domain);
     cli.set_follow_location(true);
-    std::ofstream output(stagedAppImagePath, std::ios::binary | std::ios::trunc);
-    if (!output.is_open()) {
-        Logger::log(NK_ERROR, ("NavKit: Could not create update file " + stagedAppImagePath.string()).c_str());
-        return;
-    }
-
     Logger::log(NK_INFO, ("Downloading Linux update " + localLatestVersion + ".").c_str());
-    const auto response = cli.Get(downloadPath, [&](const char* data, const size_t dataLength) {
-        output.write(data, static_cast<std::streamsize>(dataLength));
-        return output.good();
-    });
-    output.close();
-    std::error_code error;
-    if (!response || response->status != 200 || !output) {
-        std::filesystem::remove(stagedAppImagePath, error);
-        Logger::log(NK_ERROR,
-            ("NavKit: Linux update download failed: " +
-                (response ? std::to_string(response->status) : "connection failure"))
-                .c_str());
+    if (const std::string failure =
+            downloadVerified(cli, downloadPath, stagedAppImagePath, localUpdateSize, localUpdateSha256);
+        !failure.empty()) {
+        Logger::log(NK_ERROR, ("NavKit: Linux update download failed: " + failure).c_str());
         return;
     }
 
+    std::error_code error;
     using std::filesystem::perms;
     std::filesystem::permissions(stagedAppImagePath,
         perms::owner_all | perms::group_read | perms::group_exec | perms::others_read | perms::others_exec, error);
