@@ -240,15 +240,12 @@ jobs:
       - name: Create vcpkg cache directory
         run: mkdir -p "${VCPKG_CACHE_DIR}"
 
-      - name: Verify navkit-rpkg-lib universal binaries
-        run: |
-          lipo lib/Debug/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
-          lipo lib/Release/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
-
       - name: Build universal macOS release
         run: |
           cmake --preset macos-release -D BUILD_TESTING=ON
           cmake --build --preset macos-release --parallel 4
+          lipo build/macos-release/lib/navkit-rpkg-lib/Debug/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
+          lipo build/macos-release/lib/navkit-rpkg-lib/Release/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
           ctest --test-dir build/macos-release --output-on-failure
           cmake --install build/macos-release --prefix "${GITHUB_WORKSPACE}/build/macos-stage"
 
@@ -414,15 +411,12 @@ jobs:
       - name: Create vcpkg cache directory
         run: mkdir -p "${VCPKG_CACHE_DIR}"
 
-      - name: Verify navkit-rpkg-lib universal binaries
-        run: |
-          lipo lib/Debug/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
-          lipo lib/Release/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
-
       - name: Build universal macOS release
         run: |
           cmake --preset macos-release -D BUILD_TESTING=ON
           cmake --build --preset macos-release --parallel 4
+          lipo build/macos-release/lib/navkit-rpkg-lib/Debug/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
+          lipo build/macos-release/lib/navkit-rpkg-lib/Release/libnavkit_rpkg_lib.dylib -verify_arch arm64 x86_64
           ctest --test-dir build/macos-release --output-on-failure
           cmake --install build/macos-release --prefix "${GITHUB_WORKSPACE}/build/macos-stage"
 
