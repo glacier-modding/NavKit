@@ -319,7 +319,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgl-dev libglu1-mesa-dev libegl-dev libxi-dev libxrandr-dev \
             libxcursor-dev libxinerama-dev libxxf86vm-dev libxss-dev libxmu-dev libxtst-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols autoconf autoconf-archive automake libtool bison flex nasm python3-jinja2 python3-setuptools \
+            libwayland-dev wayland-protocols autoconf autoconf-archive automake libtool libltdl-dev bison flex nasm python3-jinja2 python3-setuptools python3-venv \
             file
 
       - name: Checkout
@@ -562,7 +562,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgl-dev libglu1-mesa-dev libegl-dev libxi-dev libxrandr-dev \
             libxcursor-dev libxinerama-dev libxxf86vm-dev libxss-dev libxmu-dev libxtst-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols autoconf autoconf-archive automake libtool bison flex nasm python3-jinja2 python3-setuptools \
+            libwayland-dev wayland-protocols autoconf autoconf-archive automake libtool libltdl-dev bison flex nasm python3-jinja2 python3-setuptools python3-venv \
             file
 
       - name: Checkout
