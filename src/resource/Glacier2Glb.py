@@ -2586,7 +2586,9 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
     data = json.loads(f.read())
     f.close()
     transforms = {}
-    room_names = {}
+    room_collections = {}
+    room_folder_collections = {}
+    mesh_room_collections = {}
     room_color_index = 0
     room_folder_color_index = 0
 
@@ -2667,22 +2669,27 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             mesh_hash = hash_and_entity['primHash']
 
         room_folder_name = hash_and_entity["roomFolderName"][:63] if hash_and_entity["roomFolderName"] else "Default"
-        if room_folder_name not in bpy.data.collections:
-            coll = bpy.data.collections.new(room_folder_name)
-            bpy.context.scene.collection.children.link(coll)
-            coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
-            room_folder_color_index += 1
-            log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2obj")
+        if room_folder_name not in room_folder_collections:
+            coll = bpy.data.collections.get(room_folder_name)
+            if coll is None:
+                coll = bpy.data.collections.new(room_folder_name)
+                bpy.context.scene.collection.children.link(coll)
+                coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
+                room_folder_color_index += 1
+                log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2obj")
+            room_folder_collections[room_folder_name] = coll
 
-        room_folder_coll = bpy.data.collections.get(room_folder_name)
+        room_folder_coll = room_folder_collections[room_folder_name]
 
         room_name = hash_and_entity["roomName"][:63] if hash_and_entity["roomName"] else "Default"
-        if room_name not in bpy.data.collections:
+        room_collection_key = (room_folder_name, room_name)
+        if room_collection_key not in room_collections:
             coll = bpy.data.collections.new(room_name)
             room_folder_coll.children.link(coll)
             coll.color_tag = "COLOR_0" + str(room_color_index % 8 + 1)
             room_color_index += 1
             log("DEBUG", "Adding new collection for room name: " + room_name, "glacier2obj")
+            room_collections[room_collection_key] = coll
 
         entity = hash_and_entity['entity']
         transform = {"position": entity["position"], "rotate": entity["rotation"],
@@ -2690,9 +2697,9 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
 
         if mesh_hash not in transforms:
             transforms[mesh_hash] = []
-            room_names[mesh_hash] = []
+            mesh_room_collections[mesh_hash] = []
         transforms[mesh_hash].append(transform)
-        room_names[mesh_hash].append(room_name)
+        mesh_room_collections[mesh_hash].append(room_collections[room_collection_key])
     output_dir = os.path.abspath(os.path.dirname(path_to_output_glb_file))
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
     log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2obj")
@@ -2814,32 +2821,45 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                                 instance_bbox_center - pf_box_bounding_sphere_center).length_squared > threshold * threshold:
                             culled_indices.add(u)
 
-                positions = [mesh_positions[u] for u in range(mesh_instance_count) if u not in culled_indices]
-                rotations = [mesh_rotations[u] for u in range(mesh_instance_count) if u not in culled_indices]
-                scales = [mesh_scales[u] for u in range(mesh_instance_count) if u not in culled_indices]
+                room_instances = []
+                for mesh_index in range(mesh_instance_count):
+                    if mesh_index in culled_indices:
+                        continue
+                    room_collection = mesh_room_collections[mesh_hash][mesh_index]
+                    room_group = next(
+                        (group for group in room_instances if group[0] is room_collection), None)
+                    if room_group is None:
+                        room_group = (room_collection, [])
+                        room_instances.append(room_group)
+                    room_group[1].append(mesh_index)
 
-                # create the "fake" placement mesh
-                mesh = bpy.data.meshes.new(mesh_hash + "_placement")
-                mesh.from_pydata(positions, [], [])
-                # rotation attrib
-                attr = mesh.attributes.new(name="rotation", type='FLOAT_VECTOR', domain='POINT')
-                for mesh_index, r in enumerate(rotations):
-                    attr.data[mesh_index].vector = r
-                # scale attrib
-                attr = mesh.attributes.new(name="scale", type='FLOAT_VECTOR', domain='POINT')
-                for mesh_index, s in enumerate(scales):
-                    attr.data[mesh_index].vector = s
+                for room_collection, instance_indices in room_instances:
+                    positions = [mesh_positions[i] for i in instance_indices]
+                    rotations = [mesh_rotations[i] for i in instance_indices]
+                    scales = [mesh_scales[i] for i in instance_indices]
 
-                mesh.update()
-                attr_obj = bpy.data.objects.new(mesh_hash + "_placement", mesh)
-                bpy.context.collection.objects.link(attr_obj)
+                    # Create a placement mesh for this room's instances.
+                    mesh = bpy.data.meshes.new(mesh_hash + "_placement")
+                    mesh.from_pydata(positions, [], [])
+                    attr = mesh.attributes.new(name="rotation", type='FLOAT_VECTOR', domain='POINT')
+                    for mesh_index, rotation in enumerate(rotations):
+                        attr.data[mesh_index].vector = rotation
+                    attr = mesh.attributes.new(name="scale", type='FLOAT_VECTOR', domain='POINT')
+                    for mesh_index, scale in enumerate(scales):
+                        attr.data[mesh_index].vector = scale
+
+                    mesh.update()
+                    attr_obj = bpy.data.objects.new(mesh_hash + "_placement", mesh)
+                    room_collection.objects.link(attr_obj)
+
+                    modifier = attr_obj.modifiers.new(name="GeometryNodes", type='NODES')
+                    modifier.node_group = bpy.data.node_groups[geo_node_name]
+                    modifier["Socket_2"] = submesh
+                    modifier["Socket_3"] = "rotation"
+                    modifier["Socket_4"] = "scale"
+
                 submesh.hide_viewport = True
 
-                modifier = attr_obj.modifiers.new(name="GeometryNodes", type='NODES')
-                modifier.node_group = bpy.data.node_groups[geo_node_name]
-                modifier["Socket_2"] = submesh
-                modifier["Socket_3"] = "rotation"
-                modifier["Socket_4"] = "scale"
                 if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
                     log("TRACE", "Adding texture", "glacier2obj")
                     try:
@@ -2882,17 +2902,18 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                 scales.append([mesh_scales[u] for u in range(mesh_instance_count) if u not in culled_indices])
             unlinked = [False for _ in range(submesh_count)]
             for mesh_index in range(mesh_instance_count):
-                room_name = room_names[mesh_hash][mesh_index]
+                room_collection = mesh_room_collections[mesh_hash][mesh_index]
                 mesh_instance_id = transforms[mesh_hash][mesh_index]["id"]
                 log("DEBUG", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_name, "glacier2obj")
+                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_collection.name, "glacier2obj")
                 mesh_i += 1
                 log("TRACE", "Total submeshes: " + str(submesh_count), "glacier2obj")
                 for submesh_instance_index in range(submesh_count):
                     submesh = submeshes[submesh_instance_index]
                     if not unlinked[submesh_instance_index]:
-                        bpy.context.scene.collection.objects.unlink(submesh)
+                        for collection in list(submesh.users_collection):
+                            collection.objects.unlink(submesh)
                         unlinked[submesh_instance_index] = True
                     if mesh_index >= len(positions[submesh_instance_index]):
                         continue
@@ -2900,7 +2921,7 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                         current_submesh = submesh
                     else:
                         current_submesh = submesh.copy()
-                    bpy.data.collections.get(room_name).objects.link(current_submesh)
+                    room_collection.objects.link(current_submesh)
                     current_submesh.name = mesh_hash + "_" + mesh_instance_id
                     current_submesh.select_set(True)
                     current_submesh.scale = mathutils.Vector(
