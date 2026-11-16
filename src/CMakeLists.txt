@@ -115,6 +115,20 @@ elseif (APPLE)
             IMPORTED_SONAME_RELEASE "@rpath/libnavkit_rpkg_lib.dylib"
     )
     add_dependencies(navkit-rpkg-lib navkit-rpkg-lib-fixup)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CMAKE_SKIP_BUILD_RPATH OFF)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH OFF)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    set(CMAKE_INSTALL_RPATH "$ORIGIN;$ORIGIN/lib")
+
+    add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL)
+    set_target_properties(navkit-rpkg-lib PROPERTIES
+            IMPORTED_CONFIGURATIONS "DEBUG;RELEASE"
+            IMPORTED_LOCATION_DEBUG "${NavKit_SOURCE_DIR}/lib/Debug/linux/${CMAKE_SYSTEM_PROCESSOR}/libnavkit_rpkg_lib.so"
+            IMPORTED_LOCATION_RELEASE "${NavKit_SOURCE_DIR}/lib/Release/linux/${CMAKE_SYSTEM_PROCESSOR}/libnavkit_rpkg_lib.so"
+            MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+            MAP_IMPORTED_CONFIG_MINSIZEREL Release
+    )
 else ()
     message(FATAL_ERROR "navkit-rpkg-lib has no native library for this platform.")
 endif ()
@@ -141,7 +155,6 @@ target_link_libraries(NavKitLib PUBLIC
         SDL2::SDL2main
         assimp::assimp
         cpptrace::cpptrace
-        ftgl
         glm::glm
         httplib::httplib
         nfd::nfd
@@ -206,6 +219,9 @@ set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/tile.bmp"
         "${NavKit_SOURCE_DIR}/src/resource/NavKitLogo.png"
 )
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND RUNTIME_FILE_DEPENDENCIES "$<TARGET_FILE:navkit-rpkg-lib>")
+endif ()
 set(RUNTIME_FILE_DEPENDENCIES ${RUNTIME_FILE_DEPENDENCIES} PARENT_SCOPE)
 
 set(STAGED_DLL_PATHS "")

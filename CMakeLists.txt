@@ -22,27 +22,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(BUILD_TESTING "Build the tests" OFF)
 find_package(BZip2 REQUIRED)
 
-if (WIN32)
-    find_package(FTGL CONFIG REQUIRED)
-else ()
-    # vcpkg's ftgl port installs its CMake config one level too deep on non-Windows (share/ftgl/FTGL/), which also breaks the import prefix inside it.
-    # So we'll prefer the config when it is usable and otherwise import the static library directly.
-    find_package(FTGL CONFIG QUIET)
-    if (NOT TARGET ftgl)
-        find_library(FTGL_LIBRARY_RELEASE NAMES ftgl REQUIRED)
-        find_library(FTGL_LIBRARY_DEBUG NAMES ftgld ftgl REQUIRED)
-        find_path(FTGL_INCLUDE_DIR NAMES FTGL/ftgl.h REQUIRED)
-        add_library(ftgl UNKNOWN IMPORTED)
-        set_target_properties(ftgl PROPERTIES
-                IMPORTED_LOCATION "${FTGL_LIBRARY_RELEASE}"
-                IMPORTED_LOCATION_DEBUG "${FTGL_LIBRARY_DEBUG}"
-                INTERFACE_INCLUDE_DIRECTORIES "${FTGL_INCLUDE_DIR}"
-                INTERFACE_LINK_LIBRARIES "Freetype::Freetype;OpenGL::GL"
-        )
-        message(STATUS "FTGL: imported ${FTGL_LIBRARY_RELEASE} directly (vcpkg config not usable)")
-    endif ()
-endif ()
-
 find_package(Freetype REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -87,7 +66,6 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:assimp::assimp>"
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"
-        "$<TARGET_FILE:ftgl>"
         "$<TARGET_FILE:unofficial::minizip::minizip>"
         "$<TARGET_FILE:nfd::nfd>"
         "$<TARGET_FILE:simdjson::simdjson>"

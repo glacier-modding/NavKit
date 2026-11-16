@@ -97,11 +97,21 @@ NavKit performs the following series of steps to be able to generate Navp files.
 * Linux and macOS support
 * More planned features are on the Issues tab
 # 🛠️ Building instructions on Windows (CLion or Visual Studio)
-1. Clone this repository with the `--recurse-submodules` option
+1. Clone this repository with the `--recurse-submodules` option, or run `git submodule update --init --recursive` after cloning
+1. In extern/vcpkg, run `bootstrap-vcpkg.bat` to build vcpkg
 1. Open in Visual Studio or CLion
 1. Cmake should load
 1. Load presets
-1. Run x64-debug or x64-release preset. 
+1. Run x64-debug or x64-release preset
+
+# Building on Debian/Ubuntu
+While running vcpkg install, you may need to install any missing dependencies. For instance, install the GLU development package required by vcpkg's GLEW port and Python's venv support required by the libsystemd port:
+
+```sh
+sudo apt install libglu1-mesa-dev python3-venv
+```
+
+These provide `glu.pc` for GLEW's pkg-config metadata and `ensurepip` for vcpkg's Python virtual environment (on some Debian releases, install the matching `python3.X-venv` package if requested).
 
 # 🧪 Manually running the integration test
 
