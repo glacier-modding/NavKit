@@ -30,6 +30,7 @@
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include "../../include/NavKit/module/SceneExtract.h"
+#include "../../include/NavKit/util/BridgeJoiner.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavWeakness/NavPower.h"
@@ -40,10 +41,10 @@
 Navp::Navp() :
     navMesh(new NavPower::NavMesh()), selectedNavpAreaIndex(-1), selectedPfSeedPointIndex(-1),
     selectedExclusionBoxIndex(-1), navpLoaded(false), showNavp(true), showKdTree(false), showNavpIndices(false),
-    showPfExclusionBoxes(true), showPfSeedPoints(true), showRecastDebugInfo(false), doZRenderOffset(false),
-    doNavpHitTest(false), doNavpExclusionBoxHitTest(false), doNavpPfSeedPointHitTest(false), loading(false),
-    stairsCheckboxValue(false), building(false), loadNavpName("Load Navp"), lastLoadNavpFile(loadNavpName),
-    saveNavpName("Save Navp"), lastSaveNavpFile(saveNavpName) {}
+    showPfExclusionBoxes(true), showPfBridgeBoxes(true), showPfSeedPoints(true), showRecastDebugInfo(false),
+    doZRenderOffset(false), doNavpHitTest(false), doNavpExclusionBoxHitTest(false), doNavpPfSeedPointHitTest(false),
+    loading(false), stairsCheckboxValue(false), building(false), loadNavpName("Load Navp"),
+    lastLoadNavpFile(loadNavpName), saveNavpName("Save Navp"), lastSaveNavpFile(saveNavpName) {}
 
 Navp::~Navp() = default;
 
@@ -87,6 +88,8 @@ void Navp::updateNavMeshBuffers(const NavPower::NavMesh* navMesh, int selectedIn
         glm::vec4 areaColor;
         if (area->m_usageFlags == NavPower::AreaUsageFlags::AREA_STEPS) {
             areaColor = selected ? glm::vec4(1.0, 1.0, 0.5, 1.0) : glm::vec4(0.5, 0.5, 0.0, 1.0);
+        } else if (area->m_usageFlags == NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED) {
+            areaColor = selected ? glm::vec4(1.0, 0.5, 1.0, 1.0) : glm::vec4(0.6, 0.0, 0.6, 1.0);
         } else {
             areaColor = selected ? glm::vec4(0.0, 0.9, 0.0, 1.0) : glm::vec4(0.0, 0.5, 0.0, 1.0);
         }
@@ -330,6 +333,18 @@ void Navp::renderExclusionBoxes() const {
     }
 }
 
+void Navp::renderPlannerExcludedBridgeBoxes() const {
+    if (showPfBridgeBoxes) {
+        Renderer& renderer = Renderer::getInstance();
+        for (const Json::PfBox& bridgeBox : Scene::getInstance().plannerExcludedBridgeBoxes) {
+            renderer.drawBox({bridgeBox.pos.x, bridgeBox.pos.z, -bridgeBox.pos.y},
+                {bridgeBox.scale.x, bridgeBox.scale.z, -bridgeBox.scale.y},
+                {bridgeBox.rotation.x, bridgeBox.rotation.z, -bridgeBox.rotation.y, bridgeBox.rotation.w}, true,
+                {0.5, 0, 0.6}, true, {0.8, 0, 1.0}, 1.0);
+        }
+    }
+}
+
 void Navp::renderExclusionBoxesForHitTest() const {
     if (showPfExclusionBoxes && Scene::getInstance().sceneLoaded) {
         Renderer& renderer = Renderer::getInstance();
@@ -365,9 +380,13 @@ char* Navp::openSaveNavpFileDialog() {
 void Navp::updateExclusionBoxConvexVolumes() {
     if (SceneMesh::getInstance().glbLoaded) {
         if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
+            const Scene& scene = Scene::getInstance();
             recastAdapter.clearConvexVolumes();
-            for (Json::PfBox exclusionBox : Scene::getInstance().exclusionBoxes) {
-                recastAdapter.addConvexVolume(exclusionBox);
+            for (const Json::PfBox& exclusionBox : scene.exclusionBoxes) {
+                recastAdapter.addConvexVolume(exclusionBox, SAMPLE_POLYAREA_WATER);
+            }
+            for (const Json::PfBox& bridgeBox : scene.plannerExcludedBridgeBoxes) {
+                recastAdapter.addConvexVolume(bridgeBox, SAMPLE_POLYAREA_BRIDGE_PAD);
             }
         }
     }
@@ -380,6 +399,9 @@ bool Navp::areaIsStairs(const NavPower::Area& area) {
 void Navp::setStairsFlags() const {
     for (int i = 0; i < getTotalAreaCount(navMesh); ++i) {
         auto& area = getAreaByIndex(navMesh, i);
+        if (area.m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED) {
+            continue;
+        }
         const Vec3 normal = area.CalculateNormal();
         const Vec3 horizontalProjection = {normal.Y, 0.0f, normal.Z};
         const float horizontalMagnitude = std::sqrt(
@@ -800,6 +822,14 @@ void Navp::renderKdTree() {
     }
 }
 
+void Navp::joinBridges() const {
+    for (const BridgeJoinResult& result :
+        joinPlannerExcludedBridges(*navMesh, Scene::getInstance().plannerExcludedBridgeBoxes)) {
+        Logger::log(result.joined ? NK_INFO : NK_WARN,
+            ("Bridge box " + result.boxName + (result.joined ? " joined: " : " not joined: ") + result.detail).c_str());
+    }
+}
+
 void Navp::loadNavMesh(
     const std::string& fileName, const bool isFromJson, const bool isFromBuildingNavp, const bool isFromBuildingAirg) {
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -815,6 +845,9 @@ void Navp::loadNavMesh(
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         if (isFromBuildingNavp || isFromBuildingAirg) {
             setStairsFlags();
+            if (isFromBuildingNavp) {
+                joinBridges();
+            }
             outputNavpFilename = (std::filesystem::u8path(navKitSettings.outputFolder) /
                 (isFromBuildingNavp ? "output.navp" : "outputForAirg.navp"))
                                      .string();
@@ -1008,10 +1041,16 @@ void Navp::handleSaveNavpClicked() {
 }
 
 bool Navp::stairsAreaSelected() const {
-    return selectedNavpAreaIndex == -1 ? false
-        : selectedNavpAreaIndex < getTotalAreaCount(navMesh)
-        ? areaIsStairs(getAreaByIndex(navMesh, selectedNavpAreaIndex))
-        : false;
+    return selectedAreaHasUsage(NavPower::AreaUsageFlags::AREA_STEPS);
+}
+
+bool Navp::plannerExcludedAreaSelected() const {
+    return selectedAreaHasUsage(NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED);
+}
+
+bool Navp::selectedAreaHasUsage(const NavPower::AreaUsageFlags usage) const {
+    return selectedNavpAreaIndex != -1 && selectedNavpAreaIndex < getTotalAreaCount(navMesh) &&
+        getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags == usage;
 }
 
 bool Navp::canBuildNavp() const {
@@ -1027,20 +1066,22 @@ bool Navp::canSave() const {
 }
 
 void Navp::handleEditStairsClicked() const {
-    if (selectedNavpAreaIndex != -1) {
-        const NavPower::AreaUsageFlags newType = (getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags ==
-                                                     NavPower::AreaUsageFlags::AREA_STEPS)
-            ? NavPower::AreaUsageFlags::AREA_FLAT
-            : NavPower::AreaUsageFlags::AREA_STEPS;
-        const std::string newTypeString = (getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags ==
-                                              NavPower::AreaUsageFlags::AREA_STEPS)
-            ? "AREA_FLAT"
-            : "AREA_STEPS";
-        Logger::log(NK_INFO, ("Setting area type to: " + newTypeString).c_str());
-        getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags = newType;
-        navMeshDirty = true;
-        Menu::updateMenuState();
+    toggleSelectedAreaUsage(NavPower::AreaUsageFlags::AREA_STEPS);
+}
+
+void Navp::handleEditPlannerExcludedClicked() const {
+    toggleSelectedAreaUsage(NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED);
+}
+
+void Navp::toggleSelectedAreaUsage(const NavPower::AreaUsageFlags usage) const {
+    if (selectedNavpAreaIndex == -1) {
+        return;
     }
+    NavPower::AreaUsageFlags& areaUsage = getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags;
+    areaUsage = areaUsage == usage ? NavPower::AreaUsageFlags::AREA_FLAT : usage;
+    Logger::log(NK_INFO, ("Setting area type to: " + NavPower::AreaUsageFlagToString(areaUsage)).c_str());
+    navMeshDirty = true;
+    Menu::updateMenuState();
 }
 
 void Navp::handleBuildNavpClicked() {

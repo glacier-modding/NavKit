@@ -51,6 +51,7 @@ wxMenuBar* Menu::createMenuBar() {
 
     auto* edit = new wxMenu();
     edit->AppendCheckItem(IDM_EDIT_NAVP_STAIRS, "&Stairs Area");
+    edit->AppendCheckItem(IDM_EDIT_NAVP_PLANNER_EXCLUDED, "&Planner Excluded Area");
     edit->AppendCheckItem(IDM_EDIT_AIRG_CONNECT_WAYPOINT, "&Connect Airg Waypoint Mode");
     edit->AppendCheckItem(IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, "&Disconnect Airg Waypoint Mode");
     bar->Append(edit, "&Edit");
@@ -71,6 +72,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendCheckItem(IDM_VIEW_NAVP_SHOW_INDICES, "Show Navp &Indices");
     view->AppendCheckItem(IDM_VIEW_NAVP_SHOW_KD_TREE, "Show &KD Tree");
     view->AppendCheckItem(IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, "Show &Exclusion Boxes")->Check();
+    view->AppendCheckItem(IDM_VIEW_NAVP_SHOW_PF_BRIDGE_BOXES, "Show &Planner Excluded Bridge Boxes")->Check();
     view->AppendCheckItem(IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS, "Show &Seed Points")->Check();
     view->AppendCheckItem(IDM_VIEW_NAVP_Z_RENDER_OFFSET, "&Z Render Offset");
     view->AppendCheckItem(IDM_VIEW_NAVP_SHOW_RECAST_DEBUG_INFO, "Show &Recast Debug Info");
@@ -200,6 +202,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_SAVE_BLEND, obj.canSaveBlend());
 
     setMenuItemEnabled(IDM_EDIT_NAVP_STAIRS, isAreaSelected);
+    setMenuItemEnabled(IDM_EDIT_NAVP_PLANNER_EXCLUDED, isAreaSelected);
     setMenuItemEnabled(IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.canEnterConnectWaypointMode());
     setMenuItemEnabled(IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.canEnterConnectWaypointMode());
 
@@ -219,6 +222,8 @@ void Menu::updateMenuState() {
         isStairs = navp.stairsAreaSelected();
     }
     setMenuItemChecked(IDM_EDIT_NAVP_STAIRS, isStairs, "Stairs Area");
+    setMenuItemChecked(
+        IDM_EDIT_NAVP_PLANNER_EXCLUDED, isAreaSelected && navp.plannerExcludedAreaSelected(), "Planner Excluded Area");
     setMenuItemChecked(
         IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
     setMenuItemChecked(
@@ -332,6 +337,11 @@ int Menu::handleMenuClicked(const int menuId) {
         navp.handleEditStairsClicked();
         break;
 
+    case IDM_EDIT_NAVP_PLANNER_EXCLUDED:
+        Logger::log(NK_DEBUG, "Edit -> Navp Planner Excluded clicked");
+        navp.handleEditPlannerExcludedClicked();
+        break;
+
     case IDM_EDIT_AIRG_CONNECT_WAYPOINT:
         Logger::log(NK_DEBUG, "Edit -> Airg Connect Waypoint clicked");
         airg.handleConnectWaypointClicked();
@@ -362,6 +372,10 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES:
         handleCheckboxMenuItem(
             IDM_VIEW_NAVP_SHOW_PF_EXCLUDE_BOXES, Navp::getInstance().showPfExclusionBoxes, "Show Exclusion Boxes");
+        break;
+    case IDM_VIEW_NAVP_SHOW_PF_BRIDGE_BOXES:
+        handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_PF_BRIDGE_BOXES, Navp::getInstance().showPfBridgeBoxes,
+            "Show Planner Excluded Bridge Boxes");
         break;
     case IDM_VIEW_NAVP_SHOW_PF_SEED_POINTS:
         handleCheckboxMenuItem(

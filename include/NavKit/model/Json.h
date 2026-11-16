@@ -185,6 +185,7 @@ namespace Json {
         static inline const std::string EXCLUDE_TYPE = "PFBT_EXCLUDE_MESH_COLLISION";
 
         static inline const std::string NO_INCLUDE_BOX_FOUND = "NO_INCLUDE_BOX_FOUND";
+        static inline const std::string PLANNER_EXCLUDED_BRIDGE_NAME_PREFIX = "NavKit_PlannerExcludedBridge";
 
         PfBoxes(simdjson::ondemand::array);
 

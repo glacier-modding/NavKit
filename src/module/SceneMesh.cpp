@@ -239,7 +239,7 @@ void SceneMesh::showSceneMeshDialog() {
     dialog->Show();
 }
 
-void SceneMesh::buildGlbFromNavp(const bool alsoLoadIntoUi) {
+void SceneMesh::buildGlbFromNavp(const bool alsoLoadIntoUi, const bool includePlannerExcludedAreas) {
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::string fileName = (std::filesystem::u8path(navKitSettings.outputFolder) / "outputNavp.glb").string();
     Gui& gui = Gui::getInstance();
@@ -254,6 +254,10 @@ void SceneMesh::buildGlbFromNavp(const bool alsoLoadIntoUi) {
     for (auto section : navp.navMesh->m_aSections) {
         for (auto navGraph : section.m_aNavGraphs) {
             for (const auto& [m_area, m_edges] : navGraph.m_areas) {
+                if (!includePlannerExcludedAreas &&
+                    m_area->m_usageFlags == NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED) {
+                    continue;
+                }
                 std::vector<int> face;
                 for (const auto edge : m_edges) {
                     auto point = edge->m_pos;
@@ -768,7 +772,7 @@ void SceneMesh::handleBuildBlendAndGlbFromSceneClicked() {
 }
 
 void SceneMesh::handleBuildGlbFromNavpClicked() {
-    return buildGlbFromNavp(true);
+    return buildGlbFromNavp(true, true);
 }
 
 void SceneMesh::finalizeLoad() {

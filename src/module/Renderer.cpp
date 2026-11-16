@@ -351,6 +351,9 @@ void Renderer::renderFrame() {
     if (const Navp& navp = Navp::getInstance(); navp.showPfExclusionBoxes && scene.sceneLoaded) {
         navp.renderExclusionBoxes();
     }
+    if (const Navp& navp = Navp::getInstance(); navp.showPfBridgeBoxes && scene.sceneLoaded) {
+        navp.renderPlannerExcludedBridgeBoxes();
+    }
     if (const Navp& navp = Navp::getInstance(); navp.showPfSeedPoints && scene.sceneLoaded) {
         navp.renderPfSeedPoints();
     }

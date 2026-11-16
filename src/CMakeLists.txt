@@ -2,6 +2,7 @@ configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit
 configure_file("${NavKit_SOURCE_DIR}/include/NavKit/NavKitConfig.h.in" "${NavKit_BINARY_DIR}/NavKit/NavKitConfig.h")
 set(RECAST_DEMO_SOURCES
         extern/RecastDemo/ChunkyTriMesh.cpp
+        extern/RecastDemo/UnpartitionedAreaRegions.cpp
         extern/RecastDemo/InputGeom.cpp
         extern/RecastDemo/MeshLoaderGlb.cpp
         extern/RecastDemo/PerfTimer.cpp
@@ -48,6 +49,7 @@ set(RENDER_SOURCES
         render/stb_image_impl.cpp
 )
 set(UTIL_SOURCES
+        util/BridgeJoiner.cpp
         util/CommandRunner.cpp
         util/ErrorHandler.cpp
         util/FileUtil.cpp

@@ -79,6 +79,8 @@ public:
 
     void renderExclusionBoxes() const;
 
+    void renderPlannerExcludedBridgeBoxes() const;
+
     void renderExclusionBoxesForHitTest() const;
 
     void renderNavMesh();
@@ -128,6 +130,7 @@ public:
     bool showKdTree;
     bool showNavpIndices;
     bool showPfExclusionBoxes;
+    bool showPfBridgeBoxes;
     bool showPfSeedPoints;
     bool showRecastDebugInfo;
     bool doNavpHitTest;
@@ -157,15 +160,23 @@ public:
 
     bool stairsAreaSelected() const;
 
+    bool plannerExcludedAreaSelected() const;
+
     bool canBuildNavp() const;
 
     bool canSave() const;
 
     void handleEditStairsClicked() const;
 
+    void handleEditPlannerExcludedClicked() const;
+
     void handleBuildNavpClicked();
 
     static void updateExclusionBoxConvexVolumes();
+
+    void setStairsFlags() const;
+
+    void joinBridges() const;
 
     void loadNavMesh(const std::string& fileName, bool isFromJson, bool isFromBuildingNavp, bool isFromBuildingAirg);
 
@@ -185,7 +196,9 @@ public:
 private:
     static bool areaIsStairs(const NavPower::Area& area);
 
-    void setStairsFlags() const;
+    bool selectedAreaHasUsage(NavPower::AreaUsageFlags usage) const;
+
+    void toggleSelectedAreaUsage(NavPower::AreaUsageFlags usage) const;
 
     static char* openLoadNavpFileDialog();
 

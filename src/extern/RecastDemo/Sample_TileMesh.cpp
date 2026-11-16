@@ -26,6 +26,7 @@
 #include "../../include/RecastDemo/InputGeom.h"
 #include "../../include/RecastDemo/Sample.h"
 #include "../../include/RecastDemo/Sample_TileMesh.h"
+#include "../../include/RecastDemo/UnpartitionedAreaRegions.h"
 #include "Recast.h"
 #include "RecastDebugDraw.h"
 #include "DetourNavMesh.h"
@@ -847,6 +848,8 @@ unsigned char* Sample_TileMesh::buildTileMesh(
         }
     }
 
+    assignRegionsToUnpartitionedArea(*m_chf, SAMPLE_POLYAREA_BRIDGE_PAD);
+
     // Create contours.
     m_cset = rcAllocContourSet();
     if (!m_cset) {
@@ -907,7 +910,7 @@ unsigned char* Sample_TileMesh::buildTileMesh(
                 m_pmesh->areas[i] = SAMPLE_POLYAREA_GROUND;
 
             if (m_pmesh->areas[i] == SAMPLE_POLYAREA_GROUND || m_pmesh->areas[i] == SAMPLE_POLYAREA_GRASS ||
-                m_pmesh->areas[i] == SAMPLE_POLYAREA_ROAD) {
+                m_pmesh->areas[i] == SAMPLE_POLYAREA_ROAD || m_pmesh->areas[i] == SAMPLE_POLYAREA_BRIDGE_PAD) {
                 m_pmesh->flags[i] = SAMPLE_POLYFLAGS_WALK;
             } else if (m_pmesh->areas[i] == SAMPLE_POLYAREA_WATER) {
                 m_pmesh->flags[i] = SAMPLE_POLYFLAGS_DISABLED;
