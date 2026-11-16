@@ -20,7 +20,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_TESTING "Build the tests" OFF)
-set(NAVKIT_RPKG_LIB_VERSION "v1.3.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
+set(NAVKIT_RPKG_LIB_VERSION "v1.5.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
 find_package(BZip2 REQUIRED)
 
 find_package(Freetype REQUIRED)
