@@ -9,7 +9,7 @@
 #include "../../include/NavKit/util/FileUtil.h"
 
 PersistedSettings::PersistedSettings() : ini(CSimpleIniA()) {
-#ifdef __APPLE__
+#ifndef _WIN32
     const std::filesystem::path settingsDirectory = FileUtil::getUserDataDirectory();
     std::error_code error;
     std::filesystem::create_directories(settingsDirectory, error);

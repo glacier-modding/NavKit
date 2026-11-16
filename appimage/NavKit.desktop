@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NavKit
+Comment=Create NAVP and AIRG files for Hitman: World of Assassination
+Exec=NavKit
+Icon=NavKitLogo
+Categories=Development;Graphics;
+Terminal=false

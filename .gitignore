@@ -397,3 +397,6 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 /.idea/.idea.NavKit/.idea/workspace.xml
+
+# Linux AppImage installer output
+*.AppImage

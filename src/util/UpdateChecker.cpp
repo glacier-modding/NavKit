@@ -1,4 +1,5 @@
 #include "../../include/NavKit/util/UpdateChecker.h"
+#include <cstdlib>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -24,6 +25,8 @@ namespace {
         return url.ends_with(".msi");
 #elif defined(__APPLE__)
         return url.ends_with("NavKit-macos-universal.dmg");
+#elif defined(__linux__)
+        return url.ends_with("NavKit-linux-x86_64.AppImage");
 #else
         return false;
 #endif
@@ -328,8 +331,7 @@ void UpdateChecker::performUpdate() {
         return;
     }
 
-    const std::filesystem::path tempPath =
-        std::filesystem::u8path(wxStandardPaths::Get().GetTempDir().ToUTF8().data());
+    const std::filesystem::path tempPath = std::filesystem::u8path(wxStandardPaths::Get().GetTempDir().ToUTF8().data());
     const std::string updateId = std::to_string(wxGetProcessId());
     const std::filesystem::path dmgPath = tempPath / ("NavKitUpdate_" + updateId + ".dmg");
 
@@ -370,6 +372,79 @@ void UpdateChecker::performUpdate() {
     }
 
     Logger::log(NK_INFO, "Closing NavKit to allow the macOS update to proceed.");
+    wxMilliSleep(1000);
+    Logger::getInstance().stop();
+    exit(0);
+#elif defined(__linux__)
+    std::string localUpdateUrl;
+    std::string localLatestVersion;
+    {
+        std::lock_guard lock(mutex);
+        localUpdateUrl = updateUrl;
+        localLatestVersion = latestVersion;
+    }
+
+    if (localUpdateUrl.empty()) {
+        Logger::log(NK_ERROR, "NavKit: No Linux update URL available.");
+        return;
+    }
+
+    const char* appImageEnvironment = std::getenv("APPIMAGE");
+    if (appImageEnvironment == nullptr || *appImageEnvironment == '\0') {
+        Logger::log(NK_WARN, "Automatic updates are only supported when running the NavKit AppImage.");
+        wxLaunchDefaultBrowser("https://github.com/glacier-modding/NavKit/releases/latest");
+        return;
+    }
+
+    // Renaming within the AppImage's own directory keeps the swap atomic and on one filesystem
+    const std::filesystem::path appImagePath = std::filesystem::u8path(appImageEnvironment);
+    const std::filesystem::path stagedAppImagePath = appImagePath.parent_path() /
+        ("." + appImagePath.filename().string() + ".update-" + std::to_string(wxGetProcessId()));
+
+    std::string domain, downloadPath;
+    splitUrl(localUpdateUrl, domain, downloadPath);
+    httplib::Client cli("https://" + domain);
+    cli.set_follow_location(true);
+    std::ofstream output(stagedAppImagePath, std::ios::binary | std::ios::trunc);
+    if (!output.is_open()) {
+        Logger::log(NK_ERROR, ("NavKit: Could not create update file " + stagedAppImagePath.string()).c_str());
+        return;
+    }
+
+    Logger::log(NK_INFO, ("Downloading Linux update " + localLatestVersion + ".").c_str());
+    const auto response = cli.Get(downloadPath, [&](const char* data, const size_t dataLength) {
+        output.write(data, static_cast<std::streamsize>(dataLength));
+        return output.good();
+    });
+    output.close();
+    std::error_code error;
+    if (!response || response->status != 200 || !output) {
+        std::filesystem::remove(stagedAppImagePath, error);
+        Logger::log(NK_ERROR,
+            ("NavKit: Linux update download failed: " +
+                (response ? std::to_string(response->status) : "connection failure"))
+                .c_str());
+        return;
+    }
+
+    using std::filesystem::perms;
+    std::filesystem::permissions(stagedAppImagePath,
+        perms::owner_all | perms::group_read | perms::group_exec | perms::others_read | perms::others_exec, error);
+    if (!error) {
+        std::filesystem::rename(stagedAppImagePath, appImagePath, error);
+    }
+    if (error) {
+        const std::string replaceError = error.message();
+        std::filesystem::remove(stagedAppImagePath, error);
+        Logger::log(NK_ERROR, ("NavKit: Could not replace " + appImagePath.string() + ": " + replaceError).c_str());
+        return;
+    }
+
+    Logger::log(NK_INFO, "Relaunching updated NavKit AppImage.");
+    if (executeArguments({pathToWxString(appImagePath)}, wxEXEC_ASYNC, nullptr) == 0) {
+        Logger::log(NK_ERROR, "NavKit: Update installed but the new AppImage could not be launched.");
+        return;
+    }
     wxMilliSleep(1000);
     Logger::getInstance().stop();
     exit(0);

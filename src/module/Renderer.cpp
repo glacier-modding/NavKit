@@ -30,6 +30,7 @@
 
 Renderer::Renderer() : projectionMatrix{}, modelviewMatrix{}, viewport{} {
     framebuffer = 0;
+    framebufferWidth = 0, framebufferHeight = 0;
     color_rb = 0;
     depth_rb = 0;
     height = 0;
@@ -66,7 +67,22 @@ void Renderer::initFrameBuffer(const int width, const int height) {
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rb);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    framebufferWidth = width;
+    framebufferHeight = height;
     updateFrameRate();
+}
+
+void Renderer::resizeFrameBufferToView() {
+    if (framebuffer == 0 || (framebufferWidth == width && framebufferHeight == height) || width <= 0 || height <= 0) {
+        return;
+    }
+    glBindRenderbuffer(GL_RENDERBUFFER, color_rb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, depth_rb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    framebufferWidth = width;
+    framebufferHeight = height;
 }
 
 void Renderer::initFrameRate(const float frameRateValue) {
@@ -87,7 +103,7 @@ void Renderer::updateFrameRate() {
 }
 
 bool Renderer::initWindowAndRenderer() {
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER) != 0) {
         printf("Could not initialise SDL.\nError: %s\n", SDL_GetError());
         return false;
     }
@@ -119,7 +135,7 @@ bool Renderer::initWindowAndRenderer() {
     getMainFrame()->SetClientSize(width, height);
     getMainFrame()->Layout();
     handleResize();
-    window = SDL_CreateWindowFrom(renderPanel->GetHandle());
+    window = SDL_CreateWindowFrom(getRenderPanelNativeWindow());
     if (!window) {
         Logger::log(NK_ERROR, "Could not attach SDL to the wxWidgets render panel: %s", SDL_GetError());
         return false;
@@ -271,6 +287,7 @@ void Renderer::renderFrame() {
         Logger::log(NK_ERROR, "Could not activate the wxWidgets OpenGL context.");
         return;
     }
+    resizeFrameBufferToView();
     setCoreProfileFogEnabled(true);
     glViewport(0, 0, width, height);
     glGetIntegerv(GL_VIEWPORT, viewport);

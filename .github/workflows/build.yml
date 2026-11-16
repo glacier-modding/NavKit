@@ -301,6 +301,82 @@ jobs:
           name: macos-universal
           path: build/NavKit-macos-universal.dmg
 
+  validate_linux:
+    name: Validate Linux AppImage build
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+    env:
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}/vcpkg_cache
+    steps:
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl-dev libglu1-mesa-dev libegl-dev libxi-dev libxrandr-dev \
+            libxcursor-dev libxinerama-dev libxxf86vm-dev libxss-dev libxmu-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols autoconf autoconf-archive automake libtool bison flex nasm python3-jinja2 python3-setuptools \
+            file
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Restore vcpkg cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/linux-release/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'ports/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'ports/**') }}-
+            vcpkg-${{ runner.os }}-release-
+            vcpkg-${{ runner.os }}-
+
+      - name: Create vcpkg cache directory
+        run: mkdir -p "${VCPKG_CACHE_DIR}"
+
+      - name: Build Linux release
+        run: |
+          cmake --preset linux-release -D BUILD_TESTING=ON
+          cmake --build --preset linux-release --parallel 4
+          ctest --test-dir build/linux-release --output-on-failure
+
+      - name: Save vcpkg cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/linux-release/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'ports/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Install linuxdeploy
+        run: |
+          mkdir -p "${RUNNER_TEMP}/linuxdeploy"
+          curl -fsSL -o "${RUNNER_TEMP}/linuxdeploy/linuxdeploy-x86_64.AppImage" \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x "${RUNNER_TEMP}/linuxdeploy/linuxdeploy-x86_64.AppImage"
+          echo "LINUXDEPLOY_DIR=${RUNNER_TEMP}/linuxdeploy" >> "$GITHUB_ENV"
+
+      - name: Configure and Build Installer
+        run: |
+          cmake --preset linux-release -D BUILD_TESTING=ON -D BUILD_INSTALLER=ON
+          cmake --build build/linux-release --target installer
+
+      - name: Upload Linux AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: build/linux-release/NavKit-linux-x86_64.AppImage
+          if-no-files-found: error
+
   create_release:
     name: Rebuild release and package MSI
     runs-on: windows-2022
@@ -464,10 +540,83 @@ jobs:
           path: build/NavKit-macos-universal.dmg
           if-no-files-found: error
 
+  create_linux_release:
+    name: Rebuild Linux release and package AppImage
+    runs-on: ubuntu-24.04
+    needs: [ create_versioned_release ]
+    if: needs.create_versioned_release.result == 'success'
+    continue-on-error: true
+    outputs:
+      artifact_uploaded: ${{ steps.upload_artifact.outcome == 'success' }}
+    env:
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+      VCPKG_CACHE_DIR: ${{ github.workspace }}/vcpkg_cache
+    steps:
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~3.30.0"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl-dev libglu1-mesa-dev libegl-dev libxi-dev libxrandr-dev \
+            libxcursor-dev libxinerama-dev libxxf86vm-dev libxss-dev libxmu-dev libxtst-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols autoconf autoconf-archive automake libtool bison flex nasm python3-jinja2 python3-setuptools \
+            file
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create_versioned_release.outputs.sha }}
+          submodules: recursive
+
+      - name: Restore vcpkg cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ env.VCPKG_CACHE_DIR }}
+            build/linux-release/vcpkg_installed/
+          key: vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'ports/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-release-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json', 'ports/**') }}-
+            vcpkg-${{ runner.os }}-release-
+            vcpkg-${{ runner.os }}-
+
+      - name: Create vcpkg cache directory
+        run: mkdir -p "${VCPKG_CACHE_DIR}"
+
+      - name: Build Linux release
+        run: |
+          cmake --preset linux-release -D BUILD_TESTING=ON
+          cmake --build --preset linux-release --parallel 4
+          ctest --test-dir build/linux-release --output-on-failure
+
+      - name: Install linuxdeploy
+        run: |
+          mkdir -p "${RUNNER_TEMP}/linuxdeploy"
+          curl -fsSL -o "${RUNNER_TEMP}/linuxdeploy/linuxdeploy-x86_64.AppImage" \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x "${RUNNER_TEMP}/linuxdeploy/linuxdeploy-x86_64.AppImage"
+          echo "LINUXDEPLOY_DIR=${RUNNER_TEMP}/linuxdeploy" >> "$GITHUB_ENV"
+
+      - name: Configure and Build Installer
+        run: |
+          cmake --preset linux-release -D BUILD_TESTING=ON -D BUILD_INSTALLER=ON
+          cmake --build build/linux-release --target installer
+
+      - name: Upload Linux release artifact
+        id: upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: build/linux-release/NavKit-linux-x86_64.AppImage
+          if-no-files-found: error
+
   publish_release:
     name: Publish release
     runs-on: ubuntu-latest
-    needs: [ create_versioned_release, create_release, create_macos_release ]
+    needs: [ create_versioned_release, create_release, create_macos_release, create_linux_release ]
     if: "${{ always() && !cancelled() && needs.create_versioned_release.result == 'success' && needs.create_release.result == 'success' }}"
     permissions:
       contents: write
@@ -491,6 +640,13 @@ jobs:
           name: release-macos
           path: release-assets
 
+      - name: Download Linux AppImage
+        if: needs.create_linux_release.outputs.artifact_uploaded == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux
+          path: release-assets
+
       - name: Create tag and GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -501,6 +657,9 @@ jobs:
           assets=(release-assets/NavKit.msi)
           if [ -f release-assets/NavKit-macos-universal.dmg ]; then
             assets+=(release-assets/NavKit-macos-universal.dmg)
+          fi
+          if [ -f release-assets/NavKit-linux-x86_64.AppImage ]; then
+            assets+=(release-assets/NavKit-linux-x86_64.AppImage)
           fi
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \

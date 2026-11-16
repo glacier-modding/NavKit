@@ -19,7 +19,6 @@ private:
     void onMenu(wxCommandEvent& event);
     void onClose(wxCloseEvent& event);
     void onMove(wxMoveEvent& event);
-    void onSize(wxSizeEvent& event);
     void onQuit(wxCommandEvent& event);
     void onCanvasMouseMove(wxMouseEvent& event);
     void onCanvasMouseDown(wxMouseEvent& event);
@@ -29,6 +28,7 @@ private:
     void onCanvasKeyDown(wxKeyEvent& event);
     void onCanvasKeyUp(wxKeyEvent& event);
     void onCanvasKillFocus(wxFocusEvent& event);
+    void onCanvasSize(wxSizeEvent& event);
 
     wxGLCanvas* panel;
 };
@@ -42,3 +42,5 @@ void processWxEvents();
 void shutdownWx();
 wxFrame* getMainFrame();
 wxGLCanvas* getRenderPanel();
+
+void* getRenderPanelNativeWindow();

@@ -179,4 +179,7 @@ elseif (NAVKIT_RPKG_LIB_PLATFORM STREQUAL "macos")
             IMPORTED_SONAME_RELEASE "@rpath/libnavkit_rpkg_lib.dylib"
     )
     add_dependencies(navkit-rpkg-lib navkit-rpkg-lib-fixup)
+else ()
+    # cargo cdylibs have no SONAME, so link by name to avoid an absolute DT_NEEDED path
+    set_target_properties(navkit-rpkg-lib PROPERTIES IMPORTED_NO_SONAME TRUE)
 endif ()

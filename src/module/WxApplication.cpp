@@ -12,6 +12,9 @@
 #ifdef __WXMSW__
 #include <windows.h>
 #endif
+#ifdef __WXGTK__
+#include "../../include/NavKit/util/GtkIntegration.h"
+#endif
 
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
@@ -66,7 +69,6 @@ MainFrame::MainFrame() :
     Bind(wxEVT_MENU, &MainFrame::onMenu, this);
     Bind(wxEVT_MENU, &MainFrame::onQuit, this, wxID_EXIT);
     Bind(wxEVT_CLOSE_WINDOW, &MainFrame::onClose, this);
-    Bind(wxEVT_SIZE, &MainFrame::onSize, this);
     // Mouse and keyboard input for the 3D view. wxWidgets owns the canvas's native view, so it is what receives the
     // events; SDL does not get them (on macOS the wxWidgets view consumes them before SDL's responder sees them).
     panel->Bind(wxEVT_MOTION, &MainFrame::onCanvasMouseMove, this);
@@ -79,6 +81,9 @@ MainFrame::MainFrame() :
     panel->Bind(wxEVT_KEY_DOWN, &MainFrame::onCanvasKeyDown, this);
     panel->Bind(wxEVT_KEY_UP, &MainFrame::onCanvasKeyUp, this);
     panel->Bind(wxEVT_KILL_FOCUS, &MainFrame::onCanvasKillFocus, this);
+    // The frame's size event precedes sizer layout and SDL misses adopted-window resizes on X11
+    panel->Bind(wxEVT_SIZE, &MainFrame::onCanvasSize, this);
+    Bind(wxEVT_MOVE, &MainFrame::onMove, this);
 }
 
 wxGLCanvas* MainFrame::renderPanel() const {
@@ -105,13 +110,6 @@ void MainFrame::onMove(wxMoveEvent& event) {
     event.Skip();
     if (Renderer::getInstance().window) {
         Renderer::getInstance().handleMoved();
-    }
-}
-
-void MainFrame::onSize(wxSizeEvent& event) {
-    event.Skip();
-    if (Renderer::getInstance().window) {
-        Renderer::getInstance().handleResize();
     }
 }
 
@@ -180,6 +178,13 @@ void MainFrame::onCanvasKeyUp(wxKeyEvent& event) {
     }
 }
 
+void MainFrame::onCanvasSize(wxSizeEvent& event) {
+    event.Skip();
+    if (Renderer::getInstance().window) {
+        Renderer::getInstance().handleResize();
+    }
+}
+
 void MainFrame::onCanvasKillFocus(wxFocusEvent& event) {
     // The key-up events for keys held while the keyboard goes elsewhere would never arrive.
     InputHandler::getInstance().handleKeyboardFocusLost();
@@ -187,6 +192,11 @@ void MainFrame::onCanvasKillFocus(wxFocusEvent& event) {
 }
 
 bool initializeWx(int& argc, char** argv) {
+#ifdef __WXGTK__
+    // SDL can only adopt the render canvas as a foreign window on X11; set in-process so child processes keep Wayland
+    GtkIntegration::restrictToX11Backend();
+    SDL_SetHint(SDL_HINT_VIDEODRIVER, "x11");
+#endif
     if (!wxEntryStart(argc, argv)) {
         return false;
     }
@@ -240,6 +250,10 @@ void processWxEvents() {
     while (guiEventLoop->DispatchTimeout(0) == 1) {
         wxTheApp->ProcessPendingEvents();
     }
+#ifdef __WXGTK__
+    GtkIntegration::dispatchReadyLowPriorityWork();
+    wxTheApp->ProcessPendingEvents();
+#endif
 }
 
 void shutdownWx() {
@@ -259,4 +273,18 @@ wxFrame* getMainFrame() {
 
 wxGLCanvas* getRenderPanel() {
     return mainFrame ? mainFrame->renderPanel() : nullptr;
+}
+
+void* getRenderPanelNativeWindow() {
+    if (!mainFrame) {
+        return nullptr;
+    }
+#ifdef __WXGTK__
+    // GetXWindow() is 0 until realised; realising also lets the GL context be made current while hidden
+    wxGLCanvas* renderPanel = mainFrame->renderPanel();
+    GtkIntegration::realize(renderPanel->GetHandle());
+    return reinterpret_cast<void*>(renderPanel->GetXWindow());
+#else
+    return mainFrame->renderPanel()->GetHandle();
+#endif
 }
