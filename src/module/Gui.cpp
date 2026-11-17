@@ -1,17 +1,26 @@
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Crmd.h"
+#include "../../include/NavKit/module/Gfxf.h"
 #include "../../include/NavKit/module/Gui.h"
-
-#include <deque>
-
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
+#include <deque>
+#include <string>
+
 #include <GL/glew.h>
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/RecastDemo/imgui.h"
 #include "../../include/RecastDemo/imguiRenderGL.h"
+
+namespace {
+    std::string fileNameFromPath(const std::string& path) {
+        const size_t separator = path.find_last_of("/\\");
+        return separator == std::string::npos ? path : path.substr(separator + 1);
+    }
+} // namespace
 
 Gui::Gui() {
     showMenu = true;
@@ -49,16 +58,30 @@ void Gui::drawGui() {
         char loadedAirgText[256];
         snprintf(loadedAirgText, sizeof loadedAirgText, "Loaded Airg: %s", airg.loadedAirgText.c_str());
         imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, loadedAirgText, imguiRGBA(255, 255, 255, 128));
+        int resourceTextY = renderer.height - 120;
+        const Crmd& crmd = Crmd::getInstance();
+        if (crmd.crmdLoaded && !crmd.loadedCrmdText.empty()) {
+            const std::string loadedCrmdText = "Loaded Crmd: " + fileNameFromPath(crmd.loadedCrmdText);
+            imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, loadedCrmdText.c_str(), imguiRGBA(255, 255, 255, 128));
+            resourceTextY -= 20;
+        }
+        const Gfxf& gfxf = Gfxf::getInstance();
+        if (gfxf.gfxfLoaded && !gfxf.loadedFile.empty()) {
+            const std::string loadedGfxfText = "Loaded GFXF: " + fileNameFromPath(gfxf.loadedFile);
+            imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, loadedGfxfText.c_str(), imguiRGBA(255, 255, 255, 128));
+            resourceTextY -= 20;
+        }
         char selectedNavpAreaText[64];
         snprintf(selectedNavpAreaText, sizeof selectedNavpAreaText,
             navp.selectedNavpAreaIndex != -1 ? "Selected Area Index: %d" : "Selected Area Index: None",
             navp.selectedNavpAreaIndex + 1);
-        imguiDrawText(10, renderer.height - 120, IMGUI_ALIGN_LEFT, selectedNavpAreaText, imguiRGBA(255, 255, 255, 128));
+        imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, selectedNavpAreaText, imguiRGBA(255, 255, 255, 128));
+        resourceTextY -= 20;
         char selectedAirgText[64];
         snprintf(selectedAirgText, sizeof selectedAirgText,
             airg.selectedWaypointIndex != -1 ? "Selected Waypoint Index: %d" : "Selected Waypoint Index: None",
             airg.selectedWaypointIndex);
-        imguiDrawText(10, renderer.height - 140, IMGUI_ALIGN_LEFT, selectedAirgText, imguiRGBA(255, 255, 255, 128));
+        imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, selectedAirgText, imguiRGBA(255, 255, 255, 128));
 
         if (showLog) {
             const int logAreaHeight =

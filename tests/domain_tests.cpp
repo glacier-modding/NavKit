@@ -7,6 +7,7 @@
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Crmd.h"
 #include "../include/NavKit/module/Grid.h"
+#include "../include/NavKit/module/Gfxf.h"
 #include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/NavKitSettings.h"
 #include "../include/NavKit/module/Navp.h"
@@ -1276,6 +1277,10 @@ namespace {
         sceneMesh.glbLoaded = true;
         navp.navpLoaded = true;
         airg.airgLoaded = true;
+        Gfxf::getInstance().gfxfLoaded = true;
+        Gfxf::getInstance().loadedFile = "test.gfx";
+        Gfxf::getInstance().layerNames = {"Level 00", "Level 01"};
+        Gfxf::getInstance().selectedLayerIndex = 1;
         scene.gates.push_back({});
         navp.selectedNavpAreaIndex = 2;
         airg.selectedWaypointIndex = 1;
@@ -1288,6 +1293,25 @@ namespace {
         check(scene.gates.empty(), "New Project should clear scene gates");
         check(navp.selectedNavpAreaIndex == -1, "New Project should reset navp selection");
         check(airg.selectedWaypointIndex == -1, "New Project should reset airg selection");
+        check(!Gfxf::getInstance().gfxfLoaded, "New Project should clear GFXF");
+        check(Gfxf::getInstance().loadedFile.empty(), "New Project should clear the loaded GFXF path");
+        check(Gfxf::getInstance().layerNames.empty(), "New Project should clear the loaded map layers");
+        check(Gfxf::getInstance().selectedLayerIndex == 0, "New Project should reset the selected map layer");
+
+        Gfxf::getInstance().gfxfLoaded = true;
+        Gfxf::getInstance().loadedFile = "test.gfx";
+        Gfxf::getInstance().layerNames = {"Level 00", "Level 01"};
+        Gfxf::getInstance().selectedLayerIndex = 1;
+        Menu::handleMenuClicked(IDM_FILE_NEW_GFXF);
+        check(!Gfxf::getInstance().gfxfLoaded, "New GFXF should clear the loaded GFXF");
+        check(Gfxf::getInstance().loadedFile.empty(), "New GFXF should clear the loaded GFXF path");
+        check(Gfxf::getInstance().layerNames.empty(), "New GFXF should clear the loaded map layers");
+        check(Gfxf::getInstance().selectedLayerIndex == 0, "New GFXF should reset the selected map layer");
+
+        Gfxf::getInstance().showGfxf = true;
+        Menu::handleMenuClicked(IDM_VIEW_GFXF_SHOW_GFXF);
+        check(!Gfxf::getInstance().showGfxf, "Show GFXF should toggle viewport visibility");
+        Gfxf::getInstance().showGfxf = true;
     }
 
     // Navmesh fixture for the waypoint connection tests: a walkable plane with a wall sliver between
@@ -1314,38 +1338,27 @@ namespace {
     bool buildWaypointNavmesh(WaypointNavFixture& fixture) {
         // Coordinates are quantized (x10) against cs = 0.1, so 46 means x = 4.6.
         const unsigned short verts[] = {
-            0,
-            0,
+            0, 0,
             0, // 0 (0, 0)
-            46,
-            0,
+            46, 0,
             0, // 1 (4.6, 0)
-            46,
-            0,
+            46, 0,
             10, // 2 (4.6, 1)
-            0,
-            0,
+            0, 0,
             10, // 3 (0, 1)
-            90,
-            0,
+            90, 0,
             0, // 4 (9, 0)
-            90,
-            0,
+            90, 0,
             10, // 5 (9, 1)
-            0,
-            0,
+            0, 0,
             90, // 6 (0, 9)
-            46,
-            0,
+            46, 0,
             90, // 7 (4.6, 9)
-            47,
-            0,
+            47, 0,
             90, // 8 (4.7, 9)
-            47,
-            0,
+            47, 0,
             10, // 9 (4.7, 1)
-            90,
-            0,
+            90, 0,
             90, // 10 (9, 9)
         };
         // Polygon i is followed by the neighbor indices of its four edges (0xffff = border):
@@ -1353,37 +1366,13 @@ namespace {
         // The passage between the left and right regions only exists along the bottom strip. The wall sliver
         // edges at x = 4.6 (polygon 1) and x = 4.7 (polygon 3) are borders without links.
         const unsigned short polyData[] = {
-            0,
-            1,
-            2,
-            3,
-            0xffff,
-            2,
-            1,
+            0, 1, 2, 3, 0xffff, 2, 1,
             0xffff, // polygon 0 edges: bottom, right(sliver open), top(-x), left
-            3,
-            2,
-            7,
-            6,
-            0,
-            0xffff,
-            0xffff,
+            3, 2, 7, 6, 0, 0xffff, 0xffff,
             0xffff, // polygon 1 edges: bottom, right(sliver wall), top, left
-            1,
-            4,
-            5,
-            2,
-            0xffff,
-            0xffff,
-            3,
+            1, 4, 5, 2, 0xffff, 0xffff, 3,
             0, // polygon 2 edges: bottom, right, top, left(sliver open)
-            9,
-            5,
-            10,
-            8,
-            2,
-            0xffff,
-            0xffff,
+            9, 5, 10, 8, 2, 0xffff, 0xffff,
             0xffff, // polygon 3 edges: bottom, right, top, left(sliver wall)
         };
         constexpr int polyCount = 4;

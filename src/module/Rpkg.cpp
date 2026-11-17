@@ -10,6 +10,7 @@
 #include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Crmd.h"
+#include "../../include/NavKit/module/Gfxf.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
@@ -91,6 +92,20 @@ void Rpkg::initExtractionData() {
                                 dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
                             std::lock_guard lock(Crmd::crmdHashIoiStringMapMutex);
                             Crmd::crmdHashIoiStringMap[crmdHash] = ioiString;
+                        }
+                    }
+                    if (line.find(".GFXF") != std::string::npos) {
+                        if (const size_t commaPos = line.find(','); commaPos != std::string::npos) {
+                            std::string hashPart = line.substr(0, commaPos);
+                            std::string ioiString = line.substr(commaPos + 1);
+                            if (!ioiString.empty() && ioiString.back() == '\r') {
+                                ioiString.pop_back();
+                            }
+                            const size_t dotPos = hashPart.find('.');
+                            const std::string gfxfHash =
+                                dotPos != std::string::npos ? hashPart.substr(0, dotPos) : hashPart;
+                            std::lock_guard lock(Gfxf::gfxfHashIoiStringMapMutex);
+                            Gfxf::gfxfHashIoiStringMap[gfxfHash] = ioiString;
                         }
                     }
                 }
@@ -183,6 +198,36 @@ void Rpkg::initExtractionData() {
                 Crmd::crmdHashIoiStringMap.erase(crmdHash);
             }
         });
+        auto gfxfThread = std::async(std::launch::deferred, []() {
+            RustStringList* gfxfFilesInRpkgsRustStringList =
+                get_all_resources_hashes_by_type_from_rpkg_files(partitionManager, "GFXF", Logger::rustLogCallback);
+            if (gfxfFilesInRpkgsRustStringList == nullptr) {
+                Logger::log(NK_ERROR, "Failed to list GFXF resources in RPKG files.");
+                return;
+            }
+            std::set<std::string> gfxfFilesInRpkgs;
+            for (uintptr_t i = 0; i < gfxfFilesInRpkgsRustStringList->length; ++i) {
+                if (const char* hash = get_string_from_list(gfxfFilesInRpkgsRustStringList, i); hash != nullptr) {
+                    gfxfFilesInRpkgs.insert(hash);
+                }
+            }
+            free_rust_string_list(gfxfFilesInRpkgsRustStringList);
+            std::lock_guard lock(Gfxf::gfxfHashIoiStringMapMutex);
+            for (const auto& gfxfHash : gfxfFilesInRpkgs) {
+                if (!Gfxf::gfxfHashIoiStringMap.contains(gfxfHash)) {
+                    Gfxf::gfxfHashIoiStringMap[gfxfHash] = gfxfHash;
+                }
+            }
+            std::set<std::string> toErase;
+            for (const auto& gfxfHash : Gfxf::gfxfHashIoiStringMap | std::views::keys) {
+                if (!gfxfFilesInRpkgs.contains(gfxfHash)) {
+                    toErase.insert(gfxfHash);
+                }
+            }
+            for (const auto& gfxfHash : toErase) {
+                Gfxf::gfxfHashIoiStringMap.erase(gfxfHash);
+            }
+        });
 
         // Disabling for now since it's not actually used yet
         // std::jthread hashListThread([]() {
@@ -192,6 +237,7 @@ void Rpkg::initExtractionData() {
 
         airgThread.get();
         crmdThread.get();
+        gfxfThread.get();
         navpThread.get();
         // hashListThread.join();
 
@@ -294,12 +340,13 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
         const std::string runtimeFolder = (hitmanPath / "Runtime").string();
-        const std::string resourceFolder = (std::filesystem::u8path(navKitSettings.outputFolder) /
-            (type == NAVP          ? "navp"
-                    : type == AIRG ? "airg"
-                    : type == CRMD ? "crmd"
-                                   : "tga"))
-                                               .string();
+        const char* resourceFolderName = type == NAVP ? "navp"
+            : type == AIRG                            ? "airg"
+            : type == CRMD                            ? "crmd"
+            : type == GFXF                            ? "gfxf"
+                                                      : "tga";
+        const std::string resourceFolder =
+            (std::filesystem::u8path(navKitSettings.outputFolder) / resourceFolderName).string();
         std::vector<const char*> hashPtrs(hashes.size());
         for (size_t i = 0; i < hashes.size(); ++i) {
             hashPtrs[i] = hashes[i].c_str();
@@ -309,6 +356,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
             type == NAVP       ? "NAVP"
                 : type == AIRG ? "AIRG"
                 : type == CRMD ? "CRMD"
+                : type == GFXF ? "GFXF"
                                : "TEXT",
             Logger::rustLogCallback);
     }

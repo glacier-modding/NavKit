@@ -6,11 +6,15 @@
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
+#include "../../include/NavKit/module/Gfxf.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/render/CoreProfileDraw.h"
 
+#include <algorithm>
 #include <numbers>
 #include <array>
+#include <cmath>
+#include <limits>
 #include <vector>
 
 #include "../../include/NavKit/module/Scene.h"
@@ -271,6 +275,52 @@ void Renderer::handleResize() {
     }
 }
 
+void Renderer::toggleOrthographicTopView() {
+    if (orthographicTopView) {
+        for (int i = 0; i < 3; ++i) {
+            cameraPos[i] = savedCameraPos[i];
+        }
+        for (int i = 0; i < 2; ++i) {
+            cameraEulers[i] = savedCameraEulers[i];
+            origCameraEulers[i] = savedCameraEulers[i];
+        }
+        orthographicTopView = false;
+        return;
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        savedCameraPos[i] = cameraPos[i];
+    }
+    for (int i = 0; i < 2; ++i) {
+        savedCameraEulers[i] = cameraEulers[i];
+    }
+
+    const float pitch = glm::radians(cameraEulers[0]);
+    const float yaw = glm::radians(cameraEulers[1]);
+    const glm::vec3 direction{-std::sin(yaw) * std::cos(pitch), -std::sin(pitch), std::cos(yaw) * std::cos(pitch)};
+    float distanceToGround = std::numeric_limits<float>::quiet_NaN();
+    if (direction.y < -0.0001f) {
+        distanceToGround = -cameraPos[1] / direction.y;
+    }
+
+    glm::vec3 topViewTarget;
+    if (std::isfinite(distanceToGround) && distanceToGround > 0.0f) {
+        topViewTarget = glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]) + direction * distanceToGround;
+    } else {
+        topViewTarget = glm::vec3(cameraPos[0], 0.0f, cameraPos[2]);
+        distanceToGround = std::max(std::abs(cameraPos[1]), 10.0f);
+    }
+    topViewTarget.y = 0.0f;
+    cameraPos[0] = topViewTarget.x;
+    cameraPos[1] = std::clamp(std::max(distanceToGround, 10.0f), 2.0f, camr * 0.5f);
+    cameraPos[2] = topViewTarget.z;
+    cameraEulers[0] = 90.0f;
+    cameraEulers[1] = 0.0f;
+    origCameraEulers[0] = cameraEulers[0];
+    origCameraEulers[1] = cameraEulers[1];
+    orthographicTopView = true;
+}
+
 void Renderer::persistWindowSettings() {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     persistedSettings.setValue("Renderer", "windowWidth", std::to_string(width));
@@ -300,13 +350,21 @@ void Renderer::renderFrame() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
 
-    projection =
-        glm::perspective(glm::radians(50.0f), static_cast<float>(width) / static_cast<float>(height), 1.0f, camr);
-    view = glm::lookAt(glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]),
-        glm::vec3(cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
-            cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
-            cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
-        glm::vec3(0.0f, 1.0f, 0.0f));
+    const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    if (orthographicTopView) {
+        const float halfHeight = std::max(1.0f, cameraPos[1] * std::tan(glm::radians(25.0f)));
+        const float halfWidth = halfHeight * aspectRatio;
+        projection = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, 0.1f, camr);
+        view = glm::lookAt(glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]),
+            glm::vec3(cameraPos[0], 0.0f, cameraPos[2]), glm::vec3(0.0f, 0.0f, -1.0f));
+    } else {
+        projection = glm::perspective(glm::radians(50.0f), aspectRatio, 1.0f, camr);
+        view = glm::lookAt(glm::vec3(cameraPos[0], cameraPos[1], cameraPos[2]),
+            glm::vec3(cameraPos[0] + -sin(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0])),
+                cameraPos[1] + -sin(glm::radians(cameraEulers[0])),
+                cameraPos[2] + cos(glm::radians(cameraEulers[1])) * cos(glm::radians(cameraEulers[0]))),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+    }
 
     const float* projectionValues = glm::value_ptr(projection);
     const float* viewValues = glm::value_ptr(view);
@@ -405,6 +463,8 @@ void Renderer::renderFrame() {
     if (grid.showGrid) {
         grid.renderGridText();
     }
+
+    Gfxf::getInstance().render(shader, view, projection);
 
     glUseProgram(0);
     glDisable(GL_DEPTH_TEST);

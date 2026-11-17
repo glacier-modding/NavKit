@@ -70,6 +70,8 @@ public:
 
     void handleResize();
 
+    void toggleOrthographicTopView();
+
     void persistWindowSettings();
 
     void handleFullscreen(FullscreenMode mode) const;
@@ -97,6 +99,9 @@ public:
     float initialFrameRate;
     float cameraEulers[2];
     float cameraPos[3];
+    bool orthographicTopView = false;
+    float savedCameraEulers[2]{};
+    float savedCameraPos[3]{};
     float camr;
     float origCameraEulers[2];
     GLdouble projectionMatrix[16];

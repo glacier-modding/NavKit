@@ -6,6 +6,7 @@
 #include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/module/Gui.h"
+#include "../../include/NavKit/module/Gfxf.h"
 #include "../../include/NavKit/module/HelpDialog.h"
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
@@ -30,6 +31,7 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_NEW_NAVP, "New &Navp");
     file->Append(IDM_FILE_NEW_AIRG, "New &Airg");
     file->Append(IDM_FILE_NEW_CRMD, "New &Crmd");
+    file->Append(IDM_FILE_NEW_GFXF, "New GFXF");
     file->AppendSeparator();
     file->Append(IDM_FILE_OPEN_SCENE, "Open &Scene");
     file->Append(IDM_FILE_OPEN_GLB, "Open &GLB");
@@ -39,6 +41,8 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_OPEN_AIRG_FROM_RPKG, "Open Airg from &Rpkg");
     file->Append(IDM_FILE_OPEN_CRMD, "Open &Crmd");
     file->Append(IDM_FILE_OPEN_CRMD_FROM_RPKG, "Open Crmd from &Rpkg");
+    file->Append(IDM_FILE_OPEN_GFXF, "Open GFXF");
+    file->Append(IDM_FILE_OPEN_GFXF_FROM_RPKG, "Open GFXF from &Rpkg");
     file->AppendSeparator();
     file->Append(IDM_FILE_SAVE_SCENE, "Save &Scene");
     file->Append(IDM_FILE_SAVE_GLB, "Save &GLB");
@@ -62,9 +66,12 @@ wxMenuBar* Menu::createMenuBar() {
     settings->Append(IDM_SETTINGS_RECAST, "&Recast Settings");
     settings->Append(IDM_SETTINGS_SCENE_MESH, "&Scene Mesh Settings");
     settings->Append(IDM_SETTINGS_AIRG, "&Airg Settings");
+    settings->Append(IDM_SETTINGS_GFXF, "&GFXF Settings");
     bar->Append(settings, "&Settings");
 
     auto* view = new wxMenu();
+    view->AppendCheckItem(IDM_VIEW_ORTHOGRAPHIC_TOP_VIEW, "Orthographic Top View");
+    view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_SCENE_SHOW_BBOX, "Show &Bounding Box")->Check();
     view->AppendCheckItem(IDM_VIEW_SCENE_SHOW_AXES, "Show &Axes")->Check();
     view->AppendSeparator();
@@ -91,6 +98,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendCheckItem(IDM_VIEW_CRMD_SHOW_CRMD, "Show &CRMD")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
+    view->AppendCheckItem(IDM_VIEW_GFXF_SHOW_GFXF, "Show GFX&F")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_LOG_SHOW_LOG, "Show &Log")->Check();
     bar->Append(view, "&View");
@@ -185,16 +193,24 @@ void Menu::updateMenuState() {
     const Navp& navp = Navp::getInstance();
     const Crmd& crmd = Crmd::getInstance();
     const SceneMesh& obj = SceneMesh::getInstance();
+    const Gfxf& gfxf = Gfxf::getInstance();
     const bool isSceneLoaded = scene.sceneLoaded;
     const bool isNavpLoaded = navp.navpLoaded;
     const bool isGlbLoaded = obj.glbLoaded;
     const bool isAreaSelected = isNavpLoaded && navp.selectedNavpAreaIndex != -1;
+    bool hasGfxfResources = false;
+    {
+        std::lock_guard lock(Gfxf::gfxfHashIoiStringMapMutex);
+        hasGfxfResources = !Gfxf::gfxfHashIoiStringMap.empty();
+    }
 
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG, airg.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract());
+    setMenuItemEnabled(IDM_FILE_OPEN_GFXF, gfxf.canLoad());
+    setMenuItemEnabled(IDM_FILE_OPEN_GFXF_FROM_RPKG, Rpkg::canExtract() && gfxf.canLoad() && hasGfxfResources);
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
@@ -245,6 +261,7 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_NEW_PROJECT:
         Scene::getInstance().clear();
         SceneMesh::getInstance().clear();
+        Gfxf::getInstance().clear();
         Navp::getInstance().clear();
         Airg::getInstance().clear();
         updateMenuState();
@@ -274,6 +291,11 @@ int Menu::handleMenuClicked(const int menuId) {
         Crmd::getInstance().clear();
         updateMenuState();
         Logger::log(NK_DEBUG, "File -> New Crmd clicked");
+        break;
+    case IDM_FILE_NEW_GFXF:
+        Gfxf::getInstance().clear();
+        updateMenuState();
+        Logger::log(NK_DEBUG, "File -> New GFXF clicked");
         break;
     case IDM_FILE_OPEN_SCENE:
         Scene::getInstance().handleOpenSceneClicked();
@@ -306,6 +328,14 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_OPEN_CRMD_FROM_RPKG:
         Crmd::getInstance().showExtractCrmdDialog();
         Logger::log(NK_DEBUG, "File -> Open Crmd from Rpkg clicked");
+        break;
+    case IDM_FILE_OPEN_GFXF:
+        Gfxf::getInstance().handleOpenGfxfClicked();
+        Logger::log(NK_DEBUG, "File -> Open GFXF from File clicked");
+        break;
+    case IDM_FILE_OPEN_GFXF_FROM_RPKG:
+        Gfxf::getInstance().showExtractGfxfDialog();
+        Logger::log(NK_DEBUG, "File -> Open GFXF from Rpkg clicked");
         break;
     case IDM_FILE_SAVE_SCENE:
         Scene::getInstance().handleSaveSceneClicked();
@@ -360,6 +390,16 @@ int Menu::handleMenuClicked(const int menuId) {
         handleCheckboxMenuItem(IDM_VIEW_SCENE_SHOW_AXES, Scene::getInstance().showAxes, "Show Axes");
         break;
 
+    case IDM_VIEW_ORTHOGRAPHIC_TOP_VIEW: {
+        Renderer& renderer = Renderer::getInstance();
+        renderer.toggleOrthographicTopView();
+        if (wxFrame* frame = getMainFrame(); frame && frame->GetMenuBar()) {
+            frame->GetMenuBar()->Check(IDM_VIEW_ORTHOGRAPHIC_TOP_VIEW, renderer.orthographicTopView);
+        }
+        Logger::log(NK_INFO, "Orthographic Top View %s", renderer.orthographicTopView ? "ON" : "OFF");
+        break;
+    }
+
     case IDM_VIEW_NAVP_SHOW_NAVP:
         handleCheckboxMenuItem(IDM_VIEW_NAVP_SHOW_NAVP, Navp::getInstance().showNavp, "Show Navp");
         break;
@@ -392,6 +432,9 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_VIEW_GLB_SHOW_GLB:
         handleCheckboxMenuItem(IDM_VIEW_GLB_SHOW_GLB, SceneMesh::getInstance().showGlb, "Show GLB");
+        break;
+    case IDM_VIEW_GFXF_SHOW_GFXF:
+        handleCheckboxMenuItem(IDM_VIEW_GFXF_SHOW_GFXF, Gfxf::getInstance().showGfxf, "Show GFXF");
         break;
     case IDM_VIEW_AIRG_SHOW_AIRG:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg, "Show Airg");
@@ -478,6 +521,10 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_SETTINGS_SCENE_MESH:
         SceneMesh::getInstance().showSceneMeshDialog();
         Logger::log(NK_DEBUG, "Settings -> Scene Mesh Settings clicked");
+        break;
+    case IDM_SETTINGS_GFXF:
+        Gfxf::getInstance().showGfxfSettingsDialog();
+        Logger::log(NK_DEBUG, "Settings -> GFXF Settings clicked");
         break;
 
     default:

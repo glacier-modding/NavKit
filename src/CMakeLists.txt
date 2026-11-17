@@ -25,6 +25,7 @@ set(MODULE_SOURCES
         module/Airg.cpp
         module/Crmd.cpp
         module/GameConnection.cpp
+        module/Gfxf.cpp
         module/Grid.cpp
         module/Gui.cpp
         module/HelpDialog.cpp
@@ -204,7 +205,18 @@ if (NOT APPLE)
             ${STAGED_DLL_PATHS}
             ${RUNTIME_FILE_DEPENDENCIES}
             $<TARGET_FILE_DIR:NavKit>
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${FFDEC_RUNTIME_DIR}"
+            "$<TARGET_FILE_DIR:NavKit>/ffdec"
             COMMENT "Copying runtime files to build output directory..."
+            VERBATIM
+    )
+else ()
+    add_custom_command(TARGET NavKit POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${FFDEC_RUNTIME_DIR}"
+            "$<TARGET_BUNDLE_DIR:NavKit>/Contents/Resources/ffdec"
+            COMMENT "Copying FFDec to the application bundle..."
             VERBATIM
     )
 endif ()
@@ -221,6 +233,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${RUNTIME_FILE_DEPENDENCIES} DESTINATION bin)
 elseif (APPLE)
     install(TARGETS NavKit BUNDLE DESTINATION .)
+    install(DIRECTORY "${FFDEC_RUNTIME_DIR}/"
+            DESTINATION "NavKit.app/Contents/Resources/ffdec"
+    )
     install(TARGETS NavKitUpdater RUNTIME DESTINATION "NavKit.app/Contents/MacOS")
 
     set(NAVKIT_BUNDLE_SEARCH_DIRS)

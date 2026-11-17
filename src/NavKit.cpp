@@ -32,6 +32,7 @@
 
 #include "../include/NavKit/module/Airg.h"
 #include "../include/NavKit/module/Gui.h"
+#include "../include/NavKit/module/Gfxf.h"
 #include "../include/NavKit/module/InputHandler.h"
 #include "../include/NavKit/module/Logger.h"
 #include "../include/NavKit/module/Menu.h"
@@ -58,6 +59,7 @@ void runFrameIteration() {
     SceneMesh::getInstance().finalizeSceneMeshBuild();
     Navp::getInstance().finalizeBuild();
     SceneMesh::getInstance().finalizeLoad();
+    Gfxf::getInstance().finalizeLoad();
     Airg::getInstance().finalizeSave();
     SceneMesh::getInstance().finalizeExtractResources();
     Renderer::getInstance().finalizeFrame();

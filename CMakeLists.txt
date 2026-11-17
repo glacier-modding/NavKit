@@ -20,7 +20,51 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_TESTING "Build the tests" OFF)
-set(NAVKIT_RPKG_LIB_VERSION "v1.5.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
+set(NAVKIT_RPKG_LIB_VERSION "v1.6.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
+set(FFDEC_VERSION "26.5.0")
+set(FFDEC_URL "https://github.com/jindrapetrik/jpexs-decompiler/releases/download/version26.5.0/ffdec_26.5.0.zip")
+set(FFDEC_SHA256 "8d00c2713a724bb3f7e6c9a64994836ce3a953b5ac264f405d98f92e7c266d33")
+set(FFDEC_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/_deps/ffdec-${FFDEC_VERSION}")
+set(FFDEC_ARCHIVE "${FFDEC_DOWNLOAD_DIR}/ffdec_${FFDEC_VERSION}.zip")
+set(FFDEC_RUNTIME_DIR "${FFDEC_DOWNLOAD_DIR}/runtime")
+
+file(MAKE_DIRECTORY "${FFDEC_DOWNLOAD_DIR}")
+set(FFDEC_ARCHIVE_SHA256 "")
+if (EXISTS "${FFDEC_ARCHIVE}")
+    file(SHA256 "${FFDEC_ARCHIVE}" FFDEC_ARCHIVE_SHA256)
+endif ()
+if (NOT FFDEC_ARCHIVE_SHA256 STREQUAL FFDEC_SHA256)
+    file(DOWNLOAD
+            "${FFDEC_URL}"
+            "${FFDEC_ARCHIVE}"
+            EXPECTED_HASH "SHA256=${FFDEC_SHA256}"
+            SHOW_PROGRESS
+            STATUS FFDEC_DOWNLOAD_STATUS
+            TLS_VERIFY ON
+    )
+    list(GET FFDEC_DOWNLOAD_STATUS 0 FFDEC_DOWNLOAD_RESULT)
+    list(GET FFDEC_DOWNLOAD_STATUS 1 FFDEC_DOWNLOAD_MESSAGE)
+    if (NOT FFDEC_DOWNLOAD_RESULT EQUAL 0)
+        file(REMOVE "${FFDEC_ARCHIVE}")
+        message(FATAL_ERROR "Failed to download FFDec ${FFDEC_VERSION}: ${FFDEC_DOWNLOAD_MESSAGE}")
+    endif ()
+    file(SHA256 "${FFDEC_ARCHIVE}" FFDEC_ARCHIVE_SHA256)
+endif ()
+if (NOT FFDEC_ARCHIVE_SHA256 STREQUAL FFDEC_SHA256)
+    message(FATAL_ERROR "FFDec ${FFDEC_VERSION} archive SHA-256 did not match the published digest.")
+endif ()
+if (NOT EXISTS "${FFDEC_RUNTIME_DIR}/ffdec-cli.jar")
+    file(MAKE_DIRECTORY "${FFDEC_RUNTIME_DIR}")
+    file(ARCHIVE_EXTRACT INPUT "${FFDEC_ARCHIVE}" DESTINATION "${FFDEC_RUNTIME_DIR}")
+endif ()
+if (UNIX)
+    file(CHMOD
+            "${FFDEC_RUNTIME_DIR}/ffdec"
+            "${FFDEC_RUNTIME_DIR}/ffdec.sh"
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+endif ()
+
 find_package(BZip2 REQUIRED)
 
 find_package(Freetype REQUIRED)
@@ -35,7 +79,6 @@ find_package(assimp CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(cpptrace CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(unofficial-minizip CONFIG REQUIRED)
 find_package(nfd CONFIG REQUIRED)
 find_package(poly2tri CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
@@ -67,7 +110,6 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:assimp::assimp>"
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"
-        "$<TARGET_FILE:unofficial::minizip::minizip>"
         "$<TARGET_FILE:nfd::nfd>"
         "$<TARGET_FILE:simdjson::simdjson>"
         "$<TARGET_FILE:unofficial::brotli::brotlicommon>"
@@ -201,6 +243,9 @@ if(BUILD_INSTALLER AND WIN32)
 
         install(FILES ${RUNTIME_FILE_DEPENDENCIES}
                 DESTINATION .
+        )
+        install(DIRECTORY "${FFDEC_RUNTIME_DIR}/"
+                DESTINATION "ffdec"
         )
         set(HARVESTED_COMPONENTS_FILE "${CMAKE_CURRENT_BINARY_DIR}/HarvestedComponents.wxs")
         add_custom_command(

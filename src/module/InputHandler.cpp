@@ -163,6 +163,9 @@ void InputHandler::handleMouseButtonDown(const MouseButton button) {
     }
     // Rotate view
     Renderer& renderer = Renderer::getInstance();
+    if (renderer.orthographicTopView) {
+        return;
+    }
     rotate = true;
     movedDuringRotate = false;
     origMousePos[0] = mousePos[0];
@@ -247,6 +250,7 @@ void InputHandler::handleKeyboardFocusLost() {
 }
 
 void InputHandler::handleMovement(const float dt, const double* modelviewMatrix) {
+    Renderer& renderer = Renderer::getInstance();
     // Handle keyboard movement.
     auto isPressed = [this](const MovementAction action) {
         for (size_t i = 0; i < std::size(MOVEMENT_KEYS); ++i) {
@@ -272,10 +276,19 @@ void InputHandler::handleMovement(const float dt, const double* modelviewMatrix)
     moveDown = calculateMovement(moveDown, isPressed(MOVE_DOWN));
 
     const float moveX = (moveRight - moveLeft) * keybSpeed * dt;
-    const float moveY = (moveBack - moveFront) * keybSpeed * dt + scrollZoom * 2.0f;
+    const float keyboardMoveY = (moveBack - moveFront) * keybSpeed * dt;
+    const float scrollMove = scrollZoom * 2.0f;
     scrollZoom = 0;
 
-    Renderer& renderer = Renderer::getInstance();
+    if (renderer.orthographicTopView) {
+        renderer.cameraPos[0] += moveX;
+        renderer.cameraPos[2] += keyboardMoveY;
+        renderer.cameraPos[1] += (moveUp - moveDown) * keybSpeed * dt + scrollMove;
+        renderer.cameraPos[1] = std::clamp(renderer.cameraPos[1], 2.0f, renderer.camr * 0.5f);
+        return;
+    }
+
+    const float moveY = keyboardMoveY + scrollMove;
     renderer.cameraPos[0] += moveX * static_cast<float>(modelviewMatrix[0]);
     renderer.cameraPos[1] += moveX * static_cast<float>(modelviewMatrix[4]);
     renderer.cameraPos[2] += moveX * static_cast<float>(modelviewMatrix[8]);

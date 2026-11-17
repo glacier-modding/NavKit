@@ -1,0 +1,75 @@
+#pragma once
+
+#include <cstdint>
+#include <map>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#include "../render/Model.h"
+#include <glm/mat4x4.hpp>
+#include <wx/dialog.h>
+
+class Gfxf {
+    explicit Gfxf() = default;
+
+    struct ExportResult {
+        std::uint64_t generation;
+        std::string sourceFile;
+        std::vector<std::pair<std::string, std::vector<unsigned char>>> layers;
+        std::string error;
+    };
+
+    std::mutex resultMutex;
+    std::optional<ExportResult> completedLoad;
+    std::optional<std::jthread> backgroundWorker;
+    std::uint64_t loadGeneration = 0;
+    Model model;
+
+    void startLoad(const std::string& fileName);
+
+public:
+    static Gfxf& getInstance() {
+        static Gfxf instance;
+        return instance;
+    }
+
+    bool gfxfLoaded = false;
+    bool showGfxf = true;
+    bool loading = false;
+    float renderScale = 1.0f;
+    float renderOpacity = 1.0f;
+    int offsetX = 0;
+    int offsetY = 0;
+    int offsetZ = 0;
+    std::string loadedFile;
+    std::vector<std::string> layerNames;
+    size_t selectedLayerIndex = 0;
+
+    static std::map<std::string, std::string> gfxfHashIoiStringMap;
+    static std::mutex gfxfHashIoiStringMapMutex;
+    static wxDialog* hGfxfDialog;
+    static wxDialog* hGfxfSettingsDialog;
+
+    [[nodiscard]] bool canLoad() const;
+
+    void handleOpenGfxfClicked();
+
+    void loadGfxfFromFile(const std::string& fileName);
+
+    void showExtractGfxfDialog();
+    void updateDialogControls(wxDialog* dialog);
+
+    void showGfxfSettingsDialog();
+
+    void resetDefaults();
+
+    void finalizeLoad();
+
+    void render(const class Shader& shader, const glm::mat4& view, const glm::mat4& projection) const;
+
+    void clear();
+};
