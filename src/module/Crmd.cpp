@@ -12,6 +12,7 @@
 #include "../../include/NavKit/UiIds.h"
 #include <nfd.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -123,17 +124,59 @@ namespace {
         return model;
     }
 
-    void addCellRectangle(std::vector<CoreProfileVertex>& vertices, const float x, const float y, const float width,
-        const float height, const glm::vec4& color, const float zOffset = 0.01f) {
+    class CrowdGridHeights {
+    public:
+        CrowdGridHeights(const SCrowdMapData& data, const size_t pointsX, const size_t pointsY, const float spacingX,
+            const float spacingY) :
+            data(data), pointsX(pointsX), pointsY(pointsY), spacingX(spacingX), spacingY(spacingY) {}
+
+        float at(const float x, const float y) const {
+            const float gridX = std::clamp(x / spacingX, 0.0f, static_cast<float>(pointsX - 1));
+            const float gridY = std::clamp(y / spacingY, 0.0f, static_cast<float>(pointsY - 1));
+            const size_t x0 = static_cast<size_t>(gridX);
+            const size_t y0 = static_cast<size_t>(gridY);
+            const size_t x1 = std::min(x0 + 1, pointsX - 1);
+            const size_t y1 = std::min(y0 + 1, pointsY - 1);
+            const float fractionX = gridX - static_cast<float>(x0);
+            const float fractionY = gridY - static_cast<float>(y0);
+            float weightedHeight = 0.0f;
+            float totalWeight = 0.0f;
+            const auto accumulate = [&](const size_t pointX, const size_t pointY, const float weight) {
+                const size_t index = pointY * pointsX + pointX;
+                if (weight <= 0.0f || index >= data.m_GridMap.size() || data.m_GridMap[index].m_nOnNavGrid == 0) {
+                    return;
+                }
+                weightedHeight += weight *
+                    (static_cast<float>(data.m_GridMap[index].m_nHeightOffset) * data.m_fGridMapHeightOffsetsScale +
+                        data.m_fGridMapHeightOffsetsBias);
+                totalWeight += weight;
+            };
+            accumulate(x0, y0, (1.0f - fractionX) * (1.0f - fractionY));
+            accumulate(x1, y0, fractionX * (1.0f - fractionY));
+            accumulate(x0, y1, (1.0f - fractionX) * fractionY);
+            accumulate(x1, y1, fractionX * fractionY);
+            return totalWeight > 0.0f ? weightedHeight / totalWeight : 0.0f;
+        }
+
+    private:
+        const SCrowdMapData& data;
+        size_t pointsX;
+        size_t pointsY;
+        float spacingX;
+        float spacingY;
+    };
+
+    void addCellRectangle(std::vector<CoreProfileVertex>& vertices, const CrowdGridHeights& heights, const float x,
+        const float y, const float width, const float height, const glm::vec4& color, const float zOffset = 0.01f) {
         const float left = x;
         const float right = x + width;
         const float top = y;
         const float bottom = y + height;
         constexpr glm::vec3 normal(0.0f, 0.0f, 1.0f);
-        const glm::vec3 topLeft(left, top, zOffset);
-        const glm::vec3 topRight(right, top, zOffset);
-        const glm::vec3 bottomRight(right, bottom, zOffset);
-        const glm::vec3 bottomLeft(left, bottom, zOffset);
+        const glm::vec3 topLeft(left, top, heights.at(left, top) + zOffset);
+        const glm::vec3 topRight(right, top, heights.at(right, top) + zOffset);
+        const glm::vec3 bottomRight(right, bottom, heights.at(right, bottom) + zOffset);
+        const glm::vec3 bottomLeft(left, bottom, heights.at(left, bottom) + zOffset);
         vertices.insert(vertices.end(),
             {{topLeft, normal, color, {}}, {topRight, normal, color, {}}, {bottomRight, normal, color, {}},
                 {topLeft, normal, color, {}}, {bottomRight, normal, color, {}}, {bottomLeft, normal, color, {}}});
@@ -298,11 +341,12 @@ void Crmd::renderCrowdMapData() const {
         cellWidth = data.m_vGlobalSize.x > 0.0f ? data.m_vGlobalSize.x / static_cast<float>(gridWidth) : 1.0f;
     }
     if (!(cellHeight > 0.0f) || !std::isfinite(cellHeight)) {
-        cellHeight = data.m_vGlobalSize.z > 0.0f ? data.m_vGlobalSize.z / static_cast<float>(gridHeight) : 1.0f;
+        cellHeight = data.m_vGlobalSize.y > 0.0f ? data.m_vGlobalSize.y / static_cast<float>(gridHeight) : 1.0f;
     }
     if (!(cellWidth > 0.0f) || !(cellHeight > 0.0f) || !std::isfinite(cellWidth) || !std::isfinite(cellHeight)) {
         return;
     }
+    const CrowdGridHeights heights(data, gridWidth, gridHeight, cellWidth, cellHeight);
 
     constexpr std::array<glm::vec4, 8> groupColors = {glm::vec4(0.35f, 0.85f, 0.45f, 0.48f),
         glm::vec4(0.95f, 0.68f, 0.25f, 0.48f), glm::vec4(0.7f, 0.45f, 0.9f, 0.48f), glm::vec4(0.2f, 0.8f, 0.8f, 0.48f),
@@ -317,15 +361,14 @@ void Crmd::renderCrowdMapData() const {
     for (size_t i = 0; i < renderMapCount; ++i) {
         const size_t xIndex = i % gridWidth;
         const size_t yIndex = i / gridWidth;
-        const float x = static_cast<float>(xIndex) * cellWidth;
-        const float y = static_cast<float>(yIndex) * cellHeight;
+        const float x = (static_cast<float>(xIndex) - 0.5f) * cellWidth;
+        const float y = (static_cast<float>(yIndex) - 0.5f) * cellHeight;
         const uint8_t onNavGrid = data.m_GridMap[i].m_nOnNavGrid;
         if (onNavGrid == 0) {
             continue;
         }
-        const glm::vec4 mapColor =
-            onNavGrid != 0 ? glm::vec4(0.2f, 0.45f, 0.9f, 0.3f) : glm::vec4(0.12f, 0.2f, 0.35f, 0.22f);
-        addCellRectangle(rectangles, x, y, cellWidth, cellHeight, mapColor, -0.2);
+        const glm::vec4 mapColor = glm::vec4(0.2f, 0.45f, 0.9f, 0.3f);
+        addCellRectangle(rectangles, heights, x, y, cellWidth, cellHeight, mapColor, -0.2f);
     }
 
     for (size_t i = 0; i < renderCellCount; ++i) {
@@ -350,20 +393,23 @@ void Crmd::renderCrowdMapData() const {
             } else {
                 continue;
             }
-            addCellRectangle(rectangles, x, y, cellWidth, cellHeight, flagColor);
+            addCellRectangle(rectangles, heights, x, y, cellWidth, cellHeight, flagColor);
         }
 
         const uint8_t group = getPackedCellValue(data.m_CellGroups, i);
         if (group != 0xff) {
             const float insetX = cellWidth * 0.2f;
             const float insetY = cellHeight * 0.2f;
-            addCellRectangle(rectangles, x + insetX, y + insetY, cellWidth - 2.0f * insetX, cellHeight - 2.0f * insetY,
-                groupColors[group % groupColors.size()], 0.04f);
+            addCellRectangle(rectangles, heights, x + insetX, y + insetY, cellWidth - 2.0f * insetX,
+                cellHeight - 2.0f * insetY, groupColors[group % groupColors.size()], 0.04f);
         }
     }
 
     Renderer& renderer = Renderer::getInstance();
-    const glm::mat4 model = crowdMapTransform(data);
+    constexpr float displayLiftAboveGround = 0.25f;
+    const glm::mat4 model = glm::translate(crowdMapTransform(data),
+        glm::vec3(-0.5f * static_cast<float>(cellGridWidth) * cellWidth,
+            -0.5f * static_cast<float>(cellGridHeight) * cellHeight, displayLiftAboveGround));
     drawCoreProfileVertices(rectangles, GL_TRIANGLES, model, renderer.view, renderer.projection);
 
     constexpr std::array<glm::vec4, 8> flowChannelColors = {glm::vec4(1.0f, 0.65f, 0.9f, 0.95f),
@@ -400,13 +446,14 @@ void Crmd::renderCrowdMapData() const {
             const glm::vec2 headBase = tip - direction * arrowHeadLength;
             const glm::vec2 leftWing = headBase + perpendicular * arrowHeadWidth;
             const glm::vec2 rightWing = headBase - perpendicular * arrowHeadWidth;
+            const float arrowZ = heights.at(center.x, center.y) + 0.06f;
             arrows.insert(arrows.end(),
-                {{glm::vec3(center, 0.06f), arrowNormal, arrowColor, {}},
-                    {glm::vec3(tip, 0.06f), arrowNormal, arrowColor, {}},
-                    {glm::vec3(tip, 0.06f), arrowNormal, arrowColor, {}},
-                    {glm::vec3(leftWing, 0.06f), arrowNormal, arrowColor, {}},
-                    {glm::vec3(tip, 0.06f), arrowNormal, arrowColor, {}},
-                    {glm::vec3(rightWing, 0.06f), arrowNormal, arrowColor, {}}});
+                {{glm::vec3(center, arrowZ), arrowNormal, arrowColor, {}},
+                    {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
+                    {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
+                    {glm::vec3(leftWing, arrowZ), arrowNormal, arrowColor, {}},
+                    {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
+                    {glm::vec3(rightWing, arrowZ), arrowNormal, arrowColor, {}}});
         }
         drawCoreProfileVertices(arrows, GL_LINES, model, renderer.view, renderer.projection);
     }
