@@ -1,15 +1,19 @@
 # NavKit
-*A tool to generate Navp and Airg files for Hitman: World of Assassination Scenes in the Glacier 2 Engine*
+
+_A tool to generate Navp and Airg files for Hitman: World of Assassination Scenes in the Glacier 2 Engine_
+
 # How to Use
+
 The [NavKit Guide](https://glaciermodding.org/docs/modding/hitman/guides/customcampaigns/using_navkit) is available on the [Glacier Modding Wiki](https://glaciermodding.org/) and provides more detailed step-by-step instructions on how to use NavKit.
 
 You can run NavKit by opening `NavKit.exe`. To use the **Scene Extraction** feature, you will need ZHMModSdk installed. For the **Build Obj** and **Build Blend file** feature, you will also need to have Blender installed.
 
 You will also need to install the latest Visual C++ Redistributable from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-140. Make sure you get the X64 version.
 
-Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, scene extraction, building Obj, building blend files, building Navp, and building Airg.  
+Functions available are loading and saving Navp and Navp.json, loading Airg and Airg.json, loading and saving Obj, scene extraction, building Obj, building blend files, building Navp, and building Airg.
 
 # Full generation of Navp and Airg (Scene Extraction, Navp generation, Airg generation)
+
 1. Download the latest release of NavKit (https://github.com/glacier-modding/NavKit/releases/latest) and run the installer
 1. Install ZHMModSDK (Usually you will want to use https://github.com/OrfeasZ/ZHMModSDK/releases/latest, but at the moment use the SDK artifact mentioned in the NavKit release you are using)
 1. Install Blender (tested with 3.4 and 4.3 https://download.blender.org/release/Blender4.3/)
@@ -17,21 +21,23 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Start Hitman and enter a mission
 1. Open NavKit
 1. On the "Settings > NavKit" menu of NavKit, set your file paths:
-    1. Hitman 3 directory (e.g., C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
-    1. Output directory (e.g., C:\NavKit\Output)
-    1. Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 4.3\blender.exe)
-1. On the "Extract menu" of NavKit, click the "Extract scene from game and build all" button. It may take up to around 10 minutes depending on the complexity of the mission being extracted, and whether the alocs have already been extracted from the rpkg files.  
+   1. Hitman 3 directory (e.g., C:\Program Files (x86)\Steam\steamapps\common\HITMAN 3)
+   1. Output directory (e.g., C:\NavKit\Output)
+   1. Blender Executable (e.g. C:\Program Files\Blender Foundation\Blender 4.3\blender.exe)
+1. On the "Extract menu" of NavKit, click the "Extract scene from game and build all" button. It may take up to around 10 minutes depending on the complexity of the mission being extracted, and whether the alocs have already been extracted from the rpkg files.
 1. When the GLB finishes generating, you can save it as a GLB file so you can load it later if you'd like by clicking "File > Save GLB" on the menu bar.
 1. When the NAVP finishes generating, click on "File > Save Navp" on the menu bar
 1. When the AIRG finishes generating, click on "File > Save Airg" on the menu bar
 
 # Adding navp and airg to a new scene
+
 1. Include the .navp and .airg files in the chunk folder for your brick
 1. Choose an IOI string for it (for instance, [assembly:/_pro/scenes/missions/trapped/scene_wolverine_modified.navp].pc_navp)
-1. In GlacierKit, search the original scene file for "navp" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario_[scene name]\Global\Pathfinder\PathfinderConfiguration
+1. In GlacierKit, search the original scene file for "navp" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario\_[scene name]\Global\Pathfinder\PathfinderConfiguration
 1. Copy the entity id (in this example screenshot it is 0f374e8c1e033807) and put it somewhere easily accessible
 1. Open your new brick file in GlacierKit in the Editor
 1. In the Property overrides for your new brick, add this to add the navp:
+
 ```
     {
         "entities": [
@@ -51,10 +57,12 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
         }
     }
 ```
-7. Where [pathfinder entity id] is the id you copied earlier for the pathfinder,  [original scene file] is the ioi string of the original scene (e.g. [assembly:/_pro/scenes/missions/snug/mission_vanilla.brick].pc_entitytype), and [new navp ioi string] is your new ioi string for the navp.
-1. In GlacierKit, search the original scene file for "airg" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario_[scene name]\Global\Pathfinder\ReasoningGridConfig
+
+7. Where [pathfinder entity id] is the id you copied earlier for the pathfinder, [original scene file] is the ioi string of the original scene (e.g. [assembly:/_pro/scenes/missions/snug/mission_vanilla.brick].pc_entitytype), and [new navp ioi string] is your new ioi string for the navp.
+1. In GlacierKit, search the original scene file for "airg" and it should take you to the Pathfinder Configuration (usually at Scene\Scenario\_[scene name]\Global\Pathfinder\ReasoningGridConfig
 1. Copy the entity id (in the other example screenshot it is 6c6e6c3217bf058e) and put it somewhere easily accessible
 1. In the Property overrides for your new brick, add this to add the airg:
+
 ```
     {
         "entities": [
@@ -74,7 +82,8 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
         }
     }
 ```
-11. Where [reasoning grid entity id] is the id you copied earlier for the pathfinder,  [original scene file] is the ioi string of the original scene (e.g. [assembly:/_pro/scenes/missions/snug/mission_vanilla.brick].pc_entitytype), and [new airg ioi string] is your new ioi string for the navp.
+
+11. Where [reasoning grid entity id] is the id you copied earlier for the pathfinder, [original scene file] is the ioi string of the original scene (e.g. [assembly:/_pro/scenes/missions/snug/mission_vanilla.brick].pc_entitytype), and [new airg ioi string] is your new ioi string for the navp.
 1. Save your brick file
 1. In GlacierKit, under the Text Tools, paste your navp ioi string into the Hash Calculator
 1. Copy the Hex value, and rename your navp to [hex value].navp Where [hex value] is the Hex value you calculated
@@ -82,26 +91,33 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Copy the Hex value, and rename your airg to [hex value].airg Where [hex value] is the Hex value you calculated
 1. Deploy the mod
 
-# How NavKit generates Navp and Airg files 
+# How NavKit generates Navp and Airg files
+
 NavKit performs the following series of steps to be able to generate Navp files.
+
 1. Connect to the Editor server of the running Hitman game, and issue commands to: rebuild the entity tree, find the scene's ZGeomEntities, PFBox entities, and PFSeedPoint entities and send their data back to NavKit, where they are saved to `output.nav.json` in the specified output folder.
 1. Extract all the necessary Aloc or Prim files from the rpkg files to the `aloc` or `prim` folder of the specified output folder using navkit-rpkg-lib (A rust library included in the installer).
 1. Open the Blender CLI and run the `Glacier2Glb.py` script to generate a glTF by importing the ALOC or PRIM files, copying and transforming them as specified by the game, then save it to `output.gltf` and/or `output.blend` in the specified output folder. The glTF references its texture files separately using relative paths.
 1. Load `output.gltf` from the specified output folder or another GLB file.
 1. At this point, the build Navp section of the menu will be available. You can customize the parameters with "Settings > Recast Settings" on the menu bar, then press "Build > Build Navp" on the menu bar to call Recast to generate the Navmesh. Then you can save the Navmesh as a Navp or Navp.json file by pressing the Save Navp button.
 1. At this point, the build Airg section of the menu will be available, and you can customize the parameters, then press build to generate the Airg.
+
 # Disclaimer
-*NavKit is still a work in progress, and there may be glitches or issues with Obj, Blend, Navp, or Airg generation in the current version. If you encounter any problems while running NavKit, please create an issue on this GitHub repo.*
+
+_NavKit is still a work in progress, and there may be glitches or issues with Obj, Blend, Navp, or Airg generation in the current version. If you encounter any problems while running NavKit, please create an issue on this GitHub repo._
+
 # Future enhancements
-* Faster Scene generation
-* Linux and macOS support
-* More planned features are on the Issues tab
+
+- Faster Scene generation
+- More planned features are on the Issues tab
+
 # 🛠️ Building instructions on Windows (CLion or Visual Studio)
+
 1. Clone this repository with the `--recurse-submodules` option
 1. Open in Visual Studio or CLion
 1. Cmake should load
 1. Load presets
-1. Run x64-debug or x64-release preset. 
+1. Run x64-debug or x64-release preset.
 
 # 🧪 Manually running the integration test
 
@@ -149,46 +165,73 @@ git config core.hooksPath scripts
 Once run, Git will automatically execute the `scripts/pre-commit` script every time you make a local commit.
 
 # 🛠️ MSI Building instructions
+
 You shouldn't need to build the MSI yourself, but here are the instructions:
+
 1. Install WiX 6.0 and add its bin/x64 folder to your PATH
 1. Run the installer target. For CLion there is an included run configuration that should automatically be added called Build MSI that runs this command:  
-`cmake --build . --target installer --config Release`  
-in this working directory:  
-`build\x64-release`
+   `cmake --build . --target installer --config Release`  
+   in this working directory:  
+   `build\x64-release`
 
 # 🛠️ Building instructions (Rider)
+
 See [Rider Instructions](docs/rider_instructions.md)
 
 # Building on macOS
+
 Configure and build with `cmake --preset macos-release` and `cmake --build --preset macos-release`. To stage the app bundle, run `cmake --install build/macos-release --prefix "$PWD/build/macos-stage"`; the resulting `NavKit.app` is in `build/macos-stage`.
 
 The macOS build links the native `navkit-rpkg-lib` library for RPKG scene and resource extraction. AIRG files are read and written directly by NavKit. Scene extraction also requires a compatible HITMAN installation and ZHMModSDK editor endpoint on the Mac. For Blender mesh generation, set the Blender executable path in NavKit settings to the executable inside the Blender app bundle.
 
 Tagged releases are packaged as a universal DMG with an Applications shortcut for drag-and-drop installation. NavKit checks for updates on startup and can download and install a newer release automatically. These CI-built app bundles are not code-signed or notarized, so macOS may ask users to approve opening them.
 
+# Building on Linux
+
+## With Nix
+
+`flake.nix` provides a dev shell with every build dependency and bootstraps vcpkg on first entry.:
+
+```sh
+nix develop
+cmake --preset linux-debug
+cmake --build --preset linux-debug
+nix develop --command ./build/linux-debug/src/NavKit
+```
+
+## Building the AppImage
+
+Download [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy/releases/tag/continuous), make it executable, and either put it on your `PATH` or point `LINUXDEPLOY_DIR` at its folder. Then:
+
+```sh
+cmake --preset linux-release -D BUILD_INSTALLER=ON
+cmake --build build/linux-release --target installer
+```
+
 # Credits
-2kpr  
-Anthony Fuller  
-Atampy26  
-Dafitius  
-Dog  
-Dribbleondo  
-Invalid  
-IOI  
-Jojje  
-Kercyx  
-Kevin Rudd  
-LaNombre  
-xiuliu⅃  
-Luka  
-Lyssa  
-Mark2580  
-NoFate  
-Notex  
-Pavle  
-Piepieonline  
-Rdil  
-Recast team  
-Someone Else  
-Voodoo Hillbilly  
+
+2kpr
+Anthony Fuller
+Atampy26
+Dafitius
+Dog
+Dribbleondo
+Invalid
+IOI
+Jojje
+Kercyx
+Kevin Rudd
+LaNombre
+xiuliu⅃
+Luka
+Lyssa
+Mark2580
+NoFate
+Notex
+Pavle
+Piepieonline
+Rdil
+Recast team
+Someone Else
+Voodoo Hillbilly
 And everyone at the [Glacier 2 discord](https://discord.gg/86c3DP3WR)!

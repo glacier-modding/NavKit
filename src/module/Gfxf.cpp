@@ -1,4 +1,5 @@
 #include "../../include/NavKit/module/Gfxf.h"
+#include "../../include/NavKit/util/FilteredListPicker.h"
 
 #include <algorithm>
 #include <array>
@@ -24,7 +25,6 @@
 #include <wx/app.h>
 #include <wx/arrstr.h>
 #include <wx/button.h>
-#include <wx/choice.h>
 #include <wx/listbox.h>
 #include <wx/msgdlg.h>
 #include <wx/process.h>
@@ -470,14 +470,16 @@ void Gfxf::showExtractGfxfDialog() {
         return;
     }
 
-    auto* dialog =
-        new wxDialog(getMainFrame(), wxID_ANY, "Load GFXF from resource package", wxDefaultPosition, wxSize(750, 150));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Load GFXF from resource package", wxDefaultPosition,
+        wxSize(750, 450), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     hGfxfDialog = dialog;
-    auto* choice = new wxChoice(dialog, IDC_COMBOBOX_GFXF);
+    auto* picker = new FilteredListPicker(dialog, IDC_COMBOBOX_GFXF);
+    std::vector<std::string> items;
+    items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        choice->Append(wxString::FromUTF8(ioiString.empty() ? hash : ioiString));
+        items.push_back(ioiString.empty() ? hash : ioiString);
     }
-    choice->SetSelection(0);
+    picker->setItems(std::move(items));
 
     auto* buttons = new wxStdDialogButtonSizer();
     auto* open = new wxButton(dialog, wxID_OK, "Load GFXF");
@@ -489,14 +491,17 @@ void Gfxf::showExtractGfxfDialog() {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(
         new wxStaticText(dialog, wxID_ANY, "GFXF file in resource packages (RPKG) to extract and load"), 0, wxALL, 10);
-    sizer->Add(choice, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    sizer->Add(picker, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
     sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
     dialog->SetSizer(sizer);
 
-    open->Bind(wxEVT_BUTTON, [dialog, choice, entries = std::move(entries)](wxCommandEvent&) {
-        const int selection = choice->GetSelection();
-        if (selection != wxNOT_FOUND && selection < static_cast<int>(entries.size())) {
-            const std::string& hash = entries[selection].first;
+    open->Bind(wxEVT_BUTTON, [dialog, picker, entries = std::move(entries)](wxCommandEvent&) {
+        const std::string selected = picker->getSelection();
+        const auto entry = std::ranges::find_if(entries, [&selected](const auto& candidate) {
+            return (candidate.second.empty() ? candidate.first : candidate.second) == selected;
+        });
+        if (entry != entries.end()) {
+            const std::string& hash = entry->first;
             const std::filesystem::path outputFile =
                 std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".gfx");
             std::error_code removeError;
@@ -512,6 +517,11 @@ void Gfxf::showExtractGfxfDialog() {
         dialog->Close();
     });
     cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
+    picker->onActivate([open] {
+        wxCommandEvent clickEvent(wxEVT_BUTTON, open->GetId());
+        clickEvent.SetEventObject(open);
+        open->ProcessWindowEvent(clickEvent);
+    });
     dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
         if (hGfxfDialog == dialog) {
             hGfxfDialog = nullptr;

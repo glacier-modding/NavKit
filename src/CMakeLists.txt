@@ -54,6 +54,7 @@ set(UTIL_SOURCES
         util/CommandRunner.cpp
         util/ErrorHandler.cpp
         util/FileUtil.cpp
+        util/FilteredListPicker.cpp
         util/GridGenerator.cpp
         util/Math.cpp
         util/Pathfinding.cpp

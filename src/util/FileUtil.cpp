@@ -1,4 +1,6 @@
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/util/UpdaterUtils.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -60,19 +62,37 @@ namespace FileUtil {
                 return static_cast<nfdfiltersize_t>(items.size());
             }
         };
+
+        constexpr auto LAST_DIALOG_FOLDER_KEY = "lastFileDialogFolder";
+
+        std::string lastDialogFolder() {
+            std::string folder = PersistedSettings::getInstance().getValue("NavKit", LAST_DIALOG_FOLDER_KEY, "");
+            std::error_code error;
+            return std::filesystem::is_directory(std::filesystem::u8path(folder), error) ? folder : "";
+        }
+
+        void rememberDialogFolder(const nfdu8char_t* chosenPath) {
+            const std::string folder = NavKit::Updater::pathToUtf8(std::filesystem::u8path(chosenPath).parent_path());
+            auto& persisted = PersistedSettings::getInstance();
+            persisted.setValue("NavKit", LAST_DIALOG_FOLDER_KEY, folder);
+            persisted.save();
+        }
     } // namespace
 
     char* openNfdLoadDialog(const nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
         nfdu8char_t* outPath;
 
         DialogFilters dialogFilters(filters, filterCount);
+        const std::string defaultPath = lastDialogFolder();
         const nfdopendialogu8args_t args = {
             .filterList = dialogFilters.data(),
             .filterCount = dialogFilters.count(),
+            .defaultPath = defaultPath.empty() ? nullptr : defaultPath.c_str(),
         };
 
         const nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
         if (result == NFD_OKAY) {
+            rememberDialogFolder(outPath);
             return outPath;
         }
         if (result == NFD_CANCEL) {
@@ -86,13 +106,16 @@ namespace FileUtil {
         nfdu8char_t* outPath;
 
         DialogFilters dialogFilters(filters, filterCount);
+        const std::string defaultPath = lastDialogFolder();
         const nfdsavedialogu8args_t args = {
             .filterList = dialogFilters.data(),
             .filterCount = dialogFilters.count(),
+            .defaultPath = defaultPath.empty() ? nullptr : defaultPath.c_str(),
             .defaultName = defaultName,
         };
         const nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);
         if (result == NFD_OKAY) {
+            rememberDialogFolder(outPath);
             return outPath;
         }
         if (result == NFD_CANCEL) {
