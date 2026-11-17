@@ -1,4 +1,5 @@
 #include "../../include/NavKit/module/Crmd.h"
+#include "../../include/NavKit/util/FilteredListPicker.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
@@ -27,7 +28,6 @@
 #include <vector>
 #include <cpptrace/from_current.hpp>
 #include <wx/button.h>
-#include <wx/choice.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
@@ -496,31 +496,26 @@ void Crmd::clear() {
 }
 
 void Crmd::updateCrmdDialogControls(wxDialog* dialog) {
-    auto* choice = static_cast<wxChoice*>(dialog->FindWindow(IDC_COMBOBOX_CRMD));
-    choice->Clear();
+    auto* picker = static_cast<FilteredListPicker*>(dialog->FindWindow(IDC_COMBOBOX_CRMD));
     std::vector<std::pair<std::string, std::string>> entries(crmdHashIoiStringMap.begin(), crmdHashIoiStringMap.end());
     std::ranges::sort(entries,
         [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first < b.first; });
+    std::vector<std::string> items;
+    items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        const std::string& display = ioiString.empty() ? hash : ioiString;
-        choice->Append(wxString::FromUTF8(display));
-        if (selectedRpkgCrmd.empty()) {
-            selectedRpkgCrmd = display;
-        }
+        items.push_back(ioiString.empty() ? hash : ioiString);
     }
-    if (!entries.empty()) {
-        choice->SetSelection(0);
-    }
+    picker->setItems(std::move(items));
 }
 void Crmd::showExtractCrmdDialog() {
     if (hCrmdDialog) {
         hCrmdDialog->Raise();
         return;
     }
-    auto* dialog =
-        new wxDialog(getMainFrame(), wxID_ANY, "Load Crmd from resource package", wxDefaultPosition, wxSize(750, 150));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Load Crmd from resource package", wxDefaultPosition,
+        wxSize(750, 450), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     hCrmdDialog = dialog;
-    auto* choice = new wxChoice(dialog, IDC_COMBOBOX_CRMD);
+    auto* picker = new FilteredListPicker(dialog, IDC_COMBOBOX_CRMD);
     updateCrmdDialogControls(dialog);
     auto* buttons = new wxStdDialogButtonSizer();
     auto* open = new wxButton(dialog, wxID_OK, "Open Crmd");
@@ -531,11 +526,11 @@ void Crmd::showExtractCrmdDialog() {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(
         new wxStaticText(dialog, wxID_ANY, "Crmd file in resource packages (Rpkg) to extract and load"), 0, wxALL, 10);
-    sizer->Add(choice, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    sizer->Add(picker, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
     sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
     dialog->SetSizer(sizer);
-    choice->Bind(wxEVT_CHOICE, [](wxCommandEvent& event) { selectedRpkgCrmd = event.GetString().ToStdString(); });
-    open->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+    open->Bind(wxEVT_BUTTON, [dialog, picker](wxCommandEvent&) {
+        selectedRpkgCrmd = picker->getSelection();
         for (auto& [hash, ioiString] : crmdHashIoiStringMap) {
             if (hash == selectedRpkgCrmd) {
                 getInstance().loadedCrmdText = hash;
@@ -549,6 +544,11 @@ void Crmd::showExtractCrmdDialog() {
         dialog->Close();
     });
     cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
+    picker->onActivate([open] {
+        wxCommandEvent clickEvent(wxEVT_BUTTON, open->GetId());
+        clickEvent.SetEventObject(open);
+        open->ProcessWindowEvent(clickEvent);
+    });
     dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
         if (hCrmdDialog == dialog) {
             hCrmdDialog = nullptr;

@@ -1,4 +1,5 @@
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/util/FilteredListPicker.h"
 #include "../../include/NavKit/module/ProcessFlow.h"
 #include <numbers>
 #include <fstream>
@@ -26,7 +27,6 @@
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include <wx/button.h>
-#include <wx/choice.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include "../../include/NavKit/module/SceneExtract.h"
@@ -1194,21 +1194,16 @@ void Navp::finalizeBuild() {
 }
 
 void Navp::updateNavpDialogControls(wxDialog* dialog) {
-    auto* choice = static_cast<wxChoice*>(dialog->FindWindow(IDC_COMBOBOX_NAVP));
-    choice->Clear();
+    auto* picker = static_cast<FilteredListPicker*>(dialog->FindWindow(IDC_COMBOBOX_NAVP));
     std::vector<std::pair<std::string, std::string>> entries(navpHashIoiStringMap.begin(), navpHashIoiStringMap.end());
     std::ranges::sort(entries,
         [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first < b.first; });
+    std::vector<std::string> items;
+    items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        const std::string& display = ioiString.empty() ? hash : ioiString;
-        choice->Append(wxString::FromUTF8(display));
-        if (selectedRpkgNavp.empty()) {
-            selectedRpkgNavp = display;
-        }
+        items.push_back(ioiString.empty() ? hash : ioiString);
     }
-    if (!entries.empty()) {
-        choice->SetSelection(0);
-    }
+    picker->setItems(std::move(items));
 }
 
 void Navp::extractNavpFromRpkgs(const std::string& hash) {
@@ -1225,10 +1220,10 @@ void Navp::showExtractNavpDialog() {
         hNavpDialog->Raise();
         return;
     }
-    auto* dialog =
-        new wxDialog(getMainFrame(), wxID_ANY, "Load Navp from resource package", wxDefaultPosition, wxSize(750, 150));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Load Navp from resource package", wxDefaultPosition,
+        wxSize(750, 450), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     hNavpDialog = dialog;
-    auto* choice = new wxChoice(dialog, IDC_COMBOBOX_NAVP);
+    auto* picker = new FilteredListPicker(dialog, IDC_COMBOBOX_NAVP);
     updateNavpDialogControls(dialog);
     auto* buttons = new wxStdDialogButtonSizer();
     auto* open = new wxButton(dialog, wxID_OK, "Open Navp");
@@ -1239,11 +1234,11 @@ void Navp::showExtractNavpDialog() {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(
         new wxStaticText(dialog, wxID_ANY, "Navp file in resource packages (Rpkg) to extract and load"), 0, wxALL, 10);
-    sizer->Add(choice, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    sizer->Add(picker, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
     sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
     dialog->SetSizer(sizer);
-    choice->Bind(wxEVT_CHOICE, [](wxCommandEvent& event) { selectedRpkgNavp = event.GetString().ToStdString(); });
-    open->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) {
+    open->Bind(wxEVT_BUTTON, [dialog, picker](wxCommandEvent&) {
+        selectedRpkgNavp = picker->getSelection();
         for (auto& [hash, ioiString] : navpHashIoiStringMap) {
             if (hash == selectedRpkgNavp) {
                 getInstance().loadedNavpText = hash;
@@ -1257,6 +1252,11 @@ void Navp::showExtractNavpDialog() {
         dialog->Close();
     });
     cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
+    picker->onActivate([open] {
+        wxCommandEvent clickEvent(wxEVT_BUTTON, open->GetId());
+        clickEvent.SetEventObject(open);
+        open->ProcessWindowEvent(clickEvent);
+    });
     dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
         if (hNavpDialog == dialog) {
             hNavpDialog = nullptr;
