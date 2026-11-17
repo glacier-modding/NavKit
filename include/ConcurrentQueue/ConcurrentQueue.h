@@ -20,6 +20,7 @@ limitations under the License.
 #include <mutex>
 #include <optional>
 #include <type_traits>
+#include <utility>
 namespace rsj {
     /* all but blocking pops use scoped_lock. blocking pops use unique_lock */
     template<typename T, class Container = std::deque<T>, class Mutex = std::mutex>

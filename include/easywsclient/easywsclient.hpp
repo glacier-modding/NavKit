@@ -8,6 +8,7 @@
 // wget https://raw.github.com/dhbaird/easywsclient/master/easywsclient.hpp
 // wget https://raw.github.com/dhbaird/easywsclient/master/easywsclient.cpp
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

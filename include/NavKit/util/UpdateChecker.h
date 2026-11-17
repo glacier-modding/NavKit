@@ -1,5 +1,5 @@
 #pragma once
-#include <mutex>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -41,4 +41,6 @@ private:
     bool isUpdateAvailable;
     std::string latestVersion;
     std::string updateUrl;
+    uint64_t updateSize = 0;
+    std::string updateSha256;
 };

@@ -51,6 +51,8 @@ public:
 
     void initFrameBuffer(int width, int height);
 
+    void resizeFrameBufferToView();
+
     void drawText(const std::string& text, Vec3 pos, Vec3 color = {0.0, 0.0, 0.0}, double size = 32.0) const;
 
     void drawBox(Vec3 pos, Vec3 size, Math::Quaternion rotation, bool filled, Vec3 fillColor, bool outlined,
@@ -85,6 +87,8 @@ public:
     unsigned int framebuffer;
     unsigned int color_rb;
     unsigned int depth_rb;
+    int framebufferWidth;
+    int framebufferHeight;
     int width;
     int height;
     int windowX;

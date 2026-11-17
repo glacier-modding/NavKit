@@ -20,29 +20,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_TESTING "Build the tests" OFF)
-set(NAVKIT_RPKG_LIB_VERSION "v1.3.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
+set(NAVKIT_RPKG_LIB_VERSION "v1.5.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
 find_package(BZip2 REQUIRED)
-
-if (WIN32)
-    find_package(FTGL CONFIG REQUIRED)
-else ()
-    # vcpkg's ftgl port installs its CMake config one level too deep on non-Windows (share/ftgl/FTGL/), which also breaks the import prefix inside it.
-    # So we'll prefer the config when it is usable and otherwise import the static library directly.
-    find_package(FTGL CONFIG QUIET)
-    if (NOT TARGET ftgl)
-        find_library(FTGL_LIBRARY_RELEASE NAMES ftgl REQUIRED)
-        find_library(FTGL_LIBRARY_DEBUG NAMES ftgld ftgl REQUIRED)
-        find_path(FTGL_INCLUDE_DIR NAMES FTGL/ftgl.h REQUIRED)
-        add_library(ftgl UNKNOWN IMPORTED)
-        set_target_properties(ftgl PROPERTIES
-                IMPORTED_LOCATION "${FTGL_LIBRARY_RELEASE}"
-                IMPORTED_LOCATION_DEBUG "${FTGL_LIBRARY_DEBUG}"
-                INTERFACE_INCLUDE_DIRECTORIES "${FTGL_INCLUDE_DIR}"
-                INTERFACE_LINK_LIBRARIES "Freetype::Freetype;OpenGL::GL"
-        )
-        message(STATUS "FTGL: imported ${FTGL_LIBRARY_RELEASE} directly (vcpkg config not usable)")
-    endif ()
-endif ()
 
 find_package(Freetype REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
@@ -88,7 +67,6 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:assimp::assimp>"
         "$<TARGET_FILE:cpptrace::cpptrace>"
         "$<TARGET_FILE:freetype>"
-        "$<TARGET_FILE:ftgl>"
         "$<TARGET_FILE:unofficial::minizip::minizip>"
         "$<TARGET_FILE:nfd::nfd>"
         "$<TARGET_FILE:simdjson::simdjson>"
@@ -179,13 +157,13 @@ add_custom_target(clion_indexer_helper
         SOURCES ${IDE_RESOURCES}
 )
 
-option(BUILD_INSTALLER "Build the WiX MSI installer package" OFF)
+option(BUILD_INSTALLER "Build the WiX MSI installer on Windows or the AppImage on Linux" OFF)
 
-if(BUILD_INSTALLER AND NOT WIN32)
-    message(FATAL_ERROR "BUILD_INSTALLER is only supported on Windows.")
+if(BUILD_INSTALLER AND NOT WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "BUILD_INSTALLER is only supported on Windows and Linux.")
 endif()
 
-if(BUILD_INSTALLER)
+if(BUILD_INSTALLER AND WIN32)
     if (PROJECT_IS_TOP_LEVEL)
         set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installer_layout")
 
@@ -269,4 +247,36 @@ if(BUILD_INSTALLER)
         # Installer profiles also produce the MSI when CLion builds ALL_BUILD.
         add_custom_target(installer ALL DEPENDS "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}")
     endif()
+endif()
+
+if(BUILD_INSTALLER AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PROJECT_IS_TOP_LEVEL)
+    find_program(LINUXDEPLOY_EXECUTABLE NAMES linuxdeploy linuxdeploy-x86_64.AppImage
+            HINTS "$ENV{LINUXDEPLOY_DIR}"
+            REQUIRED
+    )
+    message(STATUS "Using linuxdeploy: ${LINUXDEPLOY_EXECUTABLE}")
+
+    set(APPIMAGE_DIR "${CMAKE_BINARY_DIR}/AppDir")
+    set(APPIMAGE_NAME "NavKit-linux-x86_64.AppImage")
+    set(APPIMAGE_DESKTOP_FILE "${CMAKE_SOURCE_DIR}/appimage/NavKit.desktop")
+    set(APPIMAGE_ICON_FILE "${CMAKE_SOURCE_DIR}/src/resource/NavKitLogo.png")
+    add_custom_command(
+            OUTPUT "${CMAKE_BINARY_DIR}/${APPIMAGE_NAME}"
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "${APPIMAGE_DIR}"
+            COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}" --prefix "${APPIMAGE_DIR}/usr" --config $<CONFIG>
+            # APPIMAGE_EXTRACT_AND_RUN lets linuxdeploy run without FUSE, e.g. on CI runners
+            COMMAND ${CMAKE_COMMAND} -E env APPIMAGE_EXTRACT_AND_RUN=1 "LDAI_OUTPUT=${APPIMAGE_NAME}"
+                    "${LINUXDEPLOY_EXECUTABLE}"
+                    --appdir "${APPIMAGE_DIR}"
+                    --executable "${APPIMAGE_DIR}/usr/bin/NavKit"
+                    --desktop-file "${APPIMAGE_DESKTOP_FILE}"
+                    --icon-file "${APPIMAGE_ICON_FILE}"
+                    --output appimage
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+            DEPENDS NavKit navkit-rpkg-lib ${RUNTIME_FILE_DEPENDENCIES}
+                    "${CMAKE_BINARY_DIR}/cmake_install.cmake" "${APPIMAGE_DESKTOP_FILE}" "${APPIMAGE_ICON_FILE}"
+            VERBATIM
+            COMMENT "Building AppImage from staged files with linuxdeploy..."
+    )
+    add_custom_target(installer ALL DEPENDS "${CMAKE_BINARY_DIR}/${APPIMAGE_NAME}")
 endif()

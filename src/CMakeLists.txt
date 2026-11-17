@@ -80,6 +80,12 @@ set_property(TARGET NavKitLib PROPERTY CXX_STANDARD 20)
 
 include("${CMAKE_CURRENT_LIST_DIR}/navkit-rpkg-lib.cmake")
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK3 REQUIRED IMPORTED_TARGET gtk+-3.0)
+    target_link_libraries(NavKitLib PUBLIC PkgConfig::GTK3)
+    target_sources(NavKitLib PRIVATE util/GtkIntegration.cpp)
+endif ()
 target_include_directories(NavKitLib
         PUBLIC
         "${PROJECT_BINARY_DIR}"
@@ -103,10 +109,10 @@ target_link_libraries(NavKitLib PUBLIC
         SDL2::SDL2main
         assimp::assimp
         cpptrace::cpptrace
-        ftgl
         glm::glm
         httplib::httplib
         nfd::nfd
+        OpenSSL::Crypto
         simdjson::simdjson
         simpleini
         wx::core
@@ -205,6 +211,14 @@ endif ()
 
 if (WIN32)
     set_target_properties(NavKit PROPERTIES WIN32_EXECUTABLE TRUE)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties(NavKit PROPERTIES
+            BUILD_RPATH "$ORIGIN"
+            INSTALL_RPATH "$ORIGIN"
+    )
+    install(TARGETS NavKit RUNTIME DESTINATION bin)
+    install(FILES $<TARGET_FILE:navkit-rpkg-lib> DESTINATION bin)
+    install(FILES ${RUNTIME_FILE_DEPENDENCIES} DESTINATION bin)
 elseif (APPLE)
     install(TARGETS NavKit BUNDLE DESTINATION .)
     install(TARGETS NavKitUpdater RUNTIME DESTINATION "NavKit.app/Contents/MacOS")

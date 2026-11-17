@@ -1,10 +1,12 @@
 #include "../../include/NavKit/util/FileUtil.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <wx/stdpaths.h>
+#include <wx/utils.h>
 
 namespace FileUtil {
     namespace {
@@ -129,6 +131,15 @@ namespace FileUtil {
     }
 
     std::filesystem::path getUserDataDirectory() {
+#if defined(__linux__)
+        // wxStandardPaths::GetUserDataDir ignores XDG on Unix and always returns ~/.NavKit
+        const char* dataHome = std::getenv("XDG_DATA_HOME");
+        const std::filesystem::path dataHomePath = dataHome != nullptr && *dataHome != '\0'
+            ? std::filesystem::u8path(dataHome)
+            : std::filesystem::u8path(toUtf8(wxGetHomeDir())) / ".local" / "share";
+        return dataHomePath / "NavKit";
+#else
         return std::filesystem::u8path(toUtf8(wxStandardPaths::Get().GetUserDataDir()));
+#endif
     }
 } // namespace FileUtil

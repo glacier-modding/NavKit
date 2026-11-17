@@ -26,7 +26,7 @@ void Logger::start() {
     if (logThread.joinable()) {
         return;
     }
-#ifdef __APPLE__
+#ifndef _WIN32
     const std::filesystem::path logDirectory = FileUtil::getUserDataDirectory();
     std::error_code error;
     std::filesystem::create_directories(logDirectory, error);

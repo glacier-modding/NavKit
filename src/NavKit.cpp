@@ -109,6 +109,10 @@ int SDL_main(const int argc, char** argv) {
         return -1;
     }
     Logger::getInstance().start();
+    const bool fileDialogsInitialized = NFD_Init() == NFD_OKAY;
+    if (!fileDialogsInitialized) {
+        Logger::log(NK_ERROR, "Could not initialize file dialogs: %s", NFD_GetError());
+    }
 
     PersistedSettings::getInstance().load();
     Renderer& renderer = Renderer::getInstance();
@@ -136,7 +140,9 @@ int SDL_main(const int argc, char** argv) {
             isRunning = mainLoopIteration();
         }
 
-        NFD_Quit();
+        if (fileDialogsInitialized) {
+            NFD_Quit();
+        }
         renderer.closeWindow();
         updateChecker.waitForUpdateCheck();
         Logger::getInstance().stop();
