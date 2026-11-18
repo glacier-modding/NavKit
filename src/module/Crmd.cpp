@@ -7,6 +7,7 @@
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/render/CoreProfileDraw.h"
+#include "../../include/NavKit/util/Bin1.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/UiIds.h"
@@ -15,7 +16,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -25,7 +25,6 @@
 #include <mutex>
 #include <numbers>
 #include <stdexcept>
-#include <type_traits>
 #include <vector>
 #include <cpptrace/from_current.hpp>
 #include <wx/button.h>
@@ -34,9 +33,7 @@
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
 namespace {
-    constexpr size_t crmdHeaderSize = 0x10;
     constexpr size_t crmdRootSize = 0xf0;
-    constexpr uint64_t nullCrmdPointer = std::numeric_limits<uint64_t>::max();
 
     void ensureCrmdHeapArenaInitialized() {
         static std::once_flag initialization;
@@ -46,55 +43,6 @@ namespace {
                 heapArena->Initialize(ZHMHeapArenaId);
             }
         });
-    }
-
-    template <typename T> T readCrmdValue(const std::vector<uint8_t>& bytes, const size_t offset) {
-        static_assert(std::is_arithmetic_v<T>);
-        if (offset > bytes.size() || sizeof(T) > bytes.size() - offset) {
-            throw std::runtime_error("Unexpected end of CRMD data.");
-        }
-        std::array<uint8_t, sizeof(T)> valueBytes{};
-        std::copy_n(bytes.begin() + static_cast<std::ptrdiff_t>(offset), sizeof(T), valueBytes.begin());
-        if constexpr (std::endian::native == std::endian::big) {
-            std::ranges::reverse(valueBytes);
-        }
-        T value;
-        std::memcpy(&value, valueBytes.data(), sizeof(T));
-        return value;
-    }
-
-    struct CrmdArray {
-        size_t offset;
-        size_t count;
-    };
-
-    CrmdArray getCrmdArray(const std::vector<uint8_t>& bytes, const size_t pointerOffset, const size_t coreSize,
-        const size_t elementSize) {
-        const uint64_t begin = readCrmdValue<uint64_t>(bytes, pointerOffset);
-        const uint64_t end = readCrmdValue<uint64_t>(bytes, pointerOffset + sizeof(uint64_t));
-        const uint64_t allocationEnd = readCrmdValue<uint64_t>(bytes, pointerOffset + 2 * sizeof(uint64_t));
-        if (begin == nullCrmdPointer && end == begin && allocationEnd == begin) {
-            return {0, 0};
-        }
-        if (end < begin || allocationEnd < end || begin > coreSize || end > coreSize || allocationEnd > coreSize) {
-            throw std::runtime_error("CRMD array pointers are invalid.");
-        }
-        const uint64_t size = end - begin;
-        if (size != 0 && begin < crmdRootSize) {
-            throw std::runtime_error("CRMD array points into its root object.");
-        }
-        if (size % elementSize != 0) {
-            throw std::runtime_error("CRMD array size does not match its element type.");
-        }
-        if (begin > std::numeric_limits<size_t>::max() - crmdHeaderSize ||
-            size > std::numeric_limits<size_t>::max() - crmdHeaderSize - begin) {
-            throw std::runtime_error("CRMD array extends beyond the end of the file.");
-        }
-        const size_t dataOffset = crmdHeaderSize + static_cast<size_t>(begin);
-        if (dataOffset > bytes.size() || size > bytes.size() - dataOffset) {
-            throw std::runtime_error("CRMD array extends beyond the end of the file.");
-        }
-        return {dataOffset, static_cast<size_t>(size / elementSize)};
     }
 
     glm::vec3 toRenderCoordinates(const float4& value) {
@@ -206,50 +154,46 @@ namespace {
         if (!stream) {
             throw std::runtime_error("Failed to read CRMD file: " + fileName);
         }
-        if (bytes.size() < crmdHeaderSize || std::memcmp(bytes.data(), "BIN1", 4) != 0) {
-            throw std::runtime_error("CRMD file does not have a valid BIN1 header.");
-        }
-        const uint32_t coreSize = (static_cast<uint32_t>(bytes[8]) << 24) | (static_cast<uint32_t>(bytes[9]) << 16) |
-            (static_cast<uint32_t>(bytes[10]) << 8) | static_cast<uint32_t>(bytes[11]);
-        if (coreSize < crmdRootSize || coreSize > bytes.size() - crmdHeaderSize) {
-            throw std::runtime_error("CRMD BIN1 data segment has an invalid size.");
-        }
+        const uint32_t dataSize = Bin1::readDataSize(bytes, crmdRootSize);
+        const auto readArray = [&bytes, dataSize](const size_t pointerOffset, const size_t elementSize) {
+            return Bin1::readArray(bytes, pointerOffset, dataSize, crmdRootSize, elementSize);
+        };
 
-        const size_t root = crmdHeaderSize;
+        const size_t root = Bin1::headerSize;
         auto loaded = std::make_unique<SCrowdMapData>();
-        loaded->m_nVersion = readCrmdValue<uint32_t>(bytes, root);
-        loaded->m_vCellConsts.x = readCrmdValue<float>(bytes, root + 4);
-        loaded->m_vCellConsts.y = readCrmdValue<float>(bytes, root + 8);
-        loaded->m_vCellConsts.z = readCrmdValue<float>(bytes, root + 12);
-        loaded->m_vCellConsts.w = readCrmdValue<float>(bytes, root + 16);
-        loaded->m_nGridSizeX = readCrmdValue<uint32_t>(bytes, root + 0x14);
-        loaded->m_nGridSizeY = readCrmdValue<uint32_t>(bytes, root + 0x18);
-        loaded->m_nCellSizeX = readCrmdValue<uint32_t>(bytes, root + 0x1c);
-        loaded->m_nCellSizeY = readCrmdValue<uint32_t>(bytes, root + 0x20);
+        loaded->m_nVersion = Bin1::readLittleEndian<uint32_t>(bytes, root);
+        loaded->m_vCellConsts.x = Bin1::readLittleEndian<float>(bytes, root + 4);
+        loaded->m_vCellConsts.y = Bin1::readLittleEndian<float>(bytes, root + 8);
+        loaded->m_vCellConsts.z = Bin1::readLittleEndian<float>(bytes, root + 12);
+        loaded->m_vCellConsts.w = Bin1::readLittleEndian<float>(bytes, root + 16);
+        loaded->m_nGridSizeX = Bin1::readLittleEndian<uint32_t>(bytes, root + 0x14);
+        loaded->m_nGridSizeY = Bin1::readLittleEndian<uint32_t>(bytes, root + 0x18);
+        loaded->m_nCellSizeX = Bin1::readLittleEndian<uint32_t>(bytes, root + 0x1c);
+        loaded->m_nCellSizeY = Bin1::readLittleEndian<uint32_t>(bytes, root + 0x20);
 
-        const CrmdArray gridMap = getCrmdArray(bytes, root + 0x28, coreSize, sizeof(ZCrowdGridPoint));
-        const CrmdArray cellFlags = getCrmdArray(bytes, root + 0x48, coreSize, sizeof(SCrowdCells));
-        const CrmdArray cellGroups = getCrmdArray(bytes, root + 0x60, coreSize, sizeof(SCrowdCells));
-        const CrmdArray flowChannels = getCrmdArray(bytes, root + 0x80, coreSize, sizeof(SCrowdFlowChannel));
-        loaded->m_fGridMapHeightOffsetsScale = readCrmdValue<float>(bytes, root + 0x40);
-        loaded->m_fGridMapHeightOffsetsBias = readCrmdValue<float>(bytes, root + 0x44);
-        loaded->m_nGroupFlowStartChannel = readCrmdValue<int32_t>(bytes, root + 0x78);
-        loaded->m_nGridCellSize = readCrmdValue<float>(bytes, root + 0x98);
+        const Bin1::Array gridMap = readArray(root + 0x28, sizeof(ZCrowdGridPoint));
+        const Bin1::Array cellFlags = readArray(root + 0x48, sizeof(SCrowdCells));
+        const Bin1::Array cellGroups = readArray(root + 0x60, sizeof(SCrowdCells));
+        const Bin1::Array flowChannels = readArray(root + 0x80, sizeof(SCrowdFlowChannel));
+        loaded->m_fGridMapHeightOffsetsScale = Bin1::readLittleEndian<float>(bytes, root + 0x40);
+        loaded->m_fGridMapHeightOffsetsBias = Bin1::readLittleEndian<float>(bytes, root + 0x44);
+        loaded->m_nGroupFlowStartChannel = Bin1::readLittleEndian<int32_t>(bytes, root + 0x78);
+        loaded->m_nGridCellSize = Bin1::readLittleEndian<float>(bytes, root + 0x98);
 
         auto readFloat4 = [&bytes](float4& target, const size_t offset) {
-            target.x = readCrmdValue<float>(bytes, offset);
-            target.y = readCrmdValue<float>(bytes, offset + 4);
-            target.z = readCrmdValue<float>(bytes, offset + 8);
-            target.w = readCrmdValue<float>(bytes, offset + 12);
+            target.x = Bin1::readLittleEndian<float>(bytes, offset);
+            target.y = Bin1::readLittleEndian<float>(bytes, offset + 4);
+            target.z = Bin1::readLittleEndian<float>(bytes, offset + 8);
+            target.w = Bin1::readLittleEndian<float>(bytes, offset + 12);
         };
         readFloat4(loaded->m_mObjectToWorld.XAxis, root + 0xa0);
         readFloat4(loaded->m_mObjectToWorld.YAxis, root + 0xb0);
         readFloat4(loaded->m_mObjectToWorld.ZAxis, root + 0xc0);
         readFloat4(loaded->m_mObjectToWorld.Trans, root + 0xd0);
-        loaded->m_vGlobalSize.x = readCrmdValue<float>(bytes, root + 0xe0);
-        loaded->m_vGlobalSize.y = readCrmdValue<float>(bytes, root + 0xe4);
-        loaded->m_vGlobalSize.z = readCrmdValue<float>(bytes, root + 0xe8);
-        loaded->m_nGridGeneratorOffset = readCrmdValue<float>(bytes, root + 0xec);
+        loaded->m_vGlobalSize.x = Bin1::readLittleEndian<float>(bytes, root + 0xe0);
+        loaded->m_vGlobalSize.y = Bin1::readLittleEndian<float>(bytes, root + 0xe4);
+        loaded->m_vGlobalSize.z = Bin1::readLittleEndian<float>(bytes, root + 0xe8);
+        loaded->m_nGridGeneratorOffset = Bin1::readLittleEndian<float>(bytes, root + 0xec);
 
         if (loaded->m_nGridSizeX == 0 || loaded->m_nGridSizeY == 0 ||
             loaded->m_nGridSizeX > std::numeric_limits<size_t>::max() / loaded->m_nGridSizeY) {
@@ -260,7 +204,7 @@ namespace {
             loaded->m_GridMap.resize(gridMap.count);
             for (size_t i = 0; i < gridMap.count; ++i) {
                 const size_t offset = gridMap.offset + i * sizeof(ZCrowdGridPoint);
-                loaded->m_GridMap[i].m_nHeightOffset = readCrmdValue<int16_t>(bytes, offset);
+                loaded->m_GridMap[i].m_nHeightOffset = Bin1::readLittleEndian<int16_t>(bytes, offset);
                 loaded->m_GridMap[i].m_nOnNavGrid = bytes[offset + 2];
             }
         }
@@ -282,8 +226,8 @@ namespace {
             loaded->m_aFlowChannels.resize(flowChannels.count);
             for (size_t i = 0; i < flowChannels.count; ++i) {
                 const size_t channelOffset = flowChannels.offset + i * sizeof(SCrowdFlowChannel);
-                const CrmdArray vectorIndices = getCrmdArray(bytes, channelOffset, coreSize, sizeof(uint8_t));
-                const CrmdArray costs = getCrmdArray(bytes, channelOffset + 0x18, coreSize, sizeof(uint16_t));
+                const Bin1::Array vectorIndices = readArray(channelOffset, sizeof(uint8_t));
+                const Bin1::Array costs = readArray(channelOffset + 0x18, sizeof(uint16_t));
                 if (vectorIndices.count != 0) {
                     loaded->m_aFlowChannels[i].m_aFlowVectorIndex.resize(vectorIndices.count);
                     std::memcpy(loaded->m_aFlowChannels[i].m_aFlowVectorIndex.begin(),
@@ -293,7 +237,7 @@ namespace {
                     loaded->m_aFlowChannels[i].m_aFlowCost.resize(costs.count);
                     for (size_t j = 0; j < costs.count; ++j) {
                         loaded->m_aFlowChannels[i].m_aFlowCost[j] =
-                            readCrmdValue<uint16_t>(bytes, costs.offset + j * sizeof(uint16_t));
+                            Bin1::readLittleEndian<uint16_t>(bytes, costs.offset + j * sizeof(uint16_t));
                     }
                 }
             }
@@ -301,9 +245,81 @@ namespace {
 
         return loaded;
     }
+
+    void putFloat4(Bin1::Writer& writer, const size_t offset, const float4& value) {
+        writer.put(offset, value.x);
+        writer.put(offset + 4, value.y);
+        writer.put(offset + 8, value.z);
+        writer.put(offset + 12, value.w);
+    }
+
+    void appendCells(Bin1::Writer& writer, const size_t pointerOffset, const TArray<SCrowdCells>& cells) {
+        writer.appendArray(pointerOffset, cells.size(), sizeof(SCrowdCells), [&] {
+            for (const SCrowdCells& block : cells) {
+                writer.data.insert(writer.data.end(), block.m_cells.begin(), block.m_cells.end());
+            }
+        });
+    }
+
+    std::vector<uint8_t> serializeCrowdMap(const SCrowdMapData& crowdMap) {
+        Bin1::Writer writer(crmdRootSize);
+        writer.put(0x00, crowdMap.m_nVersion);
+        writer.put(0x04, crowdMap.m_vCellConsts.x);
+        writer.put(0x08, crowdMap.m_vCellConsts.y);
+        writer.put(0x0c, crowdMap.m_vCellConsts.z);
+        writer.put(0x10, crowdMap.m_vCellConsts.w);
+        writer.put(0x14, crowdMap.m_nGridSizeX);
+        writer.put(0x18, crowdMap.m_nGridSizeY);
+        writer.put(0x1c, crowdMap.m_nCellSizeX);
+        writer.put(0x20, crowdMap.m_nCellSizeY);
+        writer.put(0x40, crowdMap.m_fGridMapHeightOffsetsScale);
+        writer.put(0x44, crowdMap.m_fGridMapHeightOffsetsBias);
+        writer.put(0x78, crowdMap.m_nGroupFlowStartChannel);
+        writer.put(0x98, crowdMap.m_nGridCellSize);
+        putFloat4(writer, 0xa0, crowdMap.m_mObjectToWorld.XAxis);
+        putFloat4(writer, 0xb0, crowdMap.m_mObjectToWorld.YAxis);
+        putFloat4(writer, 0xc0, crowdMap.m_mObjectToWorld.ZAxis);
+        putFloat4(writer, 0xd0, crowdMap.m_mObjectToWorld.Trans);
+        writer.put(0xe0, crowdMap.m_vGlobalSize.x);
+        writer.put(0xe4, crowdMap.m_vGlobalSize.y);
+        writer.put(0xe8, crowdMap.m_vGlobalSize.z);
+        writer.put(0xec, crowdMap.m_nGridGeneratorOffset);
+
+        writer.appendArray(0x28, crowdMap.m_GridMap.size(), alignof(int16_t), [&] {
+            for (const ZCrowdGridPoint& point : crowdMap.m_GridMap) {
+                writer.append(point.m_nHeightOffset);
+                writer.append(point.m_nOnNavGrid);
+                writer.append(static_cast<uint8_t>(0));
+            }
+        });
+        appendCells(writer, 0x48, crowdMap.m_CellFlags);
+        appendCells(writer, 0x60, crowdMap.m_CellGroups);
+
+        const TArray<SCrowdFlowChannel>& channels = crowdMap.m_aFlowChannels;
+        const size_t channelsBegin = writer.appendArray(0x80, channels.size(), 8, [&] {
+            writer.data.resize(writer.data.size() + channels.size() * sizeof(SCrowdFlowChannel), 0);
+        });
+        for (size_t i = 0; i < channels.size(); ++i) {
+            const size_t channelOffset = channelsBegin + i * sizeof(SCrowdFlowChannel);
+            const SCrowdFlowChannel& channel = channels[i];
+            writer.appendArray(channelOffset, channel.m_aFlowVectorIndex.size(), 1, [&] {
+                for (const uint8_t direction : channel.m_aFlowVectorIndex) {
+                    writer.append(direction);
+                }
+            });
+            writer.appendArray(channelOffset + 0x18, channel.m_aFlowCost.size(), alignof(uint16_t), [&] {
+                for (const uint16_t cost : channel.m_aFlowCost) {
+                    writer.append(cost);
+                }
+            });
+        }
+        std::vector<uint8_t> file = writer.finish(0x80, 2);
+        Bin1::appendEmptyTypeSegment(file);
+        return file;
+    }
 } // namespace
 
-Crmd::Crmd() : crmdLoaded(false), loading(false), showCrmd(true) {}
+Crmd::Crmd() : crmdLoaded(false), loading(false), saving(false), showCrmd(true) {}
 
 wxDialog* Crmd::hCrmdDialog = nullptr;
 std::string Crmd::selectedRpkgCrmd{};
@@ -614,6 +630,58 @@ void Crmd::extractCrmdFromRpkgs(const std::string& hash) {
         Logger::log(NK_INFO, ("Loading Crmd from file: " + fileName).c_str());
         getInstance().loadCrmdFromFile(fileName);
     }
+}
+
+bool Crmd::canSave() const {
+    return crmdLoaded && !loading && !saving && crowdMapData != nullptr;
+}
+
+void Crmd::saveCrmd(const std::string& fileName) const {
+    const std::vector<uint8_t> bytes = serializeCrowdMap(*crowdMapData);
+    std::ofstream stream(fileName, std::ios::binary | std::ios::trunc);
+    if (!stream) {
+        throw std::runtime_error("Could not open CRMD file for writing: " + fileName);
+    }
+    stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!stream) {
+        throw std::runtime_error("Failed to write CRMD file: " + fileName);
+    }
+}
+
+void Crmd::handleSaveCrmdClicked() {
+    char* fileName = openSaveCrmdFileDialog();
+    if (!fileName) {
+        return;
+    }
+    const std::string fileNameString = fileName;
+    NFD_FreePathU8(fileName);
+    Logger::log(NK_INFO, ("Saving Crmd file: '" + fileNameString + "'...").c_str());
+    saving = true;
+    Menu::updateMenuState();
+    backgroundWorker.emplace(&Crmd::saveCrmdAndReport, this, fileNameString);
+}
+
+void Crmd::saveCrmdAndReport(const std::string& fileName) {
+    const auto start = std::chrono::high_resolution_clock::now();
+    try {
+        saveCrmd(fileName);
+        const auto duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
+        Logger::log(NK_INFO,
+            ("Finished saving Crmd to " + fileName + " in " + std::to_string(duration.count()) + " ms").c_str());
+    } catch (const std::exception& error) {
+        ErrorHandler::openErrorDialog("Error saving Crmd file '" + fileName + "': " + error.what());
+        Logger::log(NK_ERROR, ("Failed to save CRMD file: " + std::string(error.what())).c_str());
+    } catch (...) {
+        Logger::log(NK_ERROR, "Failed to save CRMD file due to an unknown error.");
+    }
+    saving = false;
+    Menu::updateMenuState();
+}
+
+char* Crmd::openSaveCrmdFileDialog() {
+    nfdu8filteritem_t filter = {"Crmd files", "crmd"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.crmd");
 }
 
 char* Crmd::openLoadCrmdFileDialog() {

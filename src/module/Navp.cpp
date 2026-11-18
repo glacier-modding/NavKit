@@ -374,7 +374,7 @@ char* Navp::openLoadNavpFileDialog() {
 
 char* Navp::openSaveNavpFileDialog() {
     nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 2, "output");
+    return FileUtil::openNfdSaveDialog(filters, 2, "output.navp");
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {

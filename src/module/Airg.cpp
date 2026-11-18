@@ -390,7 +390,7 @@ char* Airg::openAirgFileDialog() {
 
 char* Airg::openSaveAirgFileDialog() {
     nfdu8filteritem_t filter = {"Airg files", "airg"};
-    return FileUtil::openNfdSaveDialog(&filter, 1, "output");
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.airg");
 }
 
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,

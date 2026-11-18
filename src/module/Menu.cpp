@@ -49,6 +49,7 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_SAVE_BLEND, "Save &Blend");
     file->Append(IDM_FILE_SAVE_NAVP, "Save &Navp");
     file->Append(IDM_FILE_SAVE_AIRG, "Save &Airg");
+    file->Append(IDM_FILE_SAVE_CRMD, "Save &Crmd");
     file->AppendSeparator();
     file->Append(IDM_FILE_EXIT, "E&xit");
     bar->Append(file, "&File");
@@ -208,12 +209,15 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
-    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract());
+    setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmd.saving);
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmd.saving);
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmd.saving);
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF, gfxf.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF_FROM_RPKG, Rpkg::canExtract() && gfxf.canLoad() && hasGfxfResources);
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
+    setMenuItemEnabled(IDM_FILE_SAVE_CRMD, crmd.canSave());
     setMenuItemEnabled(IDM_FILE_SAVE_GLB, isGlbLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_BLEND, obj.canSaveBlend());
 
@@ -356,6 +360,10 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_SAVE_AIRG:
         Airg::getInstance().handleSaveAirgClicked();
         Logger::log(NK_DEBUG, "File -> Save Airg clicked");
+        break;
+    case IDM_FILE_SAVE_CRMD:
+        Crmd::getInstance().handleSaveCrmdClicked();
+        Logger::log(NK_DEBUG, "File -> Save Crmd clicked");
         break;
 
     case IDM_FILE_EXIT:

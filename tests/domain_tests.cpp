@@ -684,6 +684,27 @@ namespace {
         crmd.crowdMapData = nullptr;
     }
 
+    void testCrmdSaveRoundTrip() {
+        const std::string fixturePath = "tests/resources/yacht.crmd";
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        const std::filesystem::path savedPath =
+            std::filesystem::temp_directory_path() / ("navkit-crmd-roundtrip-" + std::to_string(stamp) + ".crmd");
+        Crmd crmd;
+        crmd.loadCrowdMapData(fixturePath);
+        check(crmd.crmdLoaded, "CRMD fixture should load before saving");
+        crmd.saveCrmd(savedPath.string());
+
+        const auto readBytes = [](const std::filesystem::path& path) {
+            std::ifstream stream(path, std::ios::binary);
+            return std::vector<char>(std::istreambuf_iterator<char>(stream), {});
+        };
+        check(readBytes(fixturePath) == readBytes(savedPath), "saved CRMD should be byte-identical to the fixture");
+
+        std::filesystem::remove(savedPath);
+        delete crmd.crowdMapData;
+        crmd.crowdMapData = nullptr;
+    }
+
     void testWaypointConnectivityMapGeneration() {
         Airg& airg = Airg::getInstance();
         GridGenerator& generator = GridGenerator::getInstance();
@@ -1512,6 +1533,7 @@ void runDomainTests() {
     run("Reasoning grid AIRG persistence", testReasoningGridAirgRoundTrip);
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
     run("CRMD binary fixture loading", testCrmdFixtureLoading);
+    run("CRMD save round trip", testCrmdSaveRoundTrip);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);

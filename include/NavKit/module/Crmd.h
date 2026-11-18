@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/dialog.h>
+#include <atomic>
 #include <thread>
 #include <mutex>
 #include <map>
@@ -24,6 +25,9 @@ public:
     void loadCrmdFromFile(const std::string& fileName);
     void loadCrowdMapData(const std::string& fileName);
     void handleOpenCrmdClicked();
+    void handleSaveCrmdClicked();
+    void saveCrmd(const std::string& fileName) const;
+    bool canSave() const;
     void setLastLoadFileName(const char* fileName);
     void clear();
     static void updateCrmdDialogControls(wxDialog* dialog);
@@ -34,6 +38,7 @@ public:
     SCrowdMapData* crowdMapData{};
     bool crmdLoaded;
     bool loading;
+    std::atomic<bool> saving;
     bool showCrmd;
     std::string loadedCrmdText;
     static std::string selectedRpkgCrmd;
@@ -42,7 +47,9 @@ public:
     static wxDialog* hCrmdDialog;
 
 private:
+    void saveCrmdAndReport(const std::string& fileName);
     static char* openLoadCrmdFileDialog();
+    static char* openSaveCrmdFileDialog();
     std::string loadCrmdName;
     std::string lastLoadCrmdFile;
 };
