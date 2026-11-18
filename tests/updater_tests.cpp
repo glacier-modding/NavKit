@@ -51,9 +51,20 @@ namespace {
         const std::filesystem::path installDirectory =
             std::filesystem::temp_directory_path() / "Custom Install" / "NavKit";
         const auto arguments = NavKit::Updater::windowsInstallerArguments(msiPath, logPath, installDirectory);
-        const std::vector<std::string> expected = {"msiexec.exe", "/i", NavKit::Updater::pathToUtf8(msiPath),
-            "/passive", "/norestart", "/L*v", NavKit::Updater::pathToUtf8(logPath), "MSIRESTARTMANAGERCONTROL=Disable",
-            "INSTALLFOLDER=" + NavKit::Updater::pathToUtf8(installDirectory)};
+        auto normalizedMsi = msiPath;
+        auto normalizedLog = logPath;
+        auto normalizedDir = installDirectory;
+        normalizedMsi.make_preferred();
+        normalizedLog.make_preferred();
+        normalizedDir.make_preferred();
+
+        std::string dirStr = NavKit::Updater::pathToUtf8(normalizedDir);
+        while (dirStr.size() > 3 && (dirStr.back() == '\\' || dirStr.back() == '/')) {
+            dirStr.pop_back();
+        }
+        const std::vector<std::string> expected = {"msiexec.exe", "/i", NavKit::Updater::pathToUtf8(normalizedMsi),
+            "/passive", "/norestart", "/L*v", NavKit::Updater::pathToUtf8(normalizedLog),
+            "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=\"" + dirStr + "\""};
         require(arguments == expected, "Windows MSI arguments changed or paths with spaces were split");
     }
 
