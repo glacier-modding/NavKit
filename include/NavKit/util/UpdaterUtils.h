@@ -13,8 +13,20 @@ namespace NavKit::Updater {
 
     inline std::vector<std::string> windowsInstallerArguments(const std::filesystem::path& msiPath,
         const std::filesystem::path& logPath, const std::filesystem::path& installDirectory) {
-        return {"msiexec.exe", "/i", pathToUtf8(msiPath), "/passive", "/norestart", "/L*v", pathToUtf8(logPath),
-            "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=" + pathToUtf8(installDirectory)};
+        auto normalizedMsi = msiPath;
+        auto normalizedLog = logPath;
+        auto normalizedDir = installDirectory;
+        normalizedMsi.make_preferred();
+        normalizedLog.make_preferred();
+        normalizedDir.make_preferred();
+
+        std::string dirStr = pathToUtf8(normalizedDir);
+        while (dirStr.size() > 3 && (dirStr.back() == '\\' || dirStr.back() == '/')) {
+            dirStr.pop_back();
+        }
+
+        return {"msiexec.exe", "/i", pathToUtf8(normalizedMsi), "/passive", "/norestart", "/L*v",
+            pathToUtf8(normalizedLog), "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=\"" + dirStr + "\""};
     }
 
     inline std::filesystem::path windowsUpdateLogPath(
