@@ -25,8 +25,10 @@ namespace NavKit::Updater {
             dirStr.pop_back();
         }
 
-        return {"msiexec.exe", "/i", pathToUtf8(normalizedMsi), "/passive", "/norestart", "/L*v",
-            pathToUtf8(normalizedLog), "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=\"" + dirStr + "\""};
+        return {"msiexec.exe", "/i", pathToUtf8(normalizedMsi),
+            "/passive", // or "/qn" for completely silent UI
+            "/norestart", "/L*v", pathToUtf8(normalizedLog), "MSIRESTARTMANAGERCONTROL=Disable",
+            "INSTALLFOLDER=" + dirStr};
     }
 
     inline std::filesystem::path windowsUpdateLogPath(

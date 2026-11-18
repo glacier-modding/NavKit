@@ -64,7 +64,7 @@ namespace {
         }
         const std::vector<std::string> expected = {"msiexec.exe", "/i", NavKit::Updater::pathToUtf8(normalizedMsi),
             "/passive", "/norestart", "/L*v", NavKit::Updater::pathToUtf8(normalizedLog),
-            "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=\"" + dirStr + "\""};
+            "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=" + dirStr + ""};
         require(arguments == expected, "Windows MSI arguments changed or paths with spaces were split");
     }
 

@@ -4,7 +4,7 @@
     {
       "name": "base",
       "displayName": "Basic config",
-      "description": "Basic config using Visual Studio 17 2022 generator",
+      "description": "Basic config using Visual Studio 18 2026 generator",
       "generator": "Visual Studio 18 2026",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "architecture": {
