@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <utility>
 #include <unordered_map>
+#include "../../include/NavKit/util/Bin1.h"
 #include "../../include/NavKit/util/Threading.h"
 
 void ReasoningGrid::generateVisionData(const std::function<bool(const Math::Vec4&, const Math::Vec4&)>& unblocked,
@@ -318,25 +319,9 @@ void ReasoningGrid::generateDeadEndData(const std::function<void(size_t, size_t)
 }
 
 namespace {
-    template <typename T> void writeLittleEndian(std::vector<uint8_t>& bytes, const size_t offset, const T value) {
-        static_assert(std::is_arithmetic_v<T>);
-        std::array<uint8_t, sizeof(T)> valueBytes{};
-        std::memcpy(valueBytes.data(), &value, sizeof(T));
-        if constexpr (std::endian::native == std::endian::big) {
-            std::ranges::reverse(valueBytes);
-        }
-        if (offset > bytes.max_size() - valueBytes.size()) {
-            throw std::length_error("AIRG data is too large to serialize.");
-        }
-        if (bytes.size() < offset + valueBytes.size()) {
-            bytes.resize(offset + valueBytes.size());
-        }
-        std::copy(valueBytes.begin(), valueBytes.end(), bytes.begin() + static_cast<std::ptrdiff_t>(offset));
-    }
-
-    template <typename T> void appendLittleEndian(std::vector<uint8_t>& bytes, const T value) {
-        writeLittleEndian(bytes, bytes.size(), value);
-    }
+    constexpr size_t airgRootSize = 0xd0;
+    using Bin1::readLittleEndian;
+    using Bin1::writeLittleEndian;
 
     template <typename T> T readValue(std::istream& stream) {
         static_assert(std::is_arithmetic_v<T>);
@@ -353,13 +338,6 @@ namespace {
         return value;
     }
 
-    uint32_t checkedSize(const size_t size) {
-        if (size > std::numeric_limits<uint32_t>::max()) {
-            throw std::length_error("AIRG array is too large to serialize.");
-        }
-        return static_cast<uint32_t>(size);
-    }
-
     void ensureRemaining(std::istream& stream, const uint64_t size) {
         const std::istream::pos_type current = stream.tellg();
         if (current == std::istream::pos_type(-1)) {
@@ -374,89 +352,18 @@ namespace {
         }
     }
 
-    template <typename T> T readLittleEndian(const std::vector<uint8_t>& bytes, const size_t offset) {
-        static_assert(std::is_arithmetic_v<T>);
-        if (offset > bytes.size() || sizeof(T) > bytes.size() - offset) {
-            throw std::runtime_error("Unexpected end of AIRG data.");
-        }
-        std::array<uint8_t, sizeof(T)> valueBytes{};
-        std::copy_n(bytes.begin() + static_cast<std::ptrdiff_t>(offset), sizeof(T), valueBytes.begin());
-        if constexpr (std::endian::native == std::endian::big) {
-            std::ranges::reverse(valueBytes);
-        }
-        T value;
-        std::memcpy(&value, valueBytes.data(), sizeof(T));
-        return value;
-    }
-
-    uint64_t readArraySize(
-        const std::vector<uint8_t>& bytes, const size_t offset, const size_t coreEnd, const size_t elementSize) {
-        const uint64_t begin = readLittleEndian<uint64_t>(bytes, offset);
-        const uint64_t end = readLittleEndian<uint64_t>(bytes, offset + sizeof(uint64_t));
-        const uint64_t allocationEnd = readLittleEndian<uint64_t>(bytes, offset + 2 * sizeof(uint64_t));
-        if (begin == std::numeric_limits<uint64_t>::max() && end == begin && allocationEnd == begin) {
-            return 0;
-        }
-        if (end < begin || allocationEnd < end) {
-            throw std::runtime_error("AIRG array pointers are invalid.");
-        }
-        constexpr uint64_t headerSize = 16;
-        const uint64_t coreSize = coreEnd - headerSize;
-        if (begin > coreSize || end > coreSize || allocationEnd > coreSize) {
-            throw std::runtime_error("AIRG array pointers extend beyond the data segment.");
-        }
-        const uint64_t size = end - begin;
-        if (size % elementSize != 0) {
-            throw std::runtime_error("AIRG array size does not match its element type.");
-        }
-        if (size == 0) {
-            return 0;
-        }
-        if (begin > std::numeric_limits<size_t>::max() - headerSize ||
-            size > std::numeric_limits<size_t>::max() - headerSize - begin) {
-            throw std::runtime_error("AIRG array extends beyond the end of the file.");
-        }
-        const size_t dataOffset = static_cast<size_t>(headerSize + begin);
-        if (dataOffset > coreEnd || size > coreEnd - dataOffset) {
-            throw std::runtime_error("AIRG array extends beyond the end of the file.");
-        }
-        return size;
-    }
-
-    std::vector<uint8_t> readAirgArray(
-        const std::vector<uint8_t>& bytes, const size_t pointerOffset, const size_t coreEnd, const size_t elementSize) {
-        const uint64_t size = readArraySize(bytes, pointerOffset, coreEnd, elementSize);
-        const uint64_t begin = readLittleEndian<uint64_t>(bytes, pointerOffset);
-        if (size == 0) {
-            return {};
-        }
-        const size_t dataOffset = static_cast<size_t>(16 + begin);
-        return {bytes.begin() + static_cast<std::ptrdiff_t>(dataOffset),
-            bytes.begin() + static_cast<std::ptrdiff_t>(dataOffset + size)};
-    }
-
-    uint32_t readBigEndian32(const std::vector<uint8_t>& bytes, const size_t offset) {
-        if (offset > bytes.size() || sizeof(uint32_t) > bytes.size() - offset) {
-            throw std::runtime_error("Unexpected end of AIRG header.");
-        }
-        return (static_cast<uint32_t>(bytes[offset]) << 24) | (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
-            (static_cast<uint32_t>(bytes[offset + 2]) << 8) | static_cast<uint32_t>(bytes[offset + 3]);
+    std::vector<uint8_t> readAirgArray(const std::vector<uint8_t>& bytes, const size_t pointerOffset,
+        const uint32_t dataSize, const size_t elementSize) {
+        const Bin1::Array array = Bin1::readArray(bytes, pointerOffset, dataSize, airgRootSize, elementSize);
+        const auto begin = bytes.begin() + static_cast<std::ptrdiff_t>(array.offset);
+        return {begin, begin + static_cast<std::ptrdiff_t>(array.count * elementSize)};
     }
 
     ReasoningGrid readBin1Airg(const std::vector<uint8_t>& bytes) {
-        constexpr size_t headerSize = 0x10;
-        constexpr size_t rootSize = 0xd0;
-        if (bytes.size() < headerSize || std::memcmp(bytes.data(), "BIN1", 4) != 0) {
-            throw std::runtime_error("AIRG file does not have a valid BIN1 header.");
-        }
-        const uint32_t coreSize = readBigEndian32(bytes, 8);
-        if (coreSize < rootSize || coreSize > bytes.size() - headerSize) {
-            throw std::runtime_error("AIRG BIN1 data segment has an invalid size.");
-        }
-        const size_t coreEnd = headerSize + coreSize;
+        const uint32_t dataSize = Bin1::readDataSize(bytes, airgRootSize);
 
         ReasoningGrid loaded;
-        constexpr size_t rootOffset = headerSize;
+        constexpr size_t rootOffset = Bin1::headerSize;
         constexpr size_t propertiesOffset = rootOffset + 0x60;
         loaded.m_Properties.vMin = {readLittleEndian<float>(bytes, propertiesOffset),
             readLittleEndian<float>(bytes, propertiesOffset + 4), readLittleEndian<float>(bytes, propertiesOffset + 8),
@@ -471,15 +378,15 @@ namespace {
             static_cast<uint32_t>(readLittleEndian<int32_t>(bytes, propertiesOffset + 40));
         loaded.m_nNodeCount = readLittleEndian<uint32_t>(bytes, rootOffset + 0x90);
 
-        loaded.m_HighVisibilityBits.m_aBytes = readAirgArray(bytes, rootOffset + 0x38, coreEnd, sizeof(uint8_t));
+        loaded.m_HighVisibilityBits.m_aBytes = readAirgArray(bytes, rootOffset + 0x38, dataSize, sizeof(uint8_t));
         loaded.m_HighVisibilityBits.m_nSize = readLittleEndian<uint32_t>(bytes, rootOffset + 0x50);
-        loaded.m_LowVisibilityBits.m_aBytes = readAirgArray(bytes, rootOffset + 0x18, coreEnd, sizeof(uint8_t));
+        loaded.m_LowVisibilityBits.m_aBytes = readAirgArray(bytes, rootOffset + 0x18, dataSize, sizeof(uint8_t));
         loaded.m_LowVisibilityBits.m_nSize = readLittleEndian<uint32_t>(bytes, rootOffset + 0x30);
-        loaded.m_deadEndData.m_aBytes = readAirgArray(bytes, rootOffset + 0xb0, coreEnd, sizeof(uint8_t));
+        loaded.m_deadEndData.m_aBytes = readAirgArray(bytes, rootOffset + 0xb0, dataSize, sizeof(uint8_t));
         loaded.m_deadEndData.m_nSize = readLittleEndian<uint32_t>(bytes, rootOffset + 0xc8);
-        loaded.m_pVisibilityData = readAirgArray(bytes, rootOffset + 0x98, coreEnd, sizeof(uint8_t));
+        loaded.m_pVisibilityData = readAirgArray(bytes, rootOffset + 0x98, dataSize, sizeof(uint8_t));
 
-        const std::vector<uint8_t> waypointData = readAirgArray(bytes, rootOffset, coreEnd, 0x30);
+        const std::vector<uint8_t> waypointData = readAirgArray(bytes, rootOffset, dataSize, 0x30);
         const size_t waypointCount = waypointData.size() / 0x30;
         if (waypointCount > loaded.m_WaypointList.max_size()) {
             throw std::length_error("AIRG waypoint array is too large.");
@@ -501,46 +408,26 @@ namespace {
         return loaded;
     }
 
-    void appendBin1Array(std::vector<uint8_t>& data, const size_t pointerOffset, const size_t elementCount,
+    void appendBin1Array(Bin1::Writer& writer, const size_t pointerOffset, const size_t elementCount,
         const std::vector<uint8_t>& values, const bool aligned) {
-        if (values.size() > std::numeric_limits<uint32_t>::max()) {
-            throw std::length_error("AIRG array is too large to serialize.");
-        }
-        if (elementCount > std::numeric_limits<uint32_t>::max()) {
-            throw std::length_error("AIRG array is too large to serialize.");
-        }
-        if (values.empty() && !aligned) {
-            constexpr uint64_t nullPointer = std::numeric_limits<uint64_t>::max();
-            writeLittleEndian(data, pointerOffset, nullPointer);
-            writeLittleEndian(data, pointerOffset + 8, nullPointer);
-            writeLittleEndian(data, pointerOffset + 16, nullPointer);
+        const auto appendValues = [&] { writer.data.insert(writer.data.end(), values.begin(), values.end()); };
+        if (aligned) {
+            writer.appendArray(pointerOffset, elementCount, pointerOffset == 0 ? 16 : 1, appendValues);
             return;
         }
-        // The 16-byte dialect aligns waypoint elements; byte arrays have a
-        // four-byte count immediately before their data (including empty arrays).
-        const size_t alignment = aligned ? (pointerOffset == 0 ? 16 : 1) : 8;
-        const size_t prefixSize = aligned ? 4 : 8;
-        while ((data.size() + prefixSize) % alignment != 0) {
-            data.push_back(0);
+        if (values.empty()) {
+            writer.putNullArray(pointerOffset);
+            return;
         }
-        const size_t prefixOffset = data.size();
-        if (prefixOffset > std::numeric_limits<uint32_t>::max() - 8) {
-            throw std::length_error("AIRG data is too large to serialize.");
+        // The legacy dialect pads to 8 bytes and puts the count in the last half of an 8-byte prefix.
+        while (writer.data.size() % 8 != 0) {
+            writer.data.push_back(0);
         }
-        data.resize(prefixOffset + prefixSize, 0);
-        writeLittleEndian(data, prefixOffset + prefixSize - 4, static_cast<uint32_t>(elementCount));
-        const size_t begin = data.size();
-        if (values.size() > data.max_size() - begin) {
-            throw std::length_error("AIRG data is too large to serialize.");
-        }
-        data.insert(data.end(), values.begin(), values.end());
-        const size_t end = data.size();
-        writeLittleEndian(data, pointerOffset, static_cast<uint64_t>(begin));
-        writeLittleEndian(data, pointerOffset + 8, static_cast<uint64_t>(end));
-        writeLittleEndian(data, pointerOffset + 16, static_cast<uint64_t>(end));
-        if (aligned && values.empty()) {
-            data.push_back(0);
-        }
+        writer.append(uint32_t{0});
+        writer.append(static_cast<uint32_t>(elementCount));
+        const size_t begin = writer.data.size();
+        appendValues();
+        writer.putPointers(pointerOffset, begin, writer.data.size());
     }
 
     Math::Vec4 readVec4(std::istream& stream) {
@@ -591,8 +478,7 @@ namespace {
 } // namespace
 
 void ReasoningGrid::writeAirg(const std::filesystem::path& path) const {
-    constexpr size_t rootSize = 0xd0;
-    std::vector<uint8_t> data(rootSize, 0);
+    Bin1::Writer writer(airgRootSize);
 
     std::vector<uint8_t> waypoints;
     if (m_WaypointList.size() > std::numeric_limits<uint32_t>::max()) {
@@ -618,61 +504,37 @@ void ReasoningGrid::writeAirg(const std::filesystem::path& path) const {
         writeLittleEndian(waypoints, waypointOffset + 32, waypoint.nVisionDataOffset);
         writeLittleEndian(waypoints, waypointOffset + 36, static_cast<int16_t>(waypoint.nLayerIndex));
     }
-    appendBin1Array(data, 0x00, m_WaypointList.size(), waypoints, m_alignedBin1);
-    appendBin1Array(data, 0x18, m_LowVisibilityBits.m_aBytes.size(), m_LowVisibilityBits.m_aBytes, m_alignedBin1);
-    appendBin1Array(data, 0x38, m_HighVisibilityBits.m_aBytes.size(), m_HighVisibilityBits.m_aBytes, m_alignedBin1);
+    appendBin1Array(writer, 0x00, m_WaypointList.size(), waypoints, m_alignedBin1);
+    appendBin1Array(writer, 0x18, m_LowVisibilityBits.m_aBytes.size(), m_LowVisibilityBits.m_aBytes, m_alignedBin1);
+    appendBin1Array(writer, 0x38, m_HighVisibilityBits.m_aBytes.size(), m_HighVisibilityBits.m_aBytes, m_alignedBin1);
 
     const size_t propertiesOffset = 0x60;
-    writeLittleEndian(data, propertiesOffset, m_Properties.vMin.x);
-    writeLittleEndian(data, propertiesOffset + 4, m_Properties.vMin.y);
-    writeLittleEndian(data, propertiesOffset + 8, m_Properties.vMin.z);
-    writeLittleEndian(data, propertiesOffset + 12, m_Properties.vMin.w);
-    writeLittleEndian(data, propertiesOffset + 16, m_Properties.vMax.x);
-    writeLittleEndian(data, propertiesOffset + 20, m_Properties.vMax.y);
-    writeLittleEndian(data, propertiesOffset + 24, m_Properties.vMax.z);
-    writeLittleEndian(data, propertiesOffset + 28, m_Properties.vMax.w);
-    writeLittleEndian(data, propertiesOffset + 32, static_cast<int32_t>(m_Properties.nGridWidth));
-    writeLittleEndian(data, propertiesOffset + 36, m_Properties.fGridSpacing);
-    writeLittleEndian(data, propertiesOffset + 40, static_cast<int32_t>(m_Properties.nVisibilityRange));
-    writeLittleEndian(data, 0x90, m_nNodeCount);
-    writeLittleEndian(data, 0x30, m_LowVisibilityBits.m_nSize);
-    writeLittleEndian(data, 0x50, m_HighVisibilityBits.m_nSize);
-    writeLittleEndian(data, 0xc8, m_deadEndData.m_nSize);
-    appendBin1Array(data, 0x98, m_pVisibilityData.size(), m_pVisibilityData, m_alignedBin1);
-    appendBin1Array(data, 0xb0, m_deadEndData.m_aBytes.size(), m_deadEndData.m_aBytes, m_alignedBin1);
+    writer.put(propertiesOffset, m_Properties.vMin.x);
+    writer.put(propertiesOffset + 4, m_Properties.vMin.y);
+    writer.put(propertiesOffset + 8, m_Properties.vMin.z);
+    writer.put(propertiesOffset + 12, m_Properties.vMin.w);
+    writer.put(propertiesOffset + 16, m_Properties.vMax.x);
+    writer.put(propertiesOffset + 20, m_Properties.vMax.y);
+    writer.put(propertiesOffset + 24, m_Properties.vMax.z);
+    writer.put(propertiesOffset + 28, m_Properties.vMax.w);
+    writer.put(propertiesOffset + 32, static_cast<int32_t>(m_Properties.nGridWidth));
+    writer.put(propertiesOffset + 36, m_Properties.fGridSpacing);
+    writer.put(propertiesOffset + 40, static_cast<int32_t>(m_Properties.nVisibilityRange));
+    writer.put(0x90, m_nNodeCount);
+    writer.put(0x30, m_LowVisibilityBits.m_nSize);
+    writer.put(0x50, m_HighVisibilityBits.m_nSize);
+    writer.put(0xc8, m_deadEndData.m_nSize);
+    appendBin1Array(writer, 0x98, m_pVisibilityData.size(), m_pVisibilityData, m_alignedBin1);
+    appendBin1Array(writer, 0xb0, m_deadEndData.m_aBytes.size(), m_deadEndData.m_aBytes, m_alignedBin1);
 
-    while (!m_alignedBin1 && data.size() % 4 != 0) {
-        data.push_back(0);
+    while (!m_alignedBin1 && writer.data.size() % 4 != 0) {
+        writer.data.push_back(0);
     }
-    if (data.size() > std::numeric_limits<uint32_t>::max()) {
-        throw std::length_error("AIRG BIN1 data segment is too large.");
-    }
-    std::vector<uint8_t> file(16, 0);
-    file[0] = 'B';
-    file[1] = 'I';
-    file[2] = 'N';
-    file[3] = '1';
-    file[5] = m_alignedBin1 ? 0x10 : 0x04;
-    file[6] = m_alignedBin1 ? 0x02 : 0x01;
-    writeLittleEndian(file, 8, static_cast<uint32_t>(data.size()));
-    std::reverse(file.begin() + 8, file.begin() + 12);
-    file.insert(file.end(), data.begin(), data.end());
-
-    constexpr std::array<uint32_t, 15> relocationOffsets = {
-        0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x38, 0x40, 0x48, 0x98, 0xa0, 0xa8, 0xb0, 0xb8, 0xc0};
-    appendLittleEndian(file, uint32_t{0x12eba5ed});
-    appendLittleEndian(file, uint32_t{4 + relocationOffsets.size() * sizeof(uint32_t)});
-    appendLittleEndian(file, checkedSize(relocationOffsets.size()));
-    for (const uint32_t relocationOffset : relocationOffsets) {
-        appendLittleEndian(file, relocationOffset);
-    }
-
+    std::vector<uint8_t> file = writer.finish(m_alignedBin1 ? 0x10 : 0x04, m_alignedBin1 ? 2 : 1);
     if (!m_bin1Extensions.empty()) {
         file.insert(file.end(), m_bin1Extensions.begin(), m_bin1Extensions.end());
     } else if (m_alignedBin1) {
-        appendLittleEndian(file, uint32_t{0x3989bf9f});
-        appendLittleEndian(file, uint32_t{8});
-        appendLittleEndian(file, uint64_t{0});
+        Bin1::appendEmptyTypeSegment(file);
     }
 
     std::ofstream stream(path, std::ios::binary | std::ios::trunc);
@@ -709,8 +571,8 @@ void ReasoningGrid::readAirg(const std::filesystem::path& path) {
         }
         ReasoningGrid loaded = readBin1Airg(bytes);
         loaded.m_alignedBin1 = bytes[5] == 0x10 && bytes[6] == 2;
-        const size_t coreEnd = size_t{16} + readBigEndian32(bytes, 8);
-        if (bytes.size() - coreEnd >= 8 && readLittleEndian<uint32_t>(bytes, coreEnd) == 0x12eba5ed) {
+        const size_t coreEnd = Bin1::headerSize + Bin1::readDataSize(bytes, airgRootSize);
+        if (bytes.size() - coreEnd >= 8 && readLittleEndian<uint32_t>(bytes, coreEnd) == Bin1::relocationSegmentId) {
             const size_t sectionSize = readLittleEndian<uint32_t>(bytes, coreEnd + 4);
             if (sectionSize > bytes.size() - coreEnd - 8) {
                 throw std::runtime_error("AIRG BIN1 relocation section is truncated.");
