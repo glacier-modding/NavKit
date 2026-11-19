@@ -56,11 +56,11 @@ jobs:
           major, minor, patch = map(int, match.groups())
 
           subject = os.environ["COMMIT_SUBJECT"]
-          if subject.startswith("feat!:"):
+          if subject.lower().startswith("feat!:"):
               major, minor, patch = major + 1, 0, 0
-          elif subject.startswith("feat:"):
+          elif subject.lower().startswith("feat:"):
               minor, patch = minor + 1, 0
-          elif subject.startswith("fix:"):
+          elif subject.lower().startswith("fix:"):
               patch += 1
           else:
               raise SystemExit(f"Unsupported release commit: {subject}")
