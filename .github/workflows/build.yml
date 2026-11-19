@@ -218,7 +218,7 @@ jobs:
       - name: Set up CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "~3.30.0"
+          cmakeVersion: "~4.2.0"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -312,7 +312,7 @@ jobs:
       - name: Set up CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "~3.30.0"
+          cmakeVersion: "~4.2.0"
 
       - name: Install system dependencies
         run: |
@@ -379,7 +379,7 @@ jobs:
 
   create_release:
     name: Rebuild release and package MSI
-    runs-on: windows-2022
+    runs-on: windows-latest
     needs: [ create_versioned_release ]
     if: needs.create_versioned_release.result == 'success'
     env:
@@ -390,7 +390,7 @@ jobs:
       - name: Set up CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "~3.30.0"
+          cmakeVersion: "~4.2.0"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -464,7 +464,7 @@ jobs:
       - name: Set up CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "~3.30.0"
+          cmakeVersion: "~4.2.0"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -555,7 +555,7 @@ jobs:
       - name: Set up CMake
         uses: lukka/get-cmake@latest
         with:
-          cmakeVersion: "~3.30.0"
+          cmakeVersion: "~4.2.0"
 
       - name: Install system dependencies
         run: |
