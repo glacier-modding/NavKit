@@ -7,6 +7,8 @@
 #include <map>
 #include <optional>
 #include <GL/glew.h>
+#include <glm/glm.hpp>
+#include "../render/CoreProfileDraw.h"
 
 class SCrowdMapData;
 
@@ -21,7 +23,7 @@ public:
         return instance;
     }
 
-    void renderCrowdMapData() const;
+    void renderCrowdMapData();
     void loadCrmdFromFile(const std::string& fileName);
     void loadCrowdMapData(const std::string& fileName);
     void handleOpenCrmdClicked();
@@ -47,9 +49,14 @@ public:
     static wxDialog* hCrmdDialog;
 
 private:
+    void rebuildRenderGeometry();
     void saveCrmdAndReport(const std::string& fileName);
     static char* openLoadCrmdFileDialog();
     static char* openSaveCrmdFileDialog();
     std::string loadCrmdName;
     std::string lastLoadCrmdFile;
+    std::atomic<bool> renderGeometryDirty{true};
+    CoreProfileVertexBuffer cellTriangleBuffer;
+    CoreProfileVertexBuffer flowArrowLineBuffer;
+    glm::mat4 renderModel{1.0f};
 };

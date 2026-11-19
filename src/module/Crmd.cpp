@@ -327,10 +327,21 @@ std::map<std::string, std::string> Crmd::crmdHashIoiStringMap;
 std::mutex Crmd::crmdHashIoiStringMapMutex;
 ZHMArena ZHMArenas::g_Arenas[8];
 
-void Crmd::renderCrowdMapData() const {
+void Crmd::renderCrowdMapData() {
     if (loading || !crmdLoaded || !crowdMapData || crowdMapData->m_nGridSizeX == 0 || crowdMapData->m_nGridSizeY == 0) {
         return;
     }
+    if (renderGeometryDirty.exchange(false)) {
+        rebuildRenderGeometry();
+    }
+    const Renderer& renderer = Renderer::getInstance();
+    cellTriangleBuffer.draw(GL_TRIANGLES, renderModel, renderer.view, renderer.projection);
+    flowArrowLineBuffer.draw(GL_LINES, renderModel, renderer.view, renderer.projection);
+}
+
+void Crmd::rebuildRenderGeometry() {
+    cellTriangleBuffer.upload({});
+    flowArrowLineBuffer.upload({});
     const SCrowdMapData& data = *crowdMapData;
     const size_t gridWidth = data.m_nGridSizeX;
     const size_t gridHeight = data.m_nGridSizeY;
@@ -421,12 +432,11 @@ void Crmd::renderCrowdMapData() const {
         }
     }
 
-    Renderer& renderer = Renderer::getInstance();
     constexpr float displayLiftAboveGround = 0.25f;
-    const glm::mat4 model = glm::translate(crowdMapTransform(data),
+    renderModel = glm::translate(crowdMapTransform(data),
         glm::vec3(-0.5f * static_cast<float>(cellGridWidth) * cellWidth,
             -0.5f * static_cast<float>(cellGridHeight) * cellHeight, displayLiftAboveGround));
-    drawCoreProfileVertices(rectangles, GL_TRIANGLES, model, renderer.view, renderer.projection);
+    cellTriangleBuffer.upload(rectangles);
 
     constexpr std::array<glm::vec4, 8> flowChannelColors = {glm::vec4(1.0f, 0.65f, 0.9f, 0.95f),
         glm::vec4(1.0f, 0.72f, 0.25f, 0.95f), glm::vec4(0.35f, 0.85f, 1.0f, 0.95f), glm::vec4(0.95f, 0.9f, 0.3f, 0.95f),
@@ -436,15 +446,15 @@ void Crmd::renderCrowdMapData() const {
     const float arrowLength = std::min(cellWidth, cellHeight) * 0.38f;
     const float arrowHeadLength = arrowLength * 0.25f;
     const float arrowHeadWidth = arrowLength * 0.18f;
+    std::vector<CoreProfileVertex> arrows;
     for (size_t channelIndex = 0; channelIndex < data.m_aFlowChannels.size(); ++channelIndex) {
         const SCrowdFlowChannel& channel = data.m_aFlowChannels[channelIndex];
         const glm::vec4 arrowColor = flowChannelColors[channelIndex % flowChannelColors.size()];
         const size_t vectorCount = std::min(cellCount, channel.m_aFlowVectorIndex.size());
-        std::vector<CoreProfileVertex> arrows;
-        if (vectorCount > arrows.max_size() / 6) {
+        if (vectorCount > (arrows.max_size() - arrows.size()) / 6) {
             continue;
         }
-        arrows.reserve(vectorCount * 6);
+        arrows.reserve(arrows.size() + vectorCount * 6);
         for (size_t i = 0; i < vectorCount; ++i) {
             const uint8_t vectorIndex = channel.m_aFlowVectorIndex[i];
             const uint8_t flags = getPackedCellValue(data.m_CellFlags, i);
@@ -471,8 +481,8 @@ void Crmd::renderCrowdMapData() const {
                     {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
                     {glm::vec3(rightWing, arrowZ), arrowNormal, arrowColor, {}}});
         }
-        drawCoreProfileVertices(arrows, GL_LINES, model, renderer.view, renderer.projection);
     }
+    flowArrowLineBuffer.upload(arrows);
 }
 void Crmd::loadCrmdFromFile(const std::string& fileName) {
     Logger::log(NK_INFO, ("Loading Crmd from file: " + fileName).c_str());
@@ -531,6 +541,7 @@ void Crmd::loadCrowdMapData(const std::string& fileName) {
     msg += " seconds";
     Logger::log(NK_INFO, msg.c_str());
     loading = false;
+    renderGeometryDirty = true;
     crmdLoaded = true;
     Menu::updateMenuState();
 }
@@ -551,6 +562,7 @@ void Crmd::setLastLoadFileName(const char* fileName) {
 void Crmd::clear() {
     delete crowdMapData;
     crowdMapData = new SCrowdMapData();
+    renderGeometryDirty = true;
     crmdLoaded = false;
     loading = false;
     loadedCrmdText.clear();

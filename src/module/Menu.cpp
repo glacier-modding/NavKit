@@ -268,6 +268,7 @@ int Menu::handleMenuClicked(const int menuId) {
         Gfxf::getInstance().clear();
         Navp::getInstance().clear();
         Airg::getInstance().clear();
+        Crmd::getInstance().clear();
         updateMenuState();
         Logger::log(NK_DEBUG, "File -> New Project clicked");
         break;

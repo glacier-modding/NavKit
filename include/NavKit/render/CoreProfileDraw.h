@@ -14,3 +14,14 @@ struct CoreProfileVertex {
 void drawCoreProfileVertices(std::span<const CoreProfileVertex> vertices, GLenum primitive, const glm::mat4& model,
     const glm::mat4& view, const glm::mat4& projection, GLuint texture = 0, bool alphaTexture = false, bool fog = true);
 void setCoreProfileFogEnabled(bool enabled);
+
+class CoreProfileVertexBuffer {
+public:
+    void upload(std::span<const CoreProfileVertex> vertices);
+    void draw(GLenum primitive, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection) const;
+
+private:
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLsizei vertexCount = 0;
+};
