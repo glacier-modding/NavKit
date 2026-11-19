@@ -227,6 +227,11 @@ void showHelpDialog() {
                 {"Build Blend from Scene", "Builds a Blender scene from the loaded scene.",
                     "Exports scene geometry and supported scene content to Blender.",
                     "Meet the same scene, game resource, and Blender setup requirements as Build GLB from Scene."},
+                {"Build GFX from Scene", "Builds a layered GFX map from the loaded scene.",
+                    "Exports one transparent map layer per map-space configuration, then combines them into "
+                    "output.gfx. SVG layers are also saved as output_00.svg, output_01.svg, and so on.",
+                    "Load a scene, set Blender and the output folder in NavKit Settings, and make sure FFDec is "
+                    "available. Map layers use the configured map-level volume boxes."},
                 {"Build Navp from GLB and Scene", "Builds a Navp using scene geometry and a loaded GLB.",
                     "Creates a navigation mesh from the loaded scene geometry and GLB.",
                     "Load a scene and GLB, generate Recast input geometry (for example, by building a GLB from the "

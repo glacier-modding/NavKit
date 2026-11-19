@@ -79,11 +79,59 @@ class CollectionHierarchyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as output_dir:
             glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
             svg = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
-        self.assertIn("#59646d", svg)
+        self.assertIn("#404040", svg)
         self.assertNotIn("20.000", svg)
         self.assertTrue(bpy.context.scene.render.film_transparent)
         self.assertEqual(bpy.context.scene.camera.data.type, "ORTHO")
-        self.assertEqual(sum(material.name.startswith("GFX ") for material in bpy.data.materials), 3)
+        self.assertEqual(sum(material.name.startswith("GFX ") for material in bpy.data.materials), 4)
+
+    def test_map_layer_svg_uses_grayscale_palette_and_keeps_empty_layers_transparent(self):
+        outdoor = bpy.data.collections.new("Outdoor")
+        interior = bpy.data.collections.new("Rooms")
+        stairs = bpy.data.collections.new("203_Room_Indoor_StairwayBottom")
+        for collection in (outdoor, interior, stairs):
+            bpy.context.scene.collection.children.link(collection)
+
+        for name, collection, location in (
+                ("outside_floor", outdoor, (-2, 0, 0)),
+                ("inside_floor", interior, (0, 0, 0)),
+                ("stair_mesh", stairs, (2, 0, 0))):
+            bpy.ops.mesh.primitive_cube_add(size=1, location=location)
+            obj = bpy.context.object
+            obj.name = name
+            for linked_collection in list(obj.users_collection):
+                linked_collection.objects.unlink(obj)
+            collection.objects.link(obj)
+        light = bpy.data.lights.new("GFX map test light", "POINT")
+        bpy.context.scene.collection.objects.link(bpy.data.objects.new("GFX map test light", light))
+
+        nav_data = {
+            "volumeBoxes": [{
+                "id": "map-volume",
+                "position": {"x": 0, "y": 0, "z": 0},
+                "rotation": {"w": 1, "x": 0, "y": 0, "z": 0},
+                "scale": {"data": {"x": 8, "y": 4, "z": 4}},
+            }],
+            "mapSpaceConfigs": [
+                {"inclusions": {"data": ["map-volume"]}},
+                {"inclusions": {"data": []}},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as output_dir:
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+            first_layer = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
+            empty_layer = (Path(output_dir) / "output_01.svg").read_text(encoding="utf-8")
+
+        for color in ("#ffffff", "#c0c0c0", "#808080", "#404040"):
+            self.assertIn(color, first_layer)
+        self.assertIn('fill="#000000" fill-opacity="0"', empty_layer)
+        self.assertEqual(bpy.context.scene.render.engine, "BLENDER_EEVEE_NEXT")
+        self.assertFalse(light.use_shadow)
+        for material in bpy.data.materials:
+            if material.name.startswith("GFX "):
+                node_types = {node.type for node in material.node_tree.nodes}
+                self.assertIn("EMISSION", node_types)
+                self.assertNotIn("BSDF_PRINCIPLED", node_types)
 
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(CollectionHierarchyTests)
