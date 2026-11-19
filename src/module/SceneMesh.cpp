@@ -18,6 +18,7 @@
 
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/Gfxf.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
@@ -386,6 +387,9 @@ void SceneMesh::buildSceneMeshFromScene() {
             blenderSceneMeshGenerationDone = true;
             if (blendFileAndGlbAndGfxBuild || blendFileAndGlbBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
+                if (blendFileAndGlbAndGfxBuild) {
+                    Gfxf::getInstance().startGfxBuild();
+                }
             }
         },
         [this] { errorBuilding = true; });

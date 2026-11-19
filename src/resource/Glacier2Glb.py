@@ -2610,7 +2610,8 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def build_gfx():
+def render_map_layers_for_gfx():
+    # TODO: Implement render map layers for gfx
     pass
 
 
@@ -3014,10 +3015,10 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
 
     if should_build_gfx:
         start = timer()
-        log("INFO", "Building GFX...", "glacier2obj")
-        build_gfx()
+        log("INFO", "Rendering map layers for GFX build...", "glacier2obj")
+        render_map_layers_for_gfx()
         end = timer()
-        log("INFO", "Finished building GFX in " + str(end - start) + " seconds.", "glacier2obj")
+        log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2obj")
     return 0
 
 

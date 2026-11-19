@@ -28,6 +28,7 @@ class Gfxf {
     std::optional<std::jthread> backgroundWorker;
     std::uint64_t loadGeneration = 0;
     Model model;
+    void buildGfx();
 
     void startLoad(const std::string& fileName);
 
@@ -72,4 +73,6 @@ public:
     void render(const class Shader& shader, const glm::mat4& view, const glm::mat4& projection) const;
 
     void clear();
+
+    void startGfxBuild();
 };

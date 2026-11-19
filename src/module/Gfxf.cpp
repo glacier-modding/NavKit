@@ -350,6 +350,18 @@ void Gfxf::loadGfxfFromFile(const std::string& fileName) {
     startLoad(fileName);
 }
 
+void Gfxf::buildGfx() {
+    const std::time_t startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    Logger::log(NK_INFO, "Starting GFX build at %s", std::ctime(&startTime));
+    const auto start = std::chrono::high_resolution_clock::now();
+
+    // TODO: Implement build Gfx
+
+    const auto end = std::chrono::high_resolution_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    Logger::log(NK_INFO, "Finished GFX build in %s seconds", std::to_string(duration.count()).c_str());
+}
+
 void Gfxf::startLoad(const std::string& fileName) {
     if (!canLoad()) {
         return;
@@ -888,4 +900,11 @@ void Gfxf::clear() {
         std::lock_guard lock(resultMutex);
         completedLoad.reset();
     }
+}
+
+void Gfxf::startGfxBuild() {
+    if (backgroundWorker) {
+        return;
+    }
+    backgroundWorker.emplace(&Gfxf::buildGfx, this);
 }
