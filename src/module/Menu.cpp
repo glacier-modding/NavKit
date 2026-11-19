@@ -114,6 +114,7 @@ wxMenuBar* Menu::createMenuBar() {
     build->Append(IDM_BUILD_GLB_FROM_SCENE, "Build GLB from &Scene");
     build->Append(IDM_BUILD_GLB_FROM_NAVP, "Build GLB from &Navp");
     build->Append(IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, "Build GLB and Blend from &Scene");
+    build->Append(IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE, "Build GLB and Blend and GFX from &Scene");
     build->Append(IDM_BUILD_BLEND_FROM_SCENE, "Build Blend from &Scene");
     build->AppendSeparator();
     build->Append(IDM_BUILD_NAVP, "Build &Navp from GLB and Scene");
@@ -232,6 +233,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_BUILD_GLB_FROM_NAVP, obj.canBuildGlbFromNavp());
     setMenuItemEnabled(IDM_BUILD_BLEND_FROM_SCENE, obj.canBuildBlendFromScene());
     setMenuItemEnabled(IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, obj.canBuildBlendAndGlbFromScene());
+    setMenuItemEnabled(IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE, obj.canBuildBlendAndGlbFromScene());
 
     setMenuItemEnabled(IDM_EXTRACT_SCENE, sceneExtract.canExtractFromGame());
     setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_GLB, sceneExtract.canExtractFromGameAndBuildGlb());
@@ -480,6 +482,9 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_BUILD_BLEND_AND_GLB_FROM_SCENE:
         obj.handleBuildBlendAndGlbFromSceneClicked();
+        break;
+    case IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE:
+        obj.handleBuildBlendAndGlbAndGfxFromSceneClicked();
         break;
     case IDM_BUILD_GLB_FROM_SCENE:
         obj.handleBuildGlbFromSceneClicked();

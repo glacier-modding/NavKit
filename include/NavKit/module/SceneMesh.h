@@ -47,6 +47,7 @@ public:
     bool blenderSceneMeshGenerationDone;
     bool blendFileOnlyBuild;
     bool blendFileAndGlbBuild;
+    bool blendFileAndGlbAndGfxBuild;
     bool filterToIncludeBox;
     bool errorBuilding;
     bool skipExtractingAlocsOrPrims;
@@ -72,6 +73,8 @@ public:
     void loadGlbMesh();
 
     void handleBuildBlendAndGlbFromSceneClicked();
+
+    void handleBuildBlendAndGlbAndGfxFromSceneClicked();
 
     static void copyFile(const std::string& from, const std::string& to, const std::string& filetype);
 

@@ -43,8 +43,8 @@ SceneMesh::SceneMesh() :
     loadGlbName("Load GLB"), saveGlbName("Save GLB"), lastGlbFileName("Load GLB"), lastSaveGlbFileName("Save GLB"),
     glbLoaded(false), showGlb(true), loadGlb(false), startedSceneMeshGeneration(false),
     blenderSceneMeshBuildStarted(false), blenderSceneMeshGenerationDone(false), blendFileOnlyBuild(false),
-    blendFileAndGlbBuild(false), filterToIncludeBox(true), onlyCollidable(true), errorBuilding(false),
-    skipExtractingAlocsOrPrims(false), errorExtracting(false), extractingResources(false),
+    blendFileAndGlbBuild(false), blendFileAndGlbAndGfxBuild(false), filterToIncludeBox(true), onlyCollidable(true),
+    errorBuilding(false), skipExtractingAlocsOrPrims(false), errorExtracting(false), extractingResources(false),
     doneExtractingAlocsOrPrims(false), doGlbHitTest(false), meshTypeForBuild(ALOC), sceneMeshBuildType(COPY),
     primLods{true, true, true, true, true, true, true, true}, blendFileBuilt(false), extractTextures(false),
     applyTextures(false) {}
@@ -362,6 +362,12 @@ void SceneMesh::buildSceneMeshFromScene() {
         command += " false";
     }
 
+    if (blendFileAndGlbAndGfxBuild) {
+        command += " true";
+    } else {
+        command += " false";
+    }
+
     if (NavKitSettings::getInstance().showDebugLogs) {
         command += " true";
     }
@@ -378,7 +384,7 @@ void SceneMesh::buildSceneMeshFromScene() {
             Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(),
                 duration.count());
             blenderSceneMeshGenerationDone = true;
-            if (blendFileAndGlbBuild || blendFileOnlyBuild) {
+            if (blendFileAndGlbAndGfxBuild || blendFileAndGlbBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
             }
         },
@@ -771,6 +777,11 @@ void SceneMesh::handleBuildBlendAndGlbFromSceneClicked() {
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
+void SceneMesh::handleBuildBlendAndGlbAndGfxFromSceneClicked() {
+    blendFileAndGlbAndGfxBuild = true;
+    backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
+}
+
 void SceneMesh::handleBuildGlbFromNavpClicked() {
     return buildGlbFromNavp(true, true);
 }
@@ -896,6 +907,7 @@ void SceneMesh::clear() {
     blenderSceneMeshGenerationDone = false;
     blendFileOnlyBuild = false;
     blendFileAndGlbBuild = false;
+    blendFileAndGlbAndGfxBuild = false;
     blendFileBuilt = false;
     errorBuilding = false;
     skipExtractingAlocsOrPrims = false;

@@ -9,6 +9,8 @@ from timeit import default_timer as timer
 
 import bmesh
 import bpy
+import contextlib
+import logging
 import mathutils
 import numpy as np
 from bpy.types import (
@@ -16,7 +18,9 @@ from bpy.types import (
 )
 
 glacier2glb_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "TRACE", "DEBUG", "INFO", "WARNING", "ERROR"
-
+gltf_logger = logging.getLogger("gltf2")
+gltf_logger.setLevel(logging.ERROR)
+gltf_logger.disabled = True
 
 # General
 
@@ -2606,8 +2610,12 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: str, lod_mask: str, build_type: str,
-                filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool):
+def build_gfx():
+    pass
+
+
+def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mask: str, build_type: str,
+                filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool, should_build_gfx: bool):
     start = timer()
     log("INFO", "Loading scenario.", "glacier2obj")
     log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2obj")
@@ -2739,7 +2747,7 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             mesh_room_collections[mesh_hash] = []
         transforms[mesh_hash].append(transform)
         mesh_room_collections[mesh_hash].append(room_collections[room_collection_key])
-    output_dir = os.path.abspath(os.path.dirname(path_to_output_glb_file))
+    output_dir = os.path.abspath(os.path.dirname(output_path))
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
     log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2obj")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
@@ -2995,6 +3003,21 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
         for error_aloc in error_alocs:
             log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2obj")
     log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2obj")
+
+    if output_path.endswith('.both') or output_path.endswith('.bothWithGfx'):
+        save_blend_file(output_path[:-4] + "blend")
+        save_gltf_file(output_path[:-4] + "gltf")
+    elif output_path.endswith('.blend'):
+        save_blend_file(output_path)
+    else:
+        save_gltf_file(output_path)
+
+    if should_build_gfx:
+        start = timer()
+        log("INFO", "Building GFX...", "glacier2obj")
+        build_gfx()
+        end = timer()
+        log("INFO", "Finished building GFX in " + str(end - start) + " seconds.", "glacier2obj")
     return 0
 
 
@@ -3023,7 +3046,7 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
 
 def main():
     log("TRACE",
-        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.gltf path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <debug logs enabled (true | false)>",
+        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.gltf path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <export to gfx (true | false)> <debug logs enabled (true | false)>",
         "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
@@ -3035,7 +3058,8 @@ def main():
     build_type = argv[4]
     filter_to_include_box = argv[5] == "true"
     apply_textures = argv[6] == "true"
-    if len(argv) > 7 and argv[7] == "true":
+    should_build_gfx = argv[7] == "true"
+    if len(argv) > 8 and argv[8] == "true":
         log("INFO", "Enabling debug logs", "main"),
         glacier2glb_enabled_log_levels.append("TRACE")
         glacier2glb_enabled_log_levels.append("TRACE")
@@ -3048,17 +3072,10 @@ def main():
     bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
     output_to_blend = output_path.endswith('.both') or output_path.endswith('.blend')
     scenario = glacier2glb(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
-                             apply_textures, output_to_blend)
+                             apply_textures, output_to_blend, should_build_gfx)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path, "main")
         return 1
-    if output_path.endswith('.both'):
-        save_blend_file(output_path[:-4] + "blend")
-        save_gltf_file(output_path[:-4] + "gltf")
-    elif output_path.endswith('.blend'):
-        save_blend_file(output_path)
-    else:
-        save_gltf_file(output_path)
 
     log("INFO", "Script finished, waiting...", "main")
     try:
@@ -3120,7 +3137,10 @@ def bake_geometry_node_instances():
 def save_gltf_file(output_path: str):
     log("INFO", "Attempting to save glTF file to :" + output_path, "main")
     bake_geometry_node_instances()
-    bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLTF_SEPARATE', export_apply=True)
+    with open(os.devnull, "w") as devnull, \
+            contextlib.redirect_stdout(devnull), \
+            contextlib.redirect_stderr(devnull):
+        bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLTF_SEPARATE', export_apply=True)
 
 
 def save_blend_file(output_path: str):
