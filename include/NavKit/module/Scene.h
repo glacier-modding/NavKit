@@ -42,6 +42,12 @@ public:
     void loadPfSeedPoints(const std::function<void()>& errorCallback,
         simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
+    void loadVolumeShapes(const std::function<void()>& errorCallback,
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+
+    void loadCrowds(const std::function<void()>& errorCallback,
+        simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
+
     void loadMatis(const std::function<void()>& errorCallback,
         simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
@@ -72,6 +78,8 @@ public:
     std::vector<Json::AiArea> aiAreas;
     std::vector<Json::Entity> volumeBoxes;
     std::vector<Json::VolumeSphere> volumeSpheres;
+    std::vector<Json::VolumeShape> volumeShapes;
+    std::vector<Json::Crowd> crowds;
     std::vector<Json::Mesh> meshes;
     std::vector<Json::Mesh> prims;
     Json::PfBox includeBox;

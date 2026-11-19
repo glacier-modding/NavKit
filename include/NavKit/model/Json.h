@@ -1,10 +1,15 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
+#include <ostream>
 #include <string>
 #include <vector>
 #include <string_view>
 #include "../../../extern/simdjson/simdjson.h"
+
+enum class ECrowdFlowCandidates : int32_t;
+enum class TeleportActionType : int32_t;
 
 namespace Json {
     template <typename t> struct SimdJsonTypeMap;
@@ -36,6 +41,16 @@ namespace Json {
     std::string toString(bool val);
 
     std::string toString(std::string_view val);
+
+    struct Escaped {
+        std::string_view value;
+    };
+
+    inline Escaped escaped(std::string_view value) {
+        return {value};
+    }
+
+    std::ostream& operator<<(std::ostream& f, const Escaped& escaped);
 
     struct JsonValueProxy {
         simdjson::ondemand::object json;
@@ -117,6 +132,8 @@ namespace Json {
         void readJson(simdjson::ondemand::object json);
 
         void writeJson(std::ostream& f) const;
+
+        void writeJsonFields(std::ostream& f) const;
     };
 
     class HashesAndEntity {
@@ -412,6 +429,123 @@ namespace Json {
         std::vector<PfSeedPoint> readPfSeedPoints() const;
 
         std::vector<Entity> entities{};
+    };
+
+    class Transform {
+    public:
+        Vec3 x{1, 0, 0};
+        Vec3 y{0, 1, 0};
+        Vec3 z{0, 0, 1};
+        Vec3 t{};
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class CrowdEntityIdentity {
+    public:
+        std::string id;
+        std::string name;
+        std::string tblu;
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class VolumeShape : public CrowdEntityIdentity {
+    public:
+        Transform transform{};
+        std::vector<Vec3> points{};
+        float extrusionHeight = 0;
+        bool flipSurfaceNormal = false;
+        bool closed = true;
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class VolumeShapes {
+    public:
+        VolumeShapes() = default;
+
+        explicit VolumeShapes(simdjson::ondemand::array volumeShapesJson);
+
+        std::vector<VolumeShape> volumeShapes{};
+    };
+
+    class CrowdTeleport : public CrowdEntityIdentity {
+    public:
+        std::optional<Entity> exitZone{};
+        std::optional<Entity> enterZone{};
+        TeleportActionType exitActionAmbient{};
+        TeleportActionType exitActionScared{};
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class CrowdGroupBox : public Entity {
+    public:
+        int groupSize = 0;
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class CrowdSplineFlow : public CrowdEntityIdentity {
+    public:
+        Transform transform{};
+        float flowWidth = 0;
+        int lengthTessellation = 0;
+        int widthTessellation = 0;
+        float extrusionHeight = 0;
+        bool closed = false;
+        std::vector<Vec3> points{};
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class Crowd : public CrowdEntityIdentity {
+    public:
+        Transform transform{};
+        Vec3 globalSize{};
+        float cellSize = 0.45f;
+        float navMeshShrink = 0;
+        float generatorOffset = 0.25f;
+        bool smoothenExitFlows = true;
+        ECrowdFlowCandidates flowCandidates{};
+        std::vector<size_t> exclusionBoxIndices{};
+        std::vector<size_t> inclusionBoxIndices{};
+        std::vector<size_t> panicOnlyBoxIndices{};
+        std::vector<size_t> flowBoxIndices{};
+        std::vector<size_t> flowBoxTwoWayIndices{};
+        std::vector<size_t> exclusionSphereIndices{};
+        std::vector<size_t> exclusionShapeIndices{};
+        std::vector<size_t> inclusionShapeIndices{};
+        std::vector<size_t> panicOnlyShapeIndices{};
+        std::vector<CrowdTeleport> teleports{};
+        std::vector<CrowdGroupBox> groupBoxes{};
+        std::vector<CrowdSplineFlow> splineFlows{};
+
+        void readJson(simdjson::ondemand::object json);
+
+        void writeJson(std::ostream& f) const;
+    };
+
+    class Crowds {
+    public:
+        Crowds() = default;
+
+        explicit Crowds(simdjson::ondemand::array crowdsJson);
+
+        std::vector<Crowd> crowds{};
     };
 
     class Mati {

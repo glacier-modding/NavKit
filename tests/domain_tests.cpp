@@ -245,6 +245,94 @@ namespace {
         checkNear(parsedSphere.radius.data, 6.5f);
     }
 
+    void testJsonCrowdRoundTrip() {
+        const std::string editorJson = R"({"id":"crowd-id","name":"Crowd","tblu":"00AB",)"
+            R"("transform":{"x":{"x":0,"y":1,"z":0},"y":{"x":-1,"y":0,"z":0},"z":{"x":0,"y":0,"z":1},)"
+            R"("t":{"x":-6.5,"y":-27.5,"z":1}},"globalSize":{"x":17,"y":17.25,"z":2},"cellSize":0.45,)"
+            R"("navMeshShrink":0.5,"generatorOffset":0.25,"smoothenExitFlows":false,"flowCandidates":"SPAWNED_ON_FLOW",)"
+            R"("exclusionBoxes":[3,7],"inclusionBoxes":[],"panicOnlyBoxes":[1],"flowBoxes":[0],)"
+            R"("flowBoxesTwoWay":[2],)"
+            R"("groupBoxes":[{"id":"group-id","name":"Group","position":{"x":-6.5,"y":-27.5,"z":0},)"
+            R"("rotation":{"x":0,"y":0,"z":0,"w":1},"scale":{"type":"SVector3","data":{"x":5,"y":6,"z":1}},)"
+            R"("groupSize":{"type":"uint32","data":4}}],)"
+            R"("exclusionSpheres":[5],"exclusionShapes":[0,2],"inclusionShapes":[],"panicOnlyShapes":[1],)"
+            R"("teleports":[{"id":"tp-id","name":"Teleport","exitZone":{"id":"exit-id","name":"Exit",)"
+            R"("position":{"x":1.5,"y":-32,"z":0},"rotation":{"x":0,"y":0,"z":0,"w":1},)"
+            R"("scale":{"type":"SVector3","data":{"x":0.9,"y":8,"z":2}}},"enterZone":null,)"
+            R"("exitActionAmbient":"STAY","exitActionScared":"LEAVE_CROWD"}],)"
+            R"("splineFlows":[{"id":"spline-id","name":"Spline","transform":{"x":{"x":1,"y":0,"z":0},"y":{"x":0,"y":1,"z":0},)"
+            R"("z":{"x":0,"y":0,"z":1},"t":{"x":0,"y":0,"z":0}},"flowWidth":1.5,)"
+            R"("lengthTessellation":8.0,"widthTessellation":2.0,"extrusionHeight":4.5,"closed":true,"points":[{"x":1,"y":2,"z":3}]}]})";
+        const auto readCrowd = [](Json::Crowd& value, simdjson::ondemand::object object) { value.readJson(object); };
+        const Json::Crowd crowd = readJsonObject<Json::Crowd>(editorJson, readCrowd);
+        std::ostringstream savedJson;
+        crowd.writeJson(savedJson);
+        const Json::Crowd parsed = readJsonObject<Json::Crowd>(savedJson.str(), readCrowd);
+
+        for (const Json::Crowd* c : {&crowd, &parsed}) {
+            check(c->groupBoxes.size() == 1 && c->groupBoxes[0].groupSize == 4,
+                "crowd group box size should be read from its type/data wrapper");
+            check(c->teleports.size() == 1 && c->teleports[0].exitZone && !c->teleports[0].enterZone,
+                "a null teleport zone should parse as unset");
+        }
+
+        check(parsed.id == "crowd-id" && parsed.name == "Crowd" && parsed.tblu == "00AB",
+            "crowd identity did not round trip");
+        checkNear(parsed.transform.x.y, 1.0f);
+        checkNear(parsed.transform.y.x, -1.0f);
+        checkNear(parsed.transform.t.y, -27.5f);
+        checkNear(parsed.globalSize.y, 17.25f);
+        checkNear(parsed.navMeshShrink, 0.5f);
+        check(!parsed.smoothenExitFlows, "crowd smoothing flag did not round trip");
+        check(parsed.exclusionBoxIndices == std::vector<size_t>{3, 7} && parsed.inclusionBoxIndices.empty() &&
+                parsed.panicOnlyBoxIndices == std::vector<size_t>{1} && parsed.flowBoxIndices == std::vector<size_t>{0} &&
+                parsed.flowBoxTwoWayIndices == std::vector<size_t>{2},
+            "crowd box indices did not round trip");
+        check(parsed.exclusionSphereIndices == std::vector<size_t>{5}, "crowd sphere indices did not round trip");
+        check(parsed.exclusionShapeIndices == std::vector<size_t>{0, 2} && parsed.inclusionShapeIndices.empty() &&
+                parsed.panicOnlyShapeIndices == std::vector<size_t>{1},
+            "crowd shape indices did not round trip");
+        checkNear(parsed.groupBoxes[0].position.x, -6.5f);
+        checkNear(parsed.groupBoxes[0].scale.data.y, 6.0f);
+        check(parsed.flowCandidates == ECrowdFlowCandidates::SPAWNED_ON_FLOW, "crowd flow candidates did not round trip");
+        checkNear(parsed.splineFlows[0].extrusionHeight, 4.5f);
+        checkNear(parsed.teleports[0].exitZone->position.y, -32.0f);
+        checkNear(parsed.teleports[0].exitZone->scale.data.y, 8.0f);
+        check(parsed.teleports[0].exitActionAmbient == TeleportActionType::STAY &&
+                parsed.teleports[0].exitActionScared == TeleportActionType::LEAVE_CROWD,
+            "crowd teleport actions did not round trip");
+        check(parsed.splineFlows.size() == 1 && parsed.splineFlows[0].closed &&
+                parsed.splineFlows[0].lengthTessellation == 8 && parsed.splineFlows[0].widthTessellation == 2 &&
+                parsed.splineFlows[0].points.size() == 1,
+            "crowd spline flows did not round trip");
+        check(savedJson.str().find(R"("enterZone":null)") != std::string::npos,
+            "an unset teleport zone should be written as null");
+        check(savedJson.str().find(R"("exclusionBoxes":[3,7])") != std::string::npos,
+            "crowd volume indices should be written as an index array");
+    }
+
+    void testJsonVolumeShapeRoundTrip() {
+        const std::string editorJson = R"({"id":"shape-id","name":"Shape","tblu":"00EF",)"
+            R"("transform":{"x":{"x":1,"y":0,"z":0},"y":{"x":0,"y":1,"z":0},"z":{"x":0,"y":0,"z":1},)"
+            R"("t":{"x":2,"y":3,"z":4}},)"
+            R"("points":[{"x":0,"y":0,"z":0},{"x":4,"y":0,"z":0},{"x":4,"y":4,"z":0}],)"
+            R"("extrusionHeight":3,"flipSurfaceNormal":true,"closed":false})";
+        const auto readShape = [](Json::VolumeShape& value, simdjson::ondemand::object object) {
+            value.readJson(object);
+        };
+        const Json::VolumeShape shape = readJsonObject<Json::VolumeShape>(editorJson, readShape);
+        std::ostringstream savedJson;
+        shape.writeJson(savedJson);
+        const Json::VolumeShape parsed = readJsonObject<Json::VolumeShape>(savedJson.str(), readShape);
+        check(parsed.id == "shape-id" && parsed.name == "Shape" && parsed.tblu == "00EF",
+            "volume shape identity did not round trip");
+        checkNear(parsed.transform.t.z, 4.0f);
+        check(parsed.points.size() == 3, "volume shape points did not round trip");
+        checkNear(parsed.points[2].y, 4.0f);
+        checkNear(parsed.extrusionHeight, 3.0f);
+        check(parsed.flipSurfaceNormal && !parsed.closed, "volume shape normal flip and closed flag did not round trip");
+    }
+
     void testJsonMaterialRecords() {
         Json::Mati material;
         material.hash = "mati-hash";
@@ -1539,6 +1627,8 @@ void runDomainTests() {
     run("AIRG visibility type mapping", testVisionDataTypes);
     run("Packed waypoint visibility lookup", testPackedWaypointVisibilityLookup);
     run("Scene JSON persistence", testSceneSaveSerializesCollections);
+    run("Crowd JSON round trip", testJsonCrowdRoundTrip);
+    run("Volume shape JSON round trip", testJsonVolumeShapeRoundTrip);
     run("Render mesh CPU properties", testMeshCpuProperties);
     run("Render model mesh batching", testModelMeshBatching);
     run("Recast adapter geometry loading and coordinate conversion", testRecastAdapterGeometrySurface);

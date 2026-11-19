@@ -2,6 +2,7 @@
 #include <fstream>
 #include <functional>
 #include <iomanip>
+#include <limits>
 #include <array>
 #include <sstream>
 #include "../../include/NavKit/UiIds.h"
@@ -123,6 +124,12 @@ void Scene::loadPfSeedPoints(
 
 void Scene::loadRoomsAndVolumes(
     const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    gates.clear();
+    rooms.clear();
+    aiAreaWorlds.clear();
+    aiAreas.clear();
+    volumeBoxes.clear();
+    volumeSpheres.clear();
     try {
         Logger::log(NK_INFO, "Loading Gates.");
         gates = Json::Gates(jsonDocument["gates"].get_array()).gates;
@@ -143,9 +150,47 @@ void Scene::loadRoomsAndVolumes(
     }
 }
 
+void Scene::loadVolumeShapes(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    volumeShapes.clear();
+    try {
+        Logger::log(NK_INFO, "Loading Volume Shapes.");
+        simdjson::ondemand::array volumeShapesJson;
+        if (jsonDocument["volumeShapes"].get_array().get(volumeShapesJson) != simdjson::SUCCESS) {
+            Logger::log(NK_INFO, "No Volume Shapes found in scene file.");
+            return;
+        }
+        volumeShapes = Json::VolumeShapes(volumeShapesJson).volumeShapes;
+    } catch (const std::exception& e) {
+        Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
+    } catch (...) {
+        errorCallback();
+    }
+}
+
+void Scene::loadCrowds(
+    const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
+    crowds.clear();
+    try {
+        Logger::log(NK_INFO, "Loading Crowds.");
+        simdjson::ondemand::array crowdsJson;
+        if (jsonDocument["crowds"].get_array().get(crowdsJson) != simdjson::SUCCESS) {
+            Logger::log(NK_INFO, "No Crowds found in scene file.");
+            return;
+        }
+        crowds = Json::Crowds(crowdsJson).crowds;
+        Logger::log(NK_INFO, "Loaded %zu Crowds.", crowds.size());
+    } catch (const std::exception& e) {
+        Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
+    } catch (...) {
+        errorCallback();
+    }
+}
+
 void Scene::loadMatis(
     const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Logger::log(NK_INFO, "Loading Matis.");
+    matis.clear();
     try {
         for (const auto matiVec = Json::Matis(jsonDocument["matis"].get_array()).matis; const auto& mati : matiVec) {
             matis[mati.hash] = mati;
@@ -160,6 +205,7 @@ void Scene::loadMatis(
 void Scene::loadPrimMatis(
     const std::function<void()>& errorCallback, simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument) {
     Logger::log(NK_INFO, "Loading Prim Matis.");
+    primMatis.clear();
     try {
         for (const auto& primMati : Json::PrimMatis(jsonDocument["primMatis"].get_array()).primMatis) {
             primMatis[primMati.primHash] = primMati;
@@ -186,6 +232,8 @@ void Scene::loadScene(
     loadPfSeedPoints(errorCallback, jsonDocument);
     loadMatis(errorCallback, jsonDocument);
     loadRoomsAndVolumes(errorCallback, jsonDocument);
+    loadVolumeShapes(errorCallback, jsonDocument);
+    loadCrowds(errorCallback, jsonDocument);
     loadPrimMatis(errorCallback, jsonDocument);
 
     callback();
@@ -193,6 +241,7 @@ void Scene::loadScene(
 
 void Scene::saveScene(const std::string& fileName) const {
     std::stringstream ss;
+    ss << std::setprecision(std::numeric_limits<float>::max_digits10);
 
     ss << R"({"version":)" << version << ",";
     ss << R"("meshes":[)";
@@ -290,6 +339,22 @@ void Scene::saveScene(const std::string& fileName) const {
         volumeSphere.writeJson(ss);
         separator = ",";
     }
+
+    ss << R"(],"volumeShapes":[)";
+    separator = "";
+    for (auto& volumeShape : volumeShapes) {
+        ss << separator;
+        volumeShape.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"crowds":[)";
+    separator = "";
+    for (auto& crowd : crowds) {
+        ss << separator;
+        crowd.writeJson(ss);
+        separator = ",";
+    }
     ss << "]}";
 
     std::ofstream f(fileName);
@@ -369,6 +434,8 @@ void Scene::clear() {
     aiAreas.clear();
     volumeBoxes.clear();
     volumeSpheres.clear();
+    volumeShapes.clear();
+    crowds.clear();
     meshes.clear();
     prims.clear();
     includeBox = {};
