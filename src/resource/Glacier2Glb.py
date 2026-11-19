@@ -1375,7 +1375,7 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
     return mesh, material_index
 
 
-def load_prim(filepath, lod_mask):
+def load_prim(filepath, lod_mask, temp_coll):
     """Imports a mesh from the given path"""
 
     prim_name = bpy.path.display_name_from_filepath(filepath)
@@ -1404,7 +1404,7 @@ def load_prim(filepath, lod_mask):
             continue
         mesh, material_index = load_prim_mesh(prim, prim_name, submesh_index)
         obj = bpy.data.objects.new(mesh.name, mesh)
-        bpy.context.scene.collection.objects.link(obj)
+        temp_coll.objects.link(obj)
         submeshes.append(obj)
         material_indices.append(material_index)
 
@@ -2138,12 +2138,12 @@ def finalize_aloc_mesh(bm, obj):
     bm.free()
 
 
-def create_new_object(name, collision_type, data_type):
+def create_new_object(name, collision_type, data_type, temp_coll):
     log("TRACE", "Creating new object for ALOC: " + name + " with collision type: "
         + str(collision_type) + " and data type: " + str(data_type), "create_new_object")
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
-    bpy.context.scene.collection.objects.link(obj)
+    temp_coll.objects.link(obj)
     log("TRACE", "Finished Creating new object for ALOC: " + name, "create_new_object")
     return obj
 
@@ -2279,7 +2279,7 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
                 mesh_index) + " and collision layer type: " + str(capsule.collision_layer), "load_aloc")
 
 
-def load_aloc(filepath):
+def load_aloc(filepath, temp_coll):
     """Imports an ALOC mesh from the given path"""
 
     aloc_name = bpy.path.display_name_from_filepath(filepath)
@@ -2293,7 +2293,7 @@ def load_aloc(filepath):
     log("TRACE", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
     aloc_obj = create_new_object(aloc_name + "_original_" + str(aloc.collision_type) + "_" + str(aloc.data_type),
-                                 aloc.collision_type, aloc.data_type)
+                                 aloc.collision_type, aloc.data_type, temp_coll)
     bm = bmesh.new()
 
     if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
@@ -2484,9 +2484,12 @@ def create_volume(name, col_name, pos, rot, scale, shape='CUBE'):
 def load_volume_boxes(json_data, volume_types):
     volume_boxes_coll = bpy.data.collections.new("Volume boxes")
     bpy.context.scene.collection.children.link(volume_boxes_coll)
+    log("INFO", "Loading volume boxes for types:", "glacier2obj")
     for volt in volume_types:
-        if volt not in json_data:
-            continue
+        log("INFO", "   " + volt, "glacier2obj")
+
+    for volt in volume_types:
+        log("INFO", "Creating " + volt + " collection.", "glacier2obj")
         if volt == "gates":
             if volt not in bpy.data.collections:
                 gates_coll = bpy.data.collections.new(volt)
@@ -2523,6 +2526,34 @@ def load_volume_boxes(json_data, volume_types):
                     [vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])) / 2
                 pos += center
                 create_volume(vol["name"], rooms_coll.name, pos, rot, scale)
+        elif volt == "mapLevel":
+            log("INFO", "Handling mapLevel: " + volt, "glacier2obj")
+            if volt not in bpy.data.collections:
+                map_level_coll = bpy.data.collections.new(volt)
+                volume_boxes_coll.children.link(map_level_coll)
+                log("INFO", "Creating collection: " + volt, "glacier2obj")
+            else:
+                log("INFO", "Collection " + volt + " already exists", "glacier2obj")
+                map_level_coll = bpy.data.collections.get(volt)
+
+            map_level_volume_box_ids = []
+            log("INFO", "Getting mapSpaceConfigs " + volt, "glacier2obj")
+            for map_space_config in json_data["mapSpaceConfigs"]:
+                log("INFO", "Found a mapSpaceConfig", "glacier2obj")
+                for map_level_volume_box_id in map_space_config["inclusions"]["data"]:
+                    log("INFO", "Found a map_level_volume_box_id in inclusions:" + map_level_volume_box_id, "glacier2obj")
+                    map_level_volume_box_ids.append(map_level_volume_box_id)
+            for vol in json_data["volumeBoxes"]:
+                if vol["id"] in map_level_volume_box_ids:
+                    log("INFO", "Found a vol[id] in map_level_volume_box_ids: " + vol["id"], "glacier2obj")
+                    coords = ["w", "x", "y", "z"]
+                    pos, rot, scale = [
+                        mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
+                        mathutils.Quaternion([vol["rotation"][coord] for coord in coords]),
+                        mathutils.Vector([vol["scale"]["data"][coord] for coord in coords[1:]]),
+                    ]
+                    create_volume(vol["name"], map_level_coll.name, pos, rot, scale)
+                    log("INFO", "Creating volume in: " + volt + " with name " + vol["name"], "glacier2obj")
         elif volt == "aiArea":
             # Blender collection names are display labels, not entity identities.
             # Different logical parents can have the same name (or be truncated
@@ -2534,10 +2565,10 @@ def load_volume_boxes(json_data, volume_types):
                 parent_collections[ai_area_world["id"]] = area_world_coll
             # Go through the volumes and prepare the hashmap
             id_to_trigger_volume = {}
-            for trig_vol in json_data["volumeBoxes"]:
-                id_to_trigger_volume[trig_vol["id"]] = trig_vol
-            for trig_vol in json_data["volumeSpheres"]:
-                id_to_trigger_volume[trig_vol["id"]] = trig_vol
+            for vol in json_data["volumeBoxes"]:
+                id_to_trigger_volume[vol["id"]] = vol
+            for vol in json_data["volumeSpheres"]:
+                id_to_trigger_volume[vol["id"]] = vol
             for ai_area in json_data[volt]:
                 area_coll = bpy.data.collections.new(ai_area["name"])
                 prev_coll = area_coll
@@ -2557,23 +2588,23 @@ def load_volume_boxes(json_data, volume_types):
                     prev_coll = parent_coll
                 for vol_name in ai_area['areaVolumeNames']:
                     id = vol_name.split("(")[1].split(")")[0]  # name ex: VolumeBox_AIArea_02 (729b0d862bef84a2)
-                    trig_vol = id_to_trigger_volume[id]
+                    vol = id_to_trigger_volume[id]
                     coords = ["w", "x", "y", "z"]
                     pos, rot = [
-                        mathutils.Vector([trig_vol["position"][coord] for coord in coords[1:]]),
-                        mathutils.Quaternion([trig_vol["rotation"][coord] for coord in coords])
+                        mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
+                        mathutils.Quaternion([vol["rotation"][coord] for coord in coords])
                     ]
-                    if "radius" in trig_vol:  # sphere volume
+                    if "radius" in vol:  # sphere volume
                         try:
-                            scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
+                            scale = mathutils.Vector([vol["radius"]["data"] for _ in range(3)])
                         except TypeError:
                             log("WARNING",
-                                "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"],
+                                "Problem reading sphere scale for id: " + id + " value: " + vol["radius"]["data"],
                                 "load_volume_boxes")
                             scale = mathutils.Vector([1, 1, 1])
                         create_volume(vol_name, area_coll.name, pos, rot, scale, 'SPHERE')
                     else:  # box volume
-                        scale = mathutils.Vector([trig_vol["scale"]["data"][coord] for coord in coords[1:]])
+                        scale = mathutils.Vector([vol["scale"]["data"][coord] for coord in coords[1:]])
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
@@ -2592,8 +2623,11 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
     room_color_index = 0
     room_folder_color_index = 0
 
+    temp_coll = bpy.data.collections.new("Temporary")
+    bpy.context.scene.collection.children.link(temp_coll)
+
     if output_to_blend:
-        load_volume_boxes(data, ["gates", "rooms", "aiArea"])
+        load_volume_boxes(data, ["gates", "rooms", "aiArea", "mapLevel"])
 
     # Get the "pathfinding include" box
     pf_include_box_info = None
@@ -2661,6 +2695,13 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
         light_data.energy = 2.5
         light_data.angle = math.radians(180)
         light_object.rotation_euler = (0, 0, 0)
+    root_coll = bpy.data.collections.get("Collection")
+    if root_coll:
+        root_coll.name = "Environment"
+    else:
+        root_coll = bpy.data.collections.new("Environment")
+        bpy.context.scene.collection.children.link(root_coll)
+
 
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
@@ -2673,7 +2714,7 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             coll = bpy.data.collections.get(room_folder_name)
             if coll is None:
                 coll = bpy.data.collections.new(room_folder_name)
-                bpy.context.scene.collection.children.link(coll)
+                root_coll.children.link(coll)
                 coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
                 room_folder_color_index += 1
                 log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2obj")
@@ -2752,7 +2793,7 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
         material_indices = []
         try:
             if mesh_type == "ALOC":
-                aloc, submeshes = load_aloc(aloc_or_prim_path)
+                aloc, submeshes = load_aloc(aloc_or_prim_path, temp_coll)
                 if aloc == -2:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
                         mesh_hash) + " ================", "glacier2obj")
@@ -2765,7 +2806,7 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                     continue
                 collision_type = aloc.collision_type
             else:
-                submeshes, material_indices = load_prim(aloc_or_prim_path, lod_mask)
+                submeshes, material_indices = load_prim(aloc_or_prim_path, lod_mask, temp_coll)
         except struct.error as err:
             error_alocs.append("Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err))
             log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
