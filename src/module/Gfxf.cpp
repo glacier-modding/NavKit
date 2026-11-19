@@ -14,7 +14,9 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -38,9 +40,12 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Rpkg.h"
+#include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/render/Mesh.h"
+
+#include <pugixml.hpp>
 
 std::map<std::string, std::string> Gfxf::gfxfHashIoiStringMap{};
 std::mutex Gfxf::gfxfHashIoiStringMapMutex;
@@ -186,7 +191,7 @@ namespace {
         return {};
     }
 
-    long executeFfdec(const std::array<wxString, 9>& arguments) {
+    long executeFfdec(const std::vector<wxString>& arguments) {
         if (wxTheApp == nullptr) {
             return -1;
         }
@@ -212,10 +217,12 @@ namespace {
                 processState->terminatedCondition.notify_one();
             });
 
-            std::array<const wxChar*, 10> argv{};
-            for (size_t i = 0; i < arguments.size(); ++i) {
-                argv[i] = arguments[i].c_str();
+            std::vector<const wxChar*> argv;
+            argv.reserve(arguments.size() + 1);
+            for (const wxString& argument : arguments) {
+                argv.push_back(argument.c_str());
             }
+            argv.push_back(nullptr);
             const long processId = wxExecute(argv.data(), wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE, process);
             if (processId <= 0) {
                 delete process;
@@ -354,8 +361,254 @@ void Gfxf::buildGfx() {
     const std::time_t startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     Logger::log(NK_INFO, "Starting GFX build at %s", std::ctime(&startTime));
     const auto start = std::chrono::high_resolution_clock::now();
+    const auto& mapSpaceConfigs = Scene::getInstance().mapSpaceConfigs;
+    std::string error;
+    std::filesystem::path temporaryDirectory;
+    try {
+        if (mapSpaceConfigs.empty()) {
+            throw std::runtime_error("The loaded scene has no map-space configurations.");
+        }
 
-    // TODO: Implement build Gfx
+        const std::string ffdecExecutable = findFfdecExecutable();
+        if (ffdecExecutable.empty()) {
+            throw std::runtime_error(
+                "The bundled FFDec CLI is missing. Repair the NavKit installation or set FFDEC_PATH to an "
+                "FFDec CLI executable.");
+        }
+
+        const std::filesystem::path templatePath = FileUtil::getApplicationResourcePath("polarbear005.gfx");
+        if (!isRegularFile(templatePath)) {
+            throw std::runtime_error("The GFX template is missing: " + pathToUtf8(templatePath));
+        }
+
+        const std::filesystem::path outputDirectory =
+            std::filesystem::u8path(NavKitSettings::getInstance().outputFolder);
+        std::error_code filesystemError;
+        std::filesystem::create_directories(outputDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the GFX output folder: " + filesystemError.message());
+        }
+
+        static std::atomic_uint64_t outputCounter = 0;
+        temporaryDirectory = std::filesystem::temp_directory_path() / "NavKit" / "gfx-build" /
+            (std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "-" +
+                std::to_string(++outputCounter));
+        std::filesystem::create_directories(temporaryDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the temporary GFX build folder: " + filesystemError.message());
+        }
+
+        const std::filesystem::path templateXml = temporaryDirectory / "template.xml";
+        const auto runFfdec = [&ffdecExecutable](std::vector<wxString> arguments, const std::string& action) {
+            arguments.insert(arguments.begin(), wxString::FromUTF8(ffdecExecutable));
+            const long exitCode = executeFfdec(arguments);
+            if (exitCode != 0) {
+                throw std::runtime_error(
+                    "FFDec failed while " + action + " (exit code " + std::to_string(exitCode) + ").");
+            }
+        };
+        const auto asWxPath = [](const std::filesystem::path& path) { return wxString::FromUTF8(pathToUtf8(path)); };
+        runFfdec({"-swf2xml", asWxPath(templatePath), asWxPath(templateXml)}, "opening the GFX template");
+
+        const auto loadXml = [](const std::filesystem::path& path, pugi::xml_document& document) {
+            std::ifstream input(path, std::ios::binary);
+            if (!input) {
+                return pugi::xml_parse_result{};
+            }
+            const std::string contents{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+            return document.load_buffer(contents.data(), contents.size());
+        };
+        pugi::xml_document templateDocument;
+        if (const pugi::xml_parse_result parseResult = loadXml(templateXml, templateDocument); !parseResult) {
+            throw std::runtime_error(
+                "Could not parse FFDec's GFX template XML: " + std::string(parseResult.description()));
+        }
+
+        struct LayerShape {
+            unsigned int spriteId;
+            unsigned int shapeId;
+            std::filesystem::path svgPath;
+        };
+        std::vector<LayerShape> layers;
+        layers.reserve(mapSpaceConfigs.size());
+        const pugi::xml_node rootTags = templateDocument.child("swf").child("tags");
+        const pugi::xml_node exportAssets = [&rootTags] {
+            for (pugi::xml_node item : rootTags.children("item")) {
+                if (std::string_view(item.attribute("type").as_string()) == "ExportAssetsTag") {
+                    return item;
+                }
+            }
+            return pugi::xml_node{};
+        }();
+        if (!exportAssets) {
+            throw std::runtime_error("The GFX template does not export its map-layer sprites.");
+        }
+
+        const pugi::xml_node spriteIds = exportAssets.child("tags");
+        const pugi::xml_node spriteNames = exportAssets.child("names");
+        size_t sliceSpriteCount = 0;
+        for (pugi::xml_node name : spriteNames.children("item")) {
+            const std::string exportedName = name.text().as_string();
+            if (exportedName.find("SLICE_") != std::string::npos && exportedName.ends_with("_ZMapView")) {
+                ++sliceSpriteCount;
+            }
+        }
+        if (sliceSpriteCount != mapSpaceConfigs.size()) {
+            throw std::runtime_error("The GFX template has " + std::to_string(sliceSpriteCount) +
+                " map-layer sprites, but the loaded scene has " + std::to_string(mapSpaceConfigs.size()) +
+                " map-space configurations.");
+        }
+        for (size_t layerIndex = 0; layerIndex < mapSpaceConfigs.size(); ++layerIndex) {
+            const std::string layerNumber =
+                layerIndex < 10 ? "0" + std::to_string(layerIndex) : std::to_string(layerIndex);
+            const std::string expectedSpriteName = "SLICE_" + layerNumber + "_ZMapView";
+            unsigned int spriteId = 0;
+            for (auto currentId = spriteIds.child("item"), currentName = spriteNames.child("item");
+                currentId && currentName;
+                currentId = currentId.next_sibling("item"), currentName = currentName.next_sibling("item")) {
+                const std::string exportedName = currentName.text().as_string();
+                if (exportedName.size() >= expectedSpriteName.size() &&
+                    exportedName.compare(exportedName.size() - expectedSpriteName.size(), expectedSpriteName.size(),
+                        expectedSpriteName) == 0) {
+                    spriteId = currentId.text().as_uint();
+                    break;
+                }
+            }
+            if (spriteId == 0) {
+                throw std::runtime_error("The GFX template has no sprite for map layer " + layerNumber + ".");
+            }
+
+            pugi::xml_node sprite;
+            for (pugi::xml_node item : rootTags.children("item")) {
+                if (std::string_view(item.attribute("type").as_string()) == "DefineSpriteTag" &&
+                    item.attribute("spriteId").as_uint() == spriteId) {
+                    sprite = item;
+                    break;
+                }
+            }
+            const pugi::xml_node placeObject = sprite.child("subTags").child("item");
+            const unsigned int shapeId = placeObject.attribute("characterId").as_uint();
+            if (!placeObject || shapeId == 0) {
+                throw std::runtime_error(
+                    "The GFX template map-layer sprite " + layerNumber + " does not contain a replaceable shape.");
+            }
+
+            std::filesystem::path svgPath = outputDirectory / ("output_" + layerNumber + ".svg");
+            if (!isRegularFile(svgPath)) {
+                throw std::runtime_error("The Blender map-layer SVG is missing: " + pathToUtf8(svgPath));
+            }
+            layers.push_back({spriteId, shapeId, std::move(svgPath)});
+        }
+
+        const std::filesystem::path shapeDirectory = temporaryDirectory / "shapes";
+        std::filesystem::create_directories(shapeDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the temporary GFX shape folder: " + filesystemError.message());
+        }
+        for (const LayerShape& layer : layers) {
+            const std::filesystem::path shapePath = shapeDirectory / (std::to_string(layer.shapeId) + ".svg");
+            std::filesystem::copy_file(
+                layer.svgPath, shapePath, std::filesystem::copy_options::overwrite_existing, filesystemError);
+            if (filesystemError) {
+                throw std::runtime_error(
+                    "Could not stage map-layer SVG " + pathToUtf8(layer.svgPath) + ": " + filesystemError.message());
+            }
+        }
+
+        const std::filesystem::path importedGfx = temporaryDirectory / "imported.gfx";
+        runFfdec({"-importShapes", asWxPath(templatePath), asWxPath(importedGfx), asWxPath(shapeDirectory)},
+            "importing map-layer SVGs");
+
+        const std::filesystem::path importedXml = temporaryDirectory / "imported.xml";
+        runFfdec({"-swf2xml", asWxPath(importedGfx), asWxPath(importedXml)}, "preparing map-layer sprites");
+        pugi::xml_document importedDocument;
+        if (const pugi::xml_parse_result parseResult = loadXml(importedXml, importedDocument); !parseResult) {
+            throw std::runtime_error(
+                "Could not parse FFDec's imported GFX XML: " + std::string(parseResult.description()));
+        }
+
+        const pugi::xml_node importedTags = importedDocument.child("swf").child("tags");
+        pugi::xml_node showFrame;
+        for (pugi::xml_node item : importedTags.children("item")) {
+            if (std::string_view(item.attribute("type").as_string()) == "ShowFrameTag") {
+                showFrame = item;
+                break;
+            }
+        }
+        if (!showFrame) {
+            throw std::runtime_error("The GFX template has no ShowFrame tag.");
+        }
+        for (const LayerShape& layer : layers) {
+            pugi::xml_node sprite;
+            for (pugi::xml_node item : importedTags.children("item")) {
+                if (std::string_view(item.attribute("type").as_string()) == "DefineSpriteTag" &&
+                    item.attribute("spriteId").as_uint() == layer.spriteId) {
+                    sprite = item;
+                    break;
+                }
+            }
+            pugi::xml_node subTags = sprite.child("subTags");
+            pugi::xml_node placeObject = subTags.child("item");
+            if (!placeObject) {
+                throw std::runtime_error("FFDec removed the map-layer sprite's shape placement.");
+            }
+            pugi::xml_document placeObjectCopy;
+            placeObjectCopy.append_copy(placeObject);
+            subTags.remove_children();
+            placeObject = subTags.append_copy(placeObjectCopy.first_child());
+            placeObject.attribute("depth").set_value(1);
+            pugi::xml_node matrix = placeObject.child("matrix");
+            matrix.attribute("scaleX").set_value(0.5);
+            matrix.attribute("scaleY").set_value(0.5);
+            matrix.attribute("translateX").set_value(0);
+            matrix.attribute("translateY").set_value(0);
+            subTags.append_copy(showFrame);
+            sprite.attribute("frameCount").set_value(1);
+        }
+
+        const std::filesystem::path finalXml = temporaryDirectory / "output.xml";
+        std::ofstream xmlOutput(finalXml, std::ios::binary | std::ios::trunc);
+        if (!xmlOutput) {
+            throw std::runtime_error("Could not write the final GFX XML.");
+        }
+        importedDocument.save(xmlOutput, "  ", pugi::format_default, pugi::encoding_utf8);
+        if (!xmlOutput) {
+            throw std::runtime_error("Could not finish writing the final GFX XML.");
+        }
+
+        const std::filesystem::path temporaryOutput = temporaryDirectory / "output.gfx";
+        runFfdec({"-xml2swf", asWxPath(finalXml), asWxPath(temporaryOutput)}, "saving output.gfx");
+        filesystemError.clear();
+        if (!isRegularFile(temporaryOutput) || std::filesystem::file_size(temporaryOutput, filesystemError) < 21 ||
+            filesystemError) {
+            throw std::runtime_error("FFDec did not produce a valid output.gfx file.");
+        }
+        const std::filesystem::path outputPath = outputDirectory / "output.gfx";
+        std::filesystem::copy_file(
+            temporaryOutput, outputPath, std::filesystem::copy_options::overwrite_existing, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not save output.gfx: " + filesystemError.message());
+        }
+        Logger::log(NK_INFO, "Built GFX with %zu map layers at %s", layers.size(), pathToUtf8(outputPath).c_str());
+    } catch (const std::exception& exception) {
+        error = "Failed to build output.gfx: " + std::string(exception.what());
+    }
+
+    if (!temporaryDirectory.empty()) {
+        std::error_code cleanupError;
+        std::filesystem::remove_all(temporaryDirectory, cleanupError);
+        if (cleanupError) {
+            Logger::log(NK_WARN, "Could not remove temporary GFX build files: %s", cleanupError.message().c_str());
+        }
+    }
+    if (!error.empty()) {
+        Logger::log(NK_ERROR, "%s", error.c_str());
+        if (wxTheApp != nullptr) {
+            wxTheApp->CallAfter([error] {
+                wxMessageBox(wxString::FromUTF8(error), "GFX build failed", wxOK | wxICON_ERROR, getMainFrame());
+            });
+        }
+    }
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -398,7 +651,7 @@ void Gfxf::startLoad(const std::string& fileName) {
 
             std::filesystem::path ffdecInput;
             if (prepareFfdecInput(std::filesystem::u8path(inputFile), outputDirectory, ffdecInput, result.error)) {
-                const std::array<wxString, 9> arguments = {wxString::FromUTF8(ffdecExecutable), "-zoom", "2", "-format",
+                const std::vector<wxString> arguments = {wxString::FromUTF8(ffdecExecutable), "-zoom", "2", "-format",
                     "frame:png,sprite:png", "-export", "frame,sprite", wxString::FromUTF8(pathToUtf8(outputDirectory)),
                     wxString::FromUTF8(pathToUtf8(ffdecInput))};
                 const long exitCode = executeFfdec(arguments);

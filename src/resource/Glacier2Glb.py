@@ -2610,9 +2610,174 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def render_map_layers_for_gfx():
-    # TODO: Implement render map layers for gfx
-    pass
+def render_map_layers_for_gfx(json_data, output_path):
+    material_specs = [
+        ("GFX Interior Floor", (0.72, 0.82, 0.88, 1.0), "#d8e6eb"),
+        ("GFX Exterior Floor", (0.88, 0.78, 0.59, 1.0), "#e8d2a8"),
+        ("GFX Walls", (0.22, 0.27, 0.31, 1.0), "#59646d"),
+    ]
+    materials = []
+    for name, color, _ in material_specs:
+        material = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+        material.use_nodes = True
+        material.node_tree.nodes.clear()
+        emission = material.node_tree.nodes.new("ShaderNodeEmission")
+        emission.inputs["Color"].default_value = color
+        material.node_tree.links.new(emission.outputs["Emission"], material.node_tree.nodes.new(
+            "ShaderNodeOutputMaterial").inputs["Surface"])
+        material.diffuse_color = color
+        materials.append(material)
+
+    def layer_box_matrix(volume):
+        position = mathutils.Vector([volume["position"][axis] for axis in ("x", "y", "z")])
+        rotation = mathutils.Quaternion([volume["rotation"][axis] for axis in ("w", "x", "y", "z")])
+        scale = mathutils.Vector([volume["scale"]["data"][axis] for axis in ("x", "y", "z")])
+        return (mathutils.Matrix.Translation(position) @ rotation.to_matrix().to_4x4() @
+                mathutils.Matrix.Diagonal((*scale, 1.0)))
+
+    def intersects_box(obj, world_matrix, box_matrix):
+        try:
+            box_inverse = box_matrix.inverted()
+        except ValueError:
+            return False
+        bounds = [box_inverse @ world_matrix @ mathutils.Vector(corner) for corner in obj.bound_box]
+        return all(max(point[axis] for point in bounds) >= -0.5 and
+                   min(point[axis] for point in bounds) <= 0.5 for axis in range(3))
+
+    def floor_material_index(obj):
+        names = [obj.name.lower()] + [collection.name.lower() for collection in obj.users_collection]
+        if any(token in name for name in names for token in ("exterior", "outside", "outdoor", "terrain")):
+            return 1
+        room_key = " ".join(sorted(collection.name.lower() for collection in obj.users_collection)) or obj.name.lower()
+        return sum((index + 1) * ord(char) for index, char in enumerate(room_key)) % 2
+
+    def material_index_for(world_matrix, polygon, floor_index):
+        normal_matrix = world_matrix.to_3x3()
+        try:
+            normal = (normal_matrix.inverted().transposed() @ polygon.normal).normalized()
+        except ValueError:
+            return floor_index
+        if abs(normal.z) < 0.65:
+            return 2
+        return floor_index
+
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        floor_index = floor_material_index(obj)
+        obj.data.materials.clear()
+        for material in materials:
+            obj.data.materials.append(material)
+        for polygon in obj.data.polygons:
+            polygon.material_index = material_index_for(obj.matrix_world, polygon, floor_index)
+
+    map_volumes = {volume["id"]: volume for volume in json_data["volumeBoxes"]}
+    layer_boxes = []
+    for map_space_config in json_data["mapSpaceConfigs"]:
+        boxes = []
+        for volume_id in map_space_config["inclusions"]["data"]:
+            volume = map_volumes.get(volume_id)
+            if volume is None:
+                log("WARNING", "Map space volume not found: " + volume_id, "render_map_layers_for_gfx")
+                continue
+            boxes.append(layer_box_matrix(volume))
+        layer_boxes.append(boxes)
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    mesh_instances = [
+        (instance.object, instance.matrix_world.copy())
+        for instance in depsgraph.object_instances
+        if instance.object.type == "MESH"
+    ]
+
+    layer_faces = []
+    map_bounds = [float("inf"), float("inf"), float("inf"),
+                  float("-inf"), float("-inf"), float("-inf")]
+    for boxes in layer_boxes:
+        faces = []
+        seen_instances = set()
+        for obj, world_matrix in mesh_instances:
+            if not any(intersects_box(obj, world_matrix, box) for box in boxes):
+                continue
+            instance_key = (obj.original.as_pointer(),
+                            tuple(round(value, 6) for row in world_matrix for value in row))
+            if instance_key in seen_instances:
+                continue
+            seen_instances.add(instance_key)
+            mesh = obj.to_mesh()
+            try:
+                vertices = [world_matrix @ vertex.co for vertex in mesh.vertices]
+                floor_index = floor_material_index(obj.original)
+                for polygon in mesh.polygons:
+                    if len(polygon.vertices) < 3:
+                        continue
+                    points = [vertices[index] for index in polygon.vertices]
+                    material_index = material_index_for(world_matrix, polygon, floor_index)
+                    faces.append((sum(point.z for point in points) / len(points),
+                                  [(point.x, point.y) for point in points],
+                                  material_specs[material_index][2]))
+                    for point in points:
+                        map_bounds[0] = min(map_bounds[0], point.x)
+                        map_bounds[1] = min(map_bounds[1], point.y)
+                        map_bounds[2] = min(map_bounds[2], point.z)
+                        map_bounds[3] = max(map_bounds[3], point.x)
+                        map_bounds[4] = max(map_bounds[4], point.y)
+                        map_bounds[5] = max(map_bounds[5], point.z)
+            finally:
+                obj.to_mesh_clear()
+        layer_faces.append(faces)
+
+    if not layer_faces or map_bounds[0] == float("inf"):
+        raise ValueError("No map meshes were found inside the configured map-space volumes.")
+
+    width, height = 1000, 750
+    aspect = width / height
+    center_x = (map_bounds[0] + map_bounds[3]) / 2
+    center_y = (map_bounds[1] + map_bounds[4]) / 2
+    view_width = max(map_bounds[3] - map_bounds[0], (map_bounds[4] - map_bounds[1]) * aspect) * 1.05
+    view_height = view_width / aspect
+
+    scene = bpy.context.scene
+    camera_data = bpy.data.cameras.new("GFX Map Camera")
+    camera = bpy.data.objects.new("GFX Map Camera", camera_data)
+    scene.collection.objects.link(camera)
+    camera_data.type = "ORTHO"
+    camera_data.ortho_scale = view_width
+    camera.location = (center_x, center_y, map_bounds[5] + max(view_width, 100.0))
+    camera.rotation_euler = (0.0, 0.0, 0.0)
+    scene.camera = camera
+    scene.render.resolution_x = width
+    scene.render.resolution_y = height
+    scene.render.resolution_percentage = 100
+    scene.render.film_transparent = True
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    if hasattr(scene.eevee, "use_shadows"):
+        scene.eevee.use_shadows = False
+    for light in bpy.data.lights:
+        light.use_shadow = False
+
+    output_dir = os.path.abspath(os.path.dirname(output_path))
+    os.makedirs(output_dir, exist_ok=True)
+    for layer_number, faces in enumerate(layer_faces):
+        svg_path = os.path.join(output_dir, "output_" + str(layer_number).zfill(2) + ".svg")
+        with open(svg_path, "w", encoding="utf-8") as svg:
+            svg.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            svg.write('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="750" '
+                      'viewBox="0 0 1000 750">\n')
+            if not faces:
+                svg.write('<rect width="1000" height="750" fill="#000000" fill-opacity="0"/>\n')
+            for _, points, color in sorted(faces, key=lambda face: face[0]):
+                path_points = [
+                    ((x - (center_x - view_width / 2)) / view_width * width,
+                     ((center_y + view_height / 2) - y) / view_height * height)
+                    for x, y in points
+                ]
+                path_data = "M " + " L ".join(
+                    "{:.3f} {:.3f}".format(x, y) for x, y in path_points) + " Z"
+                svg.write('<path d="' + path_data + '" fill="' + color + '"/>\n')
+            svg.write("</svg>\n")
+        log("INFO", "Rendered map layer " + str(layer_number) + " to " + svg_path,
+            "render_map_layers_for_gfx")
 
 
 def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mask: str, build_type: str,
@@ -3016,7 +3181,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
     if should_build_gfx:
         start = timer()
         log("INFO", "Rendering map layers for GFX build...", "glacier2obj")
-        render_map_layers_for_gfx()
+        render_map_layers_for_gfx(data, output_path)
         end = timer()
         log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2obj")
     return 0

@@ -117,6 +117,7 @@ target_link_libraries(NavKitLib PUBLIC
         httplib::httplib
         nfd::nfd
         OpenSSL::Crypto
+        pugixml::pugixml
         simdjson::simdjson
         simpleini
         wx::core
@@ -138,6 +139,7 @@ elseif (APPLE)
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/Glacier2Glb.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/hash_list_filtered.txt"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/res.blend"
+            "${CMAKE_SOURCE_DIR}/tests/resources/polarbear005.gfx"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/vertex.glsl"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/fragment.glsl"
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/tile.bmp"
@@ -173,6 +175,7 @@ set(RUNTIME_FILE_DEPENDENCIES
         "${NavKit_SOURCE_DIR}/src/resource/Glacier2Glb.py"
         "${NavKit_SOURCE_DIR}/src/resource/hash_list_filtered.txt"
         "${NavKit_SOURCE_DIR}/src/resource/res.blend"
+        "${NavKit_SOURCE_DIR}/tests/resources/polarbear005.gfx"
         "${NavKit_SOURCE_DIR}/src/resource/vertex.glsl"
         "${NavKit_SOURCE_DIR}/src/resource/fragment.glsl"
         "${NavKit_SOURCE_DIR}/src/resource/tile.bmp"
