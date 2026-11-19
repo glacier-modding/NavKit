@@ -2537,15 +2537,14 @@ def load_volume_boxes(json_data, volume_types):
                 map_level_coll = bpy.data.collections.get(volt)
 
             map_level_volume_box_ids = []
-            log("INFO", "Getting mapSpaceConfigs " + volt, "glacier2obj")
+            log("INFO", "Getting mapSpaceConfigs.", "glacier2obj")
             for map_space_config in json_data["mapSpaceConfigs"]:
-                log("INFO", "Found a mapSpaceConfig", "glacier2obj")
+                log("INFO", "Found a mapSpaceConfig with name: " + map_space_config["name"] + " and id: " + map_space_config["id"], "glacier2obj")
                 for map_level_volume_box_id in map_space_config["inclusions"]["data"]:
-                    log("INFO", "Found a map_level_volume_box_id in inclusions:" + map_level_volume_box_id, "glacier2obj")
                     map_level_volume_box_ids.append(map_level_volume_box_id)
             for vol in json_data["volumeBoxes"]:
                 if vol["id"] in map_level_volume_box_ids:
-                    log("INFO", "Found a vol[id] in map_level_volume_box_ids: " + vol["id"], "glacier2obj")
+                    log("INFO", "Found a map level volume with name: " + vol["name"] + " and id: " + vol["id"], "glacier2obj")
                     coords = ["w", "x", "y", "z"]
                     pos, rot, scale = [
                         mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
@@ -2553,7 +2552,6 @@ def load_volume_boxes(json_data, volume_types):
                         mathutils.Vector([vol["scale"]["data"][coord] for coord in coords[1:]]),
                     ]
                     create_volume(vol["name"], map_level_coll.name, pos, rot, scale)
-                    log("INFO", "Creating volume in: " + volt + " with name " + vol["name"], "glacier2obj")
         elif volt == "aiArea":
             # Blender collection names are display labels, not entity identities.
             # Different logical parents can have the same name (or be truncated
