@@ -48,7 +48,9 @@ namespace GfxMapLayerSwf {
         const pugi::xml_node spriteTemplate = findTag(tags, "DefineSpriteTag");
         const pugi::xml_node showFrame = findTag(tags, "ShowFrameTag");
         const pugi::xml_node fileAttributes = findTag(tags, "FileAttributesTag");
-        if (!swf || !tags || !shapeTemplate || !spriteTemplate || !showFrame || !fileAttributes) {
+        const pugi::xml_node shapeBoundsTemplate = shapeTemplate.child("shapeBounds");
+        if (!swf || !tags || !shapeTemplate || !shapeBoundsTemplate || !spriteTemplate || !showFrame ||
+            !fileAttributes) {
             throw std::runtime_error("The GFX template is missing required shape, sprite, or frame tags.");
         }
 
@@ -60,6 +62,12 @@ namespace GfxMapLayerSwf {
         const pugi::xml_document spriteCopy = copyNode(spriteTemplate);
         const pugi::xml_document placeCopy = copyNode(placeTemplate);
         const pugi::xml_document showFrameCopy = copyNode(showFrame);
+        pugi::xml_node generatedShapeBounds = shapeCopy.child("item").child("shapeBounds");
+        generatedShapeBounds.attribute("Xmin").set_value(0);
+        generatedShapeBounds.attribute("Ymin").set_value(0);
+        generatedShapeBounds.attribute("Xmax").set_value(20000);
+        generatedShapeBounds.attribute("Ymax").set_value(15000);
+        generatedShapeBounds.attribute("nbits").set_value(16);
 
         std::vector<pugi::xml_document> headerCopies;
         for (const std::string_view type :
@@ -77,9 +85,11 @@ namespace GfxMapLayerSwf {
         swf.attribute("frameCount").set_value(1);
 
         const unsigned int shapeBase = 1;
-        const unsigned int spriteBase = static_cast<unsigned int>(layerCount) + 1;
+        const unsigned int spriteBase = static_cast<unsigned int>(layerCount) + 2;
+        pugi::xml_node backgroundShape = tags.append_copy(shapeCopy.first_child());
+        backgroundShape.attribute("shapeId").set_value(shapeBase);
         for (size_t layerIndex = 0; layerIndex < layerCount; ++layerIndex) {
-            const unsigned int shapeId = shapeBase + static_cast<unsigned int>(layerIndex);
+            const unsigned int shapeId = shapeBase + static_cast<unsigned int>(layerIndex) + 1;
             const unsigned int spriteId = spriteBase + static_cast<unsigned int>(layerIndex);
 
             pugi::xml_node shape = tags.append_copy(shapeCopy.first_child());
@@ -90,9 +100,17 @@ namespace GfxMapLayerSwf {
             sprite.attribute("frameCount").set_value(1);
             pugi::xml_node subTags = sprite.child("subTags");
             subTags.remove_children();
+            pugi::xml_node backgroundPlacement = subTags.append_copy(placeCopy.first_child());
+            backgroundPlacement.attribute("characterId").set_value(shapeBase);
+            backgroundPlacement.attribute("depth").set_value(1);
+            pugi::xml_node backgroundMatrix = backgroundPlacement.child("matrix");
+            backgroundMatrix.attribute("scaleX").set_value(0.5);
+            backgroundMatrix.attribute("scaleY").set_value(0.5);
+            backgroundMatrix.attribute("translateX").set_value(0);
+            backgroundMatrix.attribute("translateY").set_value(0);
             pugi::xml_node placeObject = subTags.append_copy(placeCopy.first_child());
             placeObject.attribute("characterId").set_value(shapeId);
-            placeObject.attribute("depth").set_value(1);
+            placeObject.attribute("depth").set_value(2);
             pugi::xml_node matrix = placeObject.child("matrix");
             matrix.attribute("scaleX").set_value(0.5);
             matrix.attribute("scaleY").set_value(0.5);

@@ -22,7 +22,9 @@ namespace {
   <tags>
     <item type="ExporterInfo"/>
     <item type="FileAttributesTag" actionScript3="true"/>
-    <item type="DefineShape3Tag" shapeId="42"/>
+    <item type="DefineShape3Tag" shapeId="42">
+      <shapeBounds Xmin="7600" Ymin="7600" Xmax="10400" Ymax="10400" nbits="15"/>
+    </item>
     <item type="DefineSpriteTag" spriteId="43" frameCount="1">
       <subTags>
         <item type="PlaceObject2Tag" characterId="42" depth="3">
@@ -48,12 +50,25 @@ namespace {
         std::string exportedNames;
         for (pugi::xml_node item : tags.children("item")) {
             const std::string_view type = item.attribute("type").as_string();
-            shapeCount += type == "DefineShape3Tag";
+            if (type == "DefineShape3Tag") {
+                ++shapeCount;
+                const pugi::xml_node bounds = item.child("shapeBounds");
+                check(bounds.attribute("Xmin").as_int() == 0 && bounds.attribute("Xmax").as_int() == 20000,
+                    "map-layer shape bounds do not span the SVG width");
+                check(bounds.attribute("Ymin").as_int() == 0 && bounds.attribute("Ymax").as_int() == 15000,
+                    "map-layer shape bounds do not span the SVG height");
+            }
             if (type == "DefineSpriteTag") {
                 ++spriteCount;
-                const pugi::xml_node placement = item.child("subTags").child("item");
-                check(placement.attribute("depth").as_uint() == 1, "map-layer sprite placement has an invalid depth");
-                check(placement.attribute("characterId").as_uint() > 0,
+                const pugi::xml_node backgroundPlacement = item.child("subTags").child("item");
+                const pugi::xml_node placement = backgroundPlacement.next_sibling("item");
+                check(backgroundPlacement.attribute("depth").as_uint() == 1,
+                    "map-layer background placement has an invalid depth");
+                check(backgroundPlacement.attribute("characterId").as_uint() == 1,
+                    "map-layer background placement does not reference the shared background shape");
+                check(placement && placement.attribute("depth").as_uint() == 2,
+                    "map-layer shape placement has an invalid depth");
+                check(placement.attribute("characterId").as_uint() > 1,
                     "map-layer sprite does not reference its generated shape");
                 check(placement.child("matrix").attribute("scaleX").as_double() == 0.5,
                     "map-layer sprite is not scaled for the GFX view");
@@ -65,7 +80,8 @@ namespace {
                 }
             }
         }
-        check(shapeCount == 5 && spriteCount == 5, "five map-space configurations must create five sprites");
+        check(shapeCount == 6 && spriteCount == 5,
+            "five map-space configurations must create five sprites and one shared background shape");
         for (size_t layer = 0; layer < 5; ++layer) {
             const std::string expected = "SLICE_0" + std::to_string(layer) + "_ZMapView";
             check(exportedNames.find(expected) != std::string::npos, "a generated layer export name is missing");

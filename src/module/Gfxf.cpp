@@ -443,6 +443,22 @@ void Gfxf::buildGfx() {
         };
         std::vector<LayerShape> layers;
         layers.reserve(mapSpaceConfigs.size());
+        const std::filesystem::path shapeDirectory = temporaryDirectory / "shapes";
+        std::filesystem::create_directories(shapeDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the temporary GFX shape folder: " + filesystemError.message());
+        }
+        const std::filesystem::path backgroundPath = shapeDirectory / "1.svg";
+        {
+            std::ofstream background(backgroundPath, std::ios::binary | std::ios::trunc);
+            background << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                          "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1000\" height=\"750\" "
+                          "viewBox=\"0 0 1000 750\"><rect width=\"1000\" height=\"750\" fill=\"#1c1e20\"/>"
+                          "</svg>\n";
+            if (!background) {
+                throw std::runtime_error("Could not write the GFX map background shape.");
+            }
+        }
         for (size_t layerIndex = 0; layerIndex < mapSpaceConfigs.size(); ++layerIndex) {
             const std::string layerNumber =
                 layerIndex < 10 ? "0" + std::to_string(layerIndex) : std::to_string(layerIndex);
@@ -450,14 +466,9 @@ void Gfxf::buildGfx() {
             if (!isRegularFile(svgPath)) {
                 throw std::runtime_error("The Blender map-layer SVG is missing: " + pathToUtf8(svgPath));
             }
-            layers.push_back({static_cast<unsigned int>(layerIndex + 1), std::move(svgPath)});
+            layers.push_back({static_cast<unsigned int>(layerIndex + 2), std::move(svgPath)});
         }
 
-        const std::filesystem::path shapeDirectory = temporaryDirectory / "shapes";
-        std::filesystem::create_directories(shapeDirectory, filesystemError);
-        if (filesystemError) {
-            throw std::runtime_error("Could not create the temporary GFX shape folder: " + filesystemError.message());
-        }
         for (const LayerShape& layer : layers) {
             const std::filesystem::path shapePath = shapeDirectory / (std::to_string(layer.shapeId) + ".svg");
             std::filesystem::copy_file(
@@ -507,11 +518,19 @@ void Gfxf::buildGfx() {
                 if (exportedName.ends_with(expectedName)) {
                     const unsigned int spriteId = currentId.text().as_uint();
                     for (pugi::xml_node item : importedTags.children("item")) {
-                        if (std::string_view(item.attribute("type").as_string()) == "DefineSpriteTag" &&
-                            item.attribute("spriteId").as_uint() == spriteId && item.child("subTags").child("item")) {
-                            found = true;
-                            break;
+                        if (std::string_view(item.attribute("type").as_string()) != "DefineSpriteTag" ||
+                            item.attribute("spriteId").as_uint() != spriteId) {
+                            continue;
                         }
+                        const pugi::xml_node backgroundPlacement = item.child("subTags").child("item");
+                        const pugi::xml_node mapPlacement = backgroundPlacement.next_sibling("item");
+                        if (backgroundPlacement.attribute("characterId").as_uint() == 1 &&
+                            backgroundPlacement.attribute("depth").as_uint() == 1 &&
+                            mapPlacement.attribute("characterId").as_uint() == layers[layerIndex].shapeId &&
+                            mapPlacement.attribute("depth").as_uint() == 2) {
+                            found = true;
+                        }
+                        break;
                     }
                     break;
                 }

@@ -79,8 +79,13 @@ class CollectionHierarchyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as output_dir:
             glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
             svg = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.003, location=(0, 0, 0))
+        with tempfile.TemporaryDirectory() as output_dir:
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+            svg_with_speck = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
         self.assertIn("#404040", svg)
         self.assertNotIn("20.000", svg)
+        self.assertEqual(svg.count("<path"), svg_with_speck.count("<path"))
         self.assertTrue(bpy.context.scene.render.film_transparent)
         self.assertEqual(bpy.context.scene.camera.data.type, "ORTHO")
         self.assertEqual(sum(material.name.startswith("GFX ") for material in bpy.data.materials), 4)
@@ -102,6 +107,26 @@ class CollectionHierarchyTests(unittest.TestCase):
             for linked_collection in list(obj.users_collection):
                 linked_collection.objects.unlink(obj)
             collection.objects.link(obj)
+        vertices = []
+        faces = []
+        for step in range(4):
+            x0, x1 = step, step + 1
+            z0, z1 = 0, 0.4 * (step + 1)
+            base = len(vertices)
+            vertices.extend([
+                (x0, 0, z0), (x1, 0, z0), (x1, 1, z0), (x0, 1, z0),
+                (x0, 0, z1), (x1, 0, z1), (x1, 1, z1), (x0, 1, z1),
+            ])
+            faces.extend([
+                (base, base + 3, base + 2, base + 1), (base + 4, base + 5, base + 6, base + 7),
+                (base, base + 1, base + 5, base + 4), (base + 1, base + 2, base + 6, base + 5),
+                (base + 2, base + 3, base + 7, base + 6), (base + 3, base, base + 4, base + 7),
+            ])
+        stair_data = bpy.data.meshes.new("GFX test stairs")
+        stair_data.from_pydata(vertices, [], faces)
+        stair_data.update()
+        stair_object = bpy.data.objects.new("GFX test stair flight", stair_data)
+        stairs.objects.link(stair_object)
         light = bpy.data.lights.new("GFX map test light", "POINT")
         bpy.context.scene.collection.objects.link(bpy.data.objects.new("GFX map test light", light))
 
@@ -124,6 +149,14 @@ class CollectionHierarchyTests(unittest.TestCase):
 
         for color in ("#ffffff", "#c0c0c0", "#808080", "#404040"):
             self.assertIn(color, first_layer)
+        last_floor = max(first_layer.rfind("#c0c0c0"), first_layer.rfind("#808080"))
+        first_wall = first_layer.find("#404040")
+        first_stair = first_layer.find("#ffffff")
+        self.assertGreater(first_wall, last_floor)
+        self.assertGreater(first_stair, first_wall)
+        self.assertGreater(first_layer.count('fill="#ffffff"'), 0)
+        self.assertLessEqual(first_layer.count('fill="#ffffff"'), 4)
+        self.assertIn('stroke-width="2.4"', first_layer)
         self.assertIn('fill="#000000" fill-opacity="0"', empty_layer)
         self.assertEqual(bpy.context.scene.render.engine, "BLENDER_EEVEE_NEXT")
         self.assertFalse(light.use_shadow)

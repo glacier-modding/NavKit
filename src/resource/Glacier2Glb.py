@@ -2674,9 +2674,8 @@ def render_map_layers_for_gfx(json_data, output_path):
             return 1
         return 2
 
-    def material_index_for(obj, world_matrix, polygon, floor_index):
-        names = object_name_fragments(obj)
-        if any("stair" in name for name in names):
+    def material_index_for(world_matrix, polygon, floor_index, is_stair_step=False):
+        if is_stair_step:
             return 0
         normal_matrix = world_matrix.to_3x3()
         try:
@@ -2686,6 +2685,29 @@ def render_map_layers_for_gfx(json_data, output_path):
         if abs(normal.z) < 0.65:
             return 3
         return floor_index
+
+    def stair_step_faces(obj, world_matrix, mesh, vertices):
+        if not any("stair" in name for name in object_name_fragments(obj)):
+            return set()
+
+        top_faces = []
+        normal_matrix = world_matrix.to_3x3()
+        try:
+            normal_transform = normal_matrix.inverted().transposed()
+        except ValueError:
+            return set()
+        for polygon_index, polygon in enumerate(mesh.polygons):
+            normal = (normal_transform @ polygon.normal).normalized()
+            if normal.z < 0.94:
+                continue
+            points = [world_matrix @ vertices[index] for index in polygon.vertices]
+            elevation = sum(point.z for point in points) / len(points)
+            top_faces.append((polygon_index, round(elevation, 2)))
+
+        elevations = sorted({elevation for _, elevation in top_faces})
+        if len(elevations) < 4 or elevations[-1] - elevations[0] < 0.3:
+            return set()
+        return {polygon_index for polygon_index, _ in top_faces}
 
     for obj in bpy.data.objects:
         if obj.type != "MESH":
@@ -2731,31 +2753,48 @@ def render_map_layers_for_gfx(json_data, output_path):
         mesh = obj.to_mesh()
         try:
             vertices = [vertex.co.copy() for vertex in mesh.vertices]
+            if not vertices:
+                continue
             floor_index = floor_material_index(obj.original)
             polygons = []
-            for polygon in mesh.polygons:
+            stair_faces = stair_step_faces(obj.original, world_matrix, mesh, vertices)
+            for polygon_index, polygon in enumerate(mesh.polygons):
                 if len(polygon.vertices) < 3:
                     continue
-                material_index = material_index_for(obj.original, world_matrix, polygon, floor_index)
-                polygons.append((tuple(polygon.vertices), material_specs[material_index][2]))
+                material_index = material_index_for(
+                    world_matrix, polygon, floor_index, polygon_index in stair_faces)
+                if material_index in (1, 2):
+                    render_order = 0
+                elif material_index == 0:
+                    render_order = 2
+                else:
+                    render_order = 1
+                polygons.append((tuple(polygon.vertices), material_specs[material_index][2], render_order))
         finally:
             obj.to_mesh_clear()
+        if not polygons:
+            continue
 
         for layer_index in matching_layers:
             layer_instances[layer_index].add(instance_key)
-            layer_meshes[layer_index].append((world_matrix.copy(), vertices, polygons))
+            layer_meshes[layer_index].append((world_matrix.copy(), vertices, polygons, instance_key))
 
     layer_faces = []
+    instance_bounds = {}
     map_bounds = [float("inf"), float("inf"), float("inf"),
                   float("-inf"), float("-inf"), float("-inf")]
     for meshes in layer_meshes:
         faces = []
-        for world_matrix, local_vertices, polygons in meshes:
+        for world_matrix, local_vertices, polygons, instance_key in meshes:
             vertices = [world_matrix @ vertex for vertex in local_vertices]
-            for polygon_vertices, color in polygons:
+            bounds = (
+                min(vertex.x for vertex in vertices), min(vertex.y for vertex in vertices),
+                max(vertex.x for vertex in vertices), max(vertex.y for vertex in vertices))
+            instance_bounds[instance_key] = bounds
+            for polygon_vertices, color, render_order in polygons:
                 points = [vertices[index] for index in polygon_vertices]
-                faces.append((sum(point.z for point in points) / len(points),
-                              [(point.x, point.y) for point in points], color))
+                faces.append((render_order, sum(point.z for point in points) / len(points),
+                              [(point.x, point.y) for point in points], color, instance_key))
                 for point in points:
                     map_bounds[0] = min(map_bounds[0], point.x)
                     map_bounds[1] = min(map_bounds[1], point.y)
@@ -2787,6 +2826,15 @@ def render_map_layers_for_gfx(json_data, output_path):
     center_y = (map_bounds[1] + map_bounds[4]) / 2
     view_width = max(map_bounds[3] - map_bounds[0], (map_bounds[4] - map_bounds[1]) * aspect, 1.0) * 1.05
     view_height = view_width / aspect
+    minimum_instance_dimension = 12.0
+    minimum_instance_area = minimum_instance_dimension ** 2
+    small_instances = {
+        instance_key for instance_key, bounds in instance_bounds.items()
+        if ((bounds[2] - bounds[0]) / view_width * width *
+            (bounds[3] - bounds[1]) / view_height * height < minimum_instance_area and
+            max((bounds[2] - bounds[0]) / view_width * width,
+                (bounds[3] - bounds[1]) / view_height * height) < minimum_instance_dimension)
+    }
 
     scene = bpy.context.scene
     camera_data = bpy.data.cameras.new("GFX Map Camera")
@@ -2818,15 +2866,33 @@ def render_map_layers_for_gfx(json_data, output_path):
                       'viewBox="0 0 1000 750">\n')
             if not faces:
                 svg.write('<rect width="1000" height="750" fill="#000000" fill-opacity="0"/>\n')
-            for _, points, color in sorted(faces, key=lambda face: face[0]):
+            # SVG paints later paths over earlier ones: draw floors first, objects next, and stairs last.
+            for _, _, points, color, instance_key in sorted(faces, key=lambda face: (face[0], face[1])):
+                if instance_key in small_instances:
+                    continue
                 path_points = [
                     ((x - (center_x - view_width / 2)) / view_width * width,
                      ((center_y + view_height / 2) - y) / view_height * height)
                     for x, y in points
                 ]
+                area = abs(sum(
+                    path_points[index][0] * path_points[(index + 1) % len(path_points)][1] -
+                    path_points[(index + 1) % len(path_points)][0] * path_points[index][1]
+                    for index in range(len(path_points)))) / 2
+                if area < 0.25 and color != "#404040":
+                    continue
+                if color == "#404040" and max(
+                        math.hypot(path_points[index][0] - path_points[(index + 1) % len(path_points)][0],
+                                   path_points[index][1] - path_points[(index + 1) % len(path_points)][1])
+                        for index in range(len(path_points))) < 1.0:
+                    continue
                 path_data = "M " + " L ".join(
                     "{:.3f} {:.3f}".format(x, y) for x, y in path_points) + " Z"
-                svg.write('<path d="' + path_data + '" fill="' + color + '"/>\n')
+                if color == "#404040":
+                    svg.write('<path d="' + path_data + '" fill="' + color +
+                              '" stroke="' + color + '" stroke-width="2.4" stroke-linejoin="round"/>\n')
+                else:
+                    svg.write('<path d="' + path_data + '" fill="' + color + '"/>\n')
             svg.write("</svg>\n")
         log("INFO", "Rendered map layer " + str(layer_number) + " to " + svg_path,
             "render_map_layers_for_gfx")
