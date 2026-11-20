@@ -6,11 +6,17 @@
 #include <mutex>
 #include <map>
 #include <optional>
+#include <vector>
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 #include "../render/CoreProfileDraw.h"
+#include "../util/CrowdMapBuilder.h"
 
 class SCrowdMapData;
+
+namespace Json {
+    class Crowd;
+}
 
 class Crmd {
 public:
@@ -35,22 +41,35 @@ public:
     static void updateCrmdDialogControls(wxDialog* dialog);
     void showExtractCrmdDialog();
     static void extractCrmdFromRpkgs(const std::string& hash);
+    bool canBuildCrmd() const;
+    void handleBuildCrmdClicked();
+    void setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name);
+    void loadSettings();
+    void saveSettings() const;
+    void resetDefaults();
+    void showCrmdSettingsDialog();
 
     std::optional<std::jthread> backgroundWorker;
     SCrowdMapData* crowdMapData{};
     bool crmdLoaded;
     bool loading;
     std::atomic<bool> saving;
+    std::atomic<bool> building;
     bool showCrmd;
     std::string loadedCrmdText;
     static std::string selectedRpkgCrmd;
     static std::map<std::string, std::string> crmdHashIoiStringMap;
     static std::mutex crmdHashIoiStringMapMutex;
     static wxDialog* hCrmdDialog;
+    static wxDialog* hCrmdSettingsDialog;
+    CrowdMapBuilder::CostSettings costSettings;
 
 private:
     void rebuildRenderGeometry();
     void saveCrmdAndReport(const std::string& fileName);
+    void buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
+        const std::vector<CrowdMapBuilder::NavmeshPolygon>& navmeshPolygons,
+        const std::vector<glm::dvec3>& groundTriangles, const CrowdMapBuilder::CostSettings& costSettings);
     static char* openLoadCrmdFileDialog();
     static char* openSaveCrmdFileDialog();
     std::string loadCrmdName;

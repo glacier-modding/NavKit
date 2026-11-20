@@ -19,6 +19,7 @@
 #include "../include/NavKit/render/Model.h"
 #include "../include/NavKit/util/UpdateChecker.h"
 #include "../include/NavKit/util/BridgeJoiner.h"
+#include "../include/NavKit/util/CrowdMapBuilder.h"
 #include "../include/NavKit/util/GridGenerator.h"
 #include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Pathfinding.h"
@@ -791,6 +792,189 @@ namespace {
         std::filesystem::remove(savedPath);
         delete crmd.crowdMapData;
         crmd.crowdMapData = nullptr;
+    }
+
+    Json::Entity crowdTestBox(const std::string& name, const Json::Vec3& position, const Json::Vec3& size) {
+        Json::Entity box;
+        box.name = name;
+        box.position = position;
+        box.rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+        box.scale = {"SVector3", size};
+        return box;
+    }
+
+    Json::Crowd syntheticCrowd() {
+        Json::Crowd crowd;
+        crowd.name = "Synthetic";
+        crowd.globalSize = {4.0f, 4.0f, 2.0f};
+        crowd.cellSize = 0.5f;
+        crowd.exclusionBoxIndices.push_back(1);
+        Json::CrowdTeleport exit;
+        exit.name = "West";
+        exit.exitZone = crowdTestBox("WestZone", {-1.75f, 0.0f, 0.0f}, {0.6f, 4.2f, 2.0f});
+        crowd.teleports.push_back(exit);
+        Json::CrowdGroupBox group;
+        static_cast<Json::Entity&>(group) = crowdTestBox("East", {1.5f, -1.5f, 0.0f}, {1.1f, 1.1f, 2.0f});
+        crowd.groupBoxes.push_back(group);
+        return crowd;
+    }
+
+    CrowdMapBuilder::SceneVolumes syntheticSceneVolumes() {
+        static const std::vector<Json::Entity> boxes = {
+            crowdTestBox("Unreferenced", {-0.5f, -1.5f, 0.0f}, {0.9f, 0.9f, 2.0f}),
+            crowdTestBox("Pillar", {0.5f, 0.5f, 0.0f}, {0.9f, 0.9f, 2.0f})};
+        static const std::vector<Json::VolumeSphere> spheres;
+        static const std::vector<Json::VolumeShape> shapes;
+        return {boxes, spheres, shapes};
+    }
+
+    float crmdPointHeight(const CrowdMapBuilder::CrowdMap& map, const size_t index) {
+        return static_cast<float>(map.gridMap[index].heightOffset) * map.heightScale + map.heightBias;
+    }
+
+    void testCrmdBuilderFromSyntheticNavmesh() {
+        constexpr double navmeshHeight = 0.12;
+        const std::vector<CrowdMapBuilder::NavmeshPolygon> navmesh = {{{-3.0, -3.0, navmeshHeight},
+            {3.0, -3.0, navmeshHeight}, {3.0, 3.0, navmeshHeight}, {-3.0, 3.0, navmeshHeight}}};
+        const std::vector<glm::dvec3> floor = {
+            {-3.0, -3.0, 0.0}, {3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, 3.0, 0.0}};
+        const Json::Crowd crowd = syntheticCrowd();
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map = CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), navmesh, floor, {}, report);
+
+        check(map.cellsX == 8 && map.cellsY == 8, "crowd map should have size / cell size cells");
+        check(map.gridMap.size() == 81, "crowd map should have one grid point per cell corner");
+        check(report.walkableCells == 60,
+            "only the referenced pillar exclusion should remove cells, the four around its centre");
+        check(report.exitCells == std::vector<size_t>{8}, "the exit zone should cover the west column");
+        check(report.groupCells == std::vector<size_t>{4}, "the group box should cover four cells");
+        check(map.cellFlags.size() == CrowdMapBuilder::cellsPerBlock && map.cellGroups.size() == map.cellFlags.size(),
+            "cell arrays should be padded to whole blocks");
+        const auto cell = [](const int x, const int y) { return static_cast<size_t>(y) * 8 + x; };
+        check(map.cellFlags[cell(4, 4)] == 0, "excluded cells should not be walkable");
+        check(map.cellFlags[cell(0, 3)] == (CrowdMapBuilder::cellFlagWalkable | CrowdMapBuilder::cellFlagTeleportOut),
+            "exit cells should be walkable teleport-out cells");
+        check(map.cellGroups[cell(6, 0)] == 0 && map.cellGroups[cell(0, 0)] == CrowdMapBuilder::noGroup,
+            "group cells should carry the group index");
+
+        check(map.flowChannels.size() == 3 && map.groupFlowStartChannel == 2,
+            "flow channels should be a placeholder, then exits, then groups");
+        check(map.flowChannels[0].costs.empty() &&
+                std::ranges::all_of(map.flowChannels[0].directions,
+                    [](const uint8_t direction) { return direction == CrowdMapBuilder::noDirection; }),
+            "channel 0 should be an empty placeholder");
+        check(map.flowChannels[1].costs[cell(0, 1)] == 0, "exit cells should cost nothing in their own channel");
+        check(map.flowChannels[1].directions[cell(2, 1)] == 60, "a cell east of the west exit should flow west");
+        check(map.flowChannels[1].costs[cell(4, 4)] == CrowdMapBuilder::unreachableCost,
+            "excluded cells should be unreachable");
+        check(map.flowChannels[2].costs[cell(7, 1)] == 0, "group cells should cost nothing in their own channel");
+
+        check(report.gridPointsOnGeometry == 81, "every grid point should snap to the floor below the navmesh");
+        checkNear(static_cast<float>(report.meanGeometryOffset), -0.12f, 1e-4f);
+        for (size_t i = 0; i < map.gridMap.size(); ++i) {
+            checkNear(crmdPointHeight(map, i), 0.0f, 1e-3f);
+        }
+
+        CrowdMapBuilder::Report withoutGlbReport;
+        bool threwWithoutGlb = false;
+        try {
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), navmesh, {}, {}, withoutGlbReport);
+        } catch (const std::runtime_error&) {
+            threwWithoutGlb = true;
+        }
+        check(threwWithoutGlb, "building without GLB geometry under the crowd should fail");
+
+        Json::Crowd danglingCrowd = crowd;
+        danglingCrowd.exclusionShapeIndices.push_back(0);
+        CrowdMapBuilder::Report danglingReport;
+        bool threwOnDanglingIndex = false;
+        try {
+            CrowdMapBuilder::build(danglingCrowd, syntheticSceneVolumes(), navmesh, floor, {}, danglingReport);
+        } catch (const std::runtime_error&) {
+            threwOnDanglingIndex = true;
+        }
+        check(threwOnDanglingIndex, "a crowd volume index past the end of its scene list should fail the build");
+
+        Crmd crmd;
+        crmd.setCrowdMap(map, crowd.name);
+        check(crmd.crmdLoaded && crmd.crowdMapData->m_nCellSizeX == 8 && crmd.crowdMapData->m_CellFlags.size() == 1 &&
+                crmd.crowdMapData->m_aFlowChannels.size() == 3 &&
+                crmd.crowdMapData->m_aFlowChannels[1].m_aFlowCost.size() == 64,
+            "a built crowd map should become the loaded CRMD");
+        delete crmd.crowdMapData;
+        crmd.crowdMapData = nullptr;
+    }
+
+    void testCrmdBuilderRejectsExitsWithoutWalkableCells() {
+        Json::Crowd crowd = syntheticCrowd();
+        crowd.teleports[0].exitZone->position = {50.0f, 50.0f, 0.0f};
+        const std::vector<CrowdMapBuilder::NavmeshPolygon> navmesh = {
+            {{-3.0, -3.0, 0.0}, {3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, 3.0, 0.0}}};
+        const std::vector<glm::dvec3> floor = {
+            {-3.0, -3.0, 0.0}, {3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, 3.0, 0.0}};
+        CrowdMapBuilder::Report report;
+        bool threw = false;
+        try {
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), navmesh, floor, {}, report);
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        check(threw, "an exit that covers no walkable cells should fail the build");
+    }
+
+    void testCrmdBuilderWritesZeroHeightOffNavmesh() {
+        const std::vector<CrowdMapBuilder::NavmeshPolygon> navmesh = {
+            {{-3.0, -3.0, 0.0}, {3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, 3.0, 0.0}}};
+        const auto slopedFloor = [](const double x, const double y) { return glm::dvec3(x, y, 0.05 * x); };
+        const std::vector<glm::dvec3> floor = {slopedFloor(-3, -3), slopedFloor(3, -3), slopedFloor(3, 3),
+            slopedFloor(-3, -3), slopedFloor(3, 3), slopedFloor(-3, 3)};
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map =
+            CrowdMapBuilder::build(syntheticCrowd(), syntheticSceneVolumes(), navmesh, floor, {}, report);
+        const size_t pillarCentre = 5 * 9 + 5;
+        check(map.gridMap[pillarCentre].onNavGrid == 0 && map.gridMap[pillarCentre].heightOffset == 0,
+            "a grid point surrounded by excluded cells should be off the nav grid with a zero height");
+        check(std::ranges::any_of(map.gridMap, [](const CrowdMapBuilder::GridPoint& point) {
+            return point.onNavGrid == 1 && point.heightOffset != 0;
+        }), "grid points on the nav grid should keep their sloped heights");
+    }
+
+    void testCrmdBuilderRejectsTooManyGroups() {
+        Json::Crowd crowd = syntheticCrowd();
+        crowd.groupBoxes.resize(CrowdMapBuilder::noGroup, crowd.groupBoxes[0]);
+        const std::vector<CrowdMapBuilder::NavmeshPolygon> navmesh = {
+            {{-3.0, -3.0, 0.0}, {3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, 3.0, 0.0}}};
+        const std::vector<glm::dvec3> floor = {
+            {-3.0, -3.0, 0.0}, {3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, -3.0, 0.0}, {3.0, 3.0, 0.0}, {-3.0, 3.0, 0.0}};
+        CrowdMapBuilder::Report report;
+        bool threw = false;
+        try {
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), navmesh, floor, {}, report);
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        check(threw, "a group index that would collide with noGroup should fail the build");
+    }
+
+    void testCrmdGLBTrianglesNearCrowdInGameSpace() {
+        const Json::Crowd crowd = syntheticCrowd();
+        const std::vector<float> recastVerts = {
+            0.0f, -0.1f, 0.0f, 1.0f, -0.1f, 0.0f, 0.0f, -0.1f, -1.0f,
+            100.0f, 0.0f, 0.0f, 101.0f, 0.0f, 0.0f, 100.0f, 0.0f, -1.0f};
+        const std::vector<int> tris = {0, 1, 2, 3, 4, 5};
+        const std::vector<glm::dvec3> triangles =
+            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, recastVerts.data(), tris.data(), 2);
+        check(triangles.size() == 3, "only triangles near the crowd box should be kept");
+        checkNear(static_cast<float>(triangles[2].y), 1.0f);
+        checkNear(static_cast<float>(triangles[2].z), -0.1f);
+
+        Json::Crowd scaledCrowd = crowd;
+        scaledCrowd.transform.x = {2.0f, 0.0f, 0.0f};
+        const std::vector<float> beyondUnscaledBox = {
+            4.0f, 0.0f, 0.0f, 4.5f, 0.0f, 0.0f, 4.0f, 0.0f, -0.5f};
+        const std::vector<int> oneTri = {0, 1, 2};
+        check(CrowdMapBuilder::groundTrianglesNearCrowd(scaledCrowd, beyondUnscaledBox.data(), oneTri.data(), 1).empty(),
+            "a scaled transform axis should not widen the ground region");
     }
 
     void testWaypointConnectivityMapGeneration() {
@@ -1622,6 +1806,11 @@ void runDomainTests() {
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
     run("CRMD binary fixture loading", testCrmdFixtureLoading);
     run("CRMD save round trip", testCrmdSaveRoundTrip);
+    run("CRMD builder from a synthetic navmesh", testCrmdBuilderFromSyntheticNavmesh);
+    run("CRMD builder rejects exits without walkable cells", testCrmdBuilderRejectsExitsWithoutWalkableCells);
+    run("CRMD builder writes zero height off the navmesh", testCrmdBuilderWritesZeroHeightOffNavmesh);
+    run("CRMD builder rejects too many groups", testCrmdBuilderRejectsTooManyGroups);
+    run("CRMD GLB triangles near the crowd in game space", testCrmdGLBTrianglesNearCrowdInGameSpace);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);

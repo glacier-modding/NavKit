@@ -1,16 +1,25 @@
 #include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/util/FilteredListPicker.h"
+#include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/model/Json.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
+#include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/PersistedSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
+#include "../../include/NavKit/module/Scene.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/render/CoreProfileDraw.h"
 #include "../../include/NavKit/util/Bin1.h"
+#include "../../include/NavKit/util/CrowdMapBuilder.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/UiIds.h"
+#include "../../include/RecastDemo/InputGeom.h"
+#include "../../include/RecastDemo/MeshLoaderGlb.h"
 #include <nfd.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -28,7 +37,9 @@
 #include <vector>
 #include <cpptrace/from_current.hpp>
 #include <wx/button.h>
+#include <wx/choicdlg.h>
 #include <wx/sizer.h>
+#include <wx/slider.h>
 #include <wx/stattext.h>
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
@@ -317,11 +328,98 @@ namespace {
         Bin1::appendEmptyTypeSegment(file);
         return file;
     }
+
+    std::unique_ptr<SCrowdMapData> toCrowdMapData(const CrowdMapBuilder::CrowdMap& map) {
+        ensureCrmdHeapArenaInitialized();
+        auto data = std::make_unique<SCrowdMapData>();
+        data->m_nVersion = CrowdMapBuilder::crowdMapVersion;
+        data->m_vCellConsts.x = static_cast<float>(map.cellsX);
+        data->m_vCellConsts.y = static_cast<float>(map.cellsY);
+        data->m_vCellConsts.z = map.cellSize;
+        data->m_vCellConsts.w = static_cast<float>(1.0 / map.cellSize);
+        data->m_nGridSizeX = map.cellsX + 1;
+        data->m_nGridSizeY = map.cellsY + 1;
+        data->m_nCellSizeX = map.cellsX;
+        data->m_nCellSizeY = map.cellsY;
+        data->m_fGridMapHeightOffsetsScale = map.heightScale;
+        data->m_fGridMapHeightOffsetsBias = map.heightBias;
+        data->m_nGroupFlowStartChannel = map.groupFlowStartChannel;
+        data->m_nGridCellSize = map.cellSize;
+        data->m_nGridGeneratorOffset = map.generatorOffset;
+        data->m_vGlobalSize.x = map.globalSize.x;
+        data->m_vGlobalSize.y = map.globalSize.y;
+        data->m_vGlobalSize.z = map.globalSize.z;
+        const auto setFloat4 = [](float4& target, const glm::vec4& value) {
+            target.x = value.x;
+            target.y = value.y;
+            target.z = value.z;
+            target.w = value.w;
+        };
+        setFloat4(data->m_mObjectToWorld.XAxis, map.objectToWorld[0]);
+        setFloat4(data->m_mObjectToWorld.YAxis, map.objectToWorld[1]);
+        setFloat4(data->m_mObjectToWorld.ZAxis, map.objectToWorld[2]);
+        setFloat4(data->m_mObjectToWorld.Trans, map.objectToWorld[3]);
+
+        data->m_GridMap.resize(map.gridMap.size());
+        for (size_t i = 0; i < map.gridMap.size(); ++i) {
+            data->m_GridMap[i].m_nHeightOffset = map.gridMap[i].heightOffset;
+            data->m_GridMap[i].m_nOnNavGrid = map.gridMap[i].onNavGrid;
+        }
+        const auto setCells = [](TArray<SCrowdCells>& target, const std::vector<uint8_t>& cells) {
+            target.resize(cells.size() / CrowdMapBuilder::cellsPerBlock);
+            for (size_t block = 0; block < target.size(); ++block) {
+                std::memcpy(target[block].m_cells.begin(), cells.data() + block * CrowdMapBuilder::cellsPerBlock,
+                    CrowdMapBuilder::cellsPerBlock);
+            }
+        };
+        setCells(data->m_CellFlags, map.cellFlags);
+        setCells(data->m_CellGroups, map.cellGroups);
+        data->m_aFlowChannels.resize(map.flowChannels.size());
+        for (size_t c = 0; c < map.flowChannels.size(); ++c) {
+            const CrowdMapBuilder::FlowChannel& source = map.flowChannels[c];
+            SCrowdFlowChannel& channel = data->m_aFlowChannels[c];
+            if (!source.directions.empty()) {
+                channel.m_aFlowVectorIndex.resize(source.directions.size());
+                std::memcpy(channel.m_aFlowVectorIndex.begin(), source.directions.data(), source.directions.size());
+            }
+            if (!source.costs.empty()) {
+                channel.m_aFlowCost.resize(source.costs.size());
+                for (size_t i = 0; i < source.costs.size(); ++i) {
+                    channel.m_aFlowCost[i] = source.costs[i];
+                }
+            }
+        }
+        return data;
+    }
+
+    std::vector<CrowdMapBuilder::NavmeshPolygon> collectNavmeshPolygons(const NavPower::NavMesh& navMesh) {
+        std::vector<CrowdMapBuilder::NavmeshPolygon> polygons;
+        for (const auto& section : navMesh.m_aSections) {
+            for (const auto& navGraph : section.m_aNavGraphs) {
+                for (const auto& area : navGraph.m_areas) {
+                    CrowdMapBuilder::NavmeshPolygon& polygon = polygons.emplace_back();
+                    for (const NavPower::Binary::Edge* edge : area.m_edges) {
+                        polygon.emplace_back(edge->m_pos.X, edge->m_pos.Y, edge->m_pos.Z);
+                    }
+                }
+            }
+        }
+        return polygons;
+    }
+
+    std::string joinCounts(const std::vector<size_t>& counts) {
+        std::string joined;
+        for (const size_t count : counts) {
+            joined += (joined.empty() ? "" : ", ") + std::to_string(count);
+        }
+        return "[" + joined + "]";
+    }
 } // namespace
 
-Crmd::Crmd() : crmdLoaded(false), loading(false), saving(false), showCrmd(true) {}
+Crmd::Crmd() : crmdLoaded(false), loading(false), saving(false), building(false), showCrmd(true) {}
 
 wxDialog* Crmd::hCrmdDialog = nullptr;
+wxDialog* Crmd::hCrmdSettingsDialog = nullptr;
 std::string Crmd::selectedRpkgCrmd{};
 std::map<std::string, std::string> Crmd::crmdHashIoiStringMap;
 std::mutex Crmd::crmdHashIoiStringMapMutex;
@@ -643,6 +741,211 @@ void Crmd::extractCrmdFromRpkgs(const std::string& hash) {
         Logger::log(NK_INFO, ("Loading Crmd from file: " + fileName).c_str());
         getInstance().loadCrmdFromFile(fileName);
     }
+}
+
+bool Crmd::canBuildCrmd() const {
+    const Navp& navp = Navp::getInstance();
+    const InputGeom* inputGeom = RecastAdapter::getInstance().inputGeom;
+    return !Scene::getInstance().crowds.empty() && navp.navpLoaded && navp.navMesh != nullptr &&
+        SceneMesh::getInstance().glbLoaded && inputGeom != nullptr && inputGeom->getMesh() != nullptr && !building &&
+        !loading && !saving;
+}
+
+void Crmd::handleBuildCrmdClicked() {
+    if (!canBuildCrmd()) {
+        return;
+    }
+    size_t selected = 0;
+    std::string selectedId;
+    {
+        const std::vector<Json::Crowd>& crowds = Scene::getInstance().crowds;
+        if (crowds.size() > 1) {
+            wxArrayString choices;
+            for (const Json::Crowd& crowd : crowds) {
+                choices.Add(wxString::FromUTF8(crowd.name + " (" + crowd.id + ")"));
+            }
+            wxSingleChoiceDialog dialog(getMainFrame(), "Crowd to build a Crmd for", "Build Crmd", choices);
+            if (dialog.ShowModal() != wxID_OK) {
+                return;
+            }
+            selected = static_cast<size_t>(dialog.GetSelection());
+        }
+        selectedId = crowds[selected].id;
+    }
+    const std::vector<Json::Crowd>& crowds = Scene::getInstance().crowds;
+    if (!canBuildCrmd() || selected >= crowds.size() || crowds[selected].id != selectedId) {
+        Logger::log(NK_WARN, "Crmd build cancelled: the scene or Crmd state changed while choosing a crowd.");
+        return;
+    }
+    const Json::Crowd crowd = crowds[selected];
+
+    const rcMeshLoaderGlb* mesh = RecastAdapter::getInstance().inputGeom->getMesh();
+    std::vector<glm::dvec3> groundTriangles;
+    try {
+        groundTriangles =
+            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, mesh->getVerts(), mesh->getTris(), mesh->getTriCount());
+    } catch (const std::exception& error) {
+        ErrorHandler::openErrorDialog("Error building Crmd for crowd " + crowd.name + ": " + error.what());
+        Logger::log(NK_ERROR, "Failed to build Crmd for crowd %s: %s", crowd.name.c_str(), error.what());
+        return;
+    }
+
+    building = true;
+    Menu::updateMenuState();
+    const Scene& scene = Scene::getInstance();
+    backgroundWorker.emplace([this, crowd, boxes = scene.volumeBoxes, spheres = scene.volumeSpheres,
+                                 shapes = scene.volumeShapes, polygons = collectNavmeshPolygons(*Navp::getInstance().navMesh),
+                                 groundTriangles = std::move(groundTriangles), costSettings = costSettings] {
+        buildCrmd(crowd, {boxes, spheres, shapes}, polygons, groundTriangles, costSettings);
+    });
+}
+
+void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
+    const std::vector<CrowdMapBuilder::NavmeshPolygon>& navmeshPolygons,
+    const std::vector<glm::dvec3>& groundTriangles, const CrowdMapBuilder::CostSettings& costSettings) {
+    Logger::log(NK_INFO, "Building Crmd for crowd %s (%s) from %zu Navp areas and %zu GLB triangles...",
+        crowd.name.c_str(), crowd.id.c_str(), navmeshPolygons.size(), groundTriangles.size() / 3);
+    const auto start = std::chrono::high_resolution_clock::now();
+    CPPTRACE_TRY {
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map = CrowdMapBuilder::build(crowd, sceneVolumes, navmeshPolygons, groundTriangles, costSettings, report);
+        setCrowdMap(map, crowd.name);
+        const auto duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
+        Logger::log(NK_INFO,
+            "Built Crmd for %s in %lld ms: %ux%u cells, %zu walkable, %zu panic-only, exit cells %s, group cells %s.",
+            crowd.name.c_str(), static_cast<long long>(duration.count()), map.cellsX, map.cellsY, report.walkableCells,
+            report.panicOnlyCells, joinCounts(report.exitCells).c_str(), joinCounts(report.groupCells).c_str());
+        Logger::log(NK_INFO,
+            "Crmd heights: %zu grid points on GLB geometry (mean %.3f m from the Navp), %zu on the Navp.",
+            report.gridPointsOnGeometry, report.meanGeometryOffset, report.gridPointsOnNavmesh);
+    }
+    CPPTRACE_CATCH(const std::exception& error) {
+        const std::string stackTrace = cpptrace::from_current_exception().to_string();
+        ErrorHandler::openErrorDialog("Error building Crmd for crowd " + crowd.name + ": " + error.what() +
+            "\n\nStack Trace:\n" + stackTrace);
+        Logger::log(NK_ERROR, "Failed to build Crmd for crowd %s: %s Stack trace: %s", crowd.name.c_str(),
+            error.what(), stackTrace.c_str());
+    }
+    catch (...) {
+        ErrorHandler::openErrorDialog("Error building Crmd for crowd " + crowd.name + ": unknown error.");
+        Logger::log(NK_ERROR, "Failed to build Crmd for crowd %s due to an unknown error.", crowd.name.c_str());
+    }
+    building = false;
+    Menu::updateMenuState();
+}
+
+namespace {
+    struct CostSettingRow {
+        int sliderId;
+        int labelId;
+        const char* label;
+        const char* key;
+        double CrowdMapBuilder::CostSettings::* value;
+        double minimum;
+        double step;
+        int steps;
+    };
+
+    constexpr std::array<CostSettingRow, 4> costSettingRows = {{
+        {IDC_SLIDER_CRMD_DIAGONAL_STEP, IDC_STATIC_CRMD_DIAGONAL_STEP_VALUE, "Diagonal Step:", "diagonalStep",
+            &CrowdMapBuilder::CostSettings::diagonalStep, 1.0, 0.01, 200},
+        {IDC_SLIDER_CRMD_BLOCKED_NEIGHBOUR_PENALTY, IDC_STATIC_CRMD_BLOCKED_NEIGHBOUR_PENALTY_VALUE,
+            "Blocked Neighbour Penalty:", "blockedNeighbourPenalty",
+            &CrowdMapBuilder::CostSettings::blockedNeighbourPenalty, 0.0, 0.01, 200},
+        {IDC_SLIDER_CRMD_PINCH_PENALTY, IDC_STATIC_CRMD_PINCH_PENALTY_VALUE, "Pinch Penalty:", "pinchPenalty",
+            &CrowdMapBuilder::CostSettings::pinchPenalty, 0.0, 0.05, 200},
+        {IDC_SLIDER_CRMD_DIRECTION_WALL_PENALTY, IDC_STATIC_CRMD_DIRECTION_WALL_PENALTY_VALUE,
+            "Direction Wall Penalty:", "directionWallPenalty",
+            &CrowdMapBuilder::CostSettings::directionWallPenalty, 0.0, 0.01, 200},
+    }};
+
+    void updateCrmdSettingsDialogControls(wxDialog* dialog, const CrowdMapBuilder::CostSettings& settings) {
+        for (const CostSettingRow& row : costSettingRows) {
+            const double value = settings.*row.value;
+            static_cast<wxSlider*>(dialog->FindWindow(row.sliderId))
+                ->SetValue(static_cast<int>(std::lround((value - row.minimum) / row.step)));
+            dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
+        }
+    }
+}
+
+void Crmd::loadSettings() {
+    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    const CrowdMapBuilder::CostSettings defaults;
+    for (const CostSettingRow& row : costSettingRows) {
+        costSettings.*row.value = atof(persistedSettings.getValue("Crmd", row.key, std::to_string(defaults.*row.value)));
+    }
+}
+
+void Crmd::saveSettings() const {
+    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    for (const CostSettingRow& row : costSettingRows) {
+        persistedSettings.setValue("Crmd", row.key, std::to_string(costSettings.*row.value));
+    }
+    persistedSettings.save();
+}
+
+void Crmd::resetDefaults() {
+    costSettings = {};
+    saveSettings();
+}
+
+void Crmd::showCrmdSettingsDialog() {
+    if (hCrmdSettingsDialog != nullptr) {
+        hCrmdSettingsDialog->Raise();
+        return;
+    }
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Crmd Settings", wxDefaultPosition, wxSize(460, 240));
+    hCrmdSettingsDialog = dialog;
+    auto* controls = new wxFlexGridSizer(static_cast<int>(costSettingRows.size()), 3, 8, 8);
+    for (const CostSettingRow& row : costSettingRows) {
+        controls->Add(new wxStaticText(dialog, wxID_ANY, row.label), 0, wxALIGN_CENTER_VERTICAL);
+        controls->Add(new wxSlider(dialog, row.sliderId, 0, 0, row.steps), 1, wxEXPAND);
+        controls->Add(new wxStaticText(dialog, row.labelId, ""), 0, wxALIGN_CENTER_VERTICAL);
+    }
+    controls->AddGrowableCol(1, 1);
+    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* content = new wxBoxSizer(wxVERTICAL);
+    content->Add(controls, 0, wxEXPAND | wxALL, 10);
+    content->Add(reset, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    dialog->SetSizer(content);
+    updateCrmdSettingsDialogControls(dialog, costSettings);
+
+    for (const CostSettingRow& row : costSettingRows) {
+        dialog->Bind(wxEVT_SLIDER, [this, dialog, row](const wxCommandEvent& event) {
+            const double value = row.minimum + event.GetInt() * row.step;
+            costSettings.*row.value = value;
+            dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
+            saveSettings();
+        }, row.sliderId);
+    }
+    reset->Bind(wxEVT_BUTTON, [this, dialog](wxCommandEvent&) {
+        Logger::log(NK_INFO, "Resetting Crmd Default settings");
+        resetDefaults();
+        updateCrmdSettingsDialogControls(dialog, costSettings);
+    });
+    dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
+        if (hCrmdSettingsDialog == dialog) {
+            hCrmdSettingsDialog = nullptr;
+        }
+        dialog->Destroy();
+    });
+    dialog->SetMinSize(wxSize(420, 220));
+    dialog->Layout();
+    dialog->CentreOnParent();
+    dialog->Show();
+}
+
+void Crmd::setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name) {
+    std::unique_ptr<SCrowdMapData> data = toCrowdMapData(map);
+    loading = true;
+    delete crowdMapData;
+    crowdMapData = data.release();
+    loadedCrmdText = name;
+    renderGeometryDirty = true;
+    crmdLoaded = true;
+    loading = false;
 }
 
 bool Crmd::canSave() const {

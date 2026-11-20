@@ -68,6 +68,7 @@ wxMenuBar* Menu::createMenuBar() {
     settings->Append(IDM_SETTINGS_SCENE_MESH, "&Scene Mesh Settings");
     settings->Append(IDM_SETTINGS_AIRG, "&Airg Settings");
     settings->Append(IDM_SETTINGS_GFXF, "&GFXF Settings");
+    settings->Append(IDM_SETTINGS_CRMD, "&Crmd Settings");
     bar->Append(settings, "&Settings");
 
     auto* view = new wxMenu();
@@ -119,6 +120,8 @@ wxMenuBar* Menu::createMenuBar() {
     build->Append(IDM_BUILD_NAVP, "Build &Navp from GLB and Scene");
     build->AppendSeparator();
     build->Append(IDM_BUILD_AIRG, "Build &Airg from Navp and GLB");
+    build->AppendSeparator();
+    build->Append(IDM_BUILD_CRMD, "Build &Crmd from Scene, Navp and GLB");
     bar->Append(build, "&Build");
 
     auto* help = new wxMenu();
@@ -209,7 +212,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
-    setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmd.saving);
+    setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmd.saving && !crmd.building);
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmd.saving);
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmd.saving);
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF, gfxf.canLoad());
@@ -228,6 +231,7 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
     setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
+    setMenuItemEnabled(IDM_BUILD_CRMD, crmd.canBuildCrmd());
     setMenuItemEnabled(IDM_BUILD_GLB_FROM_SCENE, obj.canBuildGlbFromScene());
     setMenuItemEnabled(IDM_BUILD_GLB_FROM_NAVP, obj.canBuildGlbFromNavp());
     setMenuItemEnabled(IDM_BUILD_BLEND_FROM_SCENE, obj.canBuildBlendFromScene());
@@ -490,6 +494,9 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_BUILD_AIRG:
         airg.handleBuildAirgClicked();
         break;
+    case IDM_BUILD_CRMD:
+        Crmd::getInstance().handleBuildCrmdClicked();
+        break;
 
     case IDM_EXTRACT_SCENE:
         sceneExtract.handleExtractFromGameClicked();
@@ -534,6 +541,10 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_SETTINGS_GFXF:
         Gfxf::getInstance().showGfxfSettingsDialog();
         Logger::log(NK_DEBUG, "Settings -> GFXF Settings clicked");
+        break;
+    case IDM_SETTINGS_CRMD:
+        Crmd::getInstance().showCrmdSettingsDialog();
+        Logger::log(NK_DEBUG, "Settings -> Crmd Settings clicked");
         break;
 
     default:
