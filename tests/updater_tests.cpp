@@ -68,6 +68,18 @@ namespace {
         require(arguments == expected, "Windows MSI arguments changed or paths with spaces were split");
     }
 
+    void testWindowsInstallerCommandLineQuoting() {
+        const std::vector<std::string> arguments = {"msiexec.exe", "/i", "C:\\Temp\\NavKit.msi", "/passive",
+            "/norestart", "/L*v", "C:\\Users\\a b\\Glacier Modding\\NavKit\\log.txt",
+            "MSIRESTARTMANAGERCONTROL=Disable", "INSTALLFOLDER=C:\\Users\\a b\\Glacier Modding\\NavKit"};
+        const std::string expected = "msiexec.exe /i C:\\Temp\\NavKit.msi /passive /norestart /L*v "
+                                     "\"C:\\Users\\a b\\Glacier Modding\\NavKit\\log.txt\" "
+                                     "MSIRESTARTMANAGERCONTROL=Disable "
+                                     "INSTALLFOLDER=\"C:\\Users\\a b\\Glacier Modding\\NavKit\"";
+        require(NavKit::Updater::windowsInstallerCommandLine(arguments) == expected,
+            "msiexec property values with spaces must be quoted as NAME=\"value\", not \"NAME=value\"");
+    }
+
     void testWindowsUpdatePathsAndResult() {
         const std::filesystem::path installDirectory =
             std::filesystem::temp_directory_path() / "Program Files" / "NavKit";
@@ -141,6 +153,7 @@ namespace {
 int main() {
     try {
         testWindowsInstallerArguments();
+        testWindowsInstallerCommandLineQuoting();
         testWindowsUpdatePathsAndResult();
         testMacUpdateArgumentValidationAndPaths();
         testMacBundleReplacementAndRollback();

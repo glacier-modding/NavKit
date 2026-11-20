@@ -31,6 +31,48 @@ namespace NavKit::Updater {
             "INSTALLFOLDER=" + dirStr};
     }
 
+    // msiexec parses its own command line and only understands property assignments written as
+    // NAME="value with spaces". Generic argv quoting (as done by wxExecute(argv) / CreateProcess helpers)
+    // produces "NAME=value with spaces", which msiexec rejects by showing its usage dialog.
+    inline std::string quoteWindowsArgument(const std::string& argument) {
+        if (!argument.empty() && argument.find_first_of(" \t\"") == std::string::npos) {
+            return argument;
+        }
+        return "\"" + argument + "\"";
+    }
+
+    inline bool isMsiPropertyAssignment(const std::string& argument, std::string::size_type& equalsPos) {
+        equalsPos = argument.find('=');
+        if (equalsPos == std::string::npos || equalsPos == 0) {
+            return false;
+        }
+        for (std::string::size_type i = 0; i < equalsPos; ++i) {
+            const char c = argument[i];
+            const bool valid =
+                (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.';
+            if (!valid) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    inline std::string windowsInstallerCommandLine(const std::vector<std::string>& arguments) {
+        std::string commandLine;
+        for (const std::string& argument : arguments) {
+            if (!commandLine.empty()) {
+                commandLine += ' ';
+            }
+            std::string::size_type equalsPos = 0;
+            if (isMsiPropertyAssignment(argument, equalsPos)) {
+                commandLine += argument.substr(0, equalsPos + 1) + quoteWindowsArgument(argument.substr(equalsPos + 1));
+            } else {
+                commandLine += quoteWindowsArgument(argument);
+            }
+        }
+        return commandLine;
+    }
+
     inline std::filesystem::path windowsUpdateLogPath(
         const std::filesystem::path& installDirectory, const std::string& version) {
         return installDirectory / ("NavKit_Update_MSI_Log_" + version + ".txt");

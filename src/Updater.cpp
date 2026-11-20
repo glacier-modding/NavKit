@@ -209,12 +209,12 @@ namespace {
         const std::filesystem::path log_path =
             NavKit::Updater::windowsUpdateLogPath(install_dir, args->new_version_str);
         LogMessage("Updater: Executing MSI installer...");
-        std::vector<wxString> installerArguments;
-        for (const std::string& argument :
-            NavKit::Updater::windowsInstallerArguments(args->msi_path, log_path, install_dir)) {
-            installerArguments.push_back(wxString::FromUTF8(argument.c_str()));
-        }
-        const long msiExitCode = executeArguments(installerArguments, wxEXEC_SYNC);
+        // Pass a pre-built command line rather than an argv array: wxExecute(argv) would wrap
+        // INSTALLFOLDER=<path with spaces> in quotes as a whole, which msiexec cannot parse.
+        const std::string installerCommandLine = NavKit::Updater::windowsInstallerCommandLine(
+            NavKit::Updater::windowsInstallerArguments(args->msi_path, log_path, install_dir));
+        LogMessage("Updater: " + installerCommandLine);
+        const long msiExitCode = wxExecute(wxString::FromUTF8(installerCommandLine), wxEXEC_SYNC);
         if (msiExitCode < 0) {
             LogMessage("Updater: Failed to launch installer.");
             NotifyUpdateComplete(0);
