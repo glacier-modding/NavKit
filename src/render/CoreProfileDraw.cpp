@@ -58,7 +58,7 @@ namespace {
         shader.setBool("useAlphaTexture", false);
         glUseProgram(0);
     }
-}
+} // namespace
 
 void drawCoreProfileVertices(const std::span<const CoreProfileVertex> vertices, const GLenum primitive,
     const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection, const GLuint texture,
@@ -102,8 +102,8 @@ void CoreProfileVertexBuffer::upload(const std::span<const CoreProfileVertex> ve
     vertexCount = static_cast<GLsizei>(vertices.size());
 }
 
-void CoreProfileVertexBuffer::draw(const GLenum primitive, const glm::mat4& model, const glm::mat4& view,
-    const glm::mat4& projection) const {
+void CoreProfileVertexBuffer::draw(
+    const GLenum primitive, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection) const {
     if (vertexCount == 0) {
         return;
     }

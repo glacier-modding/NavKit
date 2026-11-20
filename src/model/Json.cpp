@@ -28,13 +28,27 @@ std::ostream& Json::operator<<(std::ostream& f, const Escaped& escaped) {
     static constexpr char hexDigits[] = "0123456789abcdef";
     for (const char c : escaped.value) {
         switch (c) {
-        case '"': f << R"(\")"; break;
-        case '\\': f << R"(\\)"; break;
-        case '\b': f << R"(\b)"; break;
-        case '\f': f << R"(\f)"; break;
-        case '\n': f << R"(\n)"; break;
-        case '\r': f << R"(\r)"; break;
-        case '\t': f << R"(\t)"; break;
+        case '"':
+            f << R"(\")";
+            break;
+        case '\\':
+            f << R"(\\)";
+            break;
+        case '\b':
+            f << R"(\b)";
+            break;
+        case '\f':
+            f << R"(\f)";
+            break;
+        case '\n':
+            f << R"(\n)";
+            break;
+        case '\r':
+            f << R"(\r)";
+            break;
+        case '\t':
+            f << R"(\t)";
+            break;
         default:
             if (static_cast<unsigned char>(c) < 0x20) {
                 f << R"(\u00)" << hexDigits[c >> 4] << hexDigits[c & 0xF];
@@ -120,8 +134,8 @@ void Json::Vec3Wrapped::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Vec3Wrapped::writeJson(std::ostream& f, std::string propertyName) const {
-    f << R"(")" << escaped(propertyName) << R"(":{"type":")" << escaped(type) << R"(","data":{"x":)" << data.x << R"(,"y":)" << data.y
-      << R"(,"z":)" << data.z << "}}";
+    f << R"(")" << escaped(propertyName) << R"(":{"type":")" << escaped(type) << R"(","data":{"x":)" << data.x
+      << R"(,"y":)" << data.y << R"(,"z":)" << data.z << "}}";
 }
 
 void Json::Entity::readJson(simdjson::ondemand::object json) {
@@ -171,9 +185,9 @@ void Json::Mesh::readJson(simdjson::ondemand::object json) {
 }
 
 void Json::Mesh::writeJson(std::ostream& f) const {
-    f << R"({"alocHash":")" << escaped(alocHash) << R"(","primHash":")" << escaped(primHash) << R"(","roomName":")" << escaped(roomName)
-      << R"(","roomFolderName":")" << escaped(roomFolderName) << R"(","entity":{"id":")" << escaped(entity.id) << R"(","name":")"
-      << escaped(entity.name) << R"(",)";
+    f << R"({"alocHash":")" << escaped(alocHash) << R"(","primHash":")" << escaped(primHash) << R"(","roomName":")"
+      << escaped(roomName) << R"(","roomFolderName":")" << escaped(roomFolderName) << R"(","entity":{"id":")"
+      << escaped(entity.id) << R"(","name":")" << escaped(entity.name) << R"(",)";
     entity.position.writeJson(f);
     f << ",";
     entity.rotation.writeJson(f);
@@ -373,8 +387,8 @@ Json::AiAreaWorlds::AiAreaWorlds(simdjson::ondemand::array aiAreaWorldsJson) {
 }
 
 void Json::ParentData::writeJson(std::ostream& f) const {
-    f << R"("data":{"id":")" << escaped(id) << R"(","name":")" << escaped(name) << R"(","source":")" << escaped(source) << R"(","type":")" << escaped(type)
-      << R"("})";
+    f << R"("data":{"id":")" << escaped(id) << R"(","name":")" << escaped(name) << R"(","source":")" << escaped(source)
+      << R"(","type":")" << escaped(type) << R"("})";
 }
 
 void Json::ParentData::readJson(simdjson::ondemand::object json) {
@@ -669,7 +683,7 @@ namespace {
             f << "null";
         }
     }
-}
+} // namespace
 
 void Json::Transform::readJson(simdjson::ondemand::object json) {
     readObject(json, "x", x);
@@ -755,7 +769,8 @@ void Json::CrowdTeleport::writeJson(std::ostream& f) const {
 
 void Json::CrowdGroupBox::readJson(simdjson::ondemand::object json) {
     Entity::readJson(json);
-    if (simdjson::ondemand::object groupSizeJson; json["groupSize"].get_object().get(groupSizeJson) == simdjson::SUCCESS) {
+    if (simdjson::ondemand::object groupSizeJson;
+        json["groupSize"].get_object().get(groupSizeJson) == simdjson::SUCCESS) {
         groupSize = getValue(groupSizeJson, "data");
     } else {
         Logger::log(NK_ERROR, "Field: groupSize is missing or not an object.");
@@ -878,8 +893,8 @@ void Json::Mati::readJsonFromScene(simdjson::ondemand::object json) {
 }
 
 void Json::Mati::writeJson(std::ostream& f) const {
-    f << R"({"hash":")" << escaped(hash) << R"(","diffuse":")" << escaped(diffuse) << R"(","normal":")" << escaped(normal) << R"(","specular":")"
-      << escaped(specular);
+    f << R"({"hash":")" << escaped(hash) << R"(","diffuse":")" << escaped(diffuse) << R"(","normal":")"
+      << escaped(normal) << R"(","specular":")" << escaped(specular);
     f << R"("})";
 }
 

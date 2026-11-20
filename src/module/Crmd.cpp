@@ -296,9 +296,8 @@ namespace {
         appendCells(writer, 0x60, crowdMap.m_CellGroups);
 
         const TArray<SCrowdFlowChannel>& channels = crowdMap.m_aFlowChannels;
-        const size_t channelsBegin = writer.appendArray(0x80, channels.size(), 8, [&] {
-            writer.data.resize(writer.data.size() + channels.size() * sizeof(SCrowdFlowChannel), 0);
-        });
+        const size_t channelsBegin = writer.appendArray(0x80, channels.size(), 8,
+            [&] { writer.data.resize(writer.data.size() + channels.size() * sizeof(SCrowdFlowChannel), 0); });
         for (size_t i = 0; i < channels.size(); ++i) {
             const size_t channelOffset = channelsBegin + i * sizeof(SCrowdFlowChannel);
             const SCrowdFlowChannel& channel = channels[i];

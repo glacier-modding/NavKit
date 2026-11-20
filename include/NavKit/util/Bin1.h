@@ -122,9 +122,8 @@ namespace Bin1 {
         }
 
         // Writes a count-prefixed array; an empty one still takes a byte so the next array gets its own address.
-        template <typename AppendElements>
-        size_t appendArray(const size_t pointerOffset, const size_t count, const size_t alignment,
-            AppendElements appendElements) {
+        template <typename AppendElements> size_t appendArray(
+            const size_t pointerOffset, const size_t count, const size_t alignment, AppendElements appendElements) {
             const size_t begin = (data.size() + 4 + alignment - 1) / alignment * alignment;
             data.resize(begin - 4, 0);
             append(checkedUint32(count));
