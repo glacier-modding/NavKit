@@ -1945,9 +1945,21 @@ class Physics:
             log("TRACE", "Skipping header only ALOC: " + aloc_name, aloc_name)
             return -2
 
-        fp = os.fsencode(filepath)
-        file = open(fp, "rb")
+        try:
+            file = open(os.fsencode(filepath), "rb")
+        except OSError as err:
+            log("ERROR", "Unable to open ALOC " + aloc_name + ". Error message: " + str(err), aloc_name)
+            return -1
         br = BinaryReader(file)
+        try:
+            return self._read_contents(br, aloc_name)
+        except (OSError, struct.error, ValueError, UnicodeDecodeError) as err:
+            log("ERROR", "Error reading ALOC " + aloc_name + ". Error message: " + str(err), aloc_name)
+            return -1
+        finally:
+            br.close()
+
+    def _read_contents(self, br, aloc_name):
         # Header + MeshType Header: sizeof = 23
         self.data_type = br.readUInt()
         self.collision_type = br.readUInt()
@@ -2488,12 +2500,12 @@ def create_volume(name, col_name, pos, rot, scale, shape='CUBE'):
 def load_volume_boxes(json_data, volume_types):
     volume_boxes_coll = bpy.data.collections.new("Volume boxes")
     bpy.context.scene.collection.children.link(volume_boxes_coll)
-    log("INFO", "Loading volume boxes for types:", "glacier2obj")
+    log("INFO", "Loading volume boxes for types:", "glacier2glb")
     for volt in volume_types:
-        log("INFO", "   " + volt, "glacier2obj")
+        log("INFO", "   " + volt, "glacier2glb")
 
     for volt in volume_types:
-        log("INFO", "Creating " + volt + " collection.", "glacier2obj")
+        log("INFO", "Creating " + volt + " collection.", "glacier2glb")
         if volt == "gates":
             if volt not in bpy.data.collections:
                 gates_coll = bpy.data.collections.new(volt)
@@ -2531,24 +2543,24 @@ def load_volume_boxes(json_data, volume_types):
                 pos += center
                 create_volume(vol["name"], rooms_coll.name, pos, rot, scale)
         elif volt == "mapLevel":
-            log("INFO", "Handling mapLevel: " + volt, "glacier2obj")
+            log("INFO", "Handling mapLevel: " + volt, "glacier2glb")
             if volt not in bpy.data.collections:
                 map_level_coll = bpy.data.collections.new(volt)
                 volume_boxes_coll.children.link(map_level_coll)
-                log("INFO", "Creating collection: " + volt, "glacier2obj")
+                log("INFO", "Creating collection: " + volt, "glacier2glb")
             else:
-                log("INFO", "Collection " + volt + " already exists", "glacier2obj")
+                log("INFO", "Collection " + volt + " already exists", "glacier2glb")
                 map_level_coll = bpy.data.collections.get(volt)
 
             map_level_volume_box_ids = []
-            log("INFO", "Getting mapSpaceConfigs.", "glacier2obj")
+            log("INFO", "Getting mapSpaceConfigs.", "glacier2glb")
             for map_space_config in json_data["mapSpaceConfigs"]:
-                log("INFO", "Found a mapSpaceConfig with name: " + map_space_config["name"] + " and id: " + map_space_config["id"], "glacier2obj")
+                log("INFO", "Found a mapSpaceConfig with name: " + map_space_config["name"] + " and id: " + map_space_config["id"], "glacier2glb")
                 for map_level_volume_box_id in map_space_config["inclusions"]["data"]:
                     map_level_volume_box_ids.append(map_level_volume_box_id)
             for vol in json_data["volumeBoxes"]:
                 if vol["id"] in map_level_volume_box_ids:
-                    log("INFO", "Found a map level volume with name: " + vol["name"] + " and id: " + vol["id"], "glacier2obj")
+                    log("INFO", "Found a map level volume with name: " + vol["name"] + " and id: " + vol["id"], "glacier2glb")
                     coords = ["w", "x", "y", "z"]
                     pos, rot, scale = [
                         mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
@@ -3163,8 +3175,8 @@ def render_map_layers_for_gfx(json_data, output_path):
 def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mask: str, build_type: str,
                 filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool, should_build_gfx: bool):
     start = timer()
-    log("INFO", "Loading scenario.", "glacier2obj")
-    log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2obj")
+    log("INFO", "Loading scenario.", "glacier2glb")
+    log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2glb")
     f = open(path_to_nav_json, "r")
     data = json.loads(f.read())
     f.close()
@@ -3212,13 +3224,13 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
     if build_type == "instance":
         # link the geonode
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
-        log("DEBUG", "Loading geometry node from the resource blend file: " + filepath, "glacier2obj")
+        log("DEBUG", "Loading geometry node from the resource blend file: " + filepath, "glacier2glb")
         with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
             if geo_node_name in data_from.node_groups:
                 data_to.node_groups.append(geo_node_name)
             else:
                 log("ERROR", "=========================== Error Loading the resource blend file ================",
-                    "glacier2obj")
+                    "glacier2glb")
                 assert 0
     matis = {}
     prim_matis = {}
@@ -3233,12 +3245,12 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-            log("DEBUG", "Loading shading material from the resource blend file: " + filepath, "glacier2obj")
+            log("DEBUG", "Loading shading material from the resource blend file: " + filepath, "glacier2glb")
             if shading_mat_name in data_from.materials:
                 data_to.materials.append(shading_mat_name)
             else:
-                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "glacier2obj")
-        log("DEBUG", "Adding light", "glacier2obj")
+                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "glacier2glb")
+        log("DEBUG", "Adding light", "glacier2glb")
 
         light_data = bpy.data.lights.new(name="Sun", type='SUN')
         light_object = bpy.data.objects.new(name="Sun", object_data=light_data)
@@ -3269,7 +3281,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                 root_coll.children.link(coll)
                 coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
                 room_folder_color_index += 1
-                log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2obj")
+                log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2glb")
             room_folder_collections[room_folder_name] = coll
 
         room_folder_coll = room_folder_collections[room_folder_name]
@@ -3281,7 +3293,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
             room_folder_coll.children.link(coll)
             coll.color_tag = "COLOR_0" + str(room_color_index % 8 + 1)
             room_color_index += 1
-            log("DEBUG", "Adding new collection for room name: " + room_name, "glacier2obj")
+            log("DEBUG", "Adding new collection for room name: " + room_name, "glacier2glb")
             room_collections[room_collection_key] = coll
 
         entity = hash_and_entity['entity']
@@ -3295,7 +3307,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
         mesh_room_collections[mesh_hash].append(room_collections[room_collection_key])
     output_dir = os.path.abspath(os.path.dirname(output_path))
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
-    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2obj")
+    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2glb")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
     aloc_or_prim_list = [item for item in file_list if item.lower().endswith('.' + mesh_type.lower())]
 
@@ -3323,8 +3335,8 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
     mesh_i = 0
     current_mesh_in_scene_index = 0
     error_alocs = []
-    log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2obj")
-    log("INFO", "Mesh count: " + str(mesh_count), "glacier2obj")
+    log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2glb")
+    log("INFO", "Mesh count: " + str(mesh_count), "glacier2glb")
     log_threshold = max(1, round(meshes_in_scenario_count / 10, -2))
     for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
         aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
@@ -3338,9 +3350,9 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
             continue
         aloc_or_prim_path = os.path.join(path_to_aloc_or_prim_dir, aloc_or_prim_filename)
 
-        log("DEBUG", "Loading " + mesh_type + ": " + mesh_hash, "glacier2obj")
+        log("DEBUG", "Loading " + mesh_type + ": " + mesh_hash, "glacier2glb")
         if current_mesh_in_scene_index % log_threshold == 0:
-            log("INFO", "Loaded " + str(current_mesh_in_scene_index) + " " + mesh_type + "s...", "glacier2obj")
+            log("INFO", "Loaded " + str(current_mesh_in_scene_index) + " " + mesh_type + "s...", "glacier2glb")
         collision_type = None
         material_indices = []
         try:
@@ -3348,21 +3360,21 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                 aloc, submeshes = load_aloc(aloc_or_prim_path, temp_coll)
                 if aloc == -2:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                        mesh_hash) + " ================", "glacier2obj")
+                        mesh_hash) + " ================", "glacier2glb")
                     error_alocs.append(mesh_hash)
                     continue
                 if aloc == -1:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                        mesh_hash) + " ================", "glacier2obj")
+                        mesh_hash) + " ================", "glacier2glb")
                     error_alocs.append(mesh_hash)
                     continue
                 collision_type = aloc.collision_type
             else:
                 submeshes, material_indices = load_prim(aloc_or_prim_path, lod_mask, temp_coll)
-        except struct.error as err:
+        except (struct.error, OSError) as err:
             error_alocs.append("Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err))
             log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                mesh_hash) + " Exception: " + str(err) + " ================", "glacier2obj")
+                mesh_hash) + " Exception: " + str(err) + " ================", "glacier2glb")
             continue
         mesh_transforms = transforms[mesh_hash]
         mesh_instance_count = len(mesh_transforms)
@@ -3370,22 +3382,22 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
             for mesh_index in range(0, mesh_instance_count):
                 log("DEBUG", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "]", "glacier2obj")
+                    mesh_i + 1) + "/" + str(mesh_count) + "]", "glacier2glb")
                 mesh_i += 1
             continue
         if len(submeshes) == 0:
-            log("TRACE", "No submeshes for " + str(mesh_hash), "glacier2obj")
+            log("TRACE", "No submeshes for " + str(mesh_hash), "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
         if not submeshes:
             log("WARNING", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------",
-                "glacier2obj")
+                "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
         if collision_type in excluded_collision_types:
             log("TRACE",
                 "Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(
-                    collision_type), "glacier2obj")
+                    collision_type), "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
         if build_type == "instance":
@@ -3454,11 +3466,11 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                 submesh.hide_viewport = True
 
                 if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
-                    log("TRACE", "Adding texture", "glacier2obj")
+                    log("TRACE", "Adding texture", "glacier2glb")
                     try:
                         add_textures(submesh, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_indices[submesh_i])
                     except struct.error as err:
-                        log("ERROR", "Error adding texture " + str(err), "glacier2obj")
+                        log("ERROR", "Error adding texture " + str(err), "glacier2glb")
         else:
             current_submesh = None
             mesh_positions = [mathutils.Vector(
@@ -3499,9 +3511,9 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                 mesh_instance_id = transforms[mesh_hash][mesh_index]["id"]
                 log("DEBUG", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_collection.name, "glacier2obj")
+                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_collection.name, "glacier2glb")
                 mesh_i += 1
-                log("TRACE", "Total submeshes: " + str(submesh_count), "glacier2obj")
+                log("TRACE", "Total submeshes: " + str(submesh_count), "glacier2glb")
                 for submesh_instance_index in range(submesh_count):
                     submesh = submeshes[submesh_instance_index]
                     if not unlinked[submesh_instance_index]:
@@ -3533,22 +3545,22 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                         try:
                             add_textures(current_submesh, matis, mesh_hash, output_dir, prim_matis, submesh_instance_index, material_indices[submesh_instance_index])
                         except struct.error as err:
-                            log("ERROR", "Error adding texture " + str(err), "glacier2obj")
+                            log("ERROR", "Error adding texture " + str(err), "glacier2glb")
                     if current_submesh:
                         current_submesh.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
     if len(missing_mesh_hashes) > 0:
         for missing_mesh_hash in missing_mesh_hashes:
-            log("ERROR", "Missing one or more Meshes. Missing Mesh hashes:", "glacier2obj")
-            log("ERROR", "Missing Mesh: " + missing_mesh_hash, "glacier2obj")
+            log("ERROR", "Missing one or more Meshes. Missing Mesh hashes:", "glacier2glb")
+            log("ERROR", "Missing Mesh: " + missing_mesh_hash, "glacier2glb")
 
     end = timer()
     if len(error_alocs) > 0:
-        log("ERROR", "Problem loading one or more ALOCs. ALOC hashes with problems:", "glacier2obj")
+        log("ERROR", "Problem loading one or more ALOCs. ALOC hashes with problems:", "glacier2glb")
         for error_aloc in error_alocs:
-            log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2obj")
-    log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2obj")
+            log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2glb")
+    log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2glb")
 
     if output_path.endswith('.both') or output_path.endswith('.bothWithGfx'):
         save_blend_file(output_path[:-4] + "blend")
@@ -3560,10 +3572,10 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
 
     if should_build_gfx:
         start = timer()
-        log("INFO", "Rendering map layers for GFX build...", "glacier2obj")
+        log("INFO", "Rendering map layers for GFX build...", "glacier2glb")
         render_map_layers_for_gfx(data, output_path)
         end = timer()
-        log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2obj")
+        log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2glb")
     return 0
 
 

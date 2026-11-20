@@ -358,9 +358,106 @@ void Gfxf::loadGfxfFromFile(const std::string& fileName) {
     }
     startLoad(fileName);
 }
+
+bool Gfxf::canSave() const {
+    return gfxBuilt && !saving;
+}
+
+char* Gfxf::openSaveGfxfFileDialog() {
+    const nfdu8filteritem_t filter = {"GFXF files", "gfxf"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.gfxf");
+}
+
+std::vector<unsigned char> Gfxf::extractGfxFromGfxf(const std::vector<unsigned char>& gfxfBytes) {
+    // GFXF resources are BIN1 containers: a 16-byte header with a big-endian data size, then a data section whose
+    // first two 64-bit fields are the GFX payload's offset (relative to the data section) and its size.
+    constexpr size_t dataSectionOffset = 16;
+    const auto readLittleEndian = [&gfxfBytes](const size_t offset) {
+        std::uint64_t value = 0;
+        for (size_t i = 0; i < 8; ++i) {
+            value |= static_cast<std::uint64_t>(gfxfBytes[offset + i]) << (8 * i);
+        }
+        return value;
+    };
+    if (gfxfBytes.size() < dataSectionOffset + 16 || !std::equal(gfxfBytes.begin(), gfxfBytes.begin() + 4, "BIN1")) {
+        throw std::runtime_error("The GFXF file is missing its BIN1 header.");
+    }
+    const std::uint64_t dataSize = static_cast<std::uint64_t>(gfxfBytes[8]) << 24 |
+        static_cast<std::uint64_t>(gfxfBytes[9]) << 16 | static_cast<std::uint64_t>(gfxfBytes[10]) << 8 |
+        static_cast<std::uint64_t>(gfxfBytes[11]);
+    if (dataSize > gfxfBytes.size() - dataSectionOffset) {
+        throw std::runtime_error("The GFXF data section extends beyond the end of the file.");
+    }
+    const std::uint64_t gfxOffset = readLittleEndian(dataSectionOffset);
+    const std::uint64_t gfxSize = readLittleEndian(dataSectionOffset + 8);
+    if (gfxOffset > dataSize || gfxSize > dataSize - gfxOffset) {
+        throw std::runtime_error("The GFXF payload extends beyond its data section.");
+    }
+    const auto gfxBegin = gfxfBytes.begin() + static_cast<std::ptrdiff_t>(dataSectionOffset + gfxOffset);
+    std::vector<unsigned char> gfxBytes(gfxBegin, gfxBegin + static_cast<std::ptrdiff_t>(gfxSize));
+    if (gfxBytes.size() < 8 || !std::equal(gfxBytes.begin(), gfxBytes.begin() + 3, "GFX")) {
+        throw std::runtime_error("The GFXF payload is not a GFX file.");
+    }
+    return gfxBytes;
+}
+
+std::vector<unsigned char> Gfxf::loadGfxFromFile(const std::string& fileName) {
+    std::vector<unsigned char> bytes = readFileBytes(std::filesystem::u8path(fileName));
+    if (bytes.empty()) {
+        throw std::runtime_error("Could not read GFX/GFXF file: " + fileName);
+    }
+    if (bytes.size() >= 4 && std::equal(bytes.begin(), bytes.begin() + 4, "BIN1")) {
+        return extractGfxFromGfxf(bytes);
+    }
+    if (bytes.size() < 8 || !std::equal(bytes.begin(), bytes.begin() + 3, "GFX")) {
+        throw std::runtime_error("The file is neither a GFX nor a GFXF file: " + fileName);
+    }
+    return bytes;
+}
+
+bool Gfxf::packGfxToGfxfFile(const std::vector<unsigned char>& gfxBytes, const std::string& fileName) {
+    return !gfxBytes.empty() &&
+        pack_gfx_to_gfxf(gfxBytes.data(), gfxBytes.size(), fileName.c_str(), Logger::rustLogCallback) == 0;
+}
+
+void Gfxf::setGfxData(std::vector<unsigned char> bytes) {
+    {
+        std::lock_guard lock(gfxDataMutex);
+        gfxData = std::move(bytes);
+        gfxBuilt = !gfxData.empty();
+    }
+    Menu::updateMenuState();
+}
+
 void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
-    // TODO: Call this with the right params
-    // pack_gfx_to_gfxf(*gfx_data, gfx_data_len, fileName, Logger::rustLogCallback);
+    saving = true;
+    Menu::updateMenuState();
+    const auto start = std::chrono::high_resolution_clock::now();
+    Logger::log(NK_INFO, "Saving Gfxf to file: '%s'...", fileName.c_str());
+
+    {
+        std::lock_guard lock(gfxDataMutex);
+        if (gfxData.empty()) {
+            Logger::log(NK_ERROR, "No built GFX is available to save as Gfxf.");
+        } else if (!packGfxToGfxfFile(gfxData, fileName)) {
+            Logger::log(NK_ERROR, "Error saving Gfxf file '%s'.", fileName.c_str());
+        } else {
+            const auto end = std::chrono::high_resolution_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            Logger::log(NK_INFO, "Finished saving Gfxf in %lld ms.", duration.count());
+        }
+    }
+
+    saving = false;
+    Menu::updateMenuState();
+}
+
+void Gfxf::handleSaveGfxfClicked() {
+    if (char* fileName = openSaveGfxfFileDialog()) {
+        const std::string path = fileName;
+        NFD_FreePathU8(fileName);
+        saveWorker.emplace(&Gfxf::exportGfxfToGfxfFile, this, path);
+    }
 }
 
 void Gfxf::buildGfx() {
@@ -556,6 +653,11 @@ void Gfxf::buildGfx() {
         if (filesystemError) {
             throw std::runtime_error("Could not save output.gfx: " + filesystemError.message());
         }
+        std::vector<unsigned char> builtGfx = readFileBytes(importedGfx);
+        if (builtGfx.empty()) {
+            throw std::runtime_error("Could not read the built GFX into memory.");
+        }
+        setGfxData(std::move(builtGfx));
         Logger::log(NK_INFO, "Built GFX with %zu map layers at %s", layers.size(), pathToUtf8(outputPath).c_str());
     } catch (const std::exception& exception) {
         error = "Failed to build output.gfx: " + std::string(exception.what());

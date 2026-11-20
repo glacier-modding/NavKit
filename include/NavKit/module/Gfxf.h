@@ -26,6 +26,9 @@ class Gfxf {
     std::mutex resultMutex;
     std::optional<ExportResult> completedLoad;
     std::optional<std::jthread> backgroundWorker;
+    std::optional<std::jthread> saveWorker;
+    std::mutex gfxDataMutex;
+    std::vector<unsigned char> gfxData;
     std::uint64_t loadGeneration = 0;
     Model model;
     void buildGfx();
@@ -41,6 +44,8 @@ public:
     bool gfxfLoaded = false;
     bool showGfxf = true;
     bool loading = false;
+    bool saving = false;
+    bool gfxBuilt = false;
     float renderScale = 1.0f;
     float renderOpacity = 1.0f;
     int offsetX = 0;
@@ -56,11 +61,20 @@ public:
     static wxDialog* hGfxfSettingsDialog;
 
     [[nodiscard]] bool canLoad() const;
+    [[nodiscard]] bool canSave() const;
 
     void handleOpenGfxfClicked();
 
     void loadGfxfFromFile(const std::string& fileName);
     void exportGfxfToGfxfFile(const std::string& fileName);
+    void setGfxData(std::vector<unsigned char> bytes);
+
+    static std::vector<unsigned char> extractGfxFromGfxf(const std::vector<unsigned char>& gfxfBytes);
+    static std::vector<unsigned char> loadGfxFromFile(const std::string& fileName);
+    static bool packGfxToGfxfFile(const std::vector<unsigned char>& gfxBytes, const std::string& fileName);
+
+    static char* openSaveGfxfFileDialog();
+    void handleSaveGfxfClicked();
 
     void showExtractGfxfDialog();
     void updateDialogControls(wxDialog* dialog);

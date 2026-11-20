@@ -50,6 +50,7 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_SAVE_NAVP, "Save &Navp");
     file->Append(IDM_FILE_SAVE_AIRG, "Save &Airg");
     file->Append(IDM_FILE_SAVE_CRMD, "Save &Crmd");
+    file->Append(IDM_FILE_SAVE_GFXF, "Save Gfxf");
     file->AppendSeparator();
     file->Append(IDM_FILE_EXIT, "E&xit");
     bar->Append(file, "&File");
@@ -99,7 +100,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendCheckItem(IDM_VIEW_CRMD_SHOW_CRMD, "Show &CRMD")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
-    view->AppendCheckItem(IDM_VIEW_GFXF_SHOW_Gfxf, "Show GFX&F")->Check();
+    view->AppendCheckItem(IDM_VIEW_GFXF_SHOW_GFXF, "Show GFX&F")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_LOG_SHOW_LOG, "Show &Log")->Check();
     bar->Append(view, "&View");
@@ -219,6 +220,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
     setMenuItemEnabled(IDM_FILE_SAVE_CRMD, crmd.canSave());
+    setMenuItemEnabled(IDM_FILE_SAVE_GFXF, gfxf.canSave());
     setMenuItemEnabled(IDM_FILE_SAVE_GLB, isGlbLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_BLEND, obj.canSaveBlend());
 
@@ -367,6 +369,10 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_SAVE_CRMD:
         Crmd::getInstance().handleSaveCrmdClicked();
         Logger::log(NK_DEBUG, "File -> Save Crmd clicked");
+        break;
+    case IDM_FILE_SAVE_GFXF:
+        Gfxf::getInstance().handleSaveGfxfClicked();
+        Logger::log(NK_DEBUG, "File -> Save Gfxf clicked");
         break;
 
     case IDM_FILE_EXIT:

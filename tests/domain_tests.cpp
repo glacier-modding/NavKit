@@ -246,7 +246,8 @@ namespace {
     }
 
     void testJsonCrowdRoundTrip() {
-        const std::string editorJson = R"({"id":"crowd-id","name":"Crowd","tblu":"00AB",)"
+        const std::string editorJson =
+            R"({"id":"crowd-id","name":"Crowd","tblu":"00AB",)"
             R"("transform":{"x":{"x":0,"y":1,"z":0},"y":{"x":-1,"y":0,"z":0},"z":{"x":0,"y":0,"z":1},)"
             R"("t":{"x":-6.5,"y":-27.5,"z":1}},"globalSize":{"x":17,"y":17.25,"z":2},"cellSize":0.45,)"
             R"("navMeshShrink":0.5,"generatorOffset":0.25,"smoothenExitFlows":false,"flowCandidates":"SPAWNED_ON_FLOW",)"
@@ -285,7 +286,8 @@ namespace {
         checkNear(parsed.navMeshShrink, 0.5f);
         check(!parsed.smoothenExitFlows, "crowd smoothing flag did not round trip");
         check(parsed.exclusionBoxIndices == std::vector<size_t>{3, 7} && parsed.inclusionBoxIndices.empty() &&
-                parsed.panicOnlyBoxIndices == std::vector<size_t>{1} && parsed.flowBoxIndices == std::vector<size_t>{0} &&
+                parsed.panicOnlyBoxIndices == std::vector<size_t>{1} &&
+                parsed.flowBoxIndices == std::vector<size_t>{0} &&
                 parsed.flowBoxTwoWayIndices == std::vector<size_t>{2},
             "crowd box indices did not round trip");
         check(parsed.exclusionSphereIndices == std::vector<size_t>{5}, "crowd sphere indices did not round trip");
@@ -294,7 +296,8 @@ namespace {
             "crowd shape indices did not round trip");
         checkNear(parsed.groupBoxes[0].position.x, -6.5f);
         checkNear(parsed.groupBoxes[0].scale.data.y, 6.0f);
-        check(parsed.flowCandidates == ECrowdFlowCandidates::SPAWNED_ON_FLOW, "crowd flow candidates did not round trip");
+        check(
+            parsed.flowCandidates == ECrowdFlowCandidates::SPAWNED_ON_FLOW, "crowd flow candidates did not round trip");
         checkNear(parsed.splineFlows[0].extrusionHeight, 4.5f);
         checkNear(parsed.teleports[0].exitZone->position.y, -32.0f);
         checkNear(parsed.teleports[0].exitZone->scale.data.y, 8.0f);
@@ -312,7 +315,8 @@ namespace {
     }
 
     void testJsonVolumeShapeRoundTrip() {
-        const std::string editorJson = R"({"id":"shape-id","name":"Shape","tblu":"00EF",)"
+        const std::string editorJson =
+            R"({"id":"shape-id","name":"Shape","tblu":"00EF",)"
             R"("transform":{"x":{"x":1,"y":0,"z":0},"y":{"x":0,"y":1,"z":0},"z":{"x":0,"y":0,"z":1},)"
             R"("t":{"x":2,"y":3,"z":4}},)"
             R"("points":[{"x":0,"y":0,"z":0},{"x":4,"y":0,"z":0},{"x":4,"y":4,"z":0}],)"
@@ -330,7 +334,8 @@ namespace {
         check(parsed.points.size() == 3, "volume shape points did not round trip");
         checkNear(parsed.points[2].y, 4.0f);
         checkNear(parsed.extrusionHeight, 3.0f);
-        check(parsed.flipSurfaceNormal && !parsed.closed, "volume shape normal flip and closed flag did not round trip");
+        check(
+            parsed.flipSurfaceNormal && !parsed.closed, "volume shape normal flip and closed flag did not round trip");
     }
 
     void testJsonMaterialRecords() {
@@ -791,6 +796,86 @@ namespace {
         std::filesystem::remove(savedPath);
         delete crmd.crowdMapData;
         crmd.crowdMapData = nullptr;
+    }
+
+    std::vector<unsigned char> readGfxfTestBytes(const std::filesystem::path& path) {
+        std::ifstream stream(path, std::ios::binary);
+        return std::vector<unsigned char>(std::istreambuf_iterator<char>(stream), {});
+    }
+
+    std::filesystem::path gfxfTestTempPath(const std::string& name) {
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        return std::filesystem::temp_directory_path() / ("navkit-gfxf-" + std::to_string(stamp) + "-" + name);
+    }
+
+    void testGfxfLoadExtractsGfx() {
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> extracted =
+            Gfxf::extractGfxFromGfxf(readGfxfTestBytes("tests/resources/polarbear005.gfxf"));
+
+        check(gfx == extracted, "loading a GFXF should yield the GFX extracted from its container");
+        check(gfx.size() == 29682, "extracted GFX should have the vanilla payload size");
+        check(std::equal(gfx.begin(), gfx.begin() + 3, "GFX"), "extracted GFX should start with the GFX signature");
+        const std::uint32_t declaredLength = static_cast<std::uint32_t>(gfx[4]) |
+            static_cast<std::uint32_t>(gfx[5]) << 8 | static_cast<std::uint32_t>(gfx[6]) << 16 |
+            static_cast<std::uint32_t>(gfx[7]) << 24;
+        check(declaredLength == gfx.size(), "extracted GFX header length should match its payload size");
+    }
+
+    void testGfxLoadReadsRawGfx() {
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfx");
+        check(
+            gfx == readGfxfTestBytes("tests/resources/polarbear005.gfx"), "loading a raw GFX should return its bytes");
+    }
+
+    void testGfxfRejectsInvalidContainers() {
+        const auto throws = [](const std::vector<unsigned char>& bytes) {
+            try {
+                Gfxf::extractGfxFromGfxf(bytes);
+            } catch (const std::runtime_error&) {
+                return true;
+            }
+            return false;
+        };
+        check(throws(readGfxfTestBytes("tests/resources/polarbear005.gfx")), "a raw GFX is not a GFXF container");
+        std::vector<unsigned char> truncated = readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        truncated.resize(truncated.size() / 2);
+        check(throws(truncated), "a truncated GFXF should be rejected");
+    }
+
+    void testGfxfSaveMatchesVanillaGfxf() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("vanilla.gfxf");
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfxf");
+
+        check(Gfxf::packGfxToGfxfFile(gfx, savedPath.string()), "packing the extracted GFX should succeed");
+        const bool identical = readGfxfTestBytes(savedPath) == readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        std::filesystem::remove(savedPath);
+        check(identical, "repacking a vanilla GFXF's GFX should be byte-identical to the vanilla GFXF");
+    }
+
+    void testGfxPackRoundTrip() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("roundtrip.gfxf");
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfx");
+
+        check(Gfxf::packGfxToGfxfFile(gfx, savedPath.string()), "packing the vanilla GFX should succeed");
+        const std::vector<unsigned char> reloaded = Gfxf::loadGfxFromFile(savedPath.string());
+        std::filesystem::remove(savedPath);
+        check(reloaded == gfx, "a GFX packed into a GFXF should extract back unchanged");
+    }
+
+    void testGfxfSaveFromStoredGfx() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("saved.gfxf");
+        Gfxf& gfxf = Gfxf::getInstance();
+        gfxf.setGfxData(Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfx"));
+
+        check(gfxf.canSave(), "Save Gfxf should be enabled once GFX data is stored");
+        gfxf.exportGfxfToGfxfFile(savedPath.string());
+        const std::vector<unsigned char> reloaded = Gfxf::loadGfxFromFile(savedPath.string());
+        std::filesystem::remove(savedPath);
+        gfxf.setGfxData({});
+        check(!gfxf.saving, "Save Gfxf should clear the saving flag when it finishes");
+        check(reloaded == readGfxfTestBytes("tests/resources/polarbear005.gfx"),
+            "Save Gfxf should write the stored GFX into the GFXF");
     }
 
     void testWaypointConnectivityMapGeneration() {
@@ -1622,6 +1707,11 @@ void runDomainTests() {
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
     run("CRMD binary fixture loading", testCrmdFixtureLoading);
     run("CRMD save round trip", testCrmdSaveRoundTrip);
+    run("GFXF load extracts GFX", testGfxfLoadExtractsGfx);
+    run("GFX load reads raw GFX", testGfxLoadReadsRawGfx);
+    run("GFXF rejects invalid containers", testGfxfRejectsInvalidContainers);
+    run("GFX pack round trip", testGfxPackRoundTrip);
+    run("GFXF save from stored GFX", testGfxfSaveFromStoredGfx);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);
@@ -1638,4 +1728,5 @@ void runDomainTests() {
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
     run("Clear and New Project file menu options", testClearAndNewProjectOptions);
+    run("GFXF save matches vanilla GFXF", testGfxfSaveMatchesVanillaGfxf);
 }
