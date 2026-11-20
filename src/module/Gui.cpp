@@ -67,7 +67,7 @@ void Gui::drawGui() {
         }
         const Gfxf& gfxf = Gfxf::getInstance();
         if (gfxf.gfxfLoaded && !gfxf.loadedFile.empty()) {
-            const std::string loadedGfxfText = "Loaded GFXF: " + fileNameFromPath(gfxf.loadedFile);
+            const std::string loadedGfxfText = "Loaded Gfxf: " + fileNameFromPath(gfxf.loadedFile);
             imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, loadedGfxfText.c_str(), imguiRGBA(255, 255, 255, 128));
             resourceTextY -= 20;
         }

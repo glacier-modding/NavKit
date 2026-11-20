@@ -35,6 +35,7 @@
 #include <wx/stattext.h>
 #include <wx/utils.h>
 
+#include <navkit-rpkg-lib.h>
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
@@ -356,6 +357,10 @@ void Gfxf::loadGfxfFromFile(const std::string& fileName) {
         return;
     }
     startLoad(fileName);
+}
+void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
+    // TODO: Call this with the right params
+    // pack_gfx_to_gfxf(*gfx_data, gfx_data_len, fileName, Logger::rustLogCallback);
 }
 
 void Gfxf::buildGfx() {

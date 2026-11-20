@@ -1,5 +1,5 @@
-if (NOT NAVKIT_RPKG_LIB_VERSION STREQUAL "v1.6.0")
-    message(FATAL_ERROR "Only v1.6.0 SHA-256 values are configured; update the release hashes in src/navkit-rpkg-lib.cmake before selecting another version.")
+if (NOT NAVKIT_RPKG_LIB_VERSION STREQUAL "v1.7.0")
+    message(FATAL_ERROR "Only v1.7.0 SHA-256 values are configured; update the release hashes in src/navkit-rpkg-lib.cmake before selecting another version.")
 endif ()
 
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" NAVKIT_RPKG_LIB_PROCESSOR)
@@ -58,28 +58,28 @@ foreach (config Debug Release)
     if (NAVKIT_RPKG_LIB_PLATFORM STREQUAL "linux")
         if (NAVKIT_RPKG_LIB_ARCH STREQUAL "aarch64")
             if (config STREQUAL "Debug")
-                set(sha256 708c1371867dfbc1f8a79b2819385b6c63925bfcc487173eb667dd9f0b9ef048)
+                set(sha256 64e4dbafdadfc06f4e40e127574e5ef506b1236df65ac4b69bf5853c59c0aa6d)
             else ()
-                set(sha256 cc3ce7f5cea6a002f02f2c1536be26c3fc3ba5b4be718192e8189bba0deb3bb6)
+                set(sha256 e80d9808ea0b3a0aec5ae15a1e5503de0146e23c0987b7c3c623faff87b5fdc6)
             endif ()
         else ()
             if (config STREQUAL "Debug")
-                set(sha256 7400af3bd40c3a04d338b838e73b7cf147162790a226aa4f2d2c04782053377e)
+                set(sha256 6f66849702a21da64d21219cc887b8de29af8cae8edeebc4bda92028dc2f990b)
             else ()
-                set(sha256 f8168670ccff63a5b32151ae99ecbeecce29bf9cad6a5e0c8688b9fb093cf78a)
+                set(sha256 a26bf0b625a1fd357e8c3d3a6f1a7de5674722c83e4a8d0ecb01f779e67ff215)
             endif ()
         endif ()
     elseif (NAVKIT_RPKG_LIB_PLATFORM STREQUAL "macos")
         if (config STREQUAL "Debug")
-            set(sha256 aa7f346486c6ae2543064d0ba2883d14aba52754bd0a1eeb8a47d03866cf4f38)
+            set(sha256 43386dfe3159885087dfcc7522817c2d3b8007d06b9b68925b20c7b61626d79d)
         else ()
-            set(sha256 f3a68473fef94db09ada3df2925e56218131bfafd801d54b191bfc837f1ef927)
+            set(sha256 83e51e7d03e8c7fac11ec3b83c2fcbe39b9319ef60526547974ff4856e623318)
         endif ()
     else ()
         if (config STREQUAL "Debug")
-            set(sha256 7411700992539183a2ffe52c3050377488870d440a54c60e9ff25d590e0881b9)
+            set(sha256 a713bd2cfaf13d94bf7aaf474658679d2ce805e08635ca29389ae58cf58e7087)
         else ()
-            set(sha256 65a1776133d347925d800a25cafeb9b5d83b3fe48622b1201d6a0942324e0845)
+            set(sha256 79a467dcb86a12acc5714d31c420ad97be6be59f13ffe0fab8ec45aa593e41e3)
         endif ()
     endif ()
 
@@ -158,8 +158,7 @@ if (NAVKIT_RPKG_LIB_PLATFORM STREQUAL "macos")
     add_custom_target(navkit-rpkg-lib-fixup DEPENDS ${NAVKIT_RPKG_LIB_FIXED_FILES})
 endif ()
 
-add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL
-        include/navkit-rpkg-lib/navkit-rpkg-lib.h)
+add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL)
 set_target_properties(navkit-rpkg-lib PROPERTIES
         IMPORTED_CONFIGURATIONS "DEBUG;RELEASE"
         IMPORTED_LOCATION_DEBUG "${NAVKIT_RPKG_LIB_LOCATION_Debug}"
@@ -167,6 +166,7 @@ set_target_properties(navkit-rpkg-lib PROPERTIES
         MAP_IMPORTED_CONFIG_NOCONFIG Release
         MAP_IMPORTED_CONFIG_MINSIZEREL Release
         MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+        INTERFACE_INCLUDE_DIRECTORIES "${NAVKIT_RPKG_LIB_DOWNLOAD_DIR}/$<IF:$<CONFIG:Debug>,Debug,Release>"
 )
 if (NAVKIT_RPKG_LIB_PLATFORM STREQUAL "windows")
     set_target_properties(navkit-rpkg-lib PROPERTIES

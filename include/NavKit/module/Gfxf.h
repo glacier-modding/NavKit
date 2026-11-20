@@ -60,6 +60,7 @@ public:
     void handleOpenGfxfClicked();
 
     void loadGfxfFromFile(const std::string& fileName);
+    void exportGfxfToGfxfFile(const std::string& fileName);
 
     void showExtractGfxfDialog();
     void updateDialogControls(wxDialog* dialog);

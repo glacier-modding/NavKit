@@ -6,8 +6,8 @@
 
 #include <cpptrace/from_current.hpp>
 
+#include <navkit-rpkg-lib.h>
 #include "../../include/QuickDigest/quickdigest5.hpp"
-#include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Gfxf.h"

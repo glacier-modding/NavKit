@@ -32,12 +32,12 @@
 #include <wx/checkbox.h>
 #include <wx/radiobut.h>
 #include <wx/sizer.h>
+#include <navkit-rpkg-lib.h>
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
-#include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 SceneMesh::SceneMesh() :
