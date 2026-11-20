@@ -212,9 +212,10 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
+    setMenuItemEnabled(IDM_FILE_NEW_PROJECT, !crmd.building);
     setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmd.saving && !crmd.building);
-    setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmd.saving);
-    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmd.saving);
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmd.saving && !crmd.building);
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmd.saving && !crmd.building);
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF, gfxf.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF_FROM_RPKG, Rpkg::canExtract() && gfxf.canLoad() && hasGfxfResources);
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);

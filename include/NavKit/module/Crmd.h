@@ -46,7 +46,6 @@ public:
     void setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name);
     void loadSettings();
     void saveSettings() const;
-    void resetDefaults();
     void showCrmdSettingsDialog();
 
     std::optional<std::jthread> backgroundWorker;
@@ -62,14 +61,13 @@ public:
     static std::mutex crmdHashIoiStringMapMutex;
     static wxDialog* hCrmdDialog;
     static wxDialog* hCrmdSettingsDialog;
-    CrowdMapBuilder::CostSettings costSettings;
+    bool snapHeightsToGlb;
 
 private:
     void rebuildRenderGeometry();
     void saveCrmdAndReport(const std::string& fileName);
     void buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
-        const std::vector<CrowdMapBuilder::NavmeshPolygon>& navmeshPolygons,
-        const std::vector<glm::dvec3>& groundTriangles, const CrowdMapBuilder::CostSettings& costSettings);
+        const std::vector<glm::dvec3>& navmeshTriangles, const std::vector<glm::dvec3>& glbTriangles);
     static char* openLoadCrmdFileDialog();
     static char* openSaveCrmdFileDialog();
     std::string loadCrmdName;

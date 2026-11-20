@@ -1,13 +1,12 @@
 #include "../../include/NavKit/util/CrowdMapBuilder.h"
 #include "../../include/NavKit/model/Json.h"
+#include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <numbers>
-#include <numeric>
 #include <optional>
-#include <queue>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -16,45 +15,98 @@ namespace {
     using glm::dmat3;
     using glm::dvec2;
     using glm::dvec3;
+    using glm::vec2;
 
-    constexpr double infinity = std::numeric_limits<double>::infinity();
+    constexpr float unreachable = std::numeric_limits<float>::max();
     constexpr double uprightTolerance = 1e-3;
-    constexpr double layerMatch = 1.0;
-    constexpr double navmeshBucketSize = 4.0;
     constexpr double groundBucketSize = 2.0;
     constexpr double groundRegionMargin = 1.0;
-    constexpr double groundSearchBelow = 0.5;
-    constexpr double groundSearchAbove = 0.25;
+    constexpr double groundProbeDepth = 2.0;
+    constexpr double groundEdgeTolerance = 0.05;
+    constexpr double exclusionRetryDrop = 0.1;
     constexpr double barycentricTolerance = 1e-6;
-    constexpr double straightStep = 1.0;
-    constexpr double maxNormalisedCost = 65534.0;
-    constexpr double minHeightScale = 1e-5;
-    constexpr int maxHeightOffset = 32767;
-    constexpr std::array<std::array<int, 2>, 4> cellCorners = {{{0, 0}, {1, 0}, {0, 1}, {1, 1}}};
-    constexpr std::array<std::array<int, 2>, 8> neighbours = {
-        {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
-    constexpr std::array<std::array<std::array<int, 2>, 2>, 4> pinchAxes = {
-        {{{{1, 0}, {-1, 0}}}, {{{0, 1}, {0, -1}}}, {{{1, 1}, {-1, -1}}}, {{{-1, 1}, {1, -1}}}}};
+    constexpr double heightSnapAbove = 0.25;
+    constexpr double heightSnapBelow = 0.5;
+    constexpr float maxCellSlope = 1.25f;
+    constexpr float straightStep = 1.0f;
+    constexpr float diagonalStep = 1.7f;
+    constexpr float blockedNeighbourPenalty = 0.24f;
+    constexpr float pinchPenalty = 1.0f;
+    constexpr float minHeightSpan = 1.0f;
+    constexpr float heightHalfRange = 32767.5f;
+    constexpr float costHalfRange = 32767.0f;
+    constexpr float twoPi = 6.2831855f;
+    constexpr int directionCount = 120;
+    constexpr double splineSampleStep = 0.1;
+    constexpr uint32_t initialRandomSeed = 0;
+    constexpr uint32_t randomMultiplier = 0x10dcd;
+    constexpr uint32_t tieBreakChances = 7;
+    constexpr uint32_t tieBreakTakes = 5;
 
-    double roundToFloat(const double value) {
-        return static_cast<float>(value);
-    }
+    struct NeighbourOffset {
+        int dx;
+        int dy;
+        bool diagonal;
+        vec2 awayFromBlocked;
+    };
+
+    constexpr std::array<NeighbourOffset, 8> neighbourOffsets = {{
+        {-1, -1, true, {0, 0}},
+        {0, -1, false, {0, 1}},
+        {1, -1, true, {0, 0}},
+        {-1, 0, false, {1, 0}},
+        {1, 0, false, {-1, 0}},
+        {-1, 1, true, {0, 0}},
+        {0, 1, false, {0, -1}},
+        {1, 1, true, {0, 0}},
+    }};
 
     dvec3 toDvec3(const Json::Vec3& value) {
         return {value.x, value.y, value.z};
     }
 
-    std::vector<std::array<int, 2>> directionStencil() {
-        std::vector<std::array<int, 2>> stencil;
-        for (int dx = -2; dx <= 2; ++dx) {
-            for (int dy = -2; dy <= 2; ++dy) {
-                if ((dx != 0 || dy != 0) && std::gcd(dx, dy) == 1) {
-                    stencil.push_back({dx, dy});
-                }
+    const std::array<vec2, directionCount + 1>& unitCircleSplits() {
+        static const std::array<vec2, directionCount + 1> splits = [] {
+            std::array<vec2, directionCount + 1> table{};
+            for (int k = 0; k < directionCount; ++k) {
+                const double angle = 2.0 * std::numbers::pi * k / directionCount;
+                table[k] = vec2(static_cast<float>(std::cos(angle)), static_cast<float>(std::sin(angle)));
             }
-        }
-        return stencil;
+            return table;
+        }();
+        return splits;
     }
+
+    vec2 directionVector(const uint8_t direction) {
+        return unitCircleSplits()[std::min<int>(direction & 0x7F, directionCount)];
+    }
+
+    uint8_t quantiseDirection(const vec2 vector) {
+        if (vector.x == 0.0f && vector.y == 0.0f) {
+            return CrowdMapBuilder::noDirection;
+        }
+        float angle = std::atan2(vector.y, vector.x);
+        while (angle < 0.0f) {
+            angle += twoPi;
+        }
+        while (angle >= twoPi) {
+            angle -= twoPi;
+        }
+        return static_cast<uint8_t>(
+            static_cast<uint32_t>(static_cast<int>(angle * directionCount / twoPi + 0.5f)) % directionCount);
+    }
+
+    class FlowRandom {
+    public:
+        uint32_t next() {
+            const uint32_t first = seed * randomMultiplier + 1;
+            seed = first * randomMultiplier + 1;
+            return (seed & 0xFFFF0000u) | (first >> 16);
+        }
+
+    private:
+        uint32_t seed = initialRandomSeed;
+    };
 
     template <typename Point> bool pointInPolygon(const std::vector<Point>& polygon, const double x, const double y) {
         bool inside = false;
@@ -66,17 +118,6 @@ namespace {
             }
         }
         return inside;
-    }
-
-    double planeHeight(const CrowdMapBuilder::NavmeshPolygon& polygon, const double x, const double y) {
-        const dvec3& a = polygon[0];
-        for (size_t i = 1; i + 1 < polygon.size(); ++i) {
-            const dvec3 normal = glm::cross(polygon[i] - a, polygon[i + 1] - a);
-            if (std::abs(normal.z) > 1e-6) {
-                return a.z - (normal.x * (x - a.x) + normal.y * (y - a.y)) / normal.z;
-            }
-        }
-        return a.z;
     }
 
     class BucketIndex {
@@ -110,41 +151,6 @@ namespace {
         std::unordered_map<int64_t, std::vector<int>> buckets;
     };
 
-    class NavmeshSurface {
-    public:
-        explicit NavmeshSurface(const std::vector<CrowdMapBuilder::NavmeshPolygon>& allPolygons) :
-            buckets(navmeshBucketSize) {
-            for (const auto& polygon : allPolygons) {
-                if (polygon.size() < 3) {
-                    continue;
-                }
-                double minX = infinity, minY = infinity, maxX = -infinity, maxY = -infinity;
-                for (const dvec3& point : polygon) {
-                    minX = std::min(minX, point.x);
-                    minY = std::min(minY, point.y);
-                    maxX = std::max(maxX, point.x);
-                    maxY = std::max(maxY, point.y);
-                }
-                buckets.add(static_cast<int>(polygons.size()), minX, minY, maxX, maxY);
-                polygons.push_back(&polygon);
-            }
-        }
-
-        std::vector<double> heights(const double x, const double y) const {
-            std::vector<double> result;
-            for (const int index : buckets.at(x, y)) {
-                if (pointInPolygon(*polygons[index], x, y)) {
-                    result.push_back(planeHeight(*polygons[index], x, y));
-                }
-            }
-            return result;
-        }
-
-    private:
-        std::vector<const CrowdMapBuilder::NavmeshPolygon*> polygons;
-        BucketIndex buckets;
-    };
-
     class GroundSurface {
     public:
         explicit GroundSurface(const std::vector<dvec3>& triangles) : triangles(triangles), buckets(groundBucketSize) {
@@ -157,8 +163,10 @@ namespace {
             }
         }
 
-        std::vector<double> heights(const double x, const double y) const {
-            std::vector<double> result;
+        /// The first surface a ray cast straight down from @p top meets before @p bottom.
+        std::optional<double> firstHitBelow(
+            const double x, const double y, const double top, const double bottom) const {
+            std::optional<double> highest;
             for (const int index : buckets.at(x, y)) {
                 const dvec3& a = triangles[index];
                 const dvec3& b = triangles[index + 1];
@@ -170,19 +178,21 @@ namespace {
                 const double wa = ((b.y - c.y) * (x - c.x) + (c.x - b.x) * (y - c.y)) / denominator;
                 const double wb = ((c.y - a.y) * (x - c.x) + (a.x - c.x) * (y - c.y)) / denominator;
                 const double wc = 1.0 - wa - wb;
-                if (wa >= -barycentricTolerance && wb >= -barycentricTolerance && wc >= -barycentricTolerance) {
-                    result.push_back(wa * a.z + wb * b.z + wc * c.z);
+                if (wa < -barycentricTolerance || wb < -barycentricTolerance || wc < -barycentricTolerance) {
+                    continue;
+                }
+                const double z = wa * a.z + wb * b.z + wc * c.z;
+                if (z <= top && z >= bottom && (!highest || z > *highest)) {
+                    highest = z;
                 }
             }
-            return result;
+            return highest;
         }
 
     private:
         const std::vector<dvec3>& triangles;
         BucketIndex buckets;
     };
-
-    using Volume = std::function<bool(const dvec3&)>;
 
     dmat3 quaternionMatrix(const Json::Rotation& q) {
         const double x = q.x, y = q.y, z = q.z, w = q.w;
@@ -222,13 +232,25 @@ namespace {
         return {toDvec3(entity.position), quaternionMatrix(entity.rotation), toDvec3(entity.scale.data) / 2.0};
     }
 
+    struct Volume {
+        std::function<bool(const dvec3&)> contains;
+        dvec3 origin;
+
+        bool containsBoth(const dvec3& a, const dvec3& b) const {
+            return contains(a) && contains(b);
+        }
+    };
+
     Volume boxVolume(const Json::Entity& entity) {
-        return [box = boxFromEntity(entity)](const dvec3& point) { return box.contains(point); };
+        const OrientedBox box = boxFromEntity(entity);
+        return {[box](const dvec3& point) { return box.contains(point); }, box.position};
     }
 
     Volume sphereVolume(const Json::VolumeSphere& sphere) {
-        return [center = toDvec3(sphere.position), radius = static_cast<double>(sphere.radius.data)](
-                   const dvec3& point) { return glm::distance(point, center) <= radius; };
+        const dvec3 center = toDvec3(sphere.position);
+        return {[center, radius = static_cast<double>(sphere.radius.data)](
+                    const dvec3& point) { return glm::distance(point, center) <= radius; },
+            center};
     }
 
     Volume shapeVolume(const Json::VolumeShape& shape) {
@@ -240,18 +262,21 @@ namespace {
         const double extrusion = shape.flipSurfaceNormal ? -shape.extrusionHeight : shape.extrusionHeight;
         const double low = std::min(0.0, extrusion);
         const double high = std::max(0.0, extrusion);
-        return [frame, outline = std::move(outline), low, high](const dvec3& point) {
-            const dvec3 local = frame.local(point);
-            return outline.size() >= 3 && low <= local.z && local.z <= high &&
-                pointInPolygon(outline, local.x, local.y);
-        };
+        return {[frame, outline = std::move(outline), low, high](const dvec3& point) {
+                    const dvec3 local = frame.local(point);
+                    return outline.size() >= 3 && low <= local.z && local.z <= high &&
+                        pointInPolygon(outline, local.x, local.y);
+                },
+            frame.position};
     }
 
-    struct Volumes {
-        std::vector<Volume> exclusion;
-        std::vector<Volume> inclusion;
-        std::vector<Volume> panicOnly;
-    };
+    bool anyContains(const std::vector<Volume>& volumes, const dvec3& point) {
+        return std::ranges::any_of(volumes, [&](const Volume& volume) { return volume.contains(point); });
+    }
+
+    bool anyContainsBoth(const std::vector<Volume>& volumes, const dvec3& a, const dvec3& b) {
+        return std::ranges::any_of(volumes, [&](const Volume& volume) { return volume.containsBoth(a, b); });
+    }
 
     template <typename T> const T& resolveVolume(
         const Json::Crowd& crowd, const std::vector<T>& volumes, const size_t index, const char* listName) {
@@ -262,29 +287,39 @@ namespace {
         return volumes[index];
     }
 
-    Volumes crowdVolumes(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& scene) {
-        Volumes volumes;
-        const auto addBoxes = [&](std::vector<Volume>& target, const std::vector<size_t>& indices) {
+    class VolumeResolver {
+    public:
+        VolumeResolver(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& scene) :
+            crowd(crowd), scene(scene) {}
+
+        std::vector<Volume> boxes(const std::vector<size_t>& indices) const {
+            std::vector<Volume> volumes;
             for (const size_t index : indices) {
-                target.push_back(boxVolume(resolveVolume(crowd, scene.boxes, index, "volumeBoxes")));
+                volumes.push_back(boxVolume(resolveVolume(crowd, scene.boxes, index, "volumeBoxes")));
             }
-        };
-        const auto addShapes = [&](std::vector<Volume>& target, const std::vector<size_t>& indices) {
-            for (const size_t index : indices) {
-                target.push_back(shapeVolume(resolveVolume(crowd, scene.shapes, index, "volumeShapes")));
-            }
-        };
-        addBoxes(volumes.exclusion, crowd.exclusionBoxIndices);
-        for (const size_t index : crowd.exclusionSphereIndices) {
-            volumes.exclusion.push_back(sphereVolume(resolveVolume(crowd, scene.spheres, index, "volumeSpheres")));
+            return volumes;
         }
-        addShapes(volumes.exclusion, crowd.exclusionShapeIndices);
-        addBoxes(volumes.inclusion, crowd.inclusionBoxIndices);
-        addShapes(volumes.inclusion, crowd.inclusionShapeIndices);
-        addBoxes(volumes.panicOnly, crowd.panicOnlyBoxIndices);
-        addShapes(volumes.panicOnly, crowd.panicOnlyShapeIndices);
-        return volumes;
-    }
+
+        std::vector<Volume> spheres(const std::vector<size_t>& indices) const {
+            std::vector<Volume> volumes;
+            for (const size_t index : indices) {
+                volumes.push_back(sphereVolume(resolveVolume(crowd, scene.spheres, index, "volumeSpheres")));
+            }
+            return volumes;
+        }
+
+        std::vector<Volume> shapes(const std::vector<size_t>& indices) const {
+            std::vector<Volume> volumes;
+            for (const size_t index : indices) {
+                volumes.push_back(shapeVolume(resolveVolume(crowd, scene.shapes, index, "volumeShapes")));
+            }
+            return volumes;
+        }
+
+    private:
+        const Json::Crowd& crowd;
+        const CrowdMapBuilder::SceneVolumes& scene;
+    };
 
     struct CrowdFrame {
         dvec3 center;
@@ -292,8 +327,39 @@ namespace {
         dvec2 yAxis;
         dvec3 size;
         double cell;
-        uint32_t width;
-        uint32_t height;
+        int width;
+        int height;
+
+        dvec3 world(const double localX, const double localY, const double heightOffset = 0.0) const {
+            const dvec2 xy = dvec2(center) + xAxis * (localX - size.x / 2) + yAxis * (localY - size.y / 2);
+            return {xy, center.z + heightOffset};
+        }
+
+        dvec3 gridPoint(const int px, const int py, const double heightOffset = 0.0) const {
+            return world(px * cell, py * cell, heightOffset);
+        }
+
+        dvec3 local(const dvec3& point) const {
+            const dvec2 offset = dvec2(point) - dvec2(center);
+            return {glm::dot(xAxis, offset) + size.x / 2, glm::dot(yAxis, offset) + size.y / 2, point.z - center.z};
+        }
+
+        vec2 localDirection(const dvec3& direction) const {
+            return vec2(static_cast<float>(glm::dot(xAxis, dvec2(direction))),
+                static_cast<float>(glm::dot(yAxis, dvec2(direction))));
+        }
+
+        size_t cellIndex(const int x, const int y) const {
+            return static_cast<size_t>(y) * width + x;
+        }
+
+        size_t pointIndex(const int px, const int py) const {
+            return static_cast<size_t>(py) * (width + 1) + px;
+        }
+
+        bool inGrid(const int x, const int y) const {
+            return x >= 0 && x < width && y >= 0 && y < height;
+        }
     };
 
     CrowdFrame crowdFrame(const Json::Crowd& crowd) {
@@ -308,8 +374,8 @@ namespace {
         if (glm::length(xAxis) == 0.0 || glm::length(yAxis) == 0.0) {
             throw std::runtime_error("Crowd " + crowd.name + " has a degenerate transform.");
         }
-        const auto width = static_cast<uint32_t>(std::max(0.0f, std::floor(crowd.globalSize.x / crowd.cellSize)));
-        const auto height = static_cast<uint32_t>(std::max(0.0f, std::floor(crowd.globalSize.y / crowd.cellSize)));
+        const int width = std::max(0, static_cast<int>(crowd.globalSize.x / crowd.cellSize));
+        const int height = std::max(0, static_cast<int>(crowd.globalSize.y / crowd.cellSize));
         if (width == 0 || height == 0) {
             throw std::runtime_error("Crowd " + crowd.name + " is smaller than one grid cell.");
         }
@@ -317,377 +383,104 @@ namespace {
             crowd.cellSize, width, height};
     }
 
-    std::optional<double> nearestLayer(const std::vector<double>& layers, const double z) {
-        std::optional<double> nearest;
-        for (const double layer : layers) {
-            if (std::abs(layer - z) <= layerMatch && (!nearest || std::abs(layer - z) < std::abs(*nearest - z))) {
-                nearest = layer;
-            }
+    struct FlowBox {
+        Volume volume;
+        vec2 direction;
+    };
+
+    std::vector<FlowBox> flowBoxes(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& scene,
+        const CrowdFrame& frame, const std::vector<size_t>& indices) {
+        std::vector<FlowBox> boxes;
+        for (const size_t index : indices) {
+            const Json::Entity& entity = resolveVolume(crowd, scene.boxes, index, "volumeBoxes");
+            boxes.push_back({boxVolume(entity), frame.localDirection(quaternionMatrix(entity.rotation)[0])});
         }
-        return nearest;
+        return boxes;
     }
 
-    class Grid {
+    struct GroupVolumes {
+        Volume box;
+        std::vector<Volume> exclusion;
+        std::vector<Volume> seedPoints;
+    };
+
+    struct TeleportVolumes {
+        std::optional<Volume> enterZone;
+        std::optional<Volume> exitZone;
+        bool leavesCrowd;
+    };
+
+    /// ZCrowdMap::FindGeomPos: the ground under a grid point, skipping hits inside exclusion volumes.
+    class GroundFinder {
     public:
-        Grid(const CrowdFrame& frame, const NavmeshSurface& navmesh, const GroundSurface& ground,
-            const Volumes& volumes, const double generatorOffset, const CrowdMapBuilder::CostSettings& costSettings,
-            CrowdMapBuilder::Report& report) :
-            frame(frame), width(frame.width), height(frame.height), count(size_t{frame.width} * frame.height),
-            navmesh(navmesh), volumes(volumes), costSettings(costSettings) {
-            samples = {dvec2(generatorOffset, generatorOffset), dvec2(1 - generatorOffset, generatorOffset),
-                dvec2(generatorOffset, 1 - generatorOffset), dvec2(1 - generatorOffset, 1 - generatorOffset)};
-            pointLayers.reserve(size_t{width + 1} * (height + 1));
-            for (int py = 0; py <= height; ++py) {
-                for (int px = 0; px <= width; ++px) {
-                    pointLayers.push_back(layers(worldXy(px, py)));
-                }
+        GroundFinder(const Json::Crowd& crowd, const CrowdFrame& frame, const GroundSurface& ground,
+            const std::optional<GroundSurface>& heights, const std::vector<Volume>& exclusion) :
+            frame(frame), ground(ground), heights(heights), exclusion(exclusion), probeLift(crowd.generatorOffset) {
+            const double offset = (1.0 - crowd.navMeshShrink) * 0.5 * frame.cell;
+            sampleOffsets = {dvec2(0, 0)};
+            if (crowd.navMeshShrink < 1.0f) {
+                sampleOffsets.insert(sampleOffsets.end(),
+                    {dvec2(-offset, -offset), dvec2(offset, -offset), dvec2(offset, offset), dvec2(-offset, offset)});
             }
-            cellGround.resize(count);
-            walkable.resize(count);
-            for (int y = 0; y < height; ++y) {
-                for (int x = 0; x < width; ++x) {
-                    const auto [ground, isWalkable] = cellSurface(x, y);
-                    cellGround[index(x, y)] = ground;
-                    walkable[index(x, y)] = isWalkable;
-                }
-            }
-            entryPenalty.resize(count);
-            for (int y = 0; y < height; ++y) {
-                for (int x = 0; x < width; ++x) {
-                    entryPenalty[index(x, y)] = roundToFloat(computeEntryPenalty(x, y));
-                }
-            }
-            computePointHeights(ground, report);
         }
 
-        std::vector<size_t> cellsIn(const Volume& volume) const {
-            std::vector<size_t> cells;
-            for (int y = 0; y < height; ++y) {
-                for (int x = 0; x < width; ++x) {
-                    const size_t i = index(x, y);
-                    if (!walkable[i]) {
-                        continue;
-                    }
-                    const bool allCornersInside = std::ranges::all_of(cellCorners, [&](const auto& corner) {
-                        const dvec2 point = worldXy(x + corner[0], y + corner[1]);
-                        return volume(dvec3(point, *cellGround[i]));
-                    });
-                    if (allCornersInside) {
-                        cells.push_back(i);
+        std::optional<dvec3> find(const int px, const int py) const {
+            std::vector<dvec2> starts;
+            for (const dvec2& offset : sampleOffsets) {
+                starts.emplace_back(frame.world(px * frame.cell + offset.x, py * frame.cell + offset.y));
+            }
+            double top = frame.center.z + frame.size.z / 2;
+            while (true) {
+                std::optional<dvec3> firstHit;
+                for (const dvec2& start : starts) {
+                    if (const std::optional<double> z =
+                            ground.firstHitBelow(start.x, start.y, top, top - frame.size.z)) {
+                        firstHit = dvec3(start, *z);
+                        break;
                     }
                 }
-            }
-            return cells;
-        }
-
-        std::vector<double> costField(const std::vector<size_t>& targets) const {
-            return dijkstra(
-                targets,
-                [&](const int x, const int y, const int dx, const int dy,
-                    const double distance) -> std::optional<double> {
-                    if (std::abs(dx) + std::abs(dy) == 2 &&
-                        !(walkable[index(x + dx, y)] && walkable[index(x, y + dy)])) {
-                        return std::nullopt;
-                    }
-                    const double step = dx != 0 && dy != 0 ? costSettings.diagonalStep : straightStep;
-                    return roundToFloat(roundToFloat(distance + step) + entryPenalty[index(x + dx, y + dy)]);
-                },
-                neighbourOffsets());
-        }
-
-        std::vector<double> directionField(const std::vector<size_t>& targets) const {
-            static const std::vector<std::array<int, 2>> stencil = directionStencil();
-            return dijkstra(
-                targets,
-                [&](const int x, const int y, const int dx, const int dy,
-                    const double distance) -> std::optional<double> {
-                    if ((dx != 0 && dy != 0 || std::abs(dx) > 1 || std::abs(dy) > 1) && !clearLine(x, y, dx, dy)) {
-                        return std::nullopt;
-                    }
-                    return distance + std::hypot(dx, dy) +
-                        costSettings.directionWallPenalty * entryPenalty[index(x + dx, y + dy)];
-                },
-                stencil);
-        }
-
-        uint8_t downhillDirection(const std::vector<double>& distance, const size_t i) const {
-            if (distance[i] == 0.0 || distance[i] == infinity) {
-                return CrowdMapBuilder::noDirection;
-            }
-            const int x = static_cast<int>(i % width);
-            const int y = static_cast<int>(i / width);
-            const auto slope = [&](const int dx, const int dy) {
-                const std::optional<double> ahead = distanceAt(distance, x + dx, y + dy);
-                const std::optional<double> behind = distanceAt(distance, x - dx, y - dy);
-                if (ahead && behind) {
-                    return (*ahead - *behind) / 2.0;
+                if (!firstHit) {
+                    return std::nullopt;
                 }
-                if (ahead) {
-                    return *ahead - distance[i];
+                const double probeTop = firstHit->z + probeLift;
+                const std::optional<double> probeZ =
+                    ground.firstHitBelow(firstHit->x, firstHit->y, probeTop, probeTop - probeLift - groundProbeDepth);
+                if (!probeZ) {
+                    return std::nullopt;
                 }
-                if (behind) {
-                    return distance[i] - *behind;
+                const dvec3 hit(firstHit->x, firstHit->y, *probeZ);
+                const dvec3 local = frame.local(hit);
+                if (local.x < -groundEdgeTolerance || local.y < -groundEdgeTolerance ||
+                    local.x > frame.size.x + groundEdgeTolerance || local.y > frame.size.y + groundEdgeTolerance ||
+                    local.z < -frame.size.z / 2 || local.z > frame.size.z / 2) {
+                    return std::nullopt;
                 }
-                return 0.0;
-            };
-            const double gradientX = slope(1, 0);
-            const double gradientY = slope(0, 1);
-            if (gradientX == 0.0 && gradientY == 0.0) {
-                return CrowdMapBuilder::noDirection;
+                if (!anyContains(exclusion, hit)) {
+                    return dvec3(hit.x, hit.y, snappedHeight(hit));
+                }
+                top = firstHit->z - exclusionRetryDrop;
             }
-            double degrees = std::atan2(-gradientY, -gradientX) * 180.0 / std::numbers::pi;
-            degrees = std::fmod(std::fmod(degrees, 360.0) + 360.0, 360.0);
-            return static_cast<uint8_t>(static_cast<int>(std::nearbyint(degrees / 3.0)) % 120);
         }
 
-        dvec2 worldXy(const double gridX, const double gridY) const {
-            const double localX = gridX * frame.cell - frame.size.x / 2;
-            const double localY = gridY * frame.cell - frame.size.y / 2;
-            return dvec2(frame.center) + frame.xAxis * localX + frame.yAxis * localY;
-        }
-
-        size_t index(const int x, const int y) const {
-            return static_cast<size_t>(y) * width + x;
-        }
-
-        bool touchesWalkable(const int px, const int py) const {
-            for (int cx = px - 1; cx <= px; ++cx) {
-                for (int cy = py - 1; cy <= py; ++cy) {
-                    if (inGrid(cx, cy) && walkable[index(cx, cy)]) {
-                        return true;
-                    }
-                }
+    private:
+        double snappedHeight(const dvec3& hit) const {
+            if (!heights) {
+                return hit.z;
             }
-            return false;
+            const std::optional<double> above = heights->firstHitBelow(hit.x, hit.y, hit.z + heightSnapAbove, hit.z);
+            const std::optional<double> below = heights->firstHitBelow(hit.x, hit.y, hit.z, hit.z - heightSnapBelow);
+            if (above && (!below || *above - hit.z < hit.z - *below)) {
+                return *above;
+            }
+            return below.value_or(hit.z);
         }
 
         const CrowdFrame& frame;
-        int width;
-        int height;
-        size_t count;
-        std::vector<bool> walkable;
-        std::vector<double> pointHeights;
-
-    private:
-        using StepCost = std::function<std::optional<double>(int, int, int, int, double)>;
-
-        static const std::vector<std::array<int, 2>>& neighbourOffsets() {
-            static const std::vector<std::array<int, 2>> offsets(neighbours.begin(), neighbours.end());
-            return offsets;
-        }
-
-        bool inGrid(const int x, const int y) const {
-            return x >= 0 && x < width && y >= 0 && y < height;
-        }
-
-        std::vector<double> layers(const dvec2& point) const {
-            std::vector<double> result;
-            for (const double z : navmesh.heights(point.x, point.y)) {
-                if (std::abs(z - frame.center.z) <= frame.size.z / 2) {
-                    result.push_back(z);
-                }
-            }
-            std::ranges::sort(result);
-            return result;
-        }
-
-        const std::vector<double>& pointLayersAt(const int px, const int py) const {
-            return pointLayers[static_cast<size_t>(py) * (width + 1) + px];
-        }
-
-        std::pair<std::optional<double>, bool> cellSurface(const int x, const int y) const {
-            std::array<std::vector<double>, 4> sampleLayers;
-            std::array<dvec2, 4> samplePoints;
-            for (size_t s = 0; s < samples.size(); ++s) {
-                samplePoints[s] = worldXy(x + samples[s].x, y + samples[s].y);
-                sampleLayers[s] = layers(samplePoints[s]);
-            }
-            std::vector<double> candidates;
-            for (const double first : sampleLayers[0]) {
-                double sum = 0;
-                bool allMatched = true;
-                for (const auto& layer : sampleLayers) {
-                    const std::optional<double> matched = nearestLayer(layer, first);
-                    allMatched = allMatched && matched.has_value();
-                    sum += matched.value_or(0.0);
-                }
-                if (allMatched) {
-                    candidates.push_back(sum / static_cast<double>(sampleLayers.size()));
-                }
-            }
-            if (candidates.empty()) {
-                return {std::nullopt, false};
-            }
-            std::ranges::stable_sort(candidates, {}, [&](const double z) { return std::abs(z - frame.center.z); });
-
-            using LayeredPoint = std::pair<dvec2, const std::vector<double>*>;
-            std::vector<LayeredPoint> corners;
-            for (const auto& corner : cellCorners) {
-                const int px = x + corner[0];
-                const int py = y + corner[1];
-                corners.emplace_back(worldXy(px, py), &pointLayersAt(px, py));
-            }
-            std::vector<LayeredPoint> cornersAndSamples = corners;
-            for (size_t s = 0; s < samples.size(); ++s) {
-                cornersAndSamples.emplace_back(samplePoints[s], &sampleLayers[s]);
-            }
-            const auto inside = [](const std::vector<Volume>& volumeList, const std::vector<LayeredPoint>& points,
-                                    const double z) {
-                return std::ranges::any_of(points, [&](const LayeredPoint& point) {
-                    const double pointZ = nearestLayer(*point.second, z).value_or(z);
-                    return std::ranges::any_of(
-                        volumeList, [&](const Volume& volume) { return volume(dvec3(point.first, pointZ)); });
-                });
-            };
-            const auto excluded = [&](const double z) { return inside(volumes.exclusion, corners, z); };
-            const auto included = [&](const double z) { return inside(volumes.inclusion, cornersAndSamples, z); };
-            const auto chosen =
-                std::ranges::find_if(candidates, [&](const double z) { return included(z) && !excluded(z); });
-            const double ground = chosen != candidates.end() ? *chosen : candidates.front();
-            return {ground, !excluded(ground)};
-        }
-
-        bool blockedInGrid(const int x, const int y) const {
-            return inGrid(x, y) && !walkable[index(x, y)];
-        }
-
-        double computeEntryPenalty(const int x, const int y) const {
-            int blocked = 0;
-            for (const auto& [dx, dy] : neighbours) {
-                blocked += blockedInGrid(x + dx, y + dy);
-            }
-            int pinches = 0;
-            for (const auto& [a, b] : pinchAxes) {
-                pinches += blockedInGrid(x + a[0], y + a[1]) && blockedInGrid(x + b[0], y + b[1]);
-            }
-            return costSettings.blockedNeighbourPenalty * blocked + costSettings.pinchPenalty * pinches;
-        }
-
-        void computePointHeights(const GroundSurface& ground, CrowdMapBuilder::Report& report) {
-            double totalGeometryOffset = 0;
-            pointHeights.reserve(size_t{width + 1} * (height + 1));
-            for (int py = 0; py <= height; ++py) {
-                for (int px = 0; px <= width; ++px) {
-                    std::vector<double> walkableGround;
-                    std::vector<double> anyGround;
-                    for (int cx = px - 1; cx <= px; ++cx) {
-                        for (int cy = py - 1; cy <= py; ++cy) {
-                            if (!inGrid(cx, cy) || !cellGround[index(cx, cy)]) {
-                                continue;
-                            }
-                            anyGround.push_back(*cellGround[index(cx, cy)]);
-                            if (walkable[index(cx, cy)]) {
-                                walkableGround.push_back(*cellGround[index(cx, cy)]);
-                            }
-                        }
-                    }
-                    const std::vector<double>& preferred = walkableGround.empty() ? anyGround : walkableGround;
-                    std::optional<double> reference;
-                    if (!preferred.empty()) {
-                        reference = std::accumulate(preferred.begin(), preferred.end(), 0.0) /
-                            static_cast<double>(preferred.size());
-                    }
-                    const std::vector<double>& pointLayer = pointLayersAt(px, py);
-                    double groundZ;
-                    if (!pointLayer.empty() && reference) {
-                        const double nearest = *std::ranges::min_element(
-                            pointLayer, {}, [&](const double z) { return std::abs(z - *reference); });
-                        groundZ = std::abs(nearest - *reference) <= layerMatch ? nearest : *reference;
-                    } else if (reference) {
-                        groundZ = *reference;
-                    } else if (!pointLayer.empty()) {
-                        groundZ = *std::ranges::min_element(
-                            pointLayer, {}, [&](const double z) { return std::abs(z - frame.center.z); });
-                    } else {
-                        groundZ = frame.center.z;
-                    }
-
-                    if (const std::optional<double> geometryZ = groundBelow(ground, worldXy(px, py), groundZ)) {
-                        totalGeometryOffset += *geometryZ - groundZ;
-                        groundZ = *geometryZ;
-                        ++report.gridPointsOnGeometry;
-                    } else {
-                        ++report.gridPointsOnNavmesh;
-                    }
-                    pointHeights.push_back(groundZ - frame.center.z);
-                }
-            }
-            if (report.gridPointsOnGeometry != 0) {
-                report.meanGeometryOffset = totalGeometryOffset / static_cast<double>(report.gridPointsOnGeometry);
-            }
-        }
-
-        static std::optional<double> groundBelow(
-            const GroundSurface& ground, const dvec2& point, const double navmeshZ) {
-            std::optional<double> nearest;
-            for (const double z : ground.heights(point.x, point.y)) {
-                if (z < navmeshZ - groundSearchBelow || z > navmeshZ + groundSearchAbove) {
-                    continue;
-                }
-                if (!nearest || std::abs(z - navmeshZ) < std::abs(*nearest - navmeshZ)) {
-                    nearest = z;
-                }
-            }
-            return nearest;
-        }
-
-        std::vector<double> dijkstra(const std::vector<size_t>& targets, const StepCost& stepCost,
-            const std::vector<std::array<int, 2>>& offsets) const {
-            std::vector<double> distance(count, infinity);
-            using Entry = std::pair<double, size_t>;
-            std::priority_queue<Entry, std::vector<Entry>, std::greater<>> queue;
-            for (const size_t target : targets) {
-                distance[target] = 0.0;
-                queue.emplace(0.0, target);
-            }
-            while (!queue.empty()) {
-                const auto [current, i] = queue.top();
-                queue.pop();
-                if (current > distance[i]) {
-                    continue;
-                }
-                const int x = static_cast<int>(i % width);
-                const int y = static_cast<int>(i / width);
-                for (const auto& [dx, dy] : offsets) {
-                    if (!inGrid(x + dx, y + dy) || !walkable[index(x + dx, y + dy)]) {
-                        continue;
-                    }
-                    const std::optional<double> candidate = stepCost(x, y, dx, dy, current);
-                    if (const size_t neighbour = index(x + dx, y + dy); candidate && *candidate < distance[neighbour]) {
-                        distance[neighbour] = *candidate;
-                        queue.emplace(*candidate, neighbour);
-                    }
-                }
-            }
-            return distance;
-        }
-
-        bool clearLine(const int x, const int y, const int dx, const int dy) const {
-            const int steps = 2 * std::max(std::abs(dx), std::abs(dy));
-            for (int step = 1; step <= steps; ++step) {
-                const auto gx = static_cast<int>(x + 0.5 + dx * static_cast<double>(step) / steps);
-                const auto gy = static_cast<int>(y + 0.5 + dy * static_cast<double>(step) / steps);
-                if (!inGrid(gx, gy) || !walkable[index(gx, gy)]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        std::optional<double> distanceAt(const std::vector<double>& distance, const int x, const int y) const {
-            if (!inGrid(x, y) || distance[index(x, y)] == infinity) {
-                return std::nullopt;
-            }
-            return distance[index(x, y)];
-        }
-
-        const NavmeshSurface& navmesh;
-        const Volumes& volumes;
-        const CrowdMapBuilder::CostSettings costSettings;
-        std::array<dvec2, 4> samples{};
-        std::vector<std::vector<double>> pointLayers;
-        std::vector<std::optional<double>> cellGround;
-        std::vector<double> entryPenalty;
+        const GroundSurface& ground;
+        const std::optional<GroundSurface>& heights;
+        const std::vector<Volume>& exclusion;
+        double probeLift;
+        std::vector<dvec2> sampleOffsets;
     };
 
     std::vector<uint8_t> paddedCells(const size_t count, const uint8_t fill) {
@@ -695,6 +488,303 @@ namespace {
         std::vector<uint8_t> cells(blocks * CrowdMapBuilder::cellsPerBlock, 0);
         std::fill_n(cells.begin(), count, fill);
         return cells;
+    }
+
+    /// ZCrowdMap::BuildFlow: Dijkstra from @p sources, with each cell pointing at the parent it was reached from.
+    class FlowBuilder {
+    public:
+        FlowBuilder(const CrowdFrame& frame, const std::vector<uint8_t>& cellFlags, const bool smoothen) :
+            frame(frame), cellFlags(cellFlags), smoothen(smoothen),
+            count(static_cast<size_t>(frame.width) * frame.height) {
+            entryPenalty.resize(count);
+            for (int y = 0; y < frame.height; ++y) {
+                for (int x = 0; x < frame.width; ++x) {
+                    entryPenalty[frame.cellIndex(x, y)] = computeEntryPenalty(x, y);
+                }
+            }
+        }
+
+        void build(const std::vector<size_t>& sources, std::vector<float>& costs, std::vector<uint8_t>& directions) {
+            directions.assign(count, CrowdMapBuilder::noDirection);
+            costs.assign(count, unreachable);
+            std::vector<uint8_t> state(count, unvisited);
+            std::vector<int64_t> parent(count, -1);
+            std::vector<size_t> candidates;
+
+            for (const size_t source : sources) {
+                state[source] = finished;
+                costs[source] = 0.0f;
+            }
+            for (const size_t source : sources) {
+                for (const NeighbourOffset& offset : neighbourOffsets) {
+                    const std::optional<size_t> target = reachableNeighbour(source, offset);
+                    if (!target || state[*target] == finished) {
+                        continue;
+                    }
+                    const float cost = costs[source] + stepCost(offset) + entryPenalty[*target];
+                    if (cost < costs[*target]) {
+                        costs[*target] = cost;
+                        parent[*target] = static_cast<int64_t>(source);
+                        insertCandidate(candidates, *target, cost, costs, state);
+                    }
+                }
+            }
+
+            while (!candidates.empty()) {
+                const size_t current = candidates.back();
+                candidates.pop_back();
+                state[current] = finished;
+                for (const size_t k : shuffledNeighbourOrder()) {
+                    const NeighbourOffset& offset = neighbourOffsets[k];
+                    const std::optional<size_t> target = reachableNeighbour(current, offset);
+                    if (!target) {
+                        continue;
+                    }
+                    const float cost = costs[current] + stepCost(offset) + entryPenalty[*target];
+                    if (cost < costs[*target]) {
+                        costs[*target] = cost;
+                        parent[*target] = static_cast<int64_t>(current);
+                        insertCandidate(candidates, *target, cost, costs, state);
+                    }
+                    if (cost == costs[*target] && random.next() % tieBreakChances < tieBreakTakes) {
+                        parent[*target] = static_cast<int64_t>(current);
+                    }
+                }
+            }
+
+            for (size_t i = 0; i < count; ++i) {
+                if (costs[i] > 0.0f && costs[i] < unreachable) {
+                    const auto from = static_cast<size_t>(parent[i]);
+                    const auto cell = static_cast<float>(frame.cell);
+                    directions[i] = quantiseDirection(vec2(
+                        cell * static_cast<float>(from % frame.width) - cell * static_cast<float>(i % frame.width),
+                        cell * static_cast<float>(from / frame.width) - cell * static_cast<float>(i / frame.width)));
+                }
+            }
+            if (smoothen) {
+                smoothDirections(costs, parent, directions);
+            }
+        }
+
+    private:
+        static constexpr uint8_t unvisited = 0;
+        static constexpr uint8_t candidate = 1;
+        static constexpr uint8_t finished = 2;
+
+        bool walkable(const int x, const int y) const {
+            return (cellFlags[frame.cellIndex(x, y)] & CrowdMapBuilder::cellFlagWalkable) != 0;
+        }
+
+        float computeEntryPenalty(const int x, const int y) const {
+            float penalty = 0.0f;
+            for (const NeighbourOffset& offset : neighbourOffsets) {
+                if (!frame.inGrid(x + offset.dx, y + offset.dy) || walkable(x + offset.dx, y + offset.dy)) {
+                    continue;
+                }
+                penalty += blockedNeighbourPenalty;
+                if (frame.inGrid(x - offset.dx, y - offset.dy) && !walkable(x - offset.dx, y - offset.dy)) {
+                    penalty += pinchPenalty;
+                }
+            }
+            return penalty;
+        }
+
+        float stepCost(const NeighbourOffset& offset) const {
+            return offset.diagonal ? diagonalStep : straightStep;
+        }
+
+        std::optional<size_t> reachableNeighbour(const size_t from, const NeighbourOffset& offset) const {
+            const int x = static_cast<int>(from % frame.width);
+            const int y = static_cast<int>(from / frame.width);
+            const int nx = x + offset.dx;
+            const int ny = y + offset.dy;
+            if (!frame.inGrid(nx, ny)) {
+                return std::nullopt;
+            }
+            if (offset.diagonal && !(walkable(x, ny) && walkable(nx, y))) {
+                return std::nullopt;
+            }
+            if (!walkable(nx, ny)) {
+                return std::nullopt;
+            }
+            return frame.cellIndex(nx, ny);
+        }
+
+        /// ZCrowdMap::InsertInCandidateList: kept sorted by descending cost, so the cheapest is at the back.
+        static void insertCandidate(std::vector<size_t>& candidates, const size_t cell, const float cost,
+            const std::vector<float>& costs, std::vector<uint8_t>& state) {
+            if (const auto existing = std::ranges::find(candidates, cell); existing != candidates.end()) {
+                candidates.erase(existing);
+            }
+            if (!candidates.empty() && costs[candidates.back()] < cost) {
+                const auto position =
+                    std::ranges::find_if(candidates, [&](const size_t other) { return !(cost < costs[other]); });
+                candidates.insert(position, cell);
+            } else {
+                candidates.push_back(cell);
+            }
+            state[cell] = candidate;
+        }
+
+        std::array<size_t, 8> shuffledNeighbourOrder() {
+            std::array<size_t, 8> remaining = {0, 1, 2, 3, 4, 5, 6, 7};
+            std::array<size_t, 8> order{};
+            size_t next = 0;
+            for (uint32_t last = 7; last >= 1; --last) {
+                const uint32_t pick = random.next() % (last + 1);
+                order[next++] = remaining[pick];
+                remaining[pick] = remaining[last];
+            }
+            order[next] = remaining[0];
+            return order;
+        }
+
+        void smoothDirections(const std::vector<float>& costs, const std::vector<int64_t>& parent,
+            std::vector<uint8_t>& directions) const {
+            for (size_t i = 0; i < count; ++i) {
+                if (!(costs[i] > 0.0f && costs[i] < unreachable)) {
+                    continue;
+                }
+                const int x = static_cast<int>(i % frame.width);
+                const int y = static_cast<int>(i / frame.width);
+                std::vector<vec2> blocked;
+                for (const NeighbourOffset& offset : neighbourOffsets) {
+                    if (frame.inGrid(x + offset.dx, y + offset.dy) &&
+                        costs[frame.cellIndex(x + offset.dx, y + offset.dy)] == unreachable &&
+                        offset.awayFromBlocked != vec2(0.0f)) {
+                        blocked.push_back(offset.awayFromBlocked);
+                    }
+                }
+                const vec2 own = directionVector(directions[i]);
+                vec2 sum = own;
+                for (const NeighbourOffset& offset : neighbourOffsets) {
+                    if (!frame.inGrid(x + offset.dx, y + offset.dy)) {
+                        continue;
+                    }
+                    const size_t neighbour = frame.cellIndex(x + offset.dx, y + offset.dy);
+                    if (!(costs[neighbour] < unreachable)) {
+                        continue;
+                    }
+                    const vec2 flow = directionVector(directions[neighbour]);
+                    if (!(glm::dot(own, flow) > 0.0f) ||
+                        std::ranges::any_of(blocked, [&](const vec2& away) { return glm::dot(flow, away) < 0.0f; })) {
+                        continue;
+                    }
+                    sum += flow;
+                    if (static_cast<int64_t>(neighbour) == parent[i]) {
+                        sum += flow;
+                    }
+                }
+                if (const float length = glm::length(sum); length > 0.0f) {
+                    directions[i] = quantiseDirection(sum / length);
+                }
+            }
+        }
+
+        const CrowdFrame& frame;
+        const std::vector<uint8_t>& cellFlags;
+        bool smoothen;
+        size_t count;
+        std::vector<float> entryPenalty;
+        FlowRandom random;
+    };
+
+    /// ZCrowdMap::CompressAndSaveFlowCosts: one cost range shared by every channel after channel 0.
+    void compressFlowCosts(
+        const std::vector<std::vector<float>>& channelCosts, std::vector<CrowdMapBuilder::FlowChannel>& channels) {
+        float lowest = unreachable;
+        float highest = -unreachable;
+        bool anyReachable = false;
+        for (size_t c = 1; c < channelCosts.size(); ++c) {
+            for (const float cost : channelCosts[c]) {
+                if (cost != unreachable) {
+                    lowest = std::min(lowest, cost);
+                    highest = std::max(highest, cost);
+                    anyReachable = true;
+                }
+            }
+        }
+        for (size_t c = 1; c < channelCosts.size(); ++c) {
+            std::vector<uint16_t>& encoded = channels[c].costs;
+            encoded.resize(channelCosts[c].size());
+            for (size_t i = 0; i < encoded.size(); ++i) {
+                const float cost = channelCosts[c][i];
+                if (cost == unreachable || !anyReachable) {
+                    encoded[i] = CrowdMapBuilder::unreachableCost;
+                } else if (lowest == highest) {
+                    encoded[i] = 0;
+                } else {
+                    const float range = highest - lowest;
+                    encoded[i] = static_cast<uint16_t>(
+                        static_cast<int>((costHalfRange - ((highest + lowest) / range) * costHalfRange) +
+                            (2.0f / range) * costHalfRange * cost));
+                }
+            }
+        }
+    }
+
+    vec2 steer(const uint8_t direction, const vec2 flow) {
+        return directionVector(direction) + flow;
+    }
+
+    /// ZCrowdMap::BuildAmbientFlow: channel 0, steered by flow boxes and spline flows.
+    std::vector<uint8_t> ambientFlow(const CrowdFrame& frame, const std::vector<FlowBox>& flowBoxes,
+        const std::vector<FlowBox>& flowBoxesTwoWay, const std::vector<Json::CrowdSplineFlow>& splineFlows,
+        const std::vector<uint8_t>& cellFlags, const std::vector<float>& pointHeights) {
+        std::vector<uint8_t> directions(static_cast<size_t>(frame.width) * frame.height, CrowdMapBuilder::noDirection);
+        const auto walkable = [&](const size_t i) { return (cellFlags[i] & CrowdMapBuilder::cellFlagWalkable) != 0; };
+        if (flowBoxes.empty() && flowBoxesTwoWay.empty()) {
+            return directions;
+        }
+        for (int y = 0; y < frame.height; ++y) {
+            for (int x = 0; x < frame.width; ++x) {
+                const size_t i = frame.cellIndex(x, y);
+                if (!walkable(i)) {
+                    continue;
+                }
+                const dvec3 centre =
+                    frame.world((x + 0.5) * frame.cell, (y + 0.5) * frame.cell, pointHeights[frame.pointIndex(x, y)]);
+                for (const FlowBox& box : flowBoxes) {
+                    if (box.volume.contains(centre)) {
+                        directions[i] = quantiseDirection(steer(directions[i], box.direction));
+                    }
+                }
+                for (const FlowBox& box : flowBoxesTwoWay) {
+                    if (box.volume.contains(centre)) {
+                        directions[i] =
+                            quantiseDirection(steer(directions[i], box.direction)) | CrowdMapBuilder::directionTwoWay;
+                    }
+                }
+            }
+        }
+        for (const Json::CrowdSplineFlow& spline : splineFlows) {
+            const dmat3 rotation = transformRotation(spline.transform);
+            const dvec3 origin = toDvec3(spline.transform.t);
+            const size_t segments = spline.points.size() < 2 ? 0 : spline.points.size() - (spline.closed ? 0 : 1);
+            for (size_t s = 0; s < segments; ++s) {
+                const dvec3 from = toDvec3(spline.points[s]);
+                const dvec3 to = toDvec3(spline.points[(s + 1) % spline.points.size()]);
+                const double length = glm::distance(from, to);
+                if (length == 0.0) {
+                    continue;
+                }
+                const dvec3 tangent = (to - from) / length;
+                const vec2 flow = frame.localDirection(rotation * tangent);
+                for (double t = 0.0;; t += splineSampleStep) {
+                    const dvec3 local = frame.local(origin + rotation * (from + tangent * std::min(t, length)));
+                    const int x = static_cast<int>(std::floor(local.x / frame.cell));
+                    const int y = static_cast<int>(std::floor(local.y / frame.cell));
+                    if (frame.inGrid(x, y) && walkable(frame.cellIndex(x, y))) {
+                        const size_t i = frame.cellIndex(x, y);
+                        directions[i] = quantiseDirection(steer(directions[i], flow));
+                    }
+                    if (!(t < length)) {
+                        break;
+                    }
+                }
+            }
+        }
+        return directions;
     }
 } // namespace
 
@@ -707,7 +797,7 @@ std::vector<glm::dvec3> CrowdMapBuilder::groundTrianglesNearCrowd(
     const dvec2 regionMin = center - halfExtent - groundRegionMargin;
     const dvec2 regionMax = center + halfExtent + groundRegionMargin;
     const double zMin = frame.center.z - frame.size.z / 2.0 - groundRegionMargin;
-    const double zMax = frame.center.z + frame.size.z / 2.0 + groundRegionMargin;
+    const double zMax = frame.center.z + frame.size.z / 2.0 + groundRegionMargin + crowd.generatorOffset;
 
     std::vector<dvec3> triangles;
     for (int t = 0; t < triCount; ++t) {
@@ -728,147 +818,193 @@ std::vector<glm::dvec3> CrowdMapBuilder::groundTrianglesNearCrowd(
 }
 
 CrowdMapBuilder::CrowdMap CrowdMapBuilder::build(const Json::Crowd& crowd, const SceneVolumes& sceneVolumes,
-    const std::vector<NavmeshPolygon>& navmeshPolygons, const std::vector<glm::dvec3>& groundTriangles,
-    const CostSettings& costSettings, Report& report) {
+    const std::vector<glm::dvec3>& groundTriangles, const std::vector<glm::dvec3>& heightTriangles, Report& report) {
     const CrowdFrame frame = crowdFrame(crowd);
-    const Volumes volumes = crowdVolumes(crowd, sceneVolumes);
-    std::vector<std::pair<std::string, Volume>> exits;
-    for (const auto& teleport : crowd.teleports) {
-        if (!teleport.exitZone) {
-            throw std::runtime_error("Crowd " + crowd.name + ": teleport " + teleport.name + " has no exit zone.");
-        }
-        exits.emplace_back(teleport.name, boxVolume(*teleport.exitZone));
-    }
-    std::vector<std::pair<std::string, Volume>> groups;
-    for (const auto& group : crowd.groupBoxes) {
-        groups.emplace_back(group.name, boxVolume(group));
-    }
-    if (groups.size() >= noGroup) {
-        throw std::runtime_error("Crowd " + crowd.name + ": " + std::to_string(groups.size()) +
+    if (crowd.groupBoxes.size() >= noGroup) {
+        throw std::runtime_error("Crowd " + crowd.name + ": " + std::to_string(crowd.groupBoxes.size()) +
             " group boxes, at most " + std::to_string(noGroup) + " are supported.");
     }
-
     if (groundTriangles.size() < 3) {
-        throw std::runtime_error("Crowd " + crowd.name + ": the GLB has no geometry inside the crowd box.");
+        throw std::runtime_error("Crowd " + crowd.name + ": there is no ground geometry inside the crowd box.");
     }
-    const NavmeshSurface navmesh(navmeshPolygons);
-    const GroundSurface ground(groundTriangles);
-    const Grid grid(frame, navmesh, ground, volumes, crowd.generatorOffset, costSettings, report);
 
-    std::vector<std::vector<size_t>> sources;
-    const auto addSources = [&](const std::vector<std::pair<std::string, Volume>>& items, const std::string& kind,
-                                std::vector<size_t>& reportedCounts) {
-        for (const auto& [name, volume] : items) {
-            sources.push_back(grid.cellsIn(volume));
-            if (sources.back().empty()) {
-                throw std::runtime_error(
-                    "Crowd " + crowd.name + ": " + kind + " " + name + " covers no walkable cells.");
+    const VolumeResolver resolve(crowd, sceneVolumes);
+    std::vector<Volume> exclusion = resolve.boxes(crowd.exclusionBoxIndices);
+    std::ranges::move(resolve.spheres(crowd.exclusionSphereIndices), std::back_inserter(exclusion));
+    std::ranges::move(resolve.shapes(crowd.exclusionShapeIndices), std::back_inserter(exclusion));
+    const std::vector<Volume> inclusionBoxes = resolve.boxes(crowd.inclusionBoxIndices);
+    const std::vector<Volume> inclusionShapes = resolve.shapes(crowd.inclusionShapeIndices);
+    std::vector<Volume> panicOnly = resolve.boxes(crowd.panicOnlyBoxIndices);
+    std::ranges::move(resolve.shapes(crowd.panicOnlyShapeIndices), std::back_inserter(panicOnly));
+
+    std::vector<TeleportVolumes> teleports;
+    for (const Json::CrowdTeleport& teleport : crowd.teleports) {
+        teleports.push_back({teleport.enterZone ? std::optional(boxVolume(*teleport.enterZone)) : std::nullopt,
+            teleport.exitZone ? std::optional(boxVolume(*teleport.exitZone)) : std::nullopt,
+            teleport.exitActionScared == TeleportActionType::LEAVE_CROWD});
+    }
+    std::vector<GroupVolumes> groups;
+    for (const Json::CrowdGroupBox& group : crowd.groupBoxes) {
+        std::vector<Volume> groupExclusion = resolve.boxes(group.exclusionBoxIndices);
+        std::ranges::move(resolve.shapes(group.exclusionShapeIndices), std::back_inserter(groupExclusion));
+        groups.push_back({boxVolume(group), std::move(groupExclusion), resolve.boxes(group.seedPointIndices)});
+    }
+
+    const GroundSurface ground(groundTriangles);
+    std::optional<GroundSurface> heights;
+    if (!heightTriangles.empty()) {
+        heights.emplace(heightTriangles);
+    }
+    const GroundFinder groundFinder(crowd, frame, ground, heights, exclusion);
+    const size_t pointCount = static_cast<size_t>(frame.width + 1) * (frame.height + 1);
+    std::vector<float> rawHeights(pointCount, 0.0f);
+    std::vector<uint8_t> pointStates(pointCount, offNavGrid);
+    for (int py = 0; py <= frame.height; ++py) {
+        for (int px = 0; px <= frame.width; ++px) {
+            const dvec3 plane = frame.gridPoint(px, py);
+            std::optional<dvec3> surface = groundFinder.find(px, py);
+            if (surface) {
+                ++report.gridPointsOnGeometry;
+            } else {
+                for (const std::vector<Volume>* inclusion : {&inclusionBoxes, &inclusionShapes}) {
+                    const auto containing =
+                        std::ranges::find_if(*inclusion, [&](const Volume& volume) { return volume.contains(plane); });
+                    if (containing != inclusion->end()) {
+                        surface = dvec3(dvec2(plane), containing->origin.z);
+                    }
+                }
+                if (!surface) {
+                    ++report.gridPointsOffGrid;
+                    continue;
+                }
+                ++report.gridPointsOnInclusion;
             }
-            reportedCounts.push_back(sources.back().size());
+            const size_t p = frame.pointIndex(px, py);
+            pointStates[p] = anyContains(panicOnly, *surface) ? onNavGridPanicOnly : onNavGrid;
+            rawHeights[p] = static_cast<float>(surface->z - plane.z);
         }
-    };
-    addSources(exits, "exit", report.exitCells);
-    addSources(groups, "group", report.groupCells);
+    }
 
     CrowdMap map;
-    map.cellsX = frame.width;
-    map.cellsY = frame.height;
+    float lowest = unreachable;
+    float highest = -unreachable;
+    for (const float height : rawHeights) {
+        lowest = std::min(lowest, height);
+        highest = std::max(highest, height);
+    }
+    if (highest <= lowest + minHeightSpan) {
+        highest = lowest + minHeightSpan;
+    }
+    const float heightRange = highest - lowest;
+    map.heightScale = heightRange * 0.5f / heightHalfRange;
+    map.heightBias = (lowest + highest) * 0.5f + map.heightScale * 0.5f;
+    std::vector<float> pointHeights(pointCount);
+    map.gridMap.reserve(pointCount);
+    for (size_t p = 0; p < pointCount; ++p) {
+        const auto encoded =
+            static_cast<int16_t>(static_cast<int>((-0.5f - ((lowest + highest) / heightRange) * heightHalfRange) +
+                (2.0f / heightRange) * heightHalfRange * rawHeights[p]));
+        map.gridMap.push_back({encoded, pointStates[p]});
+        pointHeights[p] = map.heightScale * static_cast<float>(encoded) + map.heightBias;
+    }
+
+    const size_t cellCount = static_cast<size_t>(frame.width) * frame.height;
+    map.cellFlags = paddedCells(cellCount, 0);
+    map.cellGroups = paddedCells(cellCount, noGroup);
+    std::vector<std::vector<size_t>> exitCells(teleports.size());
+    std::vector<std::vector<size_t>> groupSources(groups.size());
+    for (int y = 0; y < frame.height; ++y) {
+        for (int x = 0; x < frame.width; ++x) {
+            uint8_t cornerStates = onNavGridPanicOnly;
+            float cornerLow = unreachable;
+            float cornerHigh = -unreachable;
+            for (const auto& [cx, cy] : {std::pair{x, y}, {x + 1, y}, {x, y + 1}, {x + 1, y + 1}}) {
+                const size_t p = frame.pointIndex(cx, cy);
+                cornerStates &= pointStates[p];
+                cornerLow = std::min(cornerLow, pointHeights[p]);
+                cornerHigh = std::max(cornerHigh, pointHeights[p]);
+            }
+            if ((cornerHigh - cornerLow) / static_cast<float>(frame.cell) > maxCellSlope ||
+                cornerStates == offNavGrid) {
+                continue;
+            }
+            const size_t i = frame.cellIndex(x, y);
+            map.cellFlags[i] = cellFlagWalkable;
+            ++report.walkableCells;
+            if (cornerStates == onNavGridPanicOnly) {
+                map.cellFlags[i] |= cellFlagPanicOnly;
+                ++report.panicOnlyCells;
+            }
+            const dvec3 nearCorner = frame.gridPoint(x, y, pointHeights[frame.pointIndex(x, y)]);
+            const dvec3 farCorner = frame.gridPoint(x + 1, y + 1, pointHeights[frame.pointIndex(x + 1, y + 1)]);
+            for (size_t t = 0; t < teleports.size(); ++t) {
+                if (teleports[t].enterZone && teleports[t].enterZone->containsBoth(nearCorner, farCorner)) {
+                    map.cellFlags[i] |= cellFlagTeleportIn;
+                }
+                if (teleports[t].exitZone && teleports[t].exitZone->containsBoth(nearCorner, farCorner)) {
+                    map.cellFlags[i] |= cellFlagTeleportOut;
+                    exitCells[t].push_back(i);
+                }
+            }
+            if (cornerStates != onNavGrid) {
+                continue;
+            }
+            for (size_t g = 0; g < groups.size(); ++g) {
+                const GroupVolumes& group = groups[g];
+                if (!group.box.containsBoth(nearCorner, farCorner) ||
+                    anyContainsBoth(group.exclusion, nearCorner, farCorner)) {
+                    continue;
+                }
+                map.cellGroups[i] = static_cast<uint8_t>(g);
+                if (group.seedPoints.empty() || anyContainsBoth(group.seedPoints, nearCorner, farCorner)) {
+                    groupSources[g].push_back(i);
+                }
+            }
+        }
+    }
+
+    const size_t leavingTeleports = std::ranges::count_if(
+        teleports, [](const TeleportVolumes& teleport) { return teleport.exitZone && teleport.leavesCrowd; });
+    const size_t channelCount = 1 + leavingTeleports + groups.size();
+    map.flowChannels.resize(channelCount);
+    std::vector<std::vector<float>> channelCosts(channelCount);
+    for (size_t c = 1; c < channelCount; ++c) {
+        map.flowChannels[c].directions.assign(cellCount, 0);
+        channelCosts[c].assign(cellCount, 0.0f);
+    }
+    FlowBuilder flowBuilder(frame, map.cellFlags, crowd.smoothenExitFlows);
+    size_t nextChannel = 1;
+    for (size_t t = 0; t < teleports.size(); ++t) {
+        if (!teleports[t].exitZone || !teleports[t].leavesCrowd) {
+            continue;
+        }
+        if (exitCells[t].empty()) {
+            report.skippedExits.push_back(crowd.teleports[t].name);
+            continue;
+        }
+        flowBuilder.build(exitCells[t], channelCosts[nextChannel], map.flowChannels[nextChannel].directions);
+        report.exitCells.push_back(exitCells[t].size());
+        ++nextChannel;
+    }
+    if (!groups.empty()) {
+        map.groupFlowStartChannel = static_cast<int32_t>(nextChannel);
+        for (size_t g = 0; g < groups.size(); ++g) {
+            flowBuilder.build(
+                groupSources[g], channelCosts[nextChannel + g], map.flowChannels[nextChannel + g].directions);
+            report.groupCells.push_back(groupSources[g].size());
+        }
+    }
+    compressFlowCosts(channelCosts, map.flowChannels);
+    map.flowChannels[0].directions = ambientFlow(frame, flowBoxes(crowd, sceneVolumes, frame, crowd.flowBoxIndices),
+        flowBoxes(crowd, sceneVolumes, frame, crowd.flowBoxTwoWayIndices), crowd.splineFlows, map.cellFlags,
+        pointHeights);
+
+    map.cellsX = static_cast<uint32_t>(frame.width);
+    map.cellsY = static_cast<uint32_t>(frame.height);
     map.cellSize = crowd.cellSize;
     map.globalSize = {crowd.globalSize.x, crowd.globalSize.y, crowd.globalSize.z};
     map.generatorOffset = crowd.generatorOffset;
     map.objectToWorld = {glm::vec4(frame.xAxis, 0, 0), glm::vec4(frame.yAxis, 0, 0), glm::vec4(0, 0, 1, 0),
         glm::vec4(glm::vec3(frame.center), 1)};
-    map.groupFlowStartChannel = groups.empty() ? -1 : static_cast<int32_t>(1 + exits.size());
-
-    map.cellFlags = paddedCells(grid.count, 0);
-    map.cellGroups = paddedCells(grid.count, noGroup);
-    for (size_t i = 0; i < grid.count; ++i) {
-        if (grid.walkable[i]) {
-            map.cellFlags[i] = cellFlagWalkable;
-            ++report.walkableCells;
-        }
-    }
-    std::vector<bool> panicCells(grid.count, false);
-    for (const Volume& volume : volumes.panicOnly) {
-        for (const size_t i : grid.cellsIn(volume)) {
-            panicCells[i] = true;
-        }
-    }
-    for (size_t i = 0; i < grid.count; ++i) {
-        if (panicCells[i]) {
-            map.cellFlags[i] |= cellFlagPanicOnly;
-            ++report.panicOnlyCells;
-        }
-    }
-    for (size_t e = 0; e < exits.size(); ++e) {
-        for (const size_t i : sources[e]) {
-            map.cellFlags[i] |= cellFlagTeleportOut;
-        }
-    }
-    for (size_t g = 0; g < groups.size(); ++g) {
-        for (const size_t i : sources[exits.size() + g]) {
-            map.cellGroups[i] = static_cast<uint8_t>(g);
-        }
-    }
-
-    std::vector<std::vector<double>> costFields;
-    double longest = 0.0;
-    for (const auto& cells : sources) {
-        costFields.push_back(grid.costField(cells));
-        for (const double cost : costFields.back()) {
-            if (cost != infinity) {
-                longest = std::max(longest, cost);
-            }
-        }
-    }
-    if (longest == 0.0) {
-        longest = 1.0;
-    }
-    const double costScale = roundToFloat(maxNormalisedCost / longest);
-
-    map.flowChannels.push_back({std::vector<uint8_t>(grid.count, noDirection), {}});
-    for (size_t s = 0; s < sources.size(); ++s) {
-        const std::vector<double> directionDistances = grid.directionField(sources[s]);
-        FlowChannel channel;
-        channel.directions.reserve(grid.count);
-        channel.costs.reserve(grid.count);
-        for (size_t i = 0; i < grid.count; ++i) {
-            channel.directions.push_back(grid.downhillDirection(directionDistances, i));
-            const double cost = costFields[s][i];
-            channel.costs.push_back(
-                cost == infinity ? unreachableCost : static_cast<uint16_t>(roundToFloat(cost * costScale)));
-        }
-        map.flowChannels.push_back(std::move(channel));
-    }
-
-    double lowest = infinity;
-    double highest = -infinity;
-    for (int py = 0; py <= grid.height; ++py) {
-        for (int px = 0; px <= grid.width; ++px) {
-            if (grid.touchesWalkable(px, py)) {
-                const double heightOffset = grid.pointHeights[static_cast<size_t>(py) * (grid.width + 1) + px];
-                lowest = std::min(lowest, heightOffset);
-                highest = std::max(highest, heightOffset);
-            }
-        }
-    }
-    if (lowest > highest) {
-        lowest = highest = 0.0;
-    }
-    map.heightBias = static_cast<float>((lowest + highest) / 2);
-    map.heightScale = static_cast<float>(std::max((highest - lowest) / 2 / maxHeightOffset, minHeightScale));
-    map.gridMap.reserve(grid.pointHeights.size());
-    for (int py = 0; py <= grid.height; ++py) {
-        for (int px = 0; px <= grid.width; ++px) {
-            if (!grid.touchesWalkable(px, py)) {
-                map.gridMap.push_back({0, 0});
-                continue;
-            }
-            const double heightOffset = grid.pointHeights[static_cast<size_t>(py) * (grid.width + 1) + px];
-            const double encoded = std::nearbyint((heightOffset - map.heightBias) / map.heightScale);
-            const double limit = maxHeightOffset;
-            map.gridMap.push_back({static_cast<int16_t>(std::clamp(encoded, -limit, limit)), 1});
-        }
-    }
     return map;
 }

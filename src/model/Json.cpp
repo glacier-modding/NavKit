@@ -622,11 +622,13 @@ namespace {
         return items;
     }
 
-    std::vector<size_t> readIndexArray(simdjson::ondemand::object& json, const char* field) {
+    std::vector<size_t> readIndexArray(simdjson::ondemand::object& json, const char* field, const bool required = true) {
         std::vector<size_t> indices;
         simdjson::ondemand::array arrayJson;
         if (json[field].get_array().get(arrayJson) != simdjson::SUCCESS) {
-            Logger::log(NK_ERROR, "Field: %s is missing or not an array.", field);
+            if (required) {
+                Logger::log(NK_ERROR, "Field: %s is missing or not an array.", field);
+            }
             return indices;
         }
         for (auto indexResult : arrayJson) {
@@ -775,12 +777,22 @@ void Json::CrowdGroupBox::readJson(simdjson::ondemand::object json) {
     } else {
         Logger::log(NK_ERROR, "Field: groupSize is missing or not an object.");
     }
+    exclusionBoxIndices = readIndexArray(json, "exclusionBoxes", false);
+    exclusionShapeIndices = readIndexArray(json, "exclusionShapes", false);
+    seedPointIndices = readIndexArray(json, "seedPoints", false);
 }
 
 void Json::CrowdGroupBox::writeJson(std::ostream& f) const {
     f << "{";
     writeJsonFields(f);
-    f << R"(,"groupSize":{"type":"uint32","data":)" << groupSize << "}}";
+    f << R"(,"groupSize":{"type":"uint32","data":)" << groupSize << "}";
+    for (const auto& [key, indices] : {std::pair{"exclusionBoxes", &exclusionBoxIndices},
+             {"exclusionShapes", &exclusionShapeIndices}, {"seedPoints", &seedPointIndices}}) {
+        if (!indices->empty()) {
+            writeIndexArray(f, key, *indices);
+        }
+    }
+    f << "}";
 }
 
 void Json::CrowdSplineFlow::readJson(simdjson::ondemand::object json) {

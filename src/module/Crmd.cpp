@@ -2,6 +2,7 @@
 #include "../../include/NavKit/util/FilteredListPicker.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/model/Json.h"
+#include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
@@ -37,9 +38,9 @@
 #include <vector>
 #include <cpptrace/from_current.hpp>
 #include <wx/button.h>
+#include <wx/checkbox.h>
 #include <wx/choicdlg.h>
 #include <wx/sizer.h>
-#include <wx/slider.h>
 #include <wx/stattext.h>
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
 
@@ -391,19 +392,25 @@ namespace {
         return data;
     }
 
-    std::vector<CrowdMapBuilder::NavmeshPolygon> collectNavmeshPolygons(const NavPower::NavMesh& navMesh) {
-        std::vector<CrowdMapBuilder::NavmeshPolygon> polygons;
+    std::vector<glm::dvec3> collectNavmeshTriangles(const NavPower::NavMesh& navMesh) {
+        std::vector<glm::dvec3> triangles;
         for (const auto& section : navMesh.m_aSections) {
             for (const auto& navGraph : section.m_aNavGraphs) {
                 for (const auto& area : navGraph.m_areas) {
-                    CrowdMapBuilder::NavmeshPolygon& polygon = polygons.emplace_back();
-                    for (const NavPower::Binary::Edge* edge : area.m_edges) {
-                        polygon.emplace_back(edge->m_pos.X, edge->m_pos.Y, edge->m_pos.Z);
+                    if (area.m_edges.size() < 3) {
+                        continue;
+                    }
+                    const NavPower::Binary::Edge* first = area.m_edges.front();
+                    for (size_t i = 1; i + 1 < area.m_edges.size(); ++i) {
+                        for (const NavPower::Binary::Edge* edge :
+                            std::array<const NavPower::Binary::Edge*, 3>{first, area.m_edges[i], area.m_edges[i + 1]}) {
+                            triangles.emplace_back(edge->m_pos.X, edge->m_pos.Y, edge->m_pos.Z);
+                        }
                     }
                 }
             }
         }
-        return polygons;
+        return triangles;
     }
 
     std::string joinCounts(const std::vector<size_t>& counts) {
@@ -415,7 +422,8 @@ namespace {
     }
 } // namespace
 
-Crmd::Crmd() : crmdLoaded(false), loading(false), saving(false), building(false), showCrmd(true) {}
+Crmd::Crmd() :
+    crmdLoaded(false), loading(false), saving(false), building(false), showCrmd(true), snapHeightsToGlb(true) {}
 
 wxDialog* Crmd::hCrmdDialog = nullptr;
 wxDialog* Crmd::hCrmdSettingsDialog = nullptr;
@@ -745,9 +753,10 @@ void Crmd::extractCrmdFromRpkgs(const std::string& hash) {
 bool Crmd::canBuildCrmd() const {
     const Navp& navp = Navp::getInstance();
     const InputGeom* inputGeom = RecastAdapter::getInstance().inputGeom;
-    return !Scene::getInstance().crowds.empty() && navp.navpLoaded && navp.navMesh != nullptr &&
-        SceneMesh::getInstance().glbLoaded && inputGeom != nullptr && inputGeom->getMesh() != nullptr && !building &&
-        !loading && !saving;
+    const bool glbReady = SceneMesh::getInstance().glbLoaded && inputGeom != nullptr && inputGeom->getMesh() != nullptr;
+    const bool navpBusy = navp.loading || navp.building || navp.navpBuildDone || Airg::getInstance().airgBuilding;
+    return !Scene::getInstance().crowds.empty() && navp.navpLoaded && navp.navMesh != nullptr && !navpBusy &&
+        (glbReady || !snapHeightsToGlb) && !building && !loading && !saving;
 }
 
 void Crmd::handleBuildCrmdClicked() {
@@ -778,11 +787,13 @@ void Crmd::handleBuildCrmdClicked() {
     }
     const Json::Crowd crowd = crowds[selected];
 
-    const rcMeshLoaderGlb* mesh = RecastAdapter::getInstance().inputGeom->getMesh();
-    std::vector<glm::dvec3> groundTriangles;
+    std::vector<glm::dvec3> glbTriangles;
     try {
-        groundTriangles =
-            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, mesh->getVerts(), mesh->getTris(), mesh->getTriCount());
+        if (snapHeightsToGlb) {
+            const rcMeshLoaderGlb* mesh = RecastAdapter::getInstance().inputGeom->getMesh();
+            glbTriangles = CrowdMapBuilder::groundTrianglesNearCrowd(
+                crowd, mesh->getVerts(), mesh->getTris(), mesh->getTriCount());
+        }
     } catch (const std::exception& error) {
         ErrorHandler::openErrorDialog("Error building Crmd for crowd " + crowd.name + ": " + error.what());
         Logger::log(NK_ERROR, "Failed to build Crmd for crowd %s: %s", crowd.name.c_str(), error.what());
@@ -794,22 +805,22 @@ void Crmd::handleBuildCrmdClicked() {
     const Scene& scene = Scene::getInstance();
     backgroundWorker.emplace(
         [this, crowd, boxes = scene.volumeBoxes, spheres = scene.volumeSpheres, shapes = scene.volumeShapes,
-            polygons = collectNavmeshPolygons(*Navp::getInstance().navMesh),
-            groundTriangles = std::move(groundTriangles), costSettings = costSettings] {
-            buildCrmd(crowd, {boxes, spheres, shapes}, polygons, groundTriangles, costSettings);
+            navmeshTriangles = collectNavmeshTriangles(*Navp::getInstance().navMesh),
+            glbTriangles = std::move(glbTriangles)] {
+            buildCrmd(crowd, {boxes, spheres, shapes}, navmeshTriangles, glbTriangles);
         });
 }
 
 void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
-    const std::vector<CrowdMapBuilder::NavmeshPolygon>& navmeshPolygons, const std::vector<glm::dvec3>& groundTriangles,
-    const CrowdMapBuilder::CostSettings& costSettings) {
-    Logger::log(NK_INFO, "Building Crmd for crowd %s (%s) from %zu Navp areas and %zu GLB triangles...",
-        crowd.name.c_str(), crowd.id.c_str(), navmeshPolygons.size(), groundTriangles.size() / 3);
+    const std::vector<glm::dvec3>& navmeshTriangles, const std::vector<glm::dvec3>& glbTriangles) {
+    Logger::log(NK_INFO, "Building Crmd for crowd %s (%s) from %zu Navp triangles, %s...", crowd.name.c_str(),
+        crowd.id.c_str(), navmeshTriangles.size() / 3,
+        glbTriangles.empty() ? "keeping Navp heights" : "snapping heights to the GLB");
     const auto start = std::chrono::high_resolution_clock::now();
     CPPTRACE_TRY {
         CrowdMapBuilder::Report report;
         const CrowdMapBuilder::CrowdMap map =
-            CrowdMapBuilder::build(crowd, sceneVolumes, navmeshPolygons, groundTriangles, costSettings, report);
+            CrowdMapBuilder::build(crowd, sceneVolumes, navmeshTriangles, glbTriangles, report);
         setCrowdMap(map, crowd.name);
         const auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
@@ -817,9 +828,18 @@ void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolum
             "Built Crmd for %s in %lld ms: %ux%u cells, %zu walkable, %zu panic-only, exit cells %s, group cells %s.",
             crowd.name.c_str(), static_cast<long long>(duration.count()), map.cellsX, map.cellsY, report.walkableCells,
             report.panicOnlyCells, joinCounts(report.exitCells).c_str(), joinCounts(report.groupCells).c_str());
-        Logger::log(NK_INFO,
-            "Crmd heights: %zu grid points on GLB geometry (mean %.3f m from the Navp), %zu on the Navp.",
-            report.gridPointsOnGeometry, report.meanGeometryOffset, report.gridPointsOnNavmesh);
+        for (const std::string& exit : report.skippedExits) {
+            Logger::log(NK_WARN, "Crmd for %s: skipped exit %s, it covers no walkable cells.", crowd.name.c_str(),
+                exit.c_str());
+        }
+        for (size_t g = 0; g < report.groupCells.size(); ++g) {
+            if (report.groupCells[g] == 0) {
+                Logger::log(NK_WARN, "Crmd for %s: group %s covers no walkable cells.", crowd.name.c_str(),
+                    crowd.groupBoxes[g].name.c_str());
+            }
+        }
+        Logger::log(NK_INFO, "Crmd grid points: %zu on the Navp, %zu on inclusion volumes, %zu off the grid.",
+            report.gridPointsOnGeometry, report.gridPointsOnInclusion, report.gridPointsOffGrid);
     }
     CPPTRACE_CATCH(const std::exception& error) {
         const std::string stackTrace = cpptrace::from_current_exception().to_string();
@@ -836,61 +856,15 @@ void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolum
     Menu::updateMenuState();
 }
 
-namespace {
-    struct CostSettingRow {
-        int sliderId;
-        int labelId;
-        const char* label;
-        const char* key;
-        double CrowdMapBuilder::CostSettings::* value;
-        double minimum;
-        double step;
-        int steps;
-    };
-
-    constexpr std::array<CostSettingRow, 4> costSettingRows = {{
-        {IDC_SLIDER_CRMD_DIAGONAL_STEP, IDC_STATIC_CRMD_DIAGONAL_STEP_VALUE, "Diagonal Step:", "diagonalStep",
-            &CrowdMapBuilder::CostSettings::diagonalStep, 1.0, 0.01, 200},
-        {IDC_SLIDER_CRMD_BLOCKED_NEIGHBOUR_PENALTY, IDC_STATIC_CRMD_BLOCKED_NEIGHBOUR_PENALTY_VALUE,
-            "Blocked Neighbour Penalty:", "blockedNeighbourPenalty",
-            &CrowdMapBuilder::CostSettings::blockedNeighbourPenalty, 0.0, 0.01, 200},
-        {IDC_SLIDER_CRMD_PINCH_PENALTY, IDC_STATIC_CRMD_PINCH_PENALTY_VALUE, "Pinch Penalty:", "pinchPenalty",
-            &CrowdMapBuilder::CostSettings::pinchPenalty, 0.0, 0.05, 200},
-        {IDC_SLIDER_CRMD_DIRECTION_WALL_PENALTY, IDC_STATIC_CRMD_DIRECTION_WALL_PENALTY_VALUE,
-            "Direction Wall Penalty:", "directionWallPenalty", &CrowdMapBuilder::CostSettings::directionWallPenalty,
-            0.0, 0.01, 200},
-    }};
-
-    void updateCrmdSettingsDialogControls(wxDialog* dialog, const CrowdMapBuilder::CostSettings& settings) {
-        for (const CostSettingRow& row : costSettingRows) {
-            const double value = settings.*row.value;
-            static_cast<wxSlider*>(dialog->FindWindow(row.sliderId))
-                ->SetValue(static_cast<int>(std::lround((value - row.minimum) / row.step)));
-            dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
-        }
-    }
-} // namespace
-
 void Crmd::loadSettings() {
-    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    const CrowdMapBuilder::CostSettings defaults;
-    for (const CostSettingRow& row : costSettingRows) {
-        costSettings.*row.value =
-            atof(persistedSettings.getValue("Crmd", row.key, std::to_string(defaults.*row.value)));
-    }
+    snapHeightsToGlb =
+        PersistedSettings::getInstance().getValue("Crmd", "snapHeightsToGlb", "true") == std::string("true");
 }
 
 void Crmd::saveSettings() const {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    for (const CostSettingRow& row : costSettingRows) {
-        persistedSettings.setValue("Crmd", row.key, std::to_string(costSettings.*row.value));
-    }
+    persistedSettings.setValue("Crmd", "snapHeightsToGlb", snapHeightsToGlb ? "true" : "false");
     persistedSettings.save();
-}
-
-void Crmd::resetDefaults() {
-    costSettings = {};
-    saveSettings();
 }
 
 void Crmd::showCrmdSettingsDialog() {
@@ -898,37 +872,18 @@ void Crmd::showCrmdSettingsDialog() {
         hCrmdSettingsDialog->Raise();
         return;
     }
-    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Crmd Settings", wxDefaultPosition, wxSize(460, 240));
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Crmd Settings");
     hCrmdSettingsDialog = dialog;
-    auto* controls = new wxFlexGridSizer(static_cast<int>(costSettingRows.size()), 3, 8, 8);
-    for (const CostSettingRow& row : costSettingRows) {
-        controls->Add(new wxStaticText(dialog, wxID_ANY, row.label), 0, wxALIGN_CENTER_VERTICAL);
-        controls->Add(new wxSlider(dialog, row.sliderId, 0, 0, row.steps), 1, wxEXPAND);
-        controls->Add(new wxStaticText(dialog, row.labelId, ""), 0, wxALIGN_CENTER_VERTICAL);
-    }
-    controls->AddGrowableCol(1, 1);
-    auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* snapCheck = new wxCheckBox(dialog, IDC_CHECK_CRMD_SNAP_HEIGHTS_TO_GLB, "Snap Navp heights to GLB");
+    snapCheck->SetValue(snapHeightsToGlb);
     auto* content = new wxBoxSizer(wxVERTICAL);
-    content->Add(controls, 0, wxEXPAND | wxALL, 10);
-    content->Add(reset, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
-    dialog->SetSizer(content);
-    updateCrmdSettingsDialogControls(dialog, costSettings);
+    content->Add(snapCheck, 0, wxALL, 10);
+    dialog->SetSizerAndFit(content);
 
-    for (const CostSettingRow& row : costSettingRows) {
-        dialog->Bind(
-            wxEVT_SLIDER,
-            [this, dialog, row](const wxCommandEvent& event) {
-                const double value = row.minimum + event.GetInt() * row.step;
-                costSettings.*row.value = value;
-                dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
-                saveSettings();
-            },
-            row.sliderId);
-    }
-    reset->Bind(wxEVT_BUTTON, [this, dialog](wxCommandEvent&) {
-        Logger::log(NK_INFO, "Resetting Crmd Default settings");
-        resetDefaults();
-        updateCrmdSettingsDialogControls(dialog, costSettings);
+    snapCheck->Bind(wxEVT_CHECKBOX, [this](const wxCommandEvent& event) {
+        snapHeightsToGlb = event.IsChecked();
+        saveSettings();
+        Menu::updateMenuState();
     });
     dialog->Bind(wxEVT_CLOSE_WINDOW, [dialog](wxCloseEvent&) {
         if (hCrmdSettingsDialog == dialog) {
@@ -936,8 +891,6 @@ void Crmd::showCrmdSettingsDialog() {
         }
         dialog->Destroy();
     });
-    dialog->SetMinSize(wxSize(420, 220));
-    dialog->Layout();
     dialog->CentreOnParent();
     dialog->Show();
 }
@@ -954,7 +907,7 @@ void Crmd::setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& 
 }
 
 bool Crmd::canSave() const {
-    return crmdLoaded && !loading && !saving && crowdMapData != nullptr;
+    return crmdLoaded && !loading && !saving && !building && crowdMapData != nullptr;
 }
 
 void Crmd::saveCrmd(const std::string& fileName) const {
