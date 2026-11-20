@@ -2627,6 +2627,9 @@ GFX_EXTERIOR_FLOOR_COLOR = "#bec3c6"
 GFX_INTERIOR_FLOOR_COLOR = "#a7adb2"
 GFX_WALL_COLOR = "#767f86"
 GFX_STAIRS_COLOR = "#d5d8da"
+# Like the official map GFX files, the background is drawn as four quadrants with hairline gaps between them,
+# which show as a crosshair through the middle of the map.
+GFX_CROSSHAIR_GAP = 0.25
 # Map layers use one SVG pixel per metre, which matches the scale of the official map GFX files.
 GFX_WALL_WIDTH = 0.4
 # Walls and props are drawn where they cross a horizontal plane this far above the floor they stand on.
@@ -2792,7 +2795,8 @@ def render_map_layers_for_gfx(json_data, output_path):
 
     The slice SVGs are written as output_NN.svg, numbered in the order of the non-background map space
     configs. The background config (if any) is written as output_background.svg and also defines the
-    extent of the map canvas. One SVG unit is one metre.
+    extent of the map canvas; like the official maps, its fill leaves a crosshair of hairline gaps
+    through the middle of the canvas. One SVG unit is one metre.
     """
     volumes = {volume["id"]: volume for volume in json_data.get("volumeBoxes", [])}
 
@@ -3139,7 +3143,14 @@ def render_map_layers_for_gfx(json_data, output_path):
     os.makedirs(output_dir, exist_ok=True)
 
     def write_background(svg):
-        svg.write('<rect width="{:g}" height="{:g}" fill="{}"/>\n'.format(width, height, GFX_BACKGROUND_COLOR))
+        centre_x, centre_y = width / 2, height / 2
+        half_gap = GFX_CROSSHAIR_GAP / 2
+        for left, top, right, bottom in ((0.0, 0.0, centre_x - half_gap, centre_y - half_gap),
+                                         (centre_x + half_gap, 0.0, width, centre_y - half_gap),
+                                         (0.0, centre_y + half_gap, centre_x - half_gap, height),
+                                         (centre_x + half_gap, centre_y + half_gap, width, height)):
+            svg.write('<rect x="{:g}" y="{:g}" width="{:g}" height="{:g}" fill="{}"/>\n'.format(
+                left, top, right - left, bottom - top, GFX_BACKGROUND_COLOR))
         write_floors(svg, *background.floors())
         write_walls(svg, background.wall_segments)
 
