@@ -2634,9 +2634,31 @@ GFX_CROSSHAIR_GAP = 0.25
 GFX_WALL_WIDTH = 0.4
 # Walls and props are drawn where they cross a horizontal plane this far above the floor they stand on.
 GFX_SECTION_HEIGHT = 1.2
-# Props whose footprint is smaller than this are left out of the section so that clutter does not
-# hide the floor plan.
+# Like the official maps, only walls are drawn: props whose footprint is smaller than this, or whose top is
+# less than this high above the floor they stand on (boxes, crates, furniture, leaning panels), are left out.
 GFX_MINIMUM_SECTION_FOOTPRINT = 0.75
+GFX_MINIMUM_WALL_HEIGHT = 2.6
+# Wall segments are only drawn where they border visible floor, so the far side of thick or enclosing
+# structures (such as the outer face of a silo wall) does not show.
+GFX_WALL_FLOOR_DISTANCE = 0.75
+# Objects at least this tall that rise above the top of every map layer are the shell of the level (silo
+# walls, cliffs). Their upward faces are ledges of the shell, not floors: they hide the floors below them
+# instead of being drawn.
+GFX_SHELL_MINIMUM_HEIGHT = 8.0
+# Patches of floor smaller than this many square metres that touch no other floor (such as the tops of props
+# standing on a shell ledge) are left out.
+GFX_MINIMUM_FLOOR_ISLAND = 10.0
+# Patches of outdoor floor smaller than this many square metres with indoor floor all around are drawn as
+# indoor floor: they are gaps between the room volumes of a building.
+GFX_MAXIMUM_ENCLOSED_EXTERIOR = 40.0
+# A run of at least this many treads, each rising by GFX_STAIR_RISE and going forward by GFX_STAIR_GOING
+# (centre to centre, so a landing between flights still counts) and at least GFX_STAIR_MINIMUM_WIDTH wide,
+# rising GFX_STAIR_MINIMUM_SPAN in total, is drawn as stairs.
+GFX_STAIR_MINIMUM_TREADS = 5
+GFX_STAIR_RISE = (0.08, 0.35)
+GFX_STAIR_GOING = (0.1, 1.6)
+GFX_STAIR_MINIMUM_WIDTH = 0.6
+GFX_STAIR_MINIMUM_SPAN = 0.9
 # Floors are merged on a grid of this many metres (or coarser for very large maps) before they are
 # traced back to polygons, so that overlapping meshes become one clean outline per colour.
 GFX_FLOOR_RESOLUTION = 0.1
@@ -2646,6 +2668,10 @@ GFX_FLOOR_NONE = 0
 GFX_FLOOR_EXTERIOR = 1
 GFX_FLOOR_INTERIOR = 2
 GFX_FLOOR_STAIRS = 3
+# Classified per map cell from the rooms of the level.
+GFX_FLOOR_BY_ROOM = 4
+# Hides the floors below it and draws nothing.
+GFX_FLOOR_HIDDEN = 5
 
 
 def is_background_map_space_config(map_space_config):
@@ -2697,6 +2723,51 @@ def rasterize_triangles(triangles, priorities, origin, resolution, shape):
     covered = best >= 0
     best[covered] = order[best[covered]]
     return best.reshape(shape)
+
+
+def label_regions(mask):
+    """Label the 4-connected regions of a boolean grid: (labels with -1 outside the mask, cells per label)."""
+    labels = np.full(mask.shape, -1, dtype=np.int64)
+    padded = np.pad(mask, ((0, 0), (1, 1)))
+    changes = np.diff(padded.astype(np.int8), axis=1)
+    run_rows, run_starts = np.nonzero(changes == 1)
+    _, run_ends = np.nonzero(changes == -1)  # exclusive; nonzero is row-major, so the runs pair up in order
+    if len(run_rows) == 0:
+        return labels, np.empty(0)
+    parents = list(range(len(run_rows)))
+
+    def find(run):
+        while parents[run] != run:
+            parents[run] = parents[parents[run]]
+            run = parents[run]
+        return run
+
+    row_bounds = np.searchsorted(run_rows, np.arange(mask.shape[0] + 1)).tolist()
+    starts, ends = run_starts.tolist(), run_ends.tolist()
+    for row in range(mask.shape[0] - 1):
+        a, a_end = row_bounds[row], row_bounds[row + 1]
+        b, b_end = a_end, row_bounds[row + 2]
+        while a < a_end and b < b_end:
+            if starts[a] < ends[b] and starts[b] < ends[a]:
+                root_a, root_b = find(a), find(b)
+                if root_a != root_b:
+                    parents[root_b] = root_a
+            if ends[a] < ends[b]:
+                a += 1
+            else:
+                b += 1
+    _, run_labels = np.unique([find(run) for run in range(len(parents))], return_inverse=True)
+    lengths = run_ends - run_starts
+    run_of_cell = np.repeat(np.arange(len(run_rows)), lengths)
+    columns = np.arange(int(lengths.sum())) - np.repeat(np.cumsum(lengths) - lengths, lengths) +         np.repeat(run_starts, lengths)
+    labels[run_rows[run_of_cell], columns] = run_labels[run_of_cell]
+    return labels, np.bincount(run_labels, weights=lengths)
+
+
+def remove_small_islands(mask, minimum_cells):
+    """Clear the 4-connected regions of a boolean grid that have fewer than `minimum_cells` cells."""
+    labels, sizes = label_regions(mask)
+    return mask & (labels >= 0) & (sizes[np.maximum(labels, 0)] >= minimum_cells) if len(sizes) else mask
 
 
 def trace_mask(mask, minimum_cells=4.0, tolerance=0.75):
@@ -2847,7 +2918,9 @@ def render_map_layers_for_gfx(json_data, output_path):
             self.floor_triangles = []
             self.floor_elevations = []
             self.floor_kinds = []
-            self.section_candidates = []  # (instance min z, exterior by name, world triangles)
+            # The kind each floor has when it is seen from a higher slice, where stairs are plain floor.
+            self.floor_base_kinds = []
+            self.section_candidates = []  # (instance min z, instance max z, exterior by name, world triangles)
             self.levels = []
             self.wall_segments = np.empty((0, 2, 2))
             self.wall_exterior = np.empty(0, dtype=bool)
@@ -2862,11 +2935,11 @@ def render_map_layers_for_gfx(json_data, output_path):
         def z_range(self):
             return (min(box[3][2] for box in self.boxes), max(box[4][2] for box in self.boxes))
 
-        def floors(self):
+        def floors(self, base_kinds=False):
             if not self.floor_triangles:
                 return np.empty((0, 3, 2)), np.empty(0), np.empty(0, dtype=np.int64)
             return (np.concatenate(self.floor_triangles), np.concatenate(self.floor_elevations),
-                    np.concatenate(self.floor_kinds))
+                    np.concatenate(self.floor_base_kinds if base_kinds else self.floor_kinds))
 
     slices = []
     background = Slice([])
@@ -2878,6 +2951,7 @@ def render_map_layers_for_gfx(json_data, output_path):
         else:
             slices.append(Slice(boxes))
     all_slices = [layer for layer in slices + [background] if layer.boxes]
+    map_top = max((layer.z_range()[1] for layer in slices if layer.boxes), default=np.inf)
 
     interior_tokens = ("indoor", "interior", "inside")
     exterior_tokens = ("outdoor", "outside", "exterior", "terrain")
@@ -2897,21 +2971,10 @@ def render_map_layers_for_gfx(json_data, output_path):
                 "render_map_layers_for_gfx")
     use_rooms = bool(json_data.get("rooms"))
 
-    def interior_points(points, slice_bottom, horizontal_tolerance=0.0):
-        """Classify points as indoor floors of a slice whose volumes start at slice_bottom.
-
-        Points inside a room that starts on a lower slice belong to that room (for example the top of a
-        tall prop in a double-height hall) and are shown as plain ground. Points that are in no room but
-        lie within a room's footprint are upper floors or roofs of a building and count as indoor.
-        """
-        tolerance = (horizontal_tolerance, horizontal_tolerance, 0.3)
-        current = [room for room in indoor_rooms if room[3][2] >= slice_bottom - 0.5]
-        lower = [room for room in indoor_rooms if room[3][2] < slice_bottom - 0.5]
-        in_current = boxes_contain(current, points, tolerance)
-        in_lower = boxes_contain(lower, points, tolerance)
-        footprint = boxes_contain(indoor_rooms, points, tolerance,
-                                  (horizontal_tolerance, horizontal_tolerance, np.inf))
-        return in_current | (~in_lower & footprint)
+    def interior_points(points):
+        """Classify points as indoor floors: inside an indoor room, or above one (the upper floors and roofs
+        of a building, and the tops of tall props in a double-height hall)."""
+        return boxes_contain(indoor_rooms, points, (0.0, 0.0, 0.3), (0.0, 0.0, np.inf))
 
     collection_parents = {}
     for collection in bpy.data.collections:
@@ -2958,17 +3021,67 @@ def render_map_layers_for_gfx(json_data, output_path):
             finally:
                 obj.to_mesh_clear()
             names = object_name_fragments(obj.original)
-            mesh_cache[key] = (vertices.reshape(-1, 3), triangles.reshape(-1, 3), exterior_by_name(names),
-                               any("stair" in name for name in names))
+            mesh_cache[key] = (vertices.reshape(-1, 3), triangles.reshape(-1, 3), exterior_by_name(names))
         return mesh_cache[key]
 
     def stair_step_mask(triangles, normals, up):
-        if not np.any(up):
-            return up
-        elevations = np.unique(np.round(triangles[up][:, :, 2].mean(axis=1), 2))
-        if len(elevations) < 4 or elevations[-1] - elevations[0] < 0.3:
+        """The treads of a flight of stairs in the mesh: a run of flat faces rising in even steps.
+
+        Only the treads are marked, so the landings and the rest of the room stay plain floor. Names are
+        not used, since whole rooms are often named after their stairs.
+        """
+        treads = up & (normals[:, 2] >= 0.94)
+        if np.count_nonzero(treads) < GFX_STAIR_MINIMUM_TREADS:
             return np.zeros_like(up)
-        return up & (normals[:, 2] >= 0.94)
+        elevations = triangles[:, :, 2].mean(axis=1)
+        values = np.unique(np.round(elevations[treads], 2))
+        # Faces of one tread can differ by a centimetre or two; each cluster of elevations is one step.
+        cluster_starts = np.concatenate(([True], np.diff(values) > 0.04))
+        cluster_of_value = np.cumsum(cluster_starts) - 1
+        step_low = values[cluster_starts]
+        step_high = np.maximum.reduceat(values, np.nonzero(cluster_starts)[0])
+        tread_indices = np.nonzero(treads)[0]
+        tread_steps = cluster_of_value[np.searchsorted(values, np.round(elevations[tread_indices], 2))]
+        areas = 0.5 * np.linalg.norm(np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]),
+                                     axis=1)
+        step_count = len(step_low)
+        weights = np.bincount(tread_steps, weights=areas[tread_indices], minlength=step_count)
+        centres = np.stack([np.bincount(tread_steps, weights=areas[tread_indices] *
+                                        triangles[tread_indices, :, axis].mean(axis=1), minlength=step_count)
+                            for axis in (0, 1)], axis=1) / np.maximum(weights, 1e-12)[:, None]
+
+        def climbs(step):
+            """Whether going from `step` to the next one is a stair step: an even rise, a short way forward,
+            and a tread at least GFX_STAIR_MINIMUM_WIDTH wide across the way up (not the top of a beam)."""
+            rise = step_low[step + 1] - step_low[step]
+            if not GFX_STAIR_RISE[0] <= rise <= GFX_STAIR_RISE[1]:
+                return False
+            forward = centres[step + 1] - centres[step]
+            going = float(np.hypot(*forward))
+            if not GFX_STAIR_GOING[0] <= going <= GFX_STAIR_GOING[1]:
+                return False
+            across = np.array([-forward[1], forward[0]]) / going
+            for tread in (step, step + 1):
+                corners = triangles[tread_indices[tread_steps == tread], :, :2].reshape(-1, 2) @ across
+                if corners.max() - corners.min() < GFX_STAIR_MINIMUM_WIDTH:
+                    return False
+            return True
+
+        even = [climbs(step) for step in range(step_count - 1)]
+        stairs = np.zeros_like(up)
+        start = 0
+        while start < len(even):
+            if not even[start]:
+                start += 1
+                continue
+            end = start
+            while end < len(even) and even[end]:
+                end += 1
+            low, high = step_low[start], step_high[end]
+            if end - start >= GFX_STAIR_MINIMUM_TREADS and high - low >= GFX_STAIR_MINIMUM_SPAN:
+                stairs |= treads & (elevations >= low - 0.03) & (elevations <= high + 0.03)
+            start = end
+        return stairs
 
     depsgraph = bpy.context.evaluated_depsgraph_get()
     seen_instances = set()
@@ -2981,7 +3094,7 @@ def render_map_layers_for_gfx(json_data, output_path):
         if instance_key in seen_instances:
             continue
         seen_instances.add(instance_key)
-        local_vertices, triangle_indices, exterior, is_stairs = mesh_data(obj)
+        local_vertices, triangle_indices, exterior = mesh_data(obj)
         if len(triangle_indices) == 0:
             continue
         local_min, local_max = local_vertices.min(axis=0), local_vertices.max(axis=0)
@@ -3002,29 +3115,36 @@ def render_map_layers_for_gfx(json_data, output_path):
         normals = np.zeros_like(cross)
         normals[valid] = cross[valid] / lengths[valid, None]
         up = valid & (normals[:, 2] > 0.85)
-        stairs = stair_step_mask(triangles, normals, up) if is_stairs else np.zeros_like(up)
+        shell = upper[2] > map_top and upper[2] - lower[2] >= GFX_SHELL_MINIMUM_HEIGHT
+        stairs = np.zeros_like(up) if shell else stair_step_mask(triangles, normals, up)
         vertical = valid & (np.abs(normals[:, 2]) < 0.5)
         footprint = max(upper[0] - lower[0], upper[1] - lower[1])
         centroids = triangles.mean(axis=1)
+        if shell:
+            base_kind = GFX_FLOOR_HIDDEN
+        elif use_rooms:
+            base_kind = GFX_FLOOR_BY_ROOM
+        else:
+            base_kind = GFX_FLOOR_EXTERIOR if exterior else GFX_FLOOR_INTERIOR
 
         for layer in matching:
             floor_mask = up & layer.contains(centroids)
             if np.any(floor_mask):
-                if use_rooms:
-                    interior = interior_points(centroids[floor_mask], layer.z_range()[0])
-                else:
-                    interior = np.full(int(floor_mask.sum()), not exterior)
-                kinds = np.where(interior, GFX_FLOOR_INTERIOR, GFX_FLOOR_EXTERIOR)
+                base_kinds = np.full(int(floor_mask.sum()), base_kind)
+                kinds = base_kinds.copy()
                 kinds[stairs[floor_mask]] = GFX_FLOOR_STAIRS
                 layer.floor_triangles.append(triangles[floor_mask][:, :, :2])
                 layer.floor_elevations.append(centroids[floor_mask, 2])
                 layer.floor_kinds.append(kinds)
+                layer.floor_base_kinds.append(base_kinds)
             if footprint >= GFX_MINIMUM_SECTION_FOOTPRINT and np.any(vertical):
-                layer.section_candidates.append((float(lower[2]), exterior, triangles[vertical]))
+                layer.section_candidates.append((float(lower[2]), float(upper[2]), exterior, triangles[vertical]))
 
     def floor_levels(layer):
         """Elevations that carry a significant share of the slice's walkable floor area."""
-        triangles, elevations, _ = layer.floors()
+        triangles, elevations, kinds = layer.floors()
+        walkable = kinds != GFX_FLOOR_HIDDEN
+        triangles, elevations = triangles[walkable], elevations[walkable]
         if len(triangles) == 0:
             return []
         areas = 0.5 * np.abs((triangles[:, 1, 0] - triangles[:, 0, 0]) * (triangles[:, 2, 1] - triangles[:, 0, 1]) -
@@ -3061,9 +3181,11 @@ def render_map_layers_for_gfx(json_data, output_path):
             continue
         top = layer.z_range()[1]
         segments, exteriors = [], []
-        for lowest_z, exterior, triangles in layer.section_candidates:
+        for lowest_z, highest_z, exterior, triangles in layer.section_candidates:
             supporting = [level for level in layer.levels if level <= lowest_z + 0.25]
             level = supporting[-1] if supporting else layer.levels[0]
+            if highest_z - max(level, lowest_z) < GFX_MINIMUM_WALL_HEIGHT:
+                continue
             cut = min(level + GFX_SECTION_HEIGHT, top - 0.01) + 1e-4
             found = section_segments(triangles, cut)
             if len(found) == 0:
@@ -3095,19 +3217,85 @@ def render_map_layers_for_gfx(json_data, output_path):
     def to_canvas(points):
         return np.stack((points[..., 0] - canvas_min[0], canvas_max[1] - points[..., 1]), axis=-1)
 
-    def floor_paths(triangles, elevations, kinds):
-        """Merge floor triangles into one even-odd path per colour, painted in the returned order."""
+    class FloorRaster:
+        """The visible floor of one map layer on a grid in canvas coordinates."""
+
+        def __init__(self, visible, lower, resolution):
+            self.visible = visible
+            self.lower = lower
+            self.resolution = resolution
+
+        def near_floor(self, points, distance):
+            """Whether each canvas point lies within `distance` of visible floor."""
+            if self.visible is None or len(points) == 0:
+                return np.zeros(len(points), dtype=bool)
+            reach = int(np.ceil(distance / self.resolution))
+            near = dilate(self.visible != GFX_FLOOR_NONE, reach)
+            cells = np.floor((points - self.lower) / self.resolution).astype(np.int64)
+            inside = ((cells[:, 0] >= 0) & (cells[:, 0] < near.shape[1]) &
+                      (cells[:, 1] >= 0) & (cells[:, 1] < near.shape[0]))
+            result = np.zeros(len(points), dtype=bool)
+            result[inside] = near[cells[inside, 1], cells[inside, 0]]
+            return result
+
+    def dilate(mask, reach):
+        """Grow a boolean grid by `reach` cells in every direction (a square window)."""
+        for axis in (0, 1):
+            counts = np.cumsum(np.pad(mask, [(reach + 1, reach) if a == axis else (0, 0) for a in (0, 1)]),
+                               axis=axis, dtype=np.int32)
+            length = mask.shape[axis]
+            upper = np.take(counts, np.arange(2 * reach + 1, 2 * reach + 1 + length), axis=axis)
+            lower = np.take(counts, np.arange(0, length), axis=axis)
+            mask = upper - lower > 0
+        return mask
+
+    def classify_by_room(visible, winners, lower, resolution, elevations):
+        """Resolve GFX_FLOOR_BY_ROOM cells to interior or exterior from the rooms they lie in."""
+        rows, columns = np.nonzero(visible == GFX_FLOOR_BY_ROOM)
+        if len(rows) == 0:
+            return
+        owners = winners[rows, columns]
+        canvas_x = lower[0] + (columns + 0.5) * resolution
+        canvas_y = lower[1] + (rows + 0.5) * resolution
+        points = np.stack((canvas_x + canvas_min[0], canvas_max[1] - canvas_y, elevations[owners]), axis=1)
+        visible[rows, columns] = np.where(interior_points(points), GFX_FLOOR_INTERIOR, GFX_FLOOR_EXTERIOR)
+
+    def floor_paths(triangles, elevations, kinds, priorities=None):
+        """Merge floor triangles into one even-odd path per colour, painted in the returned order.
+
+        The topmost floor (by `priorities`, or else by elevation) wins each cell of a fine grid, and
+        GFX_FLOOR_BY_ROOM cells are classified there rather than per triangle, so a large triangle never
+        carries the colour of the room its centroid happens to lie in across the rooms around it.
+        """
+        empty = FloorRaster(None, None, None)
         if len(triangles) == 0:
-            return []
+            return [], empty
         triangles = to_canvas(triangles)
         lower = np.maximum(triangles.reshape(-1, 2).min(axis=0), 0.0)
         upper = np.minimum(triangles.reshape(-1, 2).max(axis=0), (width, height))
         if np.any(upper <= lower):
-            return []
+            return [], empty
         resolution = max(GFX_FLOOR_RESOLUTION, float(np.max(upper - lower)) / GFX_MAXIMUM_FLOOR_GRID)
         shape = tuple(int(np.ceil(value / resolution)) + 1 for value in (upper - lower)[::-1])
-        winners = rasterize_triangles(triangles, elevations, lower, resolution, shape)
+        winners = rasterize_triangles(triangles, elevations if priorities is None else priorities, lower,
+                                      resolution, shape)
         visible = np.where(winners >= 0, kinds[np.maximum(winners, 0)], GFX_FLOOR_NONE)
+        classify_by_room(visible, winners, lower, resolution, elevations)
+        # Shell ledges are out of bounds: hide whatever stands on them too, at any height.
+        hidden = kinds == GFX_FLOOR_HIDDEN
+        if np.any(hidden):
+            visible[rasterize_triangles(triangles[hidden], elevations[hidden], lower, resolution, shape) >= 0] =                 GFX_FLOOR_HIDDEN
+        visible[visible == GFX_FLOOR_HIDDEN] = GFX_FLOOR_NONE
+        floor = visible != GFX_FLOOR_NONE
+        visible[floor & ~remove_small_islands(floor, GFX_MINIMUM_FLOOR_ISLAND / resolution ** 2)] = GFX_FLOOR_NONE
+        # Small patches of outdoor floor with indoor floor all around are gaps between room volumes.
+        exterior = visible == GFX_FLOOR_EXTERIOR
+        labels, sizes = label_regions(exterior)
+        if len(sizes):
+            pockets = sizes < GFX_MAXIMUM_ENCLOSED_EXTERIOR / resolution ** 2
+            open_ground = np.pad(visible == GFX_FLOOR_NONE, 1, constant_values=True)
+            pockets[np.unique(labels[dilate(open_ground, 1)[1:-1, 1:-1] & exterior])] = False
+            visible[exterior & pockets[np.maximum(labels, 0)]] = GFX_FLOOR_INTERIOR
         paths = []
         # Paint every floor as exterior first so that interior and stair outlines never leave seams.
         for color, mask in ((GFX_EXTERIOR_FLOOR_COLOR, visible != GFX_FLOOR_NONE),
@@ -3118,15 +3306,19 @@ def render_map_layers_for_gfx(json_data, output_path):
                 paths.append((color, "".join(
                     "M" + " ".join("{:.2f} {:.2f}".format(*point) for point in ring * resolution + lower) + "Z"
                     for ring in rings)))
-        return paths
+        return paths, FloorRaster(visible, lower, resolution)
 
-    def write_floors(svg, triangles, elevations, kinds):
-        for color, path in floor_paths(triangles, elevations, kinds):
+    def write_floors(svg, triangles, elevations, kinds, priorities=None):
+        paths, raster = floor_paths(triangles, elevations, kinds, priorities)
+        for color, path in paths:
             svg.write('<path fill="' + color + '" fill-rule="evenodd" d="' + path + '"/>\n')
+        return raster
 
-    def write_walls(svg, segments):
+    def write_walls(svg, segments, raster):
         if len(segments):
             segments = to_canvas(segments)
+            segments = segments[raster.near_floor(segments.mean(axis=1), GFX_WALL_FLOOR_DISTANCE)]
+        if len(segments):
             path = "".join("M{:.2f} {:.2f}L{:.2f} {:.2f}".format(*segment.ravel()) for segment in segments)
             svg.write('<path fill="none" stroke="' + GFX_WALL_COLOR + '" stroke-width="' + str(GFX_WALL_WIDTH) +
                       '" stroke-linecap="square" d="' + path + '"/>\n')
@@ -3151,8 +3343,8 @@ def render_map_layers_for_gfx(json_data, output_path):
                                          (centre_x + half_gap, centre_y + half_gap, width, height)):
             svg.write('<rect x="{:g}" y="{:g}" width="{:g}" height="{:g}" fill="{}"/>\n'.format(
                 left, top, right - left, bottom - top, GFX_BACKGROUND_COLOR))
-        write_floors(svg, *background.floors())
-        write_walls(svg, background.wall_segments)
+        raster = write_floors(svg, *background.floors())
+        write_walls(svg, background.wall_segments, raster)
 
     background_path = os.path.join(output_dir, "output_background.svg")
     write_svg(background_path, write_background)
@@ -3163,18 +3355,22 @@ def render_map_layers_for_gfx(json_data, output_path):
             # A transparent canvas-sized rectangle keeps empty layers importable and pins the shape bounds.
             svg.write('<rect width="{:g}" height="{:g}" fill="#000000" fill-opacity="0"/>\n'.format(
                 width, height))
-            # Lower slices show through as plain ground with their outdoor walls, like the official maps.
+            # Lower slices show through with their outdoor walls, like the official maps: their indoor floors
+            # stay dark grey, while their stairs become plain floor.
             triangles, elevations, kinds = layer.floors()
+            priorities = elevations
             lower_slices = slices[:layer_number]
             for lower in lower_slices:
-                lower_triangles, lower_elevations, _ = lower.floors()
+                lower_triangles, lower_elevations, lower_kinds = lower.floors(base_kinds=True)
                 triangles = np.concatenate((lower_triangles, triangles))
+                elevations = np.concatenate((lower_elevations, elevations))
                 # Keep lower floors underneath this slice's floors regardless of their elevations.
-                elevations = np.concatenate((lower_elevations - 1e6, elevations))
-                kinds = np.concatenate((np.full(len(lower_triangles), GFX_FLOOR_EXTERIOR), kinds))
-            write_floors(svg, triangles, elevations, kinds)
+                priorities = np.concatenate((lower_elevations - 1e6, priorities))
+                kinds = np.concatenate((lower_kinds, kinds))
+            raster = write_floors(svg, triangles, elevations, kinds, priorities)
             write_walls(svg, np.concatenate(
-                [lower.wall_segments[lower.wall_exterior] for lower in lower_slices] + [layer.wall_segments]))
+                [lower.wall_segments[lower.wall_exterior] for lower in lower_slices] + [layer.wall_segments]),
+                raster)
 
         svg_path = os.path.join(output_dir, "output_" + str(layer_number).zfill(2) + ".svg")
         write_svg(svg_path, write_layer)
@@ -3573,6 +3769,16 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
             log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2glb")
     log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2glb")
 
+    # The map layers are rendered before saving, because saving a glTF bakes every placement's instances into
+    # one mesh, and the renderer judges each instance (its size, whether it is stairs or the level's shell) on
+    # its own.
+    if should_build_gfx:
+        start = timer()
+        log("INFO", "Rendering map layers for GFX build...", "glacier2glb")
+        render_map_layers_for_gfx(data, output_path)
+        end = timer()
+        log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2glb")
+
     if output_path.endswith('.both') or output_path.endswith('.bothWithGfx'):
         save_blend_file(output_path[:-4] + "blend")
         save_gltf_file(output_path[:-4] + "gltf")
@@ -3580,13 +3786,6 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
         save_blend_file(output_path)
     else:
         save_gltf_file(output_path)
-
-    if should_build_gfx:
-        start = timer()
-        log("INFO", "Rendering map layers for GFX build...", "glacier2glb")
-        render_map_layers_for_gfx(data, output_path)
-        end = timer()
-        log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2glb")
     return 0
 
 
