@@ -22,6 +22,7 @@
               cmake3 ninja pkg-config git curl zip unzip gnutar perl (python3.withPackages (ps: [ ps.jinja2 ps.setuptools ]))
               autoconf autoconf-archive automake libtool bison flex nasm
               libGL libGLU mesa libxkbcommon wayland wayland-scanner wayland-protocols
+              llvmPackages_19.clang-tools
             ] ++ xorgLibs;
 
             shellHook = ''
