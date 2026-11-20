@@ -80,6 +80,5 @@ namespace CrowdMapBuilder {
     /// Follows the game's own generator (ZCrowdMap::Create), raycasting @p groundTriangles in place of collision.
     /// When @p heightTriangles is not empty, each ground hit takes the height of the nearest of those surfaces.
     CrowdMap build(const Json::Crowd& crowd, const SceneVolumes& sceneVolumes,
-        const std::vector<glm::dvec3>& groundTriangles, const std::vector<glm::dvec3>& heightTriangles,
-        Report& report);
+        const std::vector<glm::dvec3>& groundTriangles, const std::vector<glm::dvec3>& heightTriangles, Report& report);
 } // namespace CrowdMapBuilder

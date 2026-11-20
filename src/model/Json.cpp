@@ -622,7 +622,8 @@ namespace {
         return items;
     }
 
-    std::vector<size_t> readIndexArray(simdjson::ondemand::object& json, const char* field, const bool required = true) {
+    std::vector<size_t> readIndexArray(
+        simdjson::ondemand::object& json, const char* field, const bool required = true) {
         std::vector<size_t> indices;
         simdjson::ondemand::array arrayJson;
         if (json[field].get_array().get(arrayJson) != simdjson::SUCCESS) {
