@@ -10,7 +10,7 @@ namespace Json {
     class Entity;
     class VolumeSphere;
     class VolumeShape;
-}
+} // namespace Json
 
 namespace CrowdMapBuilder {
     constexpr uint32_t crowdMapVersion = 0x33445568;
@@ -81,6 +81,6 @@ namespace CrowdMapBuilder {
 
     /// Walkability and layer choice come from the navmesh; grid-point heights snap to @p groundTriangles.
     CrowdMap build(const Json::Crowd& crowd, const SceneVolumes& sceneVolumes,
-        const std::vector<NavmeshPolygon>& navmeshPolygons,
-        const std::vector<glm::dvec3>& groundTriangles, const CostSettings& costSettings, Report& report);
+        const std::vector<NavmeshPolygon>& navmeshPolygons, const std::vector<glm::dvec3>& groundTriangles,
+        const CostSettings& costSettings, Report& report);
 } // namespace CrowdMapBuilder

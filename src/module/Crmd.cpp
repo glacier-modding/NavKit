@@ -307,9 +307,8 @@ namespace {
         appendCells(writer, 0x60, crowdMap.m_CellGroups);
 
         const TArray<SCrowdFlowChannel>& channels = crowdMap.m_aFlowChannels;
-        const size_t channelsBegin = writer.appendArray(0x80, channels.size(), 8, [&] {
-            writer.data.resize(writer.data.size() + channels.size() * sizeof(SCrowdFlowChannel), 0);
-        });
+        const size_t channelsBegin = writer.appendArray(0x80, channels.size(), 8,
+            [&] { writer.data.resize(writer.data.size() + channels.size() * sizeof(SCrowdFlowChannel), 0); });
         for (size_t i = 0; i < channels.size(); ++i) {
             const size_t channelOffset = channelsBegin + i * sizeof(SCrowdFlowChannel);
             const SCrowdFlowChannel& channel = channels[i];
@@ -793,22 +792,24 @@ void Crmd::handleBuildCrmdClicked() {
     building = true;
     Menu::updateMenuState();
     const Scene& scene = Scene::getInstance();
-    backgroundWorker.emplace([this, crowd, boxes = scene.volumeBoxes, spheres = scene.volumeSpheres,
-                                 shapes = scene.volumeShapes, polygons = collectNavmeshPolygons(*Navp::getInstance().navMesh),
-                                 groundTriangles = std::move(groundTriangles), costSettings = costSettings] {
-        buildCrmd(crowd, {boxes, spheres, shapes}, polygons, groundTriangles, costSettings);
-    });
+    backgroundWorker.emplace(
+        [this, crowd, boxes = scene.volumeBoxes, spheres = scene.volumeSpheres, shapes = scene.volumeShapes,
+            polygons = collectNavmeshPolygons(*Navp::getInstance().navMesh),
+            groundTriangles = std::move(groundTriangles), costSettings = costSettings] {
+            buildCrmd(crowd, {boxes, spheres, shapes}, polygons, groundTriangles, costSettings);
+        });
 }
 
 void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
-    const std::vector<CrowdMapBuilder::NavmeshPolygon>& navmeshPolygons,
-    const std::vector<glm::dvec3>& groundTriangles, const CrowdMapBuilder::CostSettings& costSettings) {
+    const std::vector<CrowdMapBuilder::NavmeshPolygon>& navmeshPolygons, const std::vector<glm::dvec3>& groundTriangles,
+    const CrowdMapBuilder::CostSettings& costSettings) {
     Logger::log(NK_INFO, "Building Crmd for crowd %s (%s) from %zu Navp areas and %zu GLB triangles...",
         crowd.name.c_str(), crowd.id.c_str(), navmeshPolygons.size(), groundTriangles.size() / 3);
     const auto start = std::chrono::high_resolution_clock::now();
     CPPTRACE_TRY {
         CrowdMapBuilder::Report report;
-        const CrowdMapBuilder::CrowdMap map = CrowdMapBuilder::build(crowd, sceneVolumes, navmeshPolygons, groundTriangles, costSettings, report);
+        const CrowdMapBuilder::CrowdMap map =
+            CrowdMapBuilder::build(crowd, sceneVolumes, navmeshPolygons, groundTriangles, costSettings, report);
         setCrowdMap(map, crowd.name);
         const auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
@@ -822,10 +823,10 @@ void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolum
     }
     CPPTRACE_CATCH(const std::exception& error) {
         const std::string stackTrace = cpptrace::from_current_exception().to_string();
-        ErrorHandler::openErrorDialog("Error building Crmd for crowd " + crowd.name + ": " + error.what() +
-            "\n\nStack Trace:\n" + stackTrace);
-        Logger::log(NK_ERROR, "Failed to build Crmd for crowd %s: %s Stack trace: %s", crowd.name.c_str(),
-            error.what(), stackTrace.c_str());
+        ErrorHandler::openErrorDialog(
+            "Error building Crmd for crowd " + crowd.name + ": " + error.what() + "\n\nStack Trace:\n" + stackTrace);
+        Logger::log(NK_ERROR, "Failed to build Crmd for crowd %s: %s Stack trace: %s", crowd.name.c_str(), error.what(),
+            stackTrace.c_str());
     }
     catch (...) {
         ErrorHandler::openErrorDialog("Error building Crmd for crowd " + crowd.name + ": unknown error.");
@@ -856,8 +857,8 @@ namespace {
         {IDC_SLIDER_CRMD_PINCH_PENALTY, IDC_STATIC_CRMD_PINCH_PENALTY_VALUE, "Pinch Penalty:", "pinchPenalty",
             &CrowdMapBuilder::CostSettings::pinchPenalty, 0.0, 0.05, 200},
         {IDC_SLIDER_CRMD_DIRECTION_WALL_PENALTY, IDC_STATIC_CRMD_DIRECTION_WALL_PENALTY_VALUE,
-            "Direction Wall Penalty:", "directionWallPenalty",
-            &CrowdMapBuilder::CostSettings::directionWallPenalty, 0.0, 0.01, 200},
+            "Direction Wall Penalty:", "directionWallPenalty", &CrowdMapBuilder::CostSettings::directionWallPenalty,
+            0.0, 0.01, 200},
     }};
 
     void updateCrmdSettingsDialogControls(wxDialog* dialog, const CrowdMapBuilder::CostSettings& settings) {
@@ -868,13 +869,14 @@ namespace {
             dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
         }
     }
-}
+} // namespace
 
 void Crmd::loadSettings() {
     const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     const CrowdMapBuilder::CostSettings defaults;
     for (const CostSettingRow& row : costSettingRows) {
-        costSettings.*row.value = atof(persistedSettings.getValue("Crmd", row.key, std::to_string(defaults.*row.value)));
+        costSettings.*row.value =
+            atof(persistedSettings.getValue("Crmd", row.key, std::to_string(defaults.*row.value)));
     }
 }
 
@@ -913,12 +915,15 @@ void Crmd::showCrmdSettingsDialog() {
     updateCrmdSettingsDialogControls(dialog, costSettings);
 
     for (const CostSettingRow& row : costSettingRows) {
-        dialog->Bind(wxEVT_SLIDER, [this, dialog, row](const wxCommandEvent& event) {
-            const double value = row.minimum + event.GetInt() * row.step;
-            costSettings.*row.value = value;
-            dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
-            saveSettings();
-        }, row.sliderId);
+        dialog->Bind(
+            wxEVT_SLIDER,
+            [this, dialog, row](const wxCommandEvent& event) {
+                const double value = row.minimum + event.GetInt() * row.step;
+                costSettings.*row.value = value;
+                dialog->FindWindow(row.labelId)->SetLabel(wxString::Format("%.2f", value));
+                saveSettings();
+            },
+            row.sliderId);
     }
     reset->Bind(wxEVT_BUTTON, [this, dialog](wxCommandEvent&) {
         Logger::log(NK_INFO, "Resetting Crmd Default settings");

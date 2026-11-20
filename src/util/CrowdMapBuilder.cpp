@@ -13,9 +13,9 @@
 #include <unordered_map>
 
 namespace {
+    using glm::dmat3;
     using glm::dvec2;
     using glm::dvec3;
-    using glm::dmat3;
 
     constexpr double infinity = std::numeric_limits<double>::infinity();
     constexpr double uprightTolerance = 1e-3;
@@ -253,8 +253,8 @@ namespace {
         std::vector<Volume> panicOnly;
     };
 
-    template <typename T> const T& resolveVolume(const Json::Crowd& crowd, const std::vector<T>& volumes,
-        const size_t index, const char* listName) {
+    template <typename T> const T& resolveVolume(
+        const Json::Crowd& crowd, const std::vector<T>& volumes, const size_t index, const char* listName) {
         if (index >= volumes.size()) {
             throw std::runtime_error("Crowd " + crowd.name + " references " + listName + " index " +
                 std::to_string(index) + ", but the scene only has " + std::to_string(volumes.size()) + ".");
@@ -381,25 +381,33 @@ namespace {
         }
 
         std::vector<double> costField(const std::vector<size_t>& targets) const {
-            return dijkstra(targets, [&](const int x, const int y, const int dx, const int dy, const double distance)
-                -> std::optional<double> {
-                if (std::abs(dx) + std::abs(dy) == 2 && !(walkable[index(x + dx, y)] && walkable[index(x, y + dy)])) {
-                    return std::nullopt;
-                }
-                const double step = dx != 0 && dy != 0 ? costSettings.diagonalStep : straightStep;
-                return roundToFloat(roundToFloat(distance + step) + entryPenalty[index(x + dx, y + dy)]);
-            }, neighbourOffsets());
+            return dijkstra(
+                targets,
+                [&](const int x, const int y, const int dx, const int dy,
+                    const double distance) -> std::optional<double> {
+                    if (std::abs(dx) + std::abs(dy) == 2 &&
+                        !(walkable[index(x + dx, y)] && walkable[index(x, y + dy)])) {
+                        return std::nullopt;
+                    }
+                    const double step = dx != 0 && dy != 0 ? costSettings.diagonalStep : straightStep;
+                    return roundToFloat(roundToFloat(distance + step) + entryPenalty[index(x + dx, y + dy)]);
+                },
+                neighbourOffsets());
         }
 
         std::vector<double> directionField(const std::vector<size_t>& targets) const {
             static const std::vector<std::array<int, 2>> stencil = directionStencil();
-            return dijkstra(targets, [&](const int x, const int y, const int dx, const int dy, const double distance)
-                -> std::optional<double> {
-                if ((dx != 0 && dy != 0 || std::abs(dx) > 1 || std::abs(dy) > 1) && !clearLine(x, y, dx, dy)) {
-                    return std::nullopt;
-                }
-                return distance + std::hypot(dx, dy) + costSettings.directionWallPenalty * entryPenalty[index(x + dx, y + dy)];
-            }, stencil);
+            return dijkstra(
+                targets,
+                [&](const int x, const int y, const int dx, const int dy,
+                    const double distance) -> std::optional<double> {
+                    if ((dx != 0 && dy != 0 || std::abs(dx) > 1 || std::abs(dy) > 1) && !clearLine(x, y, dx, dy)) {
+                        return std::nullopt;
+                    }
+                    return distance + std::hypot(dx, dy) +
+                        costSettings.directionWallPenalty * entryPenalty[index(x + dx, y + dy)];
+                },
+                stencil);
         }
 
         uint8_t downhillDirection(const std::vector<double>& distance, const size_t i) const {
@@ -694,7 +702,8 @@ std::vector<glm::dvec3> CrowdMapBuilder::groundTrianglesNearCrowd(
     const Json::Crowd& crowd, const float* recastVerts, const int* tris, const int triCount) {
     const CrowdFrame frame = crowdFrame(crowd);
     const dvec2 center(frame.center);
-    const dvec2 halfExtent = glm::abs(frame.xAxis) * (frame.size.x / 2.0) + glm::abs(frame.yAxis) * (frame.size.y / 2.0);
+    const dvec2 halfExtent =
+        glm::abs(frame.xAxis) * (frame.size.x / 2.0) + glm::abs(frame.yAxis) * (frame.size.y / 2.0);
     const dvec2 regionMin = center - halfExtent - groundRegionMargin;
     const dvec2 regionMax = center + halfExtent + groundRegionMargin;
     const double zMin = frame.center.z - frame.size.z / 2.0 - groundRegionMargin;
