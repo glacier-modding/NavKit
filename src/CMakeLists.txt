@@ -85,6 +85,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/navkit-rpkg-lib.cmake")
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED IMPORTED_TARGET gtk+-3.0)
+    # vcpkg's static wx ends its GTK link list with brotlidec but omits brotlicommon
+    set_property(TARGET wx::wxbase APPEND PROPERTY INTERFACE_LINK_LIBRARIES "$<TARGET_FILE:unofficial::brotli::brotlicommon>")
     target_link_libraries(NavKitLib PUBLIC PkgConfig::GTK3)
     target_sources(NavKitLib PRIVATE util/GtkIntegration.cpp)
 endif ()

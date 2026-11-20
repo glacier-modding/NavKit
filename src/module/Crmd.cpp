@@ -456,14 +456,15 @@ void Crmd::rebuildRenderGeometry() {
         }
         arrows.reserve(arrows.size() + vectorCount * 6);
         for (size_t i = 0; i < vectorCount; ++i) {
-            const uint8_t vectorIndex = channel.m_aFlowVectorIndex[i];
+            constexpr uint8_t unitCircleSplitCount = 120;
+            const uint8_t vectorIndex = channel.m_aFlowVectorIndex[i] & 0x7f;
             const uint8_t flags = getPackedCellValue(data.m_CellFlags, i);
-            if (vectorIndex == 0xff || flags == 0xff ||
+            if (vectorIndex >= unitCircleSplitCount || flags == 0xff ||
                 (flags & static_cast<uint8_t>(CrowdMapImpl_CellFlags::CELLFLAG_WALKABLE)) == 0) {
                 continue;
             }
-            const uint8_t reversedIndex = static_cast<uint8_t>(vectorIndex + 128);
-            const float angle = static_cast<float>(reversedIndex) * (2.0f * std::numbers::pi_v<float> / 256.0f);
+            const float angle = static_cast<float>(vectorIndex) *
+                (2.0f * std::numbers::pi_v<float> / static_cast<float>(unitCircleSplitCount));
             const glm::vec2 direction(std::cos(angle), std::sin(angle));
             const glm::vec2 perpendicular(-direction.y, direction.x);
             const glm::vec2 center((static_cast<float>(i % cellGridWidth) + 0.5f) * cellWidth,
