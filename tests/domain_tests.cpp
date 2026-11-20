@@ -843,14 +843,83 @@ namespace {
         check(throws(truncated), "a truncated GFXF should be rejected");
     }
 
+    constexpr size_t gfxfDataSectionOffset = 16;
+
+    std::uint64_t readGfxfPayloadOffset(const std::vector<unsigned char>& gfxf) {
+        std::uint64_t value = 0;
+        for (size_t i = 0; i < 8; ++i) {
+            value |= static_cast<std::uint64_t>(gfxf[gfxfDataSectionOffset + i]) << (8 * i);
+        }
+        return value;
+    }
+
+    std::uint32_t readGfxfDataSize(const std::vector<unsigned char>& gfxf) {
+        return static_cast<std::uint32_t>(gfxf[8]) << 24 | static_cast<std::uint32_t>(gfxf[9]) << 16 |
+            static_cast<std::uint32_t>(gfxf[10]) << 8 | static_cast<std::uint32_t>(gfxf[11]);
+    }
+
+    // The game's GFXF files store a 32-bit element count directly before the GFX payload. The glacier_bin1
+    // serializer leaves array and string counts out, which the game accepts. Returns the vanilla GFXF as that
+    // serializer writes it: without the count, with the payload offset and data size 4 bytes smaller.
+    std::vector<unsigned char> withoutBin1ArrayCount(std::vector<unsigned char> gfxf) {
+        const std::uint64_t payloadOffset = readGfxfPayloadOffset(gfxf);
+        const std::uint32_t dataSize = readGfxfDataSize(gfxf);
+        const size_t countPosition = gfxfDataSectionOffset + static_cast<size_t>(payloadOffset) - 4;
+        gfxf.erase(gfxf.begin() + static_cast<std::ptrdiff_t>(countPosition),
+            gfxf.begin() + static_cast<std::ptrdiff_t>(countPosition + 4));
+        const std::uint64_t newOffset = payloadOffset - 4;
+        for (size_t i = 0; i < 8; ++i) {
+            gfxf[gfxfDataSectionOffset + i] = static_cast<unsigned char>(newOffset >> (8 * i));
+        }
+        const std::uint32_t newSize = dataSize - 4;
+        for (size_t i = 0; i < 4; ++i) {
+            gfxf[8 + i] = static_cast<unsigned char>(newSize >> (8 * (3 - i)));
+        }
+        return gfxf;
+    }
+
     void testGfxfSaveMatchesVanillaGfxf() {
         const std::filesystem::path savedPath = gfxfTestTempPath("vanilla.gfxf");
-        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> vanilla = readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> gfx = Gfxf::extractGfxFromGfxf(vanilla);
+
+        // The vanilla file carries the count the serializer leaves out: the payload size, right before the payload.
+        const std::uint64_t vanillaOffset = readGfxfPayloadOffset(vanilla);
+        check(vanillaOffset == 0x44, "the vanilla GFXF payload should follow its 32-bit element count");
+        const size_t countPosition = gfxfDataSectionOffset + static_cast<size_t>(vanillaOffset) - 4;
+        const std::uint32_t vanillaCount = static_cast<std::uint32_t>(vanilla[countPosition]) |
+            static_cast<std::uint32_t>(vanilla[countPosition + 1]) << 8 |
+            static_cast<std::uint32_t>(vanilla[countPosition + 2]) << 16 |
+            static_cast<std::uint32_t>(vanilla[countPosition + 3]) << 24;
+        check(vanillaCount == gfx.size(), "the vanilla GFXF element count should be the GFX payload size");
 
         check(Gfxf::packGfxToGfxfFile(gfx, savedPath.string()), "packing the extracted GFX should succeed");
-        const bool identical = readGfxfTestBytes(savedPath) == readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> repacked = readGfxfTestBytes(savedPath);
         std::filesystem::remove(savedPath);
-        check(identical, "repacking a vanilla GFXF's GFX should be byte-identical to the vanilla GFXF");
+        check(readGfxfPayloadOffset(repacked) == 0x40, "the serializer should write the payload without a count");
+        check(repacked.size() + 4 == vanilla.size(), "the repacked GFXF should only lack the 4-byte count");
+        check(repacked == withoutBin1ArrayCount(vanilla),
+            "repacking a vanilla GFXF's GFX should match the vanilla GFXF apart from the missing count");
+        check(Gfxf::extractGfxFromGfxf(repacked) == gfx, "the repacked GFXF should read back to the vanilla GFX");
+    }
+
+    void testGfxfReadsBothCountLayouts() {
+        const std::vector<unsigned char> vanilla = readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> withoutCount = withoutBin1ArrayCount(vanilla);
+        const std::vector<unsigned char> gfx = Gfxf::extractGfxFromGfxf(vanilla);
+        check(Gfxf::extractGfxFromGfxf(withoutCount) == gfx,
+            "a GFXF without the array count should read to the same GFX as one with it");
+
+        std::vector<unsigned char> wrongSize = vanilla;
+        const size_t sizeField = gfxfDataSectionOffset + 8;
+        wrongSize[sizeField] = static_cast<unsigned char>(wrongSize[sizeField] - 1);
+        bool rejected = false;
+        try {
+            Gfxf::extractGfxFromGfxf(wrongSize);
+        } catch (const std::runtime_error&) {
+            rejected = true;
+        }
+        check(rejected, "a GFXF whose payload size disagrees with the GFX header should be rejected");
     }
 
     void testGfxPackRoundTrip() {
@@ -1728,5 +1797,6 @@ void runDomainTests() {
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
     run("Clear and New Project file menu options", testClearAndNewProjectOptions);
-    run("GFXF save matches vanilla GFXF", testGfxfSaveMatchesVanillaGfxf);
+    run("GFXF save matches vanilla GFXF apart from the array count", testGfxfSaveMatchesVanillaGfxf);
+    run("GFXF reads payloads with and without the array count", testGfxfReadsBothCountLayouts);
 }

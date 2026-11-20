@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <mutex>
@@ -27,6 +28,8 @@ class Gfxf {
     std::optional<ExportResult> completedLoad;
     std::optional<std::jthread> backgroundWorker;
     std::optional<std::jthread> saveWorker;
+    std::optional<std::jthread> buildWorker;
+    std::atomic_bool building = false;
     std::mutex gfxDataMutex;
     std::vector<unsigned char> gfxData;
     std::uint64_t loadGeneration = 0;
