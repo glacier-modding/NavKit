@@ -400,14 +400,22 @@ void Json::ParentData::readJson(simdjson::ondemand::object json) {
 
 void Json::Parent::writeJson(std::ostream& f) const {
     f << R"("parent":{"type":")" << escaped(type) << R"(",)";
-    data.writeJson(f);
+    if (hasData) {
+        data.writeJson(f);
+    } else {
+        f << R"("data":null)";
+    }
     f << "}";
 }
 
 void Json::Parent::readJson(simdjson::ondemand::object json) {
     type = getValue(json, "type");
-    const simdjson::ondemand::object dataJson = json["data"];
-    data.readJson(dataJson);
+    simdjson::ondemand::value dataJson = json["data"];
+    hasData = !dataJson.is_null();
+    data = {};
+    if (hasData) {
+        data.readJson(dataJson.get_object());
+    }
 }
 
 void Json::AiArea::writeJson(std::ostream& f) const {

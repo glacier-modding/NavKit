@@ -321,6 +321,7 @@ namespace Json {
 
         std::string type;
         ParentData data{};
+        bool hasData = true;
 
         void writeJson(std::ostream& f) const;
 
