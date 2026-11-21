@@ -448,7 +448,8 @@ namespace {
                 if (!probeZ) {
                     return std::nullopt;
                 }
-                const dvec3 hit(firstHit->x, firstHit->y, *probeZ);
+                const dvec3 probeHit(firstHit->x, firstHit->y, *probeZ);
+                const dvec3 hit(probeHit.x, probeHit.y, snappedHeight(probeHit));
                 const dvec3 local = frame.local(hit);
                 if (local.x < -groundEdgeTolerance || local.y < -groundEdgeTolerance ||
                     local.x > frame.size.x + groundEdgeTolerance || local.y > frame.size.y + groundEdgeTolerance ||
@@ -456,7 +457,7 @@ namespace {
                     return std::nullopt;
                 }
                 if (!anyContains(exclusion, hit)) {
-                    return dvec3(hit.x, hit.y, snappedHeight(hit));
+                    return hit;
                 }
                 top = firstHit->z - exclusionRetryDrop;
             }
