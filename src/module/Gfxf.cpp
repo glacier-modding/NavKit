@@ -23,6 +23,7 @@
 
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <stb_image.h>
 #include <wx/app.h>
 #include <wx/arrstr.h>
@@ -41,9 +42,11 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Rpkg.h"
+#include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/util/GfxMapAlignment.h"
 #include "../../include/NavKit/util/GfxMapLayerSwf.h"
 #include "../../include/NavKit/render/Mesh.h"
 
@@ -342,6 +345,99 @@ namespace {
         return "Level " + folderName.substr(numberStart, numberEnd - numberStart);
     }
 
+    // FFDec renders map layers at this many pixels per canvas unit (one unit is one metre in the game's maps).
+    constexpr float ffdecZoom = 2.0f;
+    // Walls are matched where they cross this far above a layer's floor, like the GFX builder draws them.
+    constexpr float sectionHeight = 1.2f;
+    // A geometry placement is used only when it is this much better than a random one.
+    constexpr float minimumAlignmentConfidence = 1.5f;
+
+    struct Bounds {
+        glm::vec3 minimum{std::numeric_limits<float>::max()};
+        glm::vec3 maximum{std::numeric_limits<float>::lowest()};
+
+        void add(const Bounds& other) {
+            minimum = glm::min(minimum, other.minimum);
+            maximum = glm::max(maximum, other.maximum);
+        }
+
+        [[nodiscard]] bool valid() const {
+            return minimum.x <= maximum.x;
+        }
+    };
+
+    // The world bounds of a map space config's volume boxes. Some exports drop the leading digit of entity IDs in
+    // references, so an unambiguous suffix match is accepted, like the GFX builder does.
+    Bounds mapSpaceBounds(const Json::MapSpaceConfig& config, const std::vector<Json::Entity>& volumeBoxes) {
+        Bounds bounds;
+        for (const std::string& id : config.inclusions.data) {
+            if (id.empty()) {
+                continue;
+            }
+            const Json::Entity* volume = nullptr;
+            int matches = 0;
+            for (const Json::Entity& candidate : volumeBoxes) {
+                if (candidate.id == id) {
+                    volume = &candidate;
+                    matches = 1;
+                    break;
+                }
+                if (candidate.id.size() > id.size() && candidate.id.ends_with(id)) {
+                    volume = &candidate;
+                    ++matches;
+                }
+            }
+            if (volume == nullptr || matches != 1) {
+                continue;
+            }
+            const glm::quat rotation(volume->rotation.w, volume->rotation.x, volume->rotation.y, volume->rotation.z);
+            const glm::vec3 half =
+                glm::abs(glm::vec3(volume->scale.data.x, volume->scale.data.y, volume->scale.data.z)) * 0.5f;
+            const glm::vec3 centre(volume->position.x, volume->position.y, volume->position.z);
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 local((corner & 1 ? 1.0f : -1.0f) * half.x, (corner & 2 ? 1.0f : -1.0f) * half.y,
+                    (corner & 4 ? 1.0f : -1.0f) * half.z);
+                const glm::vec3 point = centre + rotation * local;
+                bounds.minimum = glm::min(bounds.minimum, point);
+                bounds.maximum = glm::max(bounds.maximum, point);
+            }
+        }
+        return bounds;
+    }
+
+    // The bounds of each map layer's volumes, in the order of the GFX builder's slices, and the canvas: the
+    // background volumes, or else all of the layers' volumes.
+    std::pair<std::vector<Bounds>, Bounds> sceneMapSpaces() {
+        const Scene& scene = Scene::getInstance();
+        std::vector<Bounds> slices;
+        Bounds background;
+        Bounds all;
+        for (const Json::MapSpaceConfig& config : scene.mapSpaceConfigs) {
+            const Bounds bounds = mapSpaceBounds(config, scene.volumeBoxes);
+            if (GfxMapLayerSwf::isBackgroundMapSpaceName(config.name)) {
+                if (bounds.valid()) {
+                    background.add(bounds);
+                }
+                continue;
+            }
+            slices.push_back(bounds);
+            if (bounds.valid()) {
+                all.add(bounds);
+            }
+        }
+        return {slices, background.valid() ? background : all};
+    }
+
+    int layerSliceNumber(const std::string& layerName) {
+        if (!layerName.starts_with("Level ")) {
+            return -1;
+        }
+        try {
+            return std::stoi(layerName.substr(6));
+        } catch (const std::exception&) {
+            return -1;
+        }
+    }
 } // namespace
 
 bool Gfxf::canLoad() const {
@@ -664,6 +760,8 @@ void Gfxf::startLoad(const std::string& fileName) {
     gfxfLoaded = false;
     loadedFile.clear();
     layerNames.clear();
+    layerImages.clear();
+    layerPlacements.clear();
     selectedLayerIndex = 0;
     loading = true;
     Menu::updateMenuState();
@@ -926,9 +1024,17 @@ void Gfxf::showGfxfSettingsDialog() {
     controls->Add(offsetZValue, 0, wxALIGN_CENTER_VERTICAL);
     controls->AddGrowableCol(1, 1);
     content->Add(controls, 0, wxEXPAND | wxALL, 10);
+    auto* align = new wxButton(dialog, wxID_ANY, "Align to Scene");
+    align->SetToolTip("Place the map on the loaded GLB's geometry (or, without one, on the scene's map space "
+                      "volumes). The offsets above move it from there.");
+    align->Enable(gfxfLoaded && !aligning);
     auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* buttonRow = new wxBoxSizer(wxHORIZONTAL);
+    buttonRow->Add(align, 0, wxRIGHT, 8);
+    buttonRow->Add(reset, 0);
     dialog->SetSizer(content);
-    content->Add(reset, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    content->Add(buttonRow, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    align->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { getInstance().alignToScene(); });
 
     scaleSlider->Bind(wxEVT_SLIDER, [this, scaleValue](wxCommandEvent& event) {
         renderScale = static_cast<float>(event.GetInt()) / 100.0f;
@@ -976,6 +1082,7 @@ void Gfxf::resetDefaults() {
 }
 
 void Gfxf::finalizeLoad() {
+    finalizeAlignment();
     std::optional<ExportResult> result;
     {
         std::lock_guard lock(resultMutex);
@@ -1002,6 +1109,8 @@ void Gfxf::finalizeLoad() {
 
     GLint maxTextureSize = 0;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    layerImages.clear();
+    layerPlacements.clear();
     for (size_t layerIndex = 0; layerIndex < result->layers.size(); ++layerIndex) {
         const auto& [layerName, pngBytes] = result->layers[layerIndex];
         int width = 0;
@@ -1014,6 +1123,8 @@ void Gfxf::finalizeLoad() {
             }
             model.cleanup();
             layerNames.clear();
+            layerImages.clear();
+            layerPlacements.clear();
             selectedLayerIndex = 0;
             showGfxfError("Could not decode an FFDec PNG layer or its dimensions exceed the OpenGL texture limit.");
             Menu::updateMenuState();
@@ -1031,6 +1142,8 @@ void Gfxf::finalizeLoad() {
         const bool mapLayer = layerName.starts_with("Level ");
         texture.width = width;
         texture.height = height;
+        LayerPlacement placement;
+        placement.slice = layerSliceNumber(layerName);
         if (mapLayer) {
             int minX = width;
             int minY = height;
@@ -1065,6 +1178,7 @@ void Gfxf::finalizeLoad() {
             }
             texture.width = maxX - minX + 1;
             texture.height = maxY - minY + 1;
+            placement.cropOffset = glm::vec2(static_cast<float>(minX), static_cast<float>(minY)) / ffdecZoom;
             texture.data.resize(static_cast<size_t>(texture.width) * texture.height * 4);
             for (int y = 0; y < texture.height; ++y) {
                 const size_t sourceOffset = (static_cast<size_t>(minY + y) * width + minX) * 4;
@@ -1091,6 +1205,10 @@ void Gfxf::finalizeLoad() {
             }
         }
         stbi_image_free(pixels);
+        placement.size = glm::vec2(static_cast<float>(texture.width), static_cast<float>(texture.height)) / ffdecZoom;
+        layerPlacements.push_back(placement);
+        // The pixels go to the GPU below; keep a copy for placing the map on the scene's geometry.
+        layerImages.push_back({texture.width, texture.height, texture.data, ffdecZoom});
         const float scale = 5.0f;
         const std::vector<Vertex> vertices = {
             {{-scale, 0.0f, scale}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
@@ -1109,6 +1227,111 @@ void Gfxf::finalizeLoad() {
     gfxfLoaded = true;
     Menu::updateMenuState();
     Logger::log(NK_INFO, "GFXF load complete: %s (%zu map layers)", loadedFile.c_str(), layerNames.size());
+    alignToScene();
+}
+
+void Gfxf::placeFromScene() {
+    // A map built by NavKit has its canvas on the background (or else the layers') volumes, at one unit per
+    // metre, and each layer on its slice's floor.
+    const auto [slices, canvas] = sceneMapSpaces();
+    canvasOrigin = canvas.valid() ? glm::vec2(canvas.minimum.x, -canvas.maximum.y) : glm::vec2(0.0f);
+    for (LayerPlacement& placement : layerPlacements) {
+        const bool known = placement.slice >= 0 && static_cast<size_t>(placement.slice) < slices.size() &&
+            slices[placement.slice].valid();
+        placement.elevation = known ? slices[placement.slice].minimum.z : 0.0f;
+    }
+}
+
+void Gfxf::alignToScene() {
+    if (!gfxfLoaded || aligning || layerImages.empty()) {
+        return;
+    }
+    placeFromScene();
+    const SceneMesh& sceneMesh = SceneMesh::getInstance();
+    if (!sceneMesh.glbLoaded || sceneMesh.model.meshes.empty()) {
+        Logger::log(NK_INFO, "GFXF placed from the scene's map space volumes (no GLB is loaded to align it to).");
+        return;
+    }
+
+    // The GLB is y-up (glTF): the game's (x, y, z) is the GLB's (x, -z, y).
+    std::vector<glm::vec3> triangles;
+    for (const Mesh& mesh : sceneMesh.model.meshes) {
+        for (const unsigned int index : mesh.indices) {
+            const glm::vec3& position = mesh.vertices[index].position;
+            triangles.emplace_back(position.x, -position.z, position.y);
+        }
+    }
+    const auto [slices, canvas] = sceneMapSpaces();
+    std::vector<std::optional<std::pair<float, float>>> sliceHeights;
+    for (const LayerPlacement& placement : layerPlacements) {
+        if (placement.slice >= 0 && static_cast<size_t>(placement.slice) < slices.size() &&
+            slices[placement.slice].valid()) {
+            sliceHeights.emplace_back(std::pair{slices[placement.slice].minimum.z, slices[placement.slice].maximum.z});
+        } else {
+            sliceHeights.emplace_back(std::nullopt);
+        }
+    }
+    aligning = true;
+    alignWorker.reset();
+    alignWorker.emplace([this, generation = loadGeneration, images = layerImages, placements = layerPlacements,
+                            triangles = std::move(triangles), sliceHeights = std::move(sliceHeights)](std::stop_token) {
+        AlignmentResult result{generation, std::nullopt, 0.0f, {}};
+        // Each layer's floor: the main floor level inside its slice, or else the slice-th level of the scene.
+        const std::vector<float> sceneLevels = GfxMapAlignment::floorLevels(
+            triangles, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), 2.5f);
+        for (size_t layer = 0; layer < images.size(); ++layer) {
+            float elevation = 0.0f;
+            if (sliceHeights[layer]) {
+                const auto [bottom, top] = *sliceHeights[layer];
+                const auto levels = GfxMapAlignment::floorLevels(triangles, bottom - 0.5f, top, 2.5f);
+                elevation = levels.empty() ? bottom : levels.front();
+            } else if (!sceneLevels.empty()) {
+                const size_t level = placements[layer].slice >= 0 ? static_cast<size_t>(placements[layer].slice) : 0;
+                elevation = sceneLevels[std::min(level, sceneLevels.size() - 1)];
+            }
+            result.elevations.push_back(elevation);
+            const auto placement = GfxMapAlignment::placeLayer(
+                images[layer], GfxMapAlignment::sectionSegments(triangles, elevation + sectionHeight));
+            if (placement && placement->confidence > result.confidence) {
+                result.confidence = placement->confidence;
+                result.canvasOrigin = placement->topLeft - placements[layer].cropOffset;
+            }
+        }
+        if (result.confidence < minimumAlignmentConfidence) {
+            result.canvasOrigin.reset();
+        }
+        std::lock_guard lock(resultMutex);
+        completedAlignment = std::move(result);
+    });
+    Logger::log(NK_INFO, "Aligning the GFXF map with the loaded GLB...");
+}
+
+void Gfxf::finalizeAlignment() {
+    std::optional<AlignmentResult> result;
+    {
+        std::lock_guard lock(resultMutex);
+        result.swap(completedAlignment);
+    }
+    if (!result) {
+        return;
+    }
+    alignWorker.reset();
+    aligning = false;
+    if (result->generation != loadGeneration || result->elevations.size() != layerPlacements.size()) {
+        return;
+    }
+    for (size_t layer = 0; layer < layerPlacements.size(); ++layer) {
+        layerPlacements[layer].elevation = result->elevations[layer];
+    }
+    if (result->canvasOrigin) {
+        canvasOrigin = *result->canvasOrigin;
+        Logger::log(NK_INFO, "Aligned the GFXF map with the GLB geometry (canvas origin %.1f, %.1f; match %.1fx).",
+            canvasOrigin.x, -canvasOrigin.y, result->confidence);
+    } else {
+        Logger::log(NK_WARN,
+            "Could not align the GFXF map with the GLB geometry; it stays where the scene's map "
+            "space volumes put it.");
+    }
 }
 
 void Gfxf::render(const Shader& shader, const glm::mat4& view, const glm::mat4& projection) const {
@@ -1120,15 +1343,18 @@ void Gfxf::render(const Shader& shader, const glm::mat4& view, const glm::mat4& 
     if (mesh.textures.empty() || mesh.textures.front().height <= 0) {
         return;
     }
-    const float imageAspect =
-        static_cast<float>(mesh.textures.front().width) / static_cast<float>(mesh.textures.front().height);
-    const float width = 88.0f * renderScale;
-    const float height = width / imageAspect;
-    const glm::vec3 center{0.0f, 0.0f, 0.0f};
-    const glm::vec3 offset{static_cast<float>(offsetX), static_cast<float>(-offsetZ), static_cast<float>(offsetY)};
-    glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), center + offset);
+    // The layer lies on the map plane at one metre per canvas unit: u is the GLB's x and v its z (the game's -y),
+    // with the image's top row at the smallest v. The quad spans 10 units, its first texel at (-5, -5) once turned.
+    const LayerPlacement placement =
+        selectedLayerIndex < layerPlacements.size() ? layerPlacements[selectedLayerIndex] : LayerPlacement{};
+    const glm::vec2 centre = canvasOrigin + placement.cropOffset + placement.size * 0.5f;
+    const glm::vec3 offset{static_cast<float>(offsetX), static_cast<float>(offsetZ), static_cast<float>(offsetY)};
+    // Just above the floor so that the map shows over it.
+    const glm::vec3 position = glm::vec3(centre.x, placement.elevation + 0.05f, centre.y) + offset;
+    glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), position);
     modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    modelMatrix = glm::scale(modelMatrix, glm::vec3(width, 1.0f, height));
+    modelMatrix = glm::scale(
+        modelMatrix, glm::vec3(placement.size.x / 10.0f * renderScale, 1.0f, placement.size.y / 10.0f * renderScale));
     shader.use();
     shader.setBool("useFlatColor", true);
     shader.setBool("useVertexColor", true);
@@ -1187,6 +1413,8 @@ void Gfxf::clear() {
     gfxfLoaded = false;
     loadedFile.clear();
     layerNames.clear();
+    layerImages.clear();
+    layerPlacements.clear();
     selectedLayerIndex = 0;
     model.cleanup();
     if (backgroundWorker) {

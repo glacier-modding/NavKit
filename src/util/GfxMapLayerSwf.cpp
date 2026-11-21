@@ -205,7 +205,9 @@ namespace GfxMapLayerSwf {
     bool isBackgroundMapSpaceName(const std::string_view name) {
         std::string lower(name);
         std::ranges::transform(lower, lower.begin(), [](const unsigned char c) { return std::tolower(c); });
-        return lower.find("background") != std::string::npos;
+        // The game's scenes name it "...Background" or, with a satellite image, "..._SAT".
+        return lower.find("background") != std::string::npos || lower == "sat" ||
+            (lower.size() > 4 && lower.ends_with("_sat"));
     }
 
     std::string createMapLayerSwfXml(const std::string_view templateXml, const size_t layerCount) {

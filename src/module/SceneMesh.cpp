@@ -773,15 +773,21 @@ void SceneMesh::handleBuildGlbFromSceneClicked() {
 
 void SceneMesh::handleBuildBlendFromSceneClicked() {
     blendFileOnlyBuild = true;
+    blendFileAndGlbBuild = false;
+    blendFileAndGlbAndGfxBuild = false;
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
 void SceneMesh::handleBuildBlendAndGlbFromSceneClicked() {
+    blendFileOnlyBuild = false;
     blendFileAndGlbBuild = true;
+    blendFileAndGlbAndGfxBuild = false;
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
 void SceneMesh::handleBuildBlendAndGlbAndGfxFromSceneClicked() {
+    blendFileOnlyBuild = false;
+    blendFileAndGlbBuild = false;
     blendFileAndGlbAndGfxBuild = true;
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }

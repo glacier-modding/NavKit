@@ -809,9 +809,10 @@ namespace {
     }
 
     void testGfxfLoadExtractsGfx() {
-        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> gfx =
+            Gfxf::loadGfxFromFile("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
         const std::vector<unsigned char> extracted =
-            Gfxf::extractGfxFromGfxf(readGfxfTestBytes("tests/resources/polarbear005.gfxf"));
+            Gfxf::extractGfxFromGfxf(readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf"));
 
         check(gfx == extracted, "loading a GFXF should yield the GFX extracted from its container");
         check(gfx.size() == 29682, "extracted GFX should have the vanilla payload size");
@@ -838,7 +839,8 @@ namespace {
             return false;
         };
         check(throws(readGfxfTestBytes("tests/resources/polarbear005.gfx")), "a raw GFX is not a GFXF container");
-        std::vector<unsigned char> truncated = readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        std::vector<unsigned char> truncated =
+            readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
         truncated.resize(truncated.size() / 2);
         check(throws(truncated), "a truncated GFXF should be rejected");
     }
@@ -880,7 +882,8 @@ namespace {
 
     void testGfxfSaveMatchesVanillaGfxf() {
         const std::filesystem::path savedPath = gfxfTestTempPath("vanilla.gfxf");
-        const std::vector<unsigned char> vanilla = readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> vanilla =
+            readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
         const std::vector<unsigned char> gfx = Gfxf::extractGfxFromGfxf(vanilla);
 
         // The vanilla file carries the count the serializer leaves out: the payload size, right before the payload.
@@ -904,7 +907,8 @@ namespace {
     }
 
     void testGfxfReadsBothCountLayouts() {
-        const std::vector<unsigned char> vanilla = readGfxfTestBytes("tests/resources/polarbear005.gfxf");
+        const std::vector<unsigned char> vanilla =
+            readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
         const std::vector<unsigned char> withoutCount = withoutBin1ArrayCount(vanilla);
         const std::vector<unsigned char> gfx = Gfxf::extractGfxFromGfxf(vanilla);
         check(Gfxf::extractGfxFromGfxf(withoutCount) == gfx,

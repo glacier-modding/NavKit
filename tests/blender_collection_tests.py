@@ -62,9 +62,29 @@ class CollectionHierarchyTests(unittest.TestCase):
         self.assertNotEqual(outer, unrelated)
         self.assertEqual(len(unrelated.children), 0)
 
+    def add_box(self, name, collection, minimum, maximum):
+        return self.add_boxes(name, collection, [(minimum, maximum)])
+
+    def add_boxes(self, name, collection, boxes):
+        """One mesh object made of closed boxes, each given as (minimum corner, maximum corner)."""
+        vertices, faces = [], []
+        for (x0, y0, z0), (x1, y1, z1) in boxes:
+            base = len(vertices)
+            vertices += [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0),
+                         (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+            faces += [tuple(base + index for index in face) for face in
+                      ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7))]
+        data = bpy.data.meshes.new(name)
+        data.from_pydata(vertices, [], faces)
+        data.update()
+        obj = bpy.data.objects.new(name, data)
+        collection.objects.link(obj)
+        return obj
+
     def test_map_layer_svg_contains_only_meshes_in_inclusion_volume(self):
-        bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 0))
-        bpy.ops.mesh.primitive_cube_add(size=2, location=(20, 0, 0))
+        # Floors smaller than GFX_MINIMUM_FLOOR_ISLAND are dropped, so use 4 x 4 m slabs.
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0), scale=(4, 4, 1))
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(20, 0, 0), scale=(4, 4, 1))
         nav_data = {
             "volumeBoxes": [{
                 "id": "map-volume",
@@ -83,53 +103,26 @@ class CollectionHierarchyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as output_dir:
             glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
             svg_with_speck = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
-        self.assertIn("#404040", svg)
-        self.assertNotIn("20.000", svg)
+        # The cube's top is a floor (indoor, as nothing names it outdoor); the cube outside the volume is left out.
+        self.assertIn(glacier.GFX_INTERIOR_FLOOR_COLOR, svg)
+        self.assertNotIn("20.00", svg)
         self.assertEqual(svg.count("<path"), svg_with_speck.count("<path"))
-        self.assertTrue(bpy.context.scene.render.film_transparent)
-        self.assertEqual(bpy.context.scene.camera.data.type, "ORTHO")
-        self.assertEqual(sum(material.name.startswith("GFX ") for material in bpy.data.materials), 4)
 
-    def test_map_layer_svg_uses_grayscale_palette_and_keeps_empty_layers_transparent(self):
+    def test_map_layer_svg_uses_official_palette_and_keeps_empty_layers_transparent(self):
         outdoor = bpy.data.collections.new("Outdoor")
         interior = bpy.data.collections.new("Rooms")
+        # Rooms named after their stairs must not turn the whole room into stairs.
         stairs = bpy.data.collections.new("203_Room_Indoor_StairwayBottom")
         for collection in (outdoor, interior, stairs):
             bpy.context.scene.collection.children.link(collection)
-
-        for name, collection, location in (
-                ("outside_floor", outdoor, (-2, 0, 0)),
-                ("inside_floor", interior, (0, 0, 0)),
-                ("stair_mesh", stairs, (2, 0, 0))):
-            bpy.ops.mesh.primitive_cube_add(size=1, location=location)
-            obj = bpy.context.object
-            obj.name = name
-            for linked_collection in list(obj.users_collection):
-                linked_collection.objects.unlink(obj)
-            collection.objects.link(obj)
-        vertices = []
-        faces = []
-        for step in range(4):
-            x0, x1 = step, step + 1
-            z0, z1 = 0, 0.4 * (step + 1)
-            base = len(vertices)
-            vertices.extend([
-                (x0, 0, z0), (x1, 0, z0), (x1, 1, z0), (x0, 1, z0),
-                (x0, 0, z1), (x1, 0, z1), (x1, 1, z1), (x0, 1, z1),
-            ])
-            faces.extend([
-                (base, base + 3, base + 2, base + 1), (base + 4, base + 5, base + 6, base + 7),
-                (base, base + 1, base + 5, base + 4), (base + 1, base + 2, base + 6, base + 5),
-                (base + 2, base + 3, base + 7, base + 6), (base + 3, base, base + 4, base + 7),
-            ])
-        stair_data = bpy.data.meshes.new("GFX test stairs")
-        stair_data.from_pydata(vertices, [], faces)
-        stair_data.update()
-        stair_object = bpy.data.objects.new("GFX test stair flight", stair_data)
-        stairs.objects.link(stair_object)
-        light = bpy.data.lights.new("GFX map test light", "POINT")
-        bpy.context.scene.collection.objects.link(bpy.data.objects.new("GFX map test light", light))
-
+        self.add_box("outside_floor", outdoor, (-4, -2, -0.2), (-1, 2, 0))
+        self.add_box("inside_floor", interior, (-1, -2, -0.2), (2, 2, 0))
+        self.add_box("inside_wall", interior, (-1, 1.5, 0), (2, 1.8, 3))
+        self.add_box("inside_stair_landing", stairs, (2, -2, -0.2), (4, 2, 0))
+        # A flight of six 0.2 m steps going 0.3 m each, one metre wide, as one mesh.
+        self.add_boxes("inside_stair_flight", stairs, [((2 + 0.3 * step, -0.5, 0), (2.3 + 0.3 * step, 0.5,
+                                                                                    0.2 * (step + 1)))
+                                                       for step in range(6)])
         nav_data = {
             "volumeBoxes": [{
                 "id": "map-volume",
@@ -138,33 +131,36 @@ class CollectionHierarchyTests(unittest.TestCase):
                 "scale": {"data": {"x": 8, "y": 4, "z": 4}},
             }],
             "mapSpaceConfigs": [
-                {"inclusions": {"data": ["map-volume"]}},
-                {"inclusions": {"data": []}},
+                {"name": "MapSpaceConfig_00", "inclusions": {"data": ["map-volume"]}},
+                {"name": "MapSpaceConfig_01", "inclusions": {"data": []}},
+                {"name": "MapSpaceConfig_SAT", "inclusions": {"data": [""]}},
             ],
         }
         with tempfile.TemporaryDirectory() as output_dir:
             glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
             first_layer = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
             empty_layer = (Path(output_dir) / "output_01.svg").read_text(encoding="utf-8")
+            background = (Path(output_dir) / "output_background.svg").read_text(encoding="utf-8")
+            # The satellite config is the background, not a third layer.
+            self.assertFalse((Path(output_dir) / "output_02.svg").exists())
 
-        for color in ("#ffffff", "#c0c0c0", "#808080", "#404040"):
-            self.assertIn(color, first_layer)
-        last_floor = max(first_layer.rfind("#c0c0c0"), first_layer.rfind("#808080"))
-        first_wall = first_layer.find("#404040")
-        first_stair = first_layer.find("#ffffff")
-        self.assertGreater(first_wall, last_floor)
-        self.assertGreater(first_stair, first_wall)
-        self.assertGreater(first_layer.count('fill="#ffffff"'), 0)
-        self.assertLessEqual(first_layer.count('fill="#ffffff"'), 4)
-        self.assertIn('stroke-width="2.4"', first_layer)
+        for color in (glacier.GFX_EXTERIOR_FLOOR_COLOR, glacier.GFX_INTERIOR_FLOOR_COLOR, glacier.GFX_STAIRS_COLOR,
+                      glacier.GFX_WALL_COLOR):
+            self.assertIn('fill="' + color + '"', first_layer)
+        # Floors first, then stairs, then the walls as solid shapes (no strokes), like the official maps.
+        self.assertLess(first_layer.find(glacier.GFX_EXTERIOR_FLOOR_COLOR), first_layer.find(glacier.GFX_STAIRS_COLOR))
+        self.assertLess(first_layer.find(glacier.GFX_STAIRS_COLOR), first_layer.find(glacier.GFX_WALL_COLOR))
+        self.assertNotIn("stroke=", first_layer)
+        # Only the flight's treads are stairs (canvas y 1.5 to 2.5): the stair room's landing stays floor.
+        stair_path = [line for line in first_layer.splitlines() if glacier.GFX_STAIRS_COLOR in line][0]
+        stair_y = [float(value) for value in
+                   stair_path.split('d="')[1].replace("M", " ").replace("Z", " ").split()[1::2]]
+        self.assertGreaterEqual(min(stair_y), 1.3)
+        self.assertLessEqual(max(stair_y), 2.7)
+        # A layer above shows the floors below it, on a canvas-sized transparent base.
         self.assertIn('fill="#000000" fill-opacity="0"', empty_layer)
-        self.assertEqual(bpy.context.scene.render.engine, "BLENDER_EEVEE_NEXT")
-        self.assertFalse(light.use_shadow)
-        for material in bpy.data.materials:
-            if material.name.startswith("GFX "):
-                node_types = {node.type for node in material.node_tree.nodes}
-                self.assertIn("EMISSION", node_types)
-                self.assertNotIn("BSDF_PRINCIPLED", node_types)
+        self.assertNotIn(glacier.GFX_STAIRS_COLOR, empty_layer)
+        self.assertIn(glacier.GFX_BACKGROUND_COLOR, background)
 
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(CollectionHierarchyTests)

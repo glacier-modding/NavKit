@@ -18,7 +18,8 @@ namespace GfxMapLayerSwf {
     // "SLICE_NN", with at least two digits.
     std::string sliceName(size_t layerIndex);
 
-    // Map-space configs whose name contains "background" (case-insensitive) make the shared background, not a layer.
+    // Map-space configs whose name contains "background", or is or ends with "_SAT" (a satellite background), make
+    // the shared background, not a layer (case-insensitive).
     bool isBackgroundMapSpaceName(std::string_view name);
 
     // Turns FFDec XML of a template map GFX into the XML of a GFX with `layerCount` empty map layers whose shapes

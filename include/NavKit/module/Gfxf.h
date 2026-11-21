@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "../render/Model.h"
+#include "../util/GfxMapAlignment.h"
 #include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
 #include <wx/dialog.h>
 
 class Gfxf {
@@ -24,8 +26,29 @@ class Gfxf {
         std::string error;
     };
 
+    // Where a layer image lies: its map plane position comes from the canvas origin (the position of the uncropped
+    // image's top-left corner) plus the crop, at one canvas unit per metre; its height is its floor level.
+    struct LayerPlacement {
+        glm::vec2 cropOffset{0.0f}; // metres from the uncropped image's top-left corner
+        glm::vec2 size{0.0f}; // metres
+        int slice = -1; // the SLICE_NN number, or -1
+        float elevation = 0.0f; // game z
+    };
+
+    struct AlignmentResult {
+        std::uint64_t generation;
+        std::optional<glm::vec2> canvasOrigin;
+        float confidence = 0.0f;
+        std::vector<float> elevations;
+    };
+
     std::mutex resultMutex;
     std::optional<ExportResult> completedLoad;
+    std::optional<AlignmentResult> completedAlignment;
+    std::optional<std::jthread> alignWorker;
+    std::vector<GfxMapAlignment::LayerImage> layerImages;
+    std::vector<LayerPlacement> layerPlacements;
+    glm::vec2 canvasOrigin{0.0f};
     std::optional<std::jthread> backgroundWorker;
     std::optional<std::jthread> saveWorker;
     std::optional<std::jthread> buildWorker;
@@ -38,6 +61,10 @@ class Gfxf {
 
     void startLoad(const std::string& fileName);
 
+    void placeFromScene();
+
+    void finalizeAlignment();
+
 public:
     static Gfxf& getInstance() {
         static Gfxf instance;
@@ -49,6 +76,7 @@ public:
     bool loading = false;
     bool saving = false;
     bool gfxBuilt = false;
+    bool aligning = false;
     float renderScale = 1.0f;
     float renderOpacity = 1.0f;
     int offsetX = 0;
@@ -93,4 +121,8 @@ public:
     void clear();
 
     void startGfxBuild();
+
+    // Places the loaded map on the loaded scene: on its geometry when a GLB is loaded (in the background), else
+    // where the scene's map space volumes put a generated map's canvas.
+    void alignToScene();
 };

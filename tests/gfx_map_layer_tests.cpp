@@ -1,5 +1,9 @@
+#include "../include/NavKit/util/GfxMapAlignment.h"
 #include "../include/NavKit/util/GfxMapLayerSwf.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <iterator>
@@ -10,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include <glm/geometric.hpp>
 #include <pugixml.hpp>
 
 namespace {
@@ -265,8 +270,94 @@ namespace {
         check(GfxMapLayerSwf::isBackgroundMapSpaceName("Map Background"), "background configs must be detected");
         check(GfxMapLayerSwf::isBackgroundMapSpaceName("BACKGROUND_volume"), "detection must ignore case");
         check(!GfxMapLayerSwf::isBackgroundMapSpaceName("Level 01"), "layer configs are not backgrounds");
+        check(GfxMapLayerSwf::isBackgroundMapSpaceName("MapSpaceConfig_SAT"), "satellite configs are backgrounds");
+        check(GfxMapLayerSwf::isBackgroundMapSpaceName("SAT"), "a config named SAT is a background");
+        check(!GfxMapLayerSwf::isBackgroundMapSpaceName("MapSpaceConfig_SATURN"), "SAT must end the name");
+        check(!GfxMapLayerSwf::isBackgroundMapSpaceName("MapSpaceConfig_S0"), "slice configs are not backgrounds");
         check(GfxMapLayerSwf::sliceName(3) == "SLICE_03" && GfxMapLayerSwf::sliceName(12) == "SLICE_12",
             "slice names use two-digit layer numbers");
+    }
+
+    // Wall rectangles (left, top, right, bottom) of a made-up floor plan, in metres on the map plane.
+    const std::vector<std::array<float, 4>> planWalls = {
+        {10, 10, 70, 11},
+        {10, 10, 11, 50},
+        {69, 10, 70, 35},
+        {10, 49, 45, 50},
+        {30, 10, 31, 30},
+        {44, 30, 45, 50},
+        {50, 35, 70, 36},
+        {20, 30, 31, 31},
+        {55, 20, 56, 26},
+        {80, 5, 95, 18},
+    };
+
+    void testMapLayerPlacement() {
+        // Draw the plan into an image at two pixels per metre whose top-left corner lies at (-123.5, 47) on the
+        // map plane, then place it on the plan's wall outlines.
+        const glm::vec2 corner(-123.5f, 47.0f);
+        GfxMapAlignment::LayerImage image;
+        image.width = 240;
+        image.height = 160;
+        image.pixelsPerMetre = 2.0f;
+        image.rgba.resize(static_cast<size_t>(image.width) * image.height * 4);
+        for (int y = 0; y < image.height; ++y) {
+            for (int x = 0; x < image.width; ++x) {
+                const float u = (static_cast<float>(x) + 0.5f) / image.pixelsPerMetre;
+                const float v = (static_cast<float>(y) + 0.5f) / image.pixelsPerMetre;
+                const bool wall = std::ranges::any_of(planWalls, [&](const auto& rectangle) {
+                    return u >= rectangle[0] && u <= rectangle[2] && v >= rectangle[1] && v <= rectangle[3];
+                });
+                unsigned char* pixel = &image.rgba[(static_cast<size_t>(y) * image.width + x) * 4];
+                pixel[0] = wall ? 0x76 : 0xbe;
+                pixel[1] = wall ? 0x7f : 0xc3;
+                pixel[2] = wall ? 0x86 : 0xc6;
+                pixel[3] = 255;
+            }
+        }
+        std::vector<GfxMapAlignment::Segment> segments;
+        for (const auto& [left, top, right, bottom] : planWalls) {
+            const glm::vec2 a = corner + glm::vec2(left, top);
+            const glm::vec2 b = corner + glm::vec2(right, top);
+            const glm::vec2 c = corner + glm::vec2(right, bottom);
+            const glm::vec2 d = corner + glm::vec2(left, bottom);
+            segments.insert(segments.end(), {{a, b}, {b, c}, {c, d}, {d, a}});
+        }
+        const auto placement = GfxMapAlignment::placeLayer(image, segments);
+        check(placement.has_value(), "the plan must be placed");
+        check(std::abs(placement->topLeft.x - corner.x) <= 0.5f && std::abs(placement->topLeft.y - corner.y) <= 0.5f,
+            "the plan must be placed where it was drawn");
+        check(placement->confidence > 1.5f, "the placement must stand out from random placements");
+    }
+
+    void testSectionsAndFloorLevels() {
+        // A 4 x 2 x 3 m box standing on z = 5 (game coordinates), as twelve triangles, and a floor at z = 1.
+        const glm::vec3 low(0, 0, 5);
+        const glm::vec3 high(4, 2, 8);
+        const auto corner = [&](const int x, const int y, const int z) {
+            return glm::vec3(x ? high.x : low.x, y ? high.y : low.y, z ? high.z : low.z);
+        };
+        std::vector<glm::vec3> triangles;
+        const auto quad = [&](const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const glm::vec3 d) {
+            triangles.insert(triangles.end(), {a, b, c, a, c, d});
+        };
+        quad(corner(0, 0, 0), corner(1, 0, 0), corner(1, 0, 1), corner(0, 0, 1));
+        quad(corner(1, 0, 0), corner(1, 1, 0), corner(1, 1, 1), corner(1, 0, 1));
+        quad(corner(1, 1, 0), corner(0, 1, 0), corner(0, 1, 1), corner(1, 1, 1));
+        quad(corner(0, 1, 0), corner(0, 0, 0), corner(0, 0, 1), corner(0, 1, 1));
+        quad(corner(0, 0, 1), corner(1, 0, 1), corner(1, 1, 1), corner(0, 1, 1));
+        quad(corner(0, 0, 0), corner(0, 1, 0), corner(1, 1, 0), corner(1, 0, 0));
+        quad({-10, -10, 1}, {10, -10, 1}, {10, 10, 1}, {-10, 10, 1});
+        const auto segments = GfxMapAlignment::sectionSegments(triangles, 6.0f);
+        check(segments.size() == 8, "a box cut through its sides gives two segments per side");
+        float perimeter = 0.0f;
+        for (const auto& [start, end] : segments) {
+            perimeter += glm::length(end - start);
+            check(start.y <= 0.0f && start.y >= -2.0f, "sections use the map plane's v = -y");
+        }
+        check(std::abs(perimeter - 12.0f) < 1e-3f, "the cut outlines the box");
+        const auto levels = GfxMapAlignment::floorLevels(triangles, -100.0f, 100.0f, 2.0f);
+        check(levels.size() == 1 && std::abs(levels.front() - 1.0f) < 0.2f, "the large floor is the level");
     }
 } // namespace
 
@@ -298,10 +389,32 @@ int main(const int argc, char** argv) {
             std::cout << "GFX map layers are valid\n";
             return 0;
         }
+        if (argc == 6 && std::string_view(argv[1]) == "--place") {
+            // --place <raw RGBA file> <width> <height> <segments file: "u0 v0 u1 v1" per line, map plane metres>
+            GfxMapAlignment::LayerImage image;
+            image.width = std::stoi(argv[3]);
+            image.height = std::stoi(argv[4]);
+            std::ifstream pixels(argv[2], std::ios::binary);
+            image.rgba.assign(std::istreambuf_iterator<char>(pixels), std::istreambuf_iterator<char>());
+            check(image.rgba.size() == static_cast<size_t>(image.width) * image.height * 4, "RGBA size mismatch");
+            std::ifstream lines(argv[5]);
+            std::vector<GfxMapAlignment::Segment> segments;
+            for (GfxMapAlignment::Segment segment;
+                lines >> segment[0].x >> segment[0].y >> segment[1].x >> segment[1].y;) {
+                segments.push_back(segment);
+            }
+            const auto placement = GfxMapAlignment::placeLayer(image, segments);
+            check(placement.has_value(), "nothing to place");
+            std::cout << placement->topLeft.x << ' ' << placement->topLeft.y << ' ' << placement->score << ' '
+                      << placement->confidence << '\n';
+            return 0;
+        }
         testFiveMapLayers();
         testFewerMapLayers();
         testValidationRejectsOtherFormats();
         testBackgroundMapSpaceNames();
+        testMapLayerPlacement();
+        testSectionsAndFloorLevels();
         std::cout << "GFX builder tests passed\n";
         return 0;
     } catch (const std::exception& exception) {

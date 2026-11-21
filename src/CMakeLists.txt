@@ -55,6 +55,7 @@ set(UTIL_SOURCES
         util/ErrorHandler.cpp
         util/FileUtil.cpp
         util/FilteredListPicker.cpp
+        util/GfxMapAlignment.cpp
         util/GfxMapLayerSwf.cpp
         util/GridGenerator.cpp
         util/Math.cpp

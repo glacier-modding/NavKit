@@ -25,10 +25,11 @@ target_link_libraries(NavKitTests PRIVATE
 
 add_executable(GfxBuilderTests
         gfx_map_layer_tests.cpp
+        ../src/util/GfxMapAlignment.cpp
         ../src/util/GfxMapLayerSwf.cpp
 )
 target_include_directories(GfxBuilderTests PRIVATE "${PROJECT_SOURCE_DIR}/include")
-target_link_libraries(GfxBuilderTests PRIVATE pugixml::pugixml)
+target_link_libraries(GfxBuilderTests PRIVATE pugixml::pugixml glm::glm)
 if (WIN32)
     set(PUGIXML_RUNTIME_PATH "${PROJECT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
     add_custom_command(

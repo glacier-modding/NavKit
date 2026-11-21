@@ -2622,7 +2622,10 @@ def load_volume_boxes(json_data, volume_types):
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
+# The official map palette: the canvas (also water), floors not on the shown level, outdoor ground, indoor
+# floors, walls and solid objects, and stairs.
 GFX_BACKGROUND_COLOR = "#1c1e20"
+GFX_OTHER_LEVEL_COLOR = "#363a3d"
 GFX_EXTERIOR_FLOOR_COLOR = "#bec3c6"
 GFX_INTERIOR_FLOOR_COLOR = "#a7adb2"
 GFX_WALL_COLOR = "#767f86"
@@ -2631,7 +2634,56 @@ GFX_STAIRS_COLOR = "#d5d8da"
 # which show as a crosshair through the middle of the map.
 GFX_CROSSHAIR_GAP = 0.25
 # Map layers use one SVG pixel per metre, which matches the scale of the official map GFX files.
-GFX_WALL_WIDTH = 0.4
+# Like the official maps, walls are solid shapes: the cross-section of each wall, grown by this much on every
+# side so that thin walls still read, and without the pieces smaller than GFX_MINIMUM_WALL_AREA square metres
+# (columns, posts and railings).
+GFX_WALL_GROWTH = 0.1
+GFX_LINE_WALL_WIDTH = 0.7
+GFX_MINIMUM_WALL_AREA = 1.0
+# Low objects are drawn as solid blocks, cut halfway up, when their cross-section covers at least this many square
+# metres (garden beds, fountains and containers, not boxes and crates).
+GFX_MINIMUM_BLOCK_AREA = 6.0
+GFX_MINIMUM_BLOCK_HEIGHT = 0.3
+# Cross-sections are filled when they are solid (no thicker on average than this many metres, which covers walls
+# and blocks); hollow outlines, as of one-sided collision meshes around a room, are drawn as lines.
+GFX_MAXIMUM_SOLID_THICKNESS = 4.0
+# Outlines are simplified by this many metres (floors and walls), like the clean shapes of the official maps.
+GFX_FLOOR_TOLERANCE = 0.25
+GFX_WALL_TOLERANCE = 0.15
+# Objects whose entities are mostly plants are left out, as the official maps show no vegetation.
+GFX_VEGETATION_TOKENS = ("plant", "palm", "bamboo", "bush", "banyan", "tree", "flower", "hedge", "grass", "shrub",
+                         "foliage", "vegetation", "fern", "ivy", "leaves", "vine", "reed", "cactus", "boxwood",
+                         "plane_bundle")
+# Rocks and cliffs (such as the boulders along a river bank) are drawn as ground off the shown level, like the
+# band along the river of the official Bangkok map, rather than as walls and floors.
+GFX_ROCK_TOKENS = ("rock", "cliff", "boulder")
+# Vehicles are left out like the official maps do.
+GFX_VEHICLE_TOKENS = ("vehicle", "sedan", "_car_", "car_", "van_", "truck", "_bus_", "wheel", "motorbike", "scooter",
+                      "bicycle", "boat", "forklift")
+# Indoors, the official maps draw the walls that bound rooms, not the furniture in them: a cut object is kept when
+# at least GFX_ROOM_WALL_SHARE of its outline lies within GFX_ROOM_WALL_DISTANCE metres of a room's boundary.
+# Outdoors, an object needs an outline at least GFX_MINIMUM_OUTDOOR_OUTLINE metres long (a wall or a building,
+# not a parasol or a trunk).
+GFX_ROOM_WALL_DISTANCE = 1.0
+GFX_ROOM_WALL_SHARE = 0.3
+GFX_MINIMUM_OUTDOOR_OUTLINE = 3.0
+# Floors on other levels are drawn as smoothed areas of at least this many square metres.
+GFX_MINIMUM_OTHER_LEVEL_AREA = 25.0
+GFX_OTHER_LEVEL_SMOOTHING = 2.0
+# Land and water: the official maps paint the whole canvas as ground except for water. Water is found on a grid of
+# GFX_LAND_RESOLUTION metres as the gaps wider than GFX_WATER_MINIMUM_WIDTH between the positions of the scene's
+# objects (all of them, including those culled from the build) that lie within the area the objects enclose
+# (gaps narrower than GFX_WATER_ENCLOSURE). Only the bodies of water at least GFX_WATER_KEEP_FRACTION as large as
+# the largest are kept, which drops the gaps of thinly furnished ground. These settings recover the river of the
+# official Bangkok map.
+GFX_LAND_RESOLUTION = 1.0
+GFX_WATER_MINIMUM_WIDTH = 64.0
+GFX_WATER_ENCLOSURE = 400.0
+GFX_WATER_KEEP_FRACTION = 0.5
+GFX_MINIMUM_WATER_AREA = 4000.0
+# Like the ring around the official silo map, the shell ledge within this many metres of the land is drawn as a
+# band of indoor floor colour.
+GFX_SHELL_BAND = 4.0
 # Walls and props are drawn where they cross a horizontal plane this far above the floor they stand on.
 GFX_SECTION_HEIGHT = 1.2
 # Like the official maps, only walls are drawn: props whose footprint is smaller than this, or whose top is
@@ -2672,10 +2724,15 @@ GFX_FLOOR_STAIRS = 3
 GFX_FLOOR_BY_ROOM = 4
 # Hides the floors below it and draws nothing.
 GFX_FLOOR_HIDDEN = 5
+# A floor that is only on another level (above the shown one, or below every map layer).
+GFX_FLOOR_OTHER_LEVEL = 6
+GFX_FLOOR_WALL = 7
 
 
 def is_background_map_space_config(map_space_config):
-    return "background" in map_space_config.get("name", "").lower()
+    """The background (satellite) map space: named "...Background" or "..._SAT" in the game's scenes."""
+    name = map_space_config.get("name", "").lower()
+    return "background" in name or name == "sat" or name.endswith("_sat")
 
 
 def rasterize_triangles(triangles, priorities, origin, resolution, shape):
@@ -2723,6 +2780,65 @@ def rasterize_triangles(triangles, priorities, origin, resolution, shape):
     covered = best >= 0
     best[covered] = order[best[covered]]
     return best.reshape(shape)
+
+
+def fill_sections(sections, origin, resolution, shape, maximum_half_thickness):
+    """Fill the cross-sections of closed objects on a grid by the non-zero winding rule.
+
+    `sections` holds one (N, 2, 2) array of oriented segments per object, in the grid's coordinates (cell (i, j)
+    has its centre at origin + ((j, i) + 0.5) * resolution). Each object is filled on its own, inside its own
+    bounding box, and a row whose crossings do not balance (an open mesh) is not filled, so no object can spill
+    across the map. Collision meshes are often one-sided surfaces rather than solids, which would fill whole
+    rooms, so an object is only filled when its area is at most `maximum_half_thickness` (in the grid's units)
+    times its outline's length, as for walls and blocks. Returns the filled interiors and, separately, the
+    segments drawn as lines.
+    """
+    filled = np.zeros(shape, dtype=bool)
+    lines = np.zeros(shape, dtype=bool)
+    height, width = shape
+    for segments in sections:
+        if len(segments) == 0:
+            continue
+        cells = (segments - origin) / resolution - 0.5
+        x0 = int(np.floor(cells[:, :, 0].min())); x1 = int(np.ceil(cells[:, :, 0].max())) + 1
+        y0 = int(np.floor(cells[:, :, 1].min())); y1 = int(np.ceil(cells[:, :, 1].max())) + 1
+        if x1 <= 0 or y1 <= 0 or x0 >= width or y0 >= height:
+            continue
+        box_w, box_h = x1 - x0 + 1, y1 - y0 + 1
+        start, end = cells[:, 0] - (x0, y0), cells[:, 1] - (x0, y0)
+        low_y, high_y = np.minimum(start[:, 1], end[:, 1]), np.maximum(start[:, 1], end[:, 1])
+        first_row = np.ceil(low_y).astype(np.int64)
+        last_row = np.ceil(high_y).astype(np.int64) - 1  # rows whose centre lies in [low_y, high_y)
+        counts = np.maximum(last_row - first_row + 1, 0)
+        winding = np.zeros((box_h, box_w + 1), dtype=np.int32)
+        if counts.sum():
+            owner = np.repeat(np.arange(len(segments)), counts)
+            rows = first_row[owner] + np.arange(int(counts.sum())) - np.repeat(np.cumsum(counts) - counts, counts)
+            t = (rows - start[owner, 1]) / (end[owner, 1] - start[owner, 1])
+            crossing_x = start[owner, 0] + t * (end[owner, 0] - start[owner, 0])
+            columns = np.clip(np.ceil(crossing_x), 0, box_w).astype(np.int64)
+            signs = np.where(end[owner, 1] > start[owner, 1], 1, -1)
+            np.add.at(winding, (rows, columns), signs)
+        balanced = winding.sum(axis=1) == 0
+        inside = (np.cumsum(winding, axis=1)[:, :box_w] != 0) & balanced[:, None]
+        lengths = np.linalg.norm(end - start, axis=1)
+        if np.count_nonzero(inside) > maximum_half_thickness / resolution * lengths.sum():
+            inside[:] = False
+        # Draw the segments as well, sampled every half cell.
+        samples = np.maximum(np.ceil(lengths * 2).astype(np.int64), 1) + 1
+        owner = np.repeat(np.arange(len(segments)), samples)
+        fraction = (np.arange(int(samples.sum())) - np.repeat(np.cumsum(samples) - samples, samples)) / \
+            np.repeat(samples - 1, samples).clip(min=1)
+        points = start[owner] + (end[owner] - start[owner]) * fraction[:, None]
+        px = np.clip(np.round(points[:, 0]).astype(np.int64), 0, box_w - 1)
+        py = np.clip(np.round(points[:, 1]).astype(np.int64), 0, box_h - 1)
+        drawn = np.zeros_like(inside)
+        drawn[py, px] = True
+        gy0, gx0 = max(y0, 0), max(x0, 0)
+        gy1, gx1 = min(y0 + box_h, height), min(x0 + box_w, width)
+        filled[gy0:gy1, gx0:gx1] |= inside[gy0 - y0:gy1 - y0, gx0 - x0:gx1 - x0]
+        lines[gy0:gy1, gx0:gx1] |= drawn[gy0 - y0:gy1 - y0, gx0 - x0:gx1 - x0]
+    return filled, lines
 
 
 def label_regions(mask):
@@ -2922,8 +3038,8 @@ def render_map_layers_for_gfx(json_data, output_path):
             self.floor_base_kinds = []
             self.section_candidates = []  # (instance min z, instance max z, exterior by name, world triangles)
             self.levels = []
-            self.wall_segments = np.empty((0, 2, 2))
-            self.wall_exterior = np.empty(0, dtype=bool)
+            # One (oriented segments, outdoors) pair per object cut by the section plane.
+            self.wall_sections = []
 
         def overlaps(self, lower, upper):
             return any(np.all(lower <= box_max) and np.all(upper >= box_min)
@@ -2970,6 +3086,19 @@ def render_map_layers_for_gfx(json_data, output_path):
             log("WARNING", "Skipping room with incomplete extents: " + room.get("name", ""),
                 "render_map_layers_for_gfx")
     use_rooms = bool(json_data.get("rooms"))
+
+    def room_boundary_distance(points):
+        """For each point, its distance to the boundary of the indoor room it is in (inf when in none)."""
+        distance = np.full(len(points), np.inf)
+        if len(points) == 0:
+            return distance
+        homogeneous = np.hstack((points, np.ones((len(points), 1))))
+        for inverse, minimum, maximum, _, _ in indoor_rooms:
+            local = (homogeneous @ inverse.T)[:, :3]
+            inside = np.all((local >= minimum - (0, 0, 0.3)) & (local <= maximum + (0, 0, np.inf)), axis=1)
+            margin = np.minimum(local[:, :2] - minimum[:2], maximum[:2] - local[:, :2]).min(axis=1)
+            distance[inside] = np.minimum(distance[inside], margin[inside])
+        return distance
 
     def interior_points(points):
         """Classify points as indoor floors: inside an indoor room, or above one (the upper floors and roofs
@@ -3083,11 +3212,33 @@ def render_map_layers_for_gfx(json_data, output_path):
             start = end
         return stairs
 
+    # Meshes whose entities are mostly plants, by ALOC/PRIM hash (object names start with the hash).
+    hash_names = {}
+    for mesh in json_data.get("meshes", []):
+        name = (mesh.get("entity") or {}).get("name", "").lower()
+        for key in ("alocHash", "primHash"):
+            if mesh.get(key):
+                hash_names.setdefault(mesh[key].upper(), []).append(name)
+    def hashes_named(tokens):
+        return {mesh_hash for mesh_hash, names in hash_names.items()
+                if sum(any(token in name for token in tokens) for name in names) * 2 > len(names)}
+
+    vegetation_hashes = hashes_named(GFX_VEGETATION_TOKENS) | hashes_named(GFX_VEHICLE_TOKENS)
+    rock_hashes = hashes_named(GFX_ROCK_TOKENS) - vegetation_hashes
+    slice_bottom = min((layer.z_range()[0] for layer in slices if layer.boxes), default=-np.inf)
+    # Floors below every map layer, shown in GFX_OTHER_LEVEL_COLOR (as (2D triangle, elevation) arrays).
+    under_floors = []
+    # Where the scene has anything at all (object positions and floors), for finding land and water.
+    scene_points = [np.array([[(mesh.get("entity") or {}).get("position", {}).get(axis, 0.0) for axis in ("x", "y")]
+                              for mesh in json_data.get("meshes", []) if mesh.get("entity")]).reshape(-1, 2)]
+
     depsgraph = bpy.context.evaluated_depsgraph_get()
     seen_instances = set()
     for instance in depsgraph.object_instances:
         obj = instance.object
         if obj.type != "MESH":
+            continue
+        if obj.original.name.split("_")[0].upper() in vegetation_hashes:
             continue
         matrix = np.array(instance.matrix_world)
         instance_key = (obj.original.name, matrix.round(5).tobytes())
@@ -3102,14 +3253,15 @@ def render_map_layers_for_gfx(json_data, output_path):
                             for y in (local_min[1], local_max[1]) for z in (local_min[2], local_max[2])]) @ matrix.T
         lower, upper = corners[:, :3].min(axis=0), corners[:, :3].max(axis=0)
         matching = [layer for layer in all_slices if layer.overlaps(lower, upper)]
-        if not matching:
+        below = lower[2] < slice_bottom
+        if not matching and not below:
             continue
 
         world_vertices = local_vertices @ matrix[:3, :3].T + matrix[:3, 3]
         triangles = world_vertices[triangle_indices]
-        cross = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
         if np.linalg.det(matrix[:3, :3]) < 0:
-            cross = -cross
+            triangles = triangles[:, [0, 2, 1]]  # keep the faces pointing outward in a mirrored instance
+        cross = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
         lengths = np.linalg.norm(cross, axis=1)
         valid = lengths > 1e-9
         normals = np.zeros_like(cross)
@@ -3117,9 +3269,20 @@ def render_map_layers_for_gfx(json_data, output_path):
         up = valid & (normals[:, 2] > 0.85)
         shell = upper[2] > map_top and upper[2] - lower[2] >= GFX_SHELL_MINIMUM_HEIGHT
         stairs = np.zeros_like(up) if shell else stair_step_mask(triangles, normals, up)
-        vertical = valid & (np.abs(normals[:, 2]) < 0.5)
+        # Every face that is not flat takes part in the cross-sections, so that they close.
+        sloped = valid & (np.abs(normals[:, 2]) < 0.99)
         footprint = max(upper[0] - lower[0], upper[1] - lower[1])
         centroids = triangles.mean(axis=1)
+        if obj.original.name.split("_")[0].upper() in rock_hashes:
+            if np.any(up):
+                under_floors.append((triangles[up][:, :, :2], centroids[up, 2]))
+            continue
+        if not shell and np.any(up):
+            scene_points.append(centroids[up, :2])
+            if below:
+                under = up & (centroids[:, 2] < slice_bottom)
+                if np.any(under):
+                    under_floors.append((triangles[under][:, :, :2], centroids[under, 2]))
         if shell:
             base_kind = GFX_FLOOR_HIDDEN
         elif use_rooms:
@@ -3137,8 +3300,8 @@ def render_map_layers_for_gfx(json_data, output_path):
                 layer.floor_elevations.append(centroids[floor_mask, 2])
                 layer.floor_kinds.append(kinds)
                 layer.floor_base_kinds.append(base_kinds)
-            if footprint >= GFX_MINIMUM_SECTION_FOOTPRINT and np.any(vertical):
-                layer.section_candidates.append((float(lower[2]), float(upper[2]), exterior, triangles[vertical]))
+            if footprint >= GFX_MINIMUM_SECTION_FOOTPRINT and np.any(sloped):
+                layer.section_candidates.append((float(lower[2]), float(upper[2]), exterior, triangles[sloped]))
 
     def floor_levels(layer):
         """Elevations that carry a significant share of the slice's walkable floor area."""
@@ -3173,36 +3336,55 @@ def render_map_layers_for_gfx(json_data, output_path):
         points = triangles[:, :, :2] + (ends[:, :, :2] - triangles[:, :, :2]) * t[:, :, None]
         # Every crossing triangle has exactly two crossing edges; a stable sort brings them to the front.
         order = np.argsort(~crosses, axis=1, kind="stable")[:, :2]
-        return np.take_along_axis(points, order[:, :, None], axis=1)
+        segments = np.take_along_axis(points, order[:, :, None], axis=1)
+        # Orient each segment with the outside of the object on its right, for filling by winding.
+        normals = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])[:, :2]
+        direction = segments[:, 1] - segments[:, 0]
+        flip = direction[:, 1] * normals[:, 0] - direction[:, 0] * normals[:, 1] < 0
+        segments[flip] = segments[flip][:, ::-1]
+        return segments
 
     for layer in all_slices:
         layer.levels = floor_levels(layer)
         if not layer.levels:
             continue
         top = layer.z_range()[1]
-        segments, exteriors = [], []
         for lowest_z, highest_z, exterior, triangles in layer.section_candidates:
             supporting = [level for level in layer.levels if level <= lowest_z + 0.25]
             level = supporting[-1] if supporting else layer.levels[0]
-            if highest_z - max(level, lowest_z) < GFX_MINIMUM_WALL_HEIGHT:
+            standing = highest_z - max(level, lowest_z)
+            if standing >= GFX_MINIMUM_WALL_HEIGHT:
+                cut = min(level + GFX_SECTION_HEIGHT, top - 0.01) + 1e-4
+                block = False
+            elif standing >= GFX_MINIMUM_BLOCK_HEIGHT:
+                cut = (max(level, lowest_z) + highest_z) / 2 + 1e-4
+                block = True
+            else:
                 continue
-            cut = min(level + GFX_SECTION_HEIGHT, top - 0.01) + 1e-4
             found = section_segments(triangles, cut)
             if len(found) == 0:
                 continue
+            if block:
+                # A low object counts only as a large solid block (by the area its oriented outline encloses).
+                area = 0.5 * abs(np.sum(found[:, 0, 0] * found[:, 1, 1] - found[:, 1, 0] * found[:, 0, 1]))
+                length = np.linalg.norm(found[:, 1] - found[:, 0], axis=1).sum()
+                if area < GFX_MINIMUM_BLOCK_AREA or area > GFX_MAXIMUM_SOLID_THICKNESS / 2 * length:
+                    continue
             midpoints = np.hstack((found.mean(axis=1), np.full((len(found), 1), cut)))
-            found = found[layer.contains(midpoints)]
-            if len(found) == 0:
+            inside = layer.contains(midpoints)
+            if not np.any(inside):
                 continue
-            segments.append(found)
             if use_rooms:
-                exteriors.append(~boxes_contain(indoor_rooms, midpoints[layer.contains(midpoints)],
-                                                (0.3, 0.3, 0.3), (0.3, 0.3, np.inf)))
+                boundary = room_boundary_distance(midpoints[inside])
+                outdoors = np.mean(np.isinf(boundary)) > 0.5
+                if not outdoors and np.mean(boundary <= GFX_ROOM_WALL_DISTANCE) < GFX_ROOM_WALL_SHARE:
+                    continue  # furniture inside a room
             else:
-                exteriors.append(np.full(len(found), exterior))
-        if segments:
-            layer.wall_segments = np.concatenate(segments)
-            layer.wall_exterior = np.concatenate(exteriors)
+                outdoors = exterior
+            if outdoors and np.linalg.norm(found[:, 1] - found[:, 0], axis=1).sum() < GFX_MINIMUM_OUTDOOR_OUTLINE:
+                continue
+            # Keep the whole outline of an object that is mostly inside the layer, so that it stays closed.
+            layer.wall_sections.append((found if np.mean(inside) > 0.5 else found[inside], outdoors))
         layer.section_candidates = []
 
     canvas_boxes = background.boxes or [box for layer in slices for box in layer.boxes]
@@ -3217,29 +3399,10 @@ def render_map_layers_for_gfx(json_data, output_path):
     def to_canvas(points):
         return np.stack((points[..., 0] - canvas_min[0], canvas_max[1] - points[..., 1]), axis=-1)
 
-    class FloorRaster:
-        """The visible floor of one map layer on a grid in canvas coordinates."""
-
-        def __init__(self, visible, lower, resolution):
-            self.visible = visible
-            self.lower = lower
-            self.resolution = resolution
-
-        def near_floor(self, points, distance):
-            """Whether each canvas point lies within `distance` of visible floor."""
-            if self.visible is None or len(points) == 0:
-                return np.zeros(len(points), dtype=bool)
-            reach = int(np.ceil(distance / self.resolution))
-            near = dilate(self.visible != GFX_FLOOR_NONE, reach)
-            cells = np.floor((points - self.lower) / self.resolution).astype(np.int64)
-            inside = ((cells[:, 0] >= 0) & (cells[:, 0] < near.shape[1]) &
-                      (cells[:, 1] >= 0) & (cells[:, 1] < near.shape[0]))
-            result = np.zeros(len(points), dtype=bool)
-            result[inside] = near[cells[inside, 1], cells[inside, 0]]
-            return result
-
     def dilate(mask, reach):
         """Grow a boolean grid by `reach` cells in every direction (a square window)."""
+        if reach <= 0:
+            return mask
         for axis in (0, 1):
             counts = np.cumsum(np.pad(mask, [(reach + 1, reach) if a == axis else (0, 0) for a in (0, 1)]),
                                axis=axis, dtype=np.int32)
@@ -3248,6 +3411,9 @@ def render_map_layers_for_gfx(json_data, output_path):
             lower = np.take(counts, np.arange(0, length), axis=axis)
             mask = upper - lower > 0
         return mask
+
+    def erode(mask, reach):
+        return ~dilate(~mask, reach)
 
     def classify_by_room(visible, winners, lower, resolution, elevations):
         """Resolve GFX_FLOOR_BY_ROOM cells to interior or exterior from the rooms they lie in."""
@@ -3260,31 +3426,43 @@ def render_map_layers_for_gfx(json_data, output_path):
         points = np.stack((canvas_x + canvas_min[0], canvas_max[1] - canvas_y, elevations[owners]), axis=1)
         visible[rows, columns] = np.where(interior_points(points), GFX_FLOOR_INTERIOR, GFX_FLOOR_EXTERIOR)
 
-    def floor_paths(triangles, elevations, kinds, priorities=None):
-        """Merge floor triangles into one even-odd path per colour, painted in the returned order.
+    def mask_path(mask, lower, resolution, tolerance, minimum_area):
+        rings = trace_mask(mask, minimum_cells=minimum_area / resolution ** 2, tolerance=tolerance / resolution)
+        return "".join("M" + " ".join("{:.2f} {:.2f}".format(*point) for point in ring * resolution + lower) + "Z"
+                       for ring in rings)
 
-        The topmost floor (by `priorities`, or else by elevation) wins each cell of a fine grid, and
-        GFX_FLOOR_BY_ROOM cells are classified there rather than per triangle, so a large triangle never
-        carries the colour of the room its centroid happens to lie in across the rooms around it.
+    def layer_paths(triangles, elevations, kinds, priorities, other_triangles, other_elevations, other_kinds,
+                    wall_sections):
+        """The coloured paths of one map layer, in painting order.
+
+        The topmost floor (by `priorities`) wins each cell of a fine grid, and GFX_FLOOR_BY_ROOM cells are
+        classified there rather than per triangle, so a large triangle never carries the colour of the room its
+        centroid happens to lie in across the rooms around it. Floors that are only on other levels
+        (`other_*`: indoor floors above this layer, and floors below every layer) show where this layer has no
+        floor. Walls are the filled cross-sections of `wall_sections`, kept where they border floor.
         """
-        empty = FloorRaster(None, None, None)
-        if len(triangles) == 0:
-            return [], empty
-        triangles = to_canvas(triangles)
-        lower = np.maximum(triangles.reshape(-1, 2).min(axis=0), 0.0)
-        upper = np.minimum(triangles.reshape(-1, 2).max(axis=0), (width, height))
+        canvas_triangles = to_canvas(triangles) if len(triangles) else np.empty((0, 3, 2))
+        canvas_other = to_canvas(other_triangles) if len(other_triangles) else np.empty((0, 3, 2))
+        if len(canvas_triangles) + len(canvas_other) == 0:
+            return []
+        points = np.concatenate((canvas_triangles.reshape(-1, 2), canvas_other.reshape(-1, 2)))
+        lower = np.maximum(points.min(axis=0) - 1.0, 0.0)
+        upper = np.minimum(points.max(axis=0) + 1.0, (width, height))
         if np.any(upper <= lower):
-            return [], empty
+            return []
         resolution = max(GFX_FLOOR_RESOLUTION, float(np.max(upper - lower)) / GFX_MAXIMUM_FLOOR_GRID)
         shape = tuple(int(np.ceil(value / resolution)) + 1 for value in (upper - lower)[::-1])
-        winners = rasterize_triangles(triangles, elevations if priorities is None else priorities, lower,
-                                      resolution, shape)
+
+        winners = rasterize_triangles(canvas_triangles, priorities, lower, resolution, shape)
         visible = np.where(winners >= 0, kinds[np.maximum(winners, 0)], GFX_FLOOR_NONE)
         classify_by_room(visible, winners, lower, resolution, elevations)
         # Shell ledges are out of bounds: hide whatever stands on them too, at any height.
         hidden = kinds == GFX_FLOOR_HIDDEN
+        out_of_bounds = np.zeros(shape, dtype=bool)
         if np.any(hidden):
-            visible[rasterize_triangles(triangles[hidden], elevations[hidden], lower, resolution, shape) >= 0] =                 GFX_FLOOR_HIDDEN
+            out_of_bounds = rasterize_triangles(canvas_triangles[hidden], elevations[hidden], lower, resolution,
+                                                shape) >= 0
+            visible[out_of_bounds] = GFX_FLOOR_NONE
         visible[visible == GFX_FLOOR_HIDDEN] = GFX_FLOOR_NONE
         floor = visible != GFX_FLOOR_NONE
         visible[floor & ~remove_small_islands(floor, GFX_MINIMUM_FLOOR_ISLAND / resolution ** 2)] = GFX_FLOOR_NONE
@@ -3296,32 +3474,87 @@ def render_map_layers_for_gfx(json_data, output_path):
             open_ground = np.pad(visible == GFX_FLOOR_NONE, 1, constant_values=True)
             pockets[np.unique(labels[dilate(open_ground, 1)[1:-1, 1:-1] & exterior])] = False
             visible[exterior & pockets[np.maximum(labels, 0)]] = GFX_FLOOR_INTERIOR
-        paths = []
-        # Paint every floor as exterior first so that interior and stair outlines never leave seams.
-        for color, mask in ((GFX_EXTERIOR_FLOOR_COLOR, visible != GFX_FLOOR_NONE),
-                            (GFX_INTERIOR_FLOOR_COLOR, visible == GFX_FLOOR_INTERIOR),
-                            (GFX_STAIRS_COLOR, visible == GFX_FLOOR_STAIRS)):
-            rings = trace_mask(mask)
-            if rings:
-                paths.append((color, "".join(
-                    "M" + " ".join("{:.2f} {:.2f}".format(*point) for point in ring * resolution + lower) + "Z"
-                    for ring in rings)))
-        return paths, FloorRaster(visible, lower, resolution)
+        floor = visible != GFX_FLOOR_NONE
 
-    def write_floors(svg, triangles, elevations, kinds, priorities=None):
-        paths, raster = floor_paths(triangles, elevations, kinds, priorities)
+        # Floors on other levels, where this layer has none.
+        if len(canvas_other):
+            other_winners = rasterize_triangles(canvas_other, other_elevations, lower, resolution, shape)
+            other = np.where(other_winners >= 0, other_kinds[np.maximum(other_winners, 0)], GFX_FLOOR_NONE)
+            classify_by_room(other, other_winners, lower, resolution, other_elevations)
+            other_level = other != GFX_FLOOR_NONE
+            reach = int(np.ceil(GFX_OTHER_LEVEL_SMOOTHING / resolution))
+            other_level = erode(dilate(other_level, reach), reach) & ~floor & ~out_of_bounds
+            other_level = remove_small_islands(other_level, GFX_MINIMUM_OTHER_LEVEL_AREA / resolution ** 2)
+            visible[other_level] = GFX_FLOOR_OTHER_LEVEL
+
+        # Walls: the filled cross-sections, grown a little, where they border this layer's floor.
+        solids, lines = fill_sections([to_canvas(segments) for segments in wall_sections], lower, resolution, shape,
+                                      GFX_MAXIMUM_SOLID_THICKNESS / 2)
+        # Outlines of hollow objects (one-sided walls) are drawn as thick as the official maps' walls.
+        walls = dilate(solids | lines, int(round(GFX_WALL_GROWTH / resolution))) |             dilate(lines, int(round(GFX_LINE_WALL_WIDTH / 2 / resolution)))
+        walls &= dilate(floor, int(np.ceil(GFX_WALL_FLOOR_DISTANCE / resolution))) & ~out_of_bounds
+        walls = remove_small_islands(walls, GFX_MINIMUM_WALL_AREA / resolution ** 2)
+
+        paths = []
+        for color, mask, tolerance in (
+                (GFX_OTHER_LEVEL_COLOR, visible == GFX_FLOOR_OTHER_LEVEL, GFX_OTHER_LEVEL_SMOOTHING / 4),
+                # Paint every floor as exterior first so that interior and stair outlines never leave seams.
+                (GFX_EXTERIOR_FLOOR_COLOR, floor, GFX_FLOOR_TOLERANCE),
+                (GFX_INTERIOR_FLOOR_COLOR, visible == GFX_FLOOR_INTERIOR, GFX_FLOOR_TOLERANCE),
+                (GFX_STAIRS_COLOR, visible == GFX_FLOOR_STAIRS, GFX_FLOOR_TOLERANCE),
+                (GFX_WALL_COLOR, walls, GFX_WALL_TOLERANCE)):
+            path = mask_path(mask, lower, resolution, tolerance, 4 * resolution ** 2)
+            if path:
+                paths.append((color, path))
+        return paths
+
+    def write_paths(svg, paths):
         for color, path in paths:
             svg.write('<path fill="' + color + '" fill-rule="evenodd" d="' + path + '"/>\n')
-        return raster
 
-    def write_walls(svg, segments, raster):
-        if len(segments):
-            segments = to_canvas(segments)
-            segments = segments[raster.near_floor(segments.mean(axis=1), GFX_WALL_FLOOR_DISTANCE)]
-        if len(segments):
-            path = "".join("M{:.2f} {:.2f}L{:.2f} {:.2f}".format(*segment.ravel()) for segment in segments)
-            svg.write('<path fill="none" stroke="' + GFX_WALL_COLOR + '" stroke-width="' + str(GFX_WALL_WIDTH) +
-                      '" stroke-linecap="square" d="' + path + '"/>\n')
+    def land_mask():
+        """Land on a grid over the canvas: everything but water, and nothing outside an enclosing shell.
+
+        Water is a gap wider than GFX_WATER_MINIMUM_WIDTH between the scene's objects and floors inside the area
+        they enclose; further away from the scene the official maps still show land. Where shell ledges (a silo
+        wall) enclose the scene, the canvas outside them is not land, and the ledge next to the land is returned
+        as a band, as (land, band, resolution).
+        """
+        resolution = GFX_LAND_RESOLUTION
+        shape = (int(np.ceil(height / resolution)), int(np.ceil(width / resolution)))
+        points = to_canvas(np.concatenate(scene_points)) if scene_points else np.empty((0, 2))
+        cells = np.floor(points / resolution).astype(np.int64)
+        inside = (cells[:, 0] >= 0) & (cells[:, 0] < shape[1]) & (cells[:, 1] >= 0) & (cells[:, 1] < shape[0])
+        occupied = np.zeros(shape, dtype=bool)
+        occupied[cells[inside, 1], cells[inside, 0]] = True
+        if not occupied.any():
+            return np.ones(shape, dtype=bool), np.zeros(shape, dtype=bool), resolution
+        barrier = np.zeros(shape, dtype=bool)
+        for layer in all_slices:
+            triangles, elevations, kinds = layer.floors()
+            hidden = kinds == GFX_FLOOR_HIDDEN
+            if np.any(hidden):
+                barrier |= rasterize_triangles(to_canvas(triangles[hidden]), elevations[hidden], np.zeros(2),
+                                               resolution, shape) >= 0
+        void = np.zeros(shape, dtype=bool)
+        if barrier.any():
+            labels, _ = label_regions(~barrier)
+            reached = np.unique(labels[occupied & ~barrier])
+            void = barrier | (~barrier & ~np.isin(labels, reached[reached >= 0]))
+
+        def close(mask, width):
+            # Past the canvas edge counts as closed, so water may run off the canvas like a river does.
+            reach = int(np.ceil(width / 2 / resolution))
+            return erode(dilate(mask, reach), reach)
+
+        water = ~close(occupied, GFX_WATER_MINIMUM_WIDTH) & close(occupied, GFX_WATER_ENCLOSURE) & ~void
+        labels, sizes = label_regions(water)
+        if len(sizes):
+            keep = sizes >= max(GFX_WATER_KEEP_FRACTION * sizes.max(), GFX_MINIMUM_WATER_AREA / resolution ** 2)
+            water &= keep[np.maximum(labels, 0)]
+        land = ~water & ~void
+        band = void & dilate(land, int(round(GFX_SHELL_BAND / resolution))) if barrier.any() else barrier
+        return land, band, resolution
 
     def write_svg(path, writer):
         with open(path, "w", encoding="utf-8") as svg:
@@ -3333,6 +3566,11 @@ def render_map_layers_for_gfx(json_data, output_path):
 
     output_dir = os.path.abspath(os.path.dirname(output_path))
     os.makedirs(output_dir, exist_ok=True)
+    if under_floors:
+        under_triangles = np.concatenate([triangles for triangles, _ in under_floors])
+        under_elevations = np.concatenate([elevations for _, elevations in under_floors])
+    else:
+        under_triangles, under_elevations = np.empty((0, 3, 2)), np.empty(0)
 
     def write_background(svg):
         centre_x, centre_y = width / 2, height / 2
@@ -3343,8 +3581,16 @@ def render_map_layers_for_gfx(json_data, output_path):
                                          (centre_x + half_gap, centre_y + half_gap, width, height)):
             svg.write('<rect x="{:g}" y="{:g}" width="{:g}" height="{:g}" fill="{}"/>\n'.format(
                 left, top, right - left, bottom - top, GFX_BACKGROUND_COLOR))
-        raster = write_floors(svg, *background.floors())
-        write_walls(svg, background.wall_segments, raster)
+        # The official maps paint the ground over the whole canvas, leaving out only the water.
+        land, band, land_resolution = land_mask()
+        for color, mask in ((GFX_INTERIOR_FLOOR_COLOR, band), (GFX_EXTERIOR_FLOOR_COLOR, land)):
+            path = mask_path(mask, np.zeros(2), land_resolution, land_resolution, 4 * land_resolution ** 2)
+            if path:
+                svg.write('<path fill="' + color + '" fill-rule="evenodd" d="' + path + '"/>\n')
+        triangles, elevations, kinds = background.floors()
+        write_paths(svg, layer_paths(triangles, elevations, kinds, elevations, np.empty((0, 3, 2)), np.empty(0),
+                                     np.empty(0, dtype=np.int64),
+                                     [segments for segments, _ in background.wall_sections]))
 
     background_path = os.path.join(output_dir, "output_background.svg")
     write_svg(background_path, write_background)
@@ -3367,10 +3613,19 @@ def render_map_layers_for_gfx(json_data, output_path):
                 # Keep lower floors underneath this slice's floors regardless of their elevations.
                 priorities = np.concatenate((lower_elevations - 1e6, priorities))
                 kinds = np.concatenate((lower_kinds, kinds))
-            raster = write_floors(svg, triangles, elevations, kinds, priorities)
-            write_walls(svg, np.concatenate(
-                [lower.wall_segments[lower.wall_exterior] for lower in lower_slices] + [layer.wall_segments]),
-                raster)
+            # Floors only on other levels: those of the slices above, and every floor below all slices.
+            other_triangles, other_elevations = [under_triangles], [under_elevations]
+            other_kinds = [np.full(len(under_elevations), GFX_FLOOR_OTHER_LEVEL)]
+            for upper_slice in slices[layer_number + 1:]:
+                upper_triangles, upper_elevations, upper_kinds = upper_slice.floors(base_kinds=True)
+                other_triangles.append(upper_triangles)
+                other_elevations.append(upper_elevations)
+                other_kinds.append(upper_kinds)
+            sections = [segments for lower in lower_slices for segments, outdoors in lower.wall_sections
+                        if outdoors] + [segments for segments, _ in layer.wall_sections]
+            write_paths(svg, layer_paths(triangles, elevations, kinds, priorities,
+                                         np.concatenate(other_triangles), np.concatenate(other_elevations),
+                                         np.concatenate(other_kinds), sections))
 
         svg_path = os.path.join(output_dir, "output_" + str(layer_number).zfill(2) + ".svg")
         write_svg(svg_path, write_layer)
