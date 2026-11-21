@@ -113,7 +113,7 @@ namespace {
 </swf>)xml";
 
     std::string generate(const size_t layerCount) {
-        return GfxMapLayerSwf::createMapLayerSwfXml(templateXml, layerCount);
+        return GfxMapLayerSwf::createMapLayerSwfXml(templateXml, layerCount, 900.0, 900.0);
     }
 
     pugi::xml_document parse(const std::string& xml) {
@@ -292,6 +292,30 @@ namespace {
         {80, 5, 95, 18},
     };
 
+    void testCanvasSizedShapes() {
+        // FFDec fits imported SVGs into the shapes' bounds, so they must be the canvas, in twips.
+        const pugi::xml_document document = parse(GfxMapLayerSwf::createMapLayerSwfXml(templateXml, 2, 1100.0, 600.0));
+        size_t shapes = 0;
+        for (const pugi::xml_node item : document.child("swf").child("tags").children("item")) {
+            if (std::string_view(item.attribute("type").value()) != "DefineShape3Tag") {
+                continue;
+            }
+            const pugi::xml_node bounds = item.child("shapeBounds");
+            check(bounds.attribute("Xmin").as_int() == 0 && bounds.attribute("Ymin").as_int() == 0 &&
+                    bounds.attribute("Xmax").as_int() == 22000 && bounds.attribute("Ymax").as_int() == 12000,
+                "map shapes must span the canvas");
+            check(bounds.attribute("nbits").as_int() >= 16, "the bounds must fit their bit width");
+            ++shapes;
+        }
+        check(shapes == 4, "each layer has a background and a map shape");
+        const auto size = GfxMapLayerSwf::svgCanvasSize(
+            R"(<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="1098.22" height="723.398" )"
+            R"(viewBox="0 0 1098.22 723.398"><rect/></svg>)");
+        check(size && std::abs(size->first - 1098.22) < 1e-6 && std::abs(size->second - 723.398) < 1e-6,
+            "the canvas size comes from the SVG's viewBox");
+        check(!GfxMapLayerSwf::svgCanvasSize("<html/>"), "a document without an SVG has no canvas size");
+    }
+
     void testMapLayerPlacement() {
         // Draw the plan into an image at two pixels per metre whose top-left corner lies at (-123.5, 47) on the
         // map plane, then place it on the plan's wall outlines.
@@ -363,14 +387,15 @@ namespace {
 
 int main(const int argc, char** argv) {
     try {
-        if (argc == 5 && std::string_view(argv[1]) == "--generate") {
+        if ((argc == 5 || argc == 7) && std::string_view(argv[1]) == "--generate") {
             std::ifstream input(argv[2], std::ios::binary);
             const std::string source{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
             if (!input && source.empty()) {
                 throw std::runtime_error("could not read input XML");
             }
             const std::string generated =
-                GfxMapLayerSwf::createMapLayerSwfXml(source, static_cast<size_t>(std::stoull(argv[4])));
+                GfxMapLayerSwf::createMapLayerSwfXml(source, static_cast<size_t>(std::stoull(argv[4])),
+                    argc == 7 ? std::stod(argv[5]) : 900.0, argc == 7 ? std::stod(argv[6]) : 900.0);
             std::ofstream output(argv[3], std::ios::binary | std::ios::trunc);
             output.write(generated.data(), static_cast<std::streamsize>(generated.size()));
             if (!output) {
@@ -413,6 +438,7 @@ int main(const int argc, char** argv) {
         testFewerMapLayers();
         testValidationRejectsOtherFormats();
         testBackgroundMapSpaceNames();
+        testCanvasSizedShapes();
         testMapLayerPlacement();
         testSectionsAndFloorLevels();
         std::cout << "GFX builder tests passed\n";

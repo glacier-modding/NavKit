@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
+#include <utility>
 #include <string>
 #include <string_view>
 
@@ -23,8 +25,14 @@ namespace GfxMapLayerSwf {
     bool isBackgroundMapSpaceName(std::string_view name);
 
     // Turns FFDec XML of a template map GFX into the XML of a GFX with `layerCount` empty map layers whose shapes
-    // FFDec's -importShapes then fills from <shape id>.svg files.
-    std::string createMapLayerSwfXml(std::string_view templateXml, size_t layerCount);
+    // FFDec's -importShapes then fills from <shape id>.svg files. FFDec fits each SVG into the shape's existing
+    // bounds, so the shapes are made the size of the map canvas (`canvasWidth` x `canvasHeight` units, one per
+    // metre) for the map to keep its scale and proportions.
+    std::string createMapLayerSwfXml(
+        std::string_view templateXml, size_t layerCount, double canvasWidth, double canvasHeight);
+
+    // The width and height of an SVG document (from its viewBox, or else its width and height attributes).
+    std::optional<std::pair<double, double>> svgCanvasSize(std::string_view svg);
 
     // Checks that FFDec XML of a built map GFX has `layerCount` map layers in the game's format. Returns an empty
     // string when it does, or a description of the first problem found.

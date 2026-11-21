@@ -636,8 +636,17 @@ void Gfxf::buildGfx() {
         };
         runFfdec({"-swf2xml", asWxPath(templatePath), asWxPath(templateXml)}, "opening the GFX template");
 
-        const std::string generatedXml =
-            GfxMapLayerSwf::createMapLayerSwfXml(readText(templateXml, "GFX template XML"), layerCount);
+        // Every map SVG shares the background's canvas, at one unit per metre.
+        const std::filesystem::path backgroundPath = outputDirectory / "output_background.svg";
+        if (!isRegularFile(backgroundPath)) {
+            throw std::runtime_error("The Blender map background SVG is missing: " + pathToUtf8(backgroundPath));
+        }
+        const auto canvasSize = GfxMapLayerSwf::svgCanvasSize(readText(backgroundPath, "map background SVG"));
+        if (!canvasSize) {
+            throw std::runtime_error("The map background SVG has no canvas size: " + pathToUtf8(backgroundPath));
+        }
+        const std::string generatedXml = GfxMapLayerSwf::createMapLayerSwfXml(
+            readText(templateXml, "GFX template XML"), layerCount, canvasSize->first, canvasSize->second);
         const std::filesystem::path generatedXmlPath = temporaryDirectory / "generated.xml";
         std::ofstream generatedXmlOutput(generatedXmlPath, std::ios::binary | std::ios::trunc);
         generatedXmlOutput.write(generatedXml.data(), static_cast<std::streamsize>(generatedXml.size()));
@@ -660,16 +669,18 @@ void Gfxf::buildGfx() {
                     "Could not stage map-layer SVG " + pathToUtf8(svgPath) + ": " + filesystemError.message());
             }
         };
-        const std::filesystem::path backgroundPath = outputDirectory / "output_background.svg";
-        if (!isRegularFile(backgroundPath)) {
-            throw std::runtime_error("The Blender map background SVG is missing: " + pathToUtf8(backgroundPath));
-        }
         for (size_t layerIndex = 0; layerIndex < layerCount; ++layerIndex) {
             const std::string layerNumber =
                 layerIndex < 10 ? "0" + std::to_string(layerIndex) : std::to_string(layerIndex);
             const std::filesystem::path svgPath = outputDirectory / ("output_" + layerNumber + ".svg");
             if (!isRegularFile(svgPath)) {
                 throw std::runtime_error("The Blender map-layer SVG is missing: " + pathToUtf8(svgPath));
+            }
+            if (const auto layerSize = GfxMapLayerSwf::svgCanvasSize(readText(svgPath, "map-layer SVG")); !layerSize ||
+                std::abs(layerSize->first - canvasSize->first) > 0.01 ||
+                std::abs(layerSize->second - canvasSize->second) > 0.01) {
+                throw std::runtime_error("The map-layer SVG " + pathToUtf8(svgPath) +
+                    " is not the size of the map background; rebuild the map from the scene.");
             }
             stageShape(backgroundPath, GfxMapLayerSwf::backgroundShapeId(layerIndex));
             stageShape(svgPath, GfxMapLayerSwf::layerShapeId(layerIndex));

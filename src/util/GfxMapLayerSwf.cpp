@@ -1,6 +1,7 @@
 #include "../../include/NavKit/util/GfxMapLayerSwf.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <cstdint>
 #include <limits>
@@ -210,9 +211,54 @@ namespace GfxMapLayerSwf {
             (lower.size() > 4 && lower.ends_with("_sat"));
     }
 
-    std::string createMapLayerSwfXml(const std::string_view templateXml, const size_t layerCount) {
+    std::optional<std::pair<double, double>> svgCanvasSize(const std::string_view svg) {
+        const size_t start = svg.find("<svg");
+        if (start == std::string_view::npos) {
+            return std::nullopt;
+        }
+        const std::string_view tag = svg.substr(start, svg.find('>', start) - start);
+        const auto attribute = [&tag](const std::string_view name) -> std::optional<std::string> {
+            const std::string key = " " + std::string(name) + "=\"";
+            const size_t position = tag.find(key);
+            if (position == std::string_view::npos) {
+                return std::nullopt;
+            }
+            const size_t valueStart = position + key.size();
+            const size_t valueEnd = tag.find('"', valueStart);
+            if (valueEnd == std::string_view::npos) {
+                return std::nullopt;
+            }
+            return std::string(tag.substr(valueStart, valueEnd - valueStart));
+        };
+        try {
+            if (const auto viewBox = attribute("viewBox")) {
+                std::istringstream values(*viewBox);
+                double x = 0;
+                double y = 0;
+                double width = 0;
+                double height = 0;
+                if (values >> x >> y >> width >> height && width > 0 && height > 0) {
+                    return std::pair{width, height};
+                }
+            }
+            const auto width = attribute("width");
+            const auto height = attribute("height");
+            if (width && height && std::stod(*width) > 0 && std::stod(*height) > 0) {
+                return std::pair{std::stod(*width), std::stod(*height)};
+            }
+        } catch (const std::exception&) {
+        }
+        return std::nullopt;
+    }
+
+    std::string createMapLayerSwfXml(const std::string_view templateXml, const size_t layerCount,
+        const double canvasWidth, const double canvasHeight) {
         if (layerCount == 0) {
             throw std::runtime_error("The loaded scene has no map layers.");
+        }
+        // Shape bounds are signed twips; keep well inside FFDec's 31-bit limit.
+        if (!(canvasWidth > 0) || !(canvasHeight > 0) || canvasWidth > 1e6 || canvasHeight > 1e6) {
+            throw std::runtime_error("The map canvas size is not valid.");
         }
         // Character IDs are 16-bit; each layer uses three of them.
         if (layerCount > (std::numeric_limits<std::uint16_t>::max() - 1) / 3) {
@@ -275,12 +321,18 @@ namespace GfxMapLayerSwf {
         const pugi::xml_document symbolClassCopy = copyNode(symbolClassTemplate);
         const pugi::xml_document exportCopy = copyNode(exportTemplate);
         pugi::xml_node generatedShapeBounds = shapeCopy.child("item").child("shapeBounds");
-        // FFDec's -importShapes replaces the bounds with the SVG's; this only keeps the shell valid until then.
+        // FFDec's -importShapes fits each SVG into these bounds, so they are the canvas at one unit per metre.
+        const long long widthTwips = std::llround(canvasWidth * 20.0);
+        const long long heightTwips = std::llround(canvasHeight * 20.0);
+        int bits = 1;
+        while ((1LL << (bits - 1)) <= std::max(widthTwips, heightTwips)) {
+            ++bits;
+        }
         generatedShapeBounds.attribute("Xmin").set_value(0);
         generatedShapeBounds.attribute("Ymin").set_value(0);
-        generatedShapeBounds.attribute("Xmax").set_value(18000);
-        generatedShapeBounds.attribute("Ymax").set_value(18000);
-        generatedShapeBounds.attribute("nbits").set_value(16);
+        generatedShapeBounds.attribute("Xmax").set_value(widthTwips);
+        generatedShapeBounds.attribute("Ymax").set_value(heightTwips);
+        generatedShapeBounds.attribute("nbits").set_value(bits);
 
         std::vector<pugi::xml_document> headerCopies;
         for (const std::string_view type :
