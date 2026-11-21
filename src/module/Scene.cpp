@@ -18,6 +18,7 @@
 #include <wx/sizer.h>
 #include <wx/slider.h>
 #include <wx/stattext.h>
+#include <wx/msgdlg.h>
 
 Scene::Scene() :
     sceneLoaded(false), showBBox(true), showAxes(true), version(2), loadSceneName("Load NavKit Scene"),
@@ -65,7 +66,7 @@ void Scene::loadMeshes(
         Logger::log(NK_INFO, "Loading meshes.");
         newMeshes = Json::Meshes(jsonDocument["meshes"].get_array());
     } catch (const std::exception& e) {
-        Logger::log(NK_ERROR, e.what());
+        recordLoadError("Meshes", e.what());
     } catch (...) {
         errorCallback();
     }
@@ -79,7 +80,7 @@ void Scene::loadPfBoxes(
         Logger::log(NK_INFO, "Loading Pathfinding boxes.");
         pfBoxes = Json::PfBoxes(jsonDocument["pfBoxes"].get_array());
     } catch (const std::exception& e) {
-        Logger::log(NK_ERROR, e.what());
+        recordLoadError("Pathfinding boxes", e.what());
     } catch (...) {
         errorCallback();
     }
@@ -115,7 +116,7 @@ void Scene::loadPfSeedPoints(
         Logger::log(NK_INFO, "Loading Pathfinding seed points.");
         newPfSeedPoints = Json::PfSeedPoints(jsonDocument["pfSeedPoints"].get_array());
     } catch (const std::exception& e) {
-        Logger::log(NK_ERROR, e.what());
+        recordLoadError("Pathfinding seed points", e.what());
     } catch (...) {
         errorCallback();
     }
@@ -130,22 +131,29 @@ void Scene::loadRoomsAndVolumes(
     aiAreas.clear();
     volumeBoxes.clear();
     volumeSpheres.clear();
+    std::string section = "Gates";
     try {
         Logger::log(NK_INFO, "Loading Gates.");
         gates = Json::Gates(jsonDocument["gates"].get_array()).gates;
+        section = "Rooms";
         Logger::log(NK_INFO, "Loading Rooms.");
         rooms = Json::Rooms(jsonDocument["rooms"].get_array()).rooms;
+        section = "AI Area Worlds";
         Logger::log(NK_INFO, "Loading AI Area Worlds.");
         aiAreaWorlds = Json::AiAreaWorlds(jsonDocument["aiAreaWorld"].get_array()).aiAreaWorlds;
+        section = "AI Areas";
         Logger::log(NK_INFO, "Loading AI Areas.");
         aiAreas = Json::AiAreas(jsonDocument["aiArea"].get_array()).aiAreas;
+        section = "Volume Boxes";
         Logger::log(NK_INFO, "Loading Volume Boxes.");
         volumeBoxes = Json::VolumeBoxes(jsonDocument["volumeBoxes"].get_array()).volumeBoxes;
+        section = "Volume Spheres";
         Logger::log(NK_INFO, "Loading Volume Spheres.");
         volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"].get_array()).volumeSpheres;
     } catch (const std::exception& e) {
-        Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
+        recordLoadError(section + " (and every later section of gates/rooms/AI areas/volumes)", e.what());
     } catch (...) {
+        recordLoadError(section, "unknown error");
         errorCallback();
     }
 }
@@ -162,7 +170,7 @@ void Scene::loadVolumeShapes(
         }
         volumeShapes = Json::VolumeShapes(volumeShapesJson).volumeShapes;
     } catch (const std::exception& e) {
-        Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
+        recordLoadError("Volume Shapes", e.what());
     } catch (...) {
         errorCallback();
     }
@@ -181,7 +189,7 @@ void Scene::loadCrowds(
         crowds = Json::Crowds(crowdsJson).crowds;
         Logger::log(NK_INFO, "Loaded %zu Crowds.", crowds.size());
     } catch (const std::exception& e) {
-        Logger::log(NK_ERROR, "Error loading scene: %s", e.what());
+        recordLoadError("Crowds", e.what());
     } catch (...) {
         errorCallback();
     }
@@ -220,6 +228,7 @@ void Scene::loadPrimMatis(
 void Scene::loadScene(
     const std::string& fileName, const std::function<void()>& callback, const std::function<void()>& errorCallback) {
     sceneLoaded = false;
+    loadErrors.clear();
     Menu::updateMenuState();
 
     simdjson::ondemand::parser parser;
@@ -236,7 +245,27 @@ void Scene::loadScene(
     loadCrowds(errorCallback, jsonDocument);
     loadPrimMatis(errorCallback, jsonDocument);
 
+    showLoadErrorsIfAny();
     callback();
+}
+
+void Scene::recordLoadError(const std::string& section, const std::string& error) {
+    Logger::log(NK_ERROR, "Error loading scene section '%s': %s", section.c_str(), error.c_str());
+    loadErrors.push_back(section + ": " + error);
+}
+
+void Scene::showLoadErrorsIfAny() {
+    if (loadErrors.empty()) {
+        return;
+    }
+    std::string message = "Parts of the scene failed to load and are empty. Anything built or saved from it will be "
+                          "missing that data.\n";
+    for (const auto& error : loadErrors) {
+        message += "\n- " + error;
+    }
+    wxTheApp->CallAfter([message] {
+        wxMessageBox(wxString::FromUTF8(message), "Scene load failed", wxOK | wxICON_ERROR, getMainFrame());
+    });
 }
 
 void Scene::saveScene(const std::string& fileName) const {
@@ -363,7 +392,11 @@ void Scene::saveScene(const std::string& fileName) const {
         f.close();
         Logger::log(NK_INFO, "Done saving Scene.");
     } else {
-        Logger::log(NK_ERROR, "Failed to open file for saving scene: %s", fileName.c_str());
+        const std::string message = "Failed to open file for saving scene: " + fileName;
+        Logger::log(NK_ERROR, "%s", message.c_str());
+        wxTheApp->CallAfter([message] {
+            wxMessageBox(wxString::FromUTF8(message), "Scene save failed", wxOK | wxICON_ERROR, getMainFrame());
+        });
     }
 }
 
