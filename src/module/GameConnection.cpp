@@ -1,6 +1,9 @@
 #include "../../include/NavKit/module/GameConnection.h"
 
+#include <atomic>
+#include <cerrno>
 #include <chrono>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -123,28 +126,73 @@ int GameConnection::listNavKitSceneEntities() const {
     }
     const auto file_write_queue = std::make_unique<rsj::ConcurrentQueue<std::string>>();
     const std::string SENTINEL_MESSAGE = "::DONE_WRITING::";
+    std::atomic<bool> writeFailed = false;
     std::jthread writer_thread([&](std::stop_token stoken) {
         Logger::log(NK_INFO, "Writer thread started. Opening file...");
         const std::string outputFolder = NavKitSettings::getInstance().outputFolder;
         const std::filesystem::path outputFile = std::filesystem::u8path(outputFolder) / Scene::OUTPUT_SCENE_FILE_NAME;
-        std::ofstream f(outputFile, std::ios::app);
+        constexpr auto openMode = std::ios::binary | std::ios::app;
+        std::ofstream f(outputFile, openMode);
         if (!f.is_open()) {
             Logger::log(NK_ERROR, "Writer thread failed to open output file: %s", outputFile.string().c_str());
+            writeFailed = true;
             return;
         }
+
+        std::error_code sizeError;
+        std::uintmax_t bytesWritten = std::filesystem::file_size(outputFile, sizeError);
+        if (sizeError) {
+            bytesWritten = 0;
+        }
+
+        // A failed write puts the stream into a bad state where every later write is silently dropped,
+        // so check each message, and on failure roll the file back to the last good size and retry.
+        auto writeMessage = [&](const std::string& message) -> bool {
+            constexpr int maxAttempts = 5;
+            for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
+                f.write(message.data(), static_cast<std::streamsize>(message.size()));
+                f.flush();
+                if (f) {
+                    bytesWritten += message.size();
+                    return true;
+                }
+                const int err = errno;
+                Logger::log(NK_WARN, "Writer thread: write to '%s' failed (attempt %d of %d): %s",
+                    outputFile.string().c_str(), attempt, maxAttempts, std::strerror(err));
+                f.close();
+                f.clear();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100 * attempt));
+                std::error_code resizeError;
+                std::filesystem::resize_file(outputFile, bytesWritten, resizeError);
+                if (resizeError) {
+                    Logger::log(
+                        NK_WARN, "Writer thread: could not roll back output file: %s", resizeError.message().c_str());
+                }
+                f.open(outputFile, openMode);
+            }
+            return false;
+        };
 
         while (!stoken.stop_requested()) {
             if (auto message_to_write = file_write_queue->try_pop(); message_to_write.has_value()) {
                 if (message_to_write.value() == SENTINEL_MESSAGE) {
                     break;
                 }
-                f << message_to_write.value();
+                if (!writeFailed && !writeMessage(message_to_write.value())) {
+                    Logger::log(NK_ERROR, "Writer thread: giving up writing '%s'. The scene file is incomplete.",
+                        outputFile.string().c_str());
+                    writeFailed = true;
+                }
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
 
         f.close();
+        if (!f) {
+            Logger::log(NK_ERROR, "Writer thread: failed to close '%s'.", outputFile.string().c_str());
+            writeFailed = true;
+        }
         Logger::log(NK_INFO, "Writer thread finished writing.");
     });
 
@@ -201,6 +249,10 @@ int GameConnection::listNavKitSceneEntities() const {
 
     writer_thread.join();
 
+    if (writeFailed) {
+        Logger::log(NK_ERROR, "Failed to save entities to file.");
+        return 1;
+    }
     Logger::log(NK_INFO, "Saved entities to file.");
     return 0;
 }
