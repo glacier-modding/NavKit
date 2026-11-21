@@ -52,6 +52,7 @@ set(RENDER_SOURCES
 set(UTIL_SOURCES
         util/BridgeJoiner.cpp
         util/CommandRunner.cpp
+        util/CrowdMapBuilder.cpp
         util/ErrorHandler.cpp
         util/FileUtil.cpp
         util/FilteredListPicker.cpp

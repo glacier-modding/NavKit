@@ -492,6 +492,9 @@ namespace Json {
     class CrowdGroupBox : public Entity {
     public:
         int groupSize = 0;
+        std::vector<size_t> exclusionBoxIndices{};
+        std::vector<size_t> exclusionShapeIndices{};
+        std::vector<size_t> seedPointIndices{};
 
         void readJson(simdjson::ondemand::object json);
 

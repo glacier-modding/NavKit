@@ -234,6 +234,11 @@ void showHelpDialog() {
                 {"Build Airg from Navp and GLB", "Builds AIRG grid and waypoint data from a Navp and GLB.",
                     "Generates AIRG grid and waypoint data from the loaded Navp.",
                     "Load a Navp and make sure no AIRG load, save, or build is in progress."},
+                {"Build Crmd from Scene, Navp and GLB", "Bakes a CRMD crowd map for one of the scene's crowds.",
+                    "Takes walkable cells from the Navp and the crowd's volumes, exits and groups from the scene, and "
+                    "snaps grid heights to the GLB, which sits below the Navp.",
+                    "Load a scene containing a crowd, a Navp, and the GLB, and make sure no CRMD load, save, or build "
+                    "is in progress."},
             }},
         {"CRMD",
             "CRMD overlays show crowd-map grid data. Open a CRMD file and enable View > Show CRMD to display it. "

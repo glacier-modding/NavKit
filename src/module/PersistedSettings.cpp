@@ -2,6 +2,7 @@
 #include <filesystem>
 
 #include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/SceneMesh.h"
@@ -31,6 +32,7 @@ void PersistedSettings::load() {
     Renderer::getInstance().loadSettings();
     SceneMesh::getInstance().loadSettings();
     RecastAdapter::getInstance().loadSettings();
+    Crmd::getInstance().loadSettings();
 }
 
 void PersistedSettings::loadFile() {
