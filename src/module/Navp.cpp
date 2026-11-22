@@ -838,6 +838,7 @@ void Navp::loadNavMesh(
     Logger::log(NK_INFO, msg.c_str());
     const auto start = std::chrono::high_resolution_clock::now();
     loading = true;
+    Menu::updateMenuState();
     CPPTRACE_TRY {
         NavPower::NavMesh newNavMesh = isFromJson ? NavWeakness::LoadNavMeshFromJson(fileName.c_str())
                                                   : NavWeakness::LoadNavMeshFromBinary(fileName.c_str());

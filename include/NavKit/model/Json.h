@@ -492,6 +492,9 @@ namespace Json {
     class CrowdGroupBox : public Entity {
     public:
         int groupSize = 0;
+        std::vector<size_t> exclusionBoxIndices{};
+        std::vector<size_t> exclusionShapeIndices{};
+        std::vector<size_t> seedPointIndices{};
 
         void readJson(simdjson::ondemand::object json);
 
@@ -502,8 +505,8 @@ namespace Json {
     public:
         Transform transform{};
         float flowWidth = 0;
-        int lengthTessellation = 0;
-        int widthTessellation = 0;
+        float lengthTessellation = 0;
+        float widthTessellation = 0;
         float extrusionHeight = 0;
         bool closed = false;
         std::vector<Vec3> points{};

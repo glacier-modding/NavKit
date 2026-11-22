@@ -19,6 +19,7 @@
 #include "../include/NavKit/render/Model.h"
 #include "../include/NavKit/util/UpdateChecker.h"
 #include "../include/NavKit/util/BridgeJoiner.h"
+#include "../include/NavKit/util/CrowdMapBuilder.h"
 #include "../include/NavKit/util/GridGenerator.h"
 #include "../include/NavKit/util/Math.h"
 #include "../include/NavKit/util/Pathfinding.h"
@@ -246,7 +247,8 @@ namespace {
     }
 
     void testJsonCrowdRoundTrip() {
-        const std::string editorJson = R"({"id":"crowd-id","name":"Crowd","tblu":"00AB",)"
+        const std::string editorJson =
+            R"({"id":"crowd-id","name":"Crowd","tblu":"00AB",)"
             R"("transform":{"x":{"x":0,"y":1,"z":0},"y":{"x":-1,"y":0,"z":0},"z":{"x":0,"y":0,"z":1},)"
             R"("t":{"x":-6.5,"y":-27.5,"z":1}},"globalSize":{"x":17,"y":17.25,"z":2},"cellSize":0.45,)"
             R"("navMeshShrink":0.5,"generatorOffset":0.25,"smoothenExitFlows":false,"flowCandidates":"SPAWNED_ON_FLOW",)"
@@ -262,7 +264,7 @@ namespace {
             R"("exitActionAmbient":"STAY","exitActionScared":"LEAVE_CROWD"}],)"
             R"("splineFlows":[{"id":"spline-id","name":"Spline","transform":{"x":{"x":1,"y":0,"z":0},"y":{"x":0,"y":1,"z":0},)"
             R"("z":{"x":0,"y":0,"z":1},"t":{"x":0,"y":0,"z":0}},"flowWidth":1.5,)"
-            R"("lengthTessellation":8.0,"widthTessellation":2.0,"extrusionHeight":4.5,"closed":true,"points":[{"x":1,"y":2,"z":3}]}]})";
+            R"("lengthTessellation":8.0,"widthTessellation":0.25,"extrusionHeight":4.5,"closed":true,"points":[{"x":1,"y":2,"z":3}]}]})";
         const auto readCrowd = [](Json::Crowd& value, simdjson::ondemand::object object) { value.readJson(object); };
         const Json::Crowd crowd = readJsonObject<Json::Crowd>(editorJson, readCrowd);
         std::ostringstream savedJson;
@@ -285,7 +287,8 @@ namespace {
         checkNear(parsed.navMeshShrink, 0.5f);
         check(!parsed.smoothenExitFlows, "crowd smoothing flag did not round trip");
         check(parsed.exclusionBoxIndices == std::vector<size_t>{3, 7} && parsed.inclusionBoxIndices.empty() &&
-                parsed.panicOnlyBoxIndices == std::vector<size_t>{1} && parsed.flowBoxIndices == std::vector<size_t>{0} &&
+                parsed.panicOnlyBoxIndices == std::vector<size_t>{1} &&
+                parsed.flowBoxIndices == std::vector<size_t>{0} &&
                 parsed.flowBoxTwoWayIndices == std::vector<size_t>{2},
             "crowd box indices did not round trip");
         check(parsed.exclusionSphereIndices == std::vector<size_t>{5}, "crowd sphere indices did not round trip");
@@ -294,16 +297,18 @@ namespace {
             "crowd shape indices did not round trip");
         checkNear(parsed.groupBoxes[0].position.x, -6.5f);
         checkNear(parsed.groupBoxes[0].scale.data.y, 6.0f);
-        check(parsed.flowCandidates == ECrowdFlowCandidates::SPAWNED_ON_FLOW, "crowd flow candidates did not round trip");
+        check(
+            parsed.flowCandidates == ECrowdFlowCandidates::SPAWNED_ON_FLOW, "crowd flow candidates did not round trip");
         checkNear(parsed.splineFlows[0].extrusionHeight, 4.5f);
         checkNear(parsed.teleports[0].exitZone->position.y, -32.0f);
         checkNear(parsed.teleports[0].exitZone->scale.data.y, 8.0f);
         check(parsed.teleports[0].exitActionAmbient == TeleportActionType::STAY &&
                 parsed.teleports[0].exitActionScared == TeleportActionType::LEAVE_CROWD,
             "crowd teleport actions did not round trip");
-        check(parsed.splineFlows.size() == 1 && parsed.splineFlows[0].closed &&
-                parsed.splineFlows[0].lengthTessellation == 8 && parsed.splineFlows[0].widthTessellation == 2 &&
-                parsed.splineFlows[0].points.size() == 1,
+        checkNear(parsed.splineFlows[0].lengthTessellation, 8.0f);
+        checkNear(parsed.splineFlows[0].widthTessellation, 0.25f);
+        check(
+            parsed.splineFlows.size() == 1 && parsed.splineFlows[0].closed && parsed.splineFlows[0].points.size() == 1,
             "crowd spline flows did not round trip");
         check(savedJson.str().find(R"("enterZone":null)") != std::string::npos,
             "an unset teleport zone should be written as null");
@@ -312,7 +317,8 @@ namespace {
     }
 
     void testJsonVolumeShapeRoundTrip() {
-        const std::string editorJson = R"({"id":"shape-id","name":"Shape","tblu":"00EF",)"
+        const std::string editorJson =
+            R"({"id":"shape-id","name":"Shape","tblu":"00EF",)"
             R"("transform":{"x":{"x":1,"y":0,"z":0},"y":{"x":0,"y":1,"z":0},"z":{"x":0,"y":0,"z":1},)"
             R"("t":{"x":2,"y":3,"z":4}},)"
             R"("points":[{"x":0,"y":0,"z":0},{"x":4,"y":0,"z":0},{"x":4,"y":4,"z":0}],)"
@@ -330,7 +336,8 @@ namespace {
         check(parsed.points.size() == 3, "volume shape points did not round trip");
         checkNear(parsed.points[2].y, 4.0f);
         checkNear(parsed.extrusionHeight, 3.0f);
-        check(parsed.flipSurfaceNormal && !parsed.closed, "volume shape normal flip and closed flag did not round trip");
+        check(
+            parsed.flipSurfaceNormal && !parsed.closed, "volume shape normal flip and closed flag did not round trip");
     }
 
     void testJsonMaterialRecords() {
@@ -791,6 +798,224 @@ namespace {
         std::filesystem::remove(savedPath);
         delete crmd.crowdMapData;
         crmd.crowdMapData = nullptr;
+    }
+
+    Json::Entity crowdTestBox(const std::string& name, const Json::Vec3& position, const Json::Vec3& size) {
+        Json::Entity box;
+        box.name = name;
+        box.position = position;
+        box.rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+        box.scale = {"SVector3", size};
+        return box;
+    }
+
+    Json::Crowd syntheticCrowd() {
+        Json::Crowd crowd;
+        crowd.name = "Synthetic";
+        crowd.globalSize = {4.0f, 4.0f, 2.0f};
+        crowd.cellSize = 0.5f;
+        crowd.navMeshShrink = 0.0f;
+        crowd.exclusionBoxIndices.push_back(1);
+        Json::CrowdTeleport exit;
+        exit.name = "West";
+        exit.exitZone = crowdTestBox("WestZone", {-1.75f, 0.0f, 0.0f}, {0.6f, 4.2f, 2.0f});
+        exit.exitActionScared = TeleportActionType::LEAVE_CROWD;
+        crowd.teleports.push_back(exit);
+        Json::CrowdGroupBox group;
+        static_cast<Json::Entity&>(group) = crowdTestBox("East", {1.5f, -1.5f, 0.0f}, {1.1f, 1.1f, 2.0f});
+        crowd.groupBoxes.push_back(group);
+        return crowd;
+    }
+
+    CrowdMapBuilder::SceneVolumes syntheticSceneVolumes() {
+        static const std::vector<Json::Entity> boxes = {
+            crowdTestBox("Unreferenced", {-0.5f, -1.5f, 0.0f}, {0.9f, 0.9f, 2.0f}),
+            crowdTestBox("Pillar", {0.5f, 0.5f, 0.0f}, {0.9f, 0.9f, 2.0f}),
+            crowdTestBox("FlowEast", {-1.0f, 1.5f, 0.0f}, {1.0f, 1.0f, 2.0f}),
+            crowdTestBox("EastCorner", {1.75f, -1.75f, 0.0f}, {0.6f, 0.6f, 2.0f})};
+        static const std::vector<Json::VolumeSphere> spheres;
+        static const std::vector<Json::VolumeShape> shapes;
+        return {boxes, spheres, shapes};
+    }
+
+    std::vector<glm::dvec3> syntheticFloor(const double slope = 0.0) {
+        const auto corner = [slope](const double x, const double y) { return glm::dvec3(x, y, slope * x); };
+        return {corner(-3, -3), corner(3, -3), corner(3, 3), corner(-3, -3), corner(3, 3), corner(-3, 3)};
+    }
+
+    size_t syntheticCell(const int x, const int y) {
+        return static_cast<size_t>(y) * 8 + x;
+    }
+
+    float crmdPointHeight(const CrowdMapBuilder::CrowdMap& map, const size_t index) {
+        return static_cast<float>(map.gridMap[index].heightOffset) * map.heightScale + map.heightBias;
+    }
+
+    void testCrmdBuilderFromSyntheticFloor() {
+        const Json::Crowd crowd = syntheticCrowd();
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map =
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, report);
+
+        check(map.cellsX == 8 && map.cellsY == 8, "crowd map should have size / cell size cells");
+        check(map.gridMap.size() == 81, "crowd map should have one grid point per cell corner");
+        check(report.gridPointsOnGeometry == 80 && report.gridPointsOffGrid == 1,
+            "only the grid point whose floor hit is inside the pillar exclusion should be off the grid");
+        check(report.walkableCells == 60, "the four cells around the excluded grid point should not be walkable");
+        check(report.exitCells == std::vector<size_t>{8}, "the exit zone should cover the west column");
+        check(report.groupCells == std::vector<size_t>{4}, "the group box should cover four cells");
+        check(map.cellFlags.size() == CrowdMapBuilder::cellsPerBlock && map.cellGroups.size() == map.cellFlags.size(),
+            "cell arrays should be padded to whole blocks");
+        const auto cell = syntheticCell;
+        check(map.cellFlags[cell(4, 4)] == 0, "excluded cells should not be walkable");
+        check(map.cellFlags[cell(0, 3)] == (CrowdMapBuilder::cellFlagWalkable | CrowdMapBuilder::cellFlagTeleportOut),
+            "exit cells should be walkable teleport-out cells");
+        check(map.cellGroups[cell(6, 0)] == 0 && map.cellGroups[cell(0, 0)] == CrowdMapBuilder::noGroup,
+            "group cells should carry the group index");
+
+        check(map.flowChannels.size() == 3 && map.groupFlowStartChannel == 2,
+            "flow channels should be ambient flow, then exits, then groups");
+        check(map.flowChannels[0].costs.empty() &&
+                std::ranges::all_of(map.flowChannels[0].directions,
+                    [](const uint8_t direction) { return direction == CrowdMapBuilder::noDirection; }),
+            "channel 0 should have no directions without flow boxes");
+        check(map.flowChannels[1].costs[cell(0, 1)] == 0, "exit cells should cost nothing in their own channel");
+        check(map.flowChannels[1].directions[cell(2, 1)] == 60, "a cell east of the west exit should flow west");
+        check(map.flowChannels[1].costs[cell(4, 4)] == CrowdMapBuilder::unreachableCost,
+            "excluded cells should be unreachable");
+        check(map.flowChannels[2].costs[cell(7, 1)] == 0, "group cells should cost nothing in their own channel");
+        check(std::ranges::max(map.flowChannels[1].costs, {},
+                  [](const uint16_t cost) { return cost == CrowdMapBuilder::unreachableCost ? 0 : cost; }) == 65534 ||
+                std::ranges::max(map.flowChannels[2].costs, {},
+                    [](const uint16_t cost) { return cost == CrowdMapBuilder::unreachableCost ? 0 : cost; }) == 65534,
+            "the most expensive reachable cell across all channels should cost 65534");
+        for (size_t i = 0; i < map.gridMap.size(); ++i) {
+            checkNear(crmdPointHeight(map, i), 0.0f, 1e-3f);
+        }
+
+        CrowdMapBuilder::Report withoutGlbReport;
+        bool threwWithoutGlb = false;
+        try {
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), {}, {}, withoutGlbReport);
+        } catch (const std::runtime_error&) {
+            threwWithoutGlb = true;
+        }
+        check(threwWithoutGlb, "building without ground geometry under the crowd should fail");
+
+        Json::Crowd danglingCrowd = crowd;
+        danglingCrowd.exclusionShapeIndices.push_back(0);
+        CrowdMapBuilder::Report danglingReport;
+        bool threwOnDanglingIndex = false;
+        try {
+            CrowdMapBuilder::build(danglingCrowd, syntheticSceneVolumes(), syntheticFloor(), {}, danglingReport);
+        } catch (const std::runtime_error&) {
+            threwOnDanglingIndex = true;
+        }
+        check(threwOnDanglingIndex, "a crowd volume index past the end of its scene list should fail the build");
+
+        const std::vector<float> recastVerts = {-3.0f, -0.1f, 3.0f, 3.0f, -0.1f, 3.0f, 3.0f, -0.1f, -3.0f, -3.0f, -0.1f,
+            -3.0f, 100.0f, 0.0f, 0.0f, 101.0f, 0.0f, 0.0f, 100.0f, 0.0f, -1.0f};
+        const std::vector<int> tris = {0, 1, 2, 0, 2, 3, 4, 5, 6};
+        const std::vector<glm::dvec3> glbTriangles =
+            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, recastVerts.data(), tris.data(), 3);
+        check(glbTriangles.size() == 6, "only GLB triangles near the crowd box should be kept");
+        checkNear(static_cast<float>(glbTriangles[2].y), 3.0f);
+        checkNear(static_cast<float>(glbTriangles[2].z), -0.1f);
+        CrowdMapBuilder::Report snappedReport;
+        const CrowdMapBuilder::CrowdMap snapped =
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), glbTriangles, snappedReport);
+        for (size_t i = 0; i < snapped.gridMap.size(); ++i) {
+            if (snapped.gridMap[i].onNavGrid != CrowdMapBuilder::offNavGrid) {
+                checkNear(crmdPointHeight(snapped, i), -0.1f, 1e-3f);
+            }
+        }
+
+        Crmd crmd;
+        crmd.setCrowdMap(map, crowd.name);
+        check(crmd.crmdLoaded && crmd.crowdMapData->m_nCellSizeX == 8 && crmd.crowdMapData->m_CellFlags.size() == 1 &&
+                crmd.crowdMapData->m_aFlowChannels.size() == 3 &&
+                crmd.crowdMapData->m_aFlowChannels[1].m_aFlowCost.size() == 64,
+            "a built crowd map should become the loaded CRMD");
+        delete crmd.crowdMapData;
+        crmd.crowdMapData = nullptr;
+    }
+
+    void testCrmdBuilderReservesChannelsForSkippedExits() {
+        Json::Crowd crowd = syntheticCrowd();
+        crowd.teleports[0].exitZone->position = {50.0f, 50.0f, 0.0f};
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map =
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, report);
+        check(report.skippedExits == std::vector<std::string>{"West"} && report.exitCells.empty(),
+            "an exit that covers no walkable cells should be skipped and reported");
+        check(map.flowChannels.size() == 3 && map.groupFlowStartChannel == 1,
+            "a skipped exit should still reserve a channel, left after the group channels");
+        check(std::ranges::all_of(map.flowChannels[2].directions, [](const uint8_t d) { return d == 0; }) &&
+                std::ranges::all_of(map.flowChannels[2].costs, [](const uint16_t c) { return c == 0; }),
+            "the reserved channel of a skipped exit should be all zeros");
+        check(std::ranges::none_of(map.cellFlags,
+                  [](const uint8_t flags) { return (flags & CrowdMapBuilder::cellFlagTeleportOut) != 0; }),
+            "a skipped exit should not mark teleport-out cells");
+    }
+
+    void testCrmdBuilderAmbientFlowAndTeleportIn() {
+        Json::Crowd crowd = syntheticCrowd();
+        crowd.flowBoxTwoWayIndices.push_back(2);
+        crowd.teleports[0].enterZone = crowdTestBox("EastEnter", {1.75f, 0.0f, 0.0f}, {0.6f, 4.2f, 2.0f});
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map =
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, report);
+        check(map.flowChannels[0].directions[syntheticCell(1, 6)] == CrowdMapBuilder::directionTwoWay,
+            "a cell in an east-facing two-way flow box should flow east with the two-way bit");
+        check(map.flowChannels[0].directions[syntheticCell(5, 1)] == CrowdMapBuilder::noDirection,
+            "a cell outside every flow box should have no ambient direction");
+        check((map.cellFlags[syntheticCell(7, 5)] & CrowdMapBuilder::cellFlagTeleportIn) != 0 &&
+                (map.cellFlags[syntheticCell(6, 5)] & CrowdMapBuilder::cellFlagTeleportIn) == 0,
+            "cells inside a teleport enter zone should be flagged");
+    }
+
+    void testCrmdBuilderSplineLanesSpanFlowWidth() {
+        Json::Crowd crowd = syntheticCrowd();
+        crowd.flowBoxTwoWayIndices.push_back(2);
+        Json::CrowdSplineFlow spline;
+        spline.transform.x = {1.0f, 0.0f, 0.0f};
+        spline.transform.y = {0.0f, 1.0f, 0.0f};
+        spline.transform.z = {0.0f, 0.0f, 1.0f};
+        spline.flowWidth = 1.5f;
+        spline.widthTessellation = 0.5f;
+        spline.lengthTessellation = 0.25f;
+        spline.points = {{1.0f, -1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}};
+        crowd.splineFlows.push_back(spline);
+        const auto northDirection = static_cast<uint8_t>(30);
+
+        CrowdMapBuilder::Report report;
+        const CrowdMapBuilder::CrowdMap map =
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, report);
+        const auto& directions = map.flowChannels[0].directions;
+        check(directions[syntheticCell(4, 3)] == northDirection && directions[syntheticCell(5, 3)] == northDirection &&
+                directions[syntheticCell(6, 3)] == northDirection,
+            "spline lanes should steer every cell across the flow width");
+        check(directions[syntheticCell(7, 3)] == CrowdMapBuilder::noDirection,
+            "spline lanes start at one edge, so the last lane stops one spacing short of the other");
+    }
+
+    void testCrmdBuilderGroupSeedPointsAndExclusions() {
+        Json::Crowd seeded = syntheticCrowd();
+        seeded.groupBoxes[0].seedPointIndices.push_back(3);
+        CrowdMapBuilder::Report seededReport;
+        const CrowdMapBuilder::CrowdMap seededMap =
+            CrowdMapBuilder::build(seeded, syntheticSceneVolumes(), syntheticFloor(), {}, seededReport);
+        check(seededReport.groupCells == std::vector<size_t>{1} && seededMap.cellGroups[syntheticCell(6, 0)] == 0,
+            "seed points should limit a group's flow sources but not its membership");
+
+        Json::Crowd excluded = syntheticCrowd();
+        excluded.groupBoxes[0].exclusionBoxIndices.push_back(3);
+        CrowdMapBuilder::Report excludedReport;
+        const CrowdMapBuilder::CrowdMap excludedMap =
+            CrowdMapBuilder::build(excluded, syntheticSceneVolumes(), syntheticFloor(), {}, excludedReport);
+        check(excludedReport.groupCells == std::vector<size_t>{3} &&
+                excludedMap.cellGroups[syntheticCell(7, 0)] == CrowdMapBuilder::noGroup,
+            "a group's exclusion boxes should remove cells from the group");
     }
 
     void testWaypointConnectivityMapGeneration() {
@@ -1622,6 +1847,11 @@ void runDomainTests() {
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
     run("CRMD binary fixture loading", testCrmdFixtureLoading);
     run("CRMD save round trip", testCrmdSaveRoundTrip);
+    run("CRMD builder from a synthetic floor", testCrmdBuilderFromSyntheticFloor);
+    run("CRMD builder reserves channels for skipped exits", testCrmdBuilderReservesChannelsForSkippedExits);
+    run("CRMD builder ambient flow and teleport-in cells", testCrmdBuilderAmbientFlowAndTeleportIn);
+    run("CRMD builder spline lanes span the flow width", testCrmdBuilderSplineLanesSpanFlowWidth);
+    run("CRMD builder group seed points and exclusions", testCrmdBuilderGroupSeedPointsAndExclusions);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);
