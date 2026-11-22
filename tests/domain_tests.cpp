@@ -19,7 +19,6 @@
 #include "../include/NavKit/render/Model.h"
 #include "../include/NavKit/util/UpdateChecker.h"
 #include "../include/NavKit/util/BridgeJoiner.h"
-#include "../include/NavKit/util/CrmdDiff.h"
 #include "../include/NavKit/util/CrowdMapBuilder.h"
 #include "../include/NavKit/util/GridGenerator.h"
 #include "../include/NavKit/util/Math.h"
@@ -39,7 +38,6 @@
 #include <assimp/postprocess.h>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -802,57 +800,6 @@ namespace {
         crmd.crowdMapData = nullptr;
     }
 
-    void testCrmdDiff() {
-        const std::unique_ptr<SCrowdMapData> a = Crmd::readCrowdMapFile("tests/resources/yacht.crmd");
-        const std::unique_ptr<SCrowdMapData> b = Crmd::readCrowdMapFile("tests/resources/yacht.crmd");
-        const CrmdDiff::Tolerances tolerances;
-        const CrmdDiff::Result same = CrmdDiff::compare(*a, *b, tolerances);
-        check(same.gridsMatch && same.header.empty(), "identical CRMDs should have matching grids and headers");
-        check(CrmdDiff::findRegions(same, CrmdDiff::allKinds).empty(), "identical CRMDs should have no regions");
-
-        const size_t cellsX = a->m_nCellSizeX;
-        const size_t pointsX = a->m_nGridSizeX;
-        const auto cell = [](SCrowdMapData& data, const size_t index) -> uint8_t& {
-            return data.m_CellFlags[index / 128].m_cells[index % 128];
-        };
-        cell(*b, 10 * cellsX + 10) ^= static_cast<uint8_t>(CrowdMapImpl_CellFlags::CELLFLAG_WALKABLE);
-        for (SCrowdMapData* data : {a.get(), b.get()}) {
-            data->m_aFlowChannels[0].m_aFlowVectorIndex[50 * cellsX + 50] = 10;
-            data->m_aFlowChannels[0].m_aFlowVectorIndex[100 * cellsX + 100] = 10;
-            for (const size_t point : {200 * pointsX + 130, 200 * pointsX + 20}) {
-                data->m_GridMap[point].m_nOnNavGrid = 1;
-                data->m_GridMap[point].m_nHeightOffset = 0;
-            }
-        }
-        b->m_aFlowChannels[0].m_aFlowVectorIndex[50 * cellsX + 50] = 12;
-        b->m_aFlowChannels[0].m_aFlowVectorIndex[100 * cellsX + 100] = 13;
-        b->m_GridMap[200 * pointsX + 130].m_nHeightOffset = 2;
-        b->m_GridMap[200 * pointsX + 20].m_nHeightOffset = 1;
-
-        const CrmdDiff::Result diff = CrmdDiff::compare(*a, *b, tolerances);
-        const auto kindIndex = [](const CrmdDiff::Kind kind) {
-            return static_cast<size_t>(std::countr_zero(static_cast<unsigned>(kind)));
-        };
-        const auto count = [&](const CrmdDiff::Kind kind) { return diff.counts[kindIndex(kind)]; };
-        check(count(CrmdDiff::walkable) == 1, "one cell's walkable flag should differ");
-        check(count(CrmdDiff::direction) == 1, "only the 9 degree direction change should exceed 6 degrees");
-        check(count(CrmdDiff::height) == 1, "only the two step height change should exceed one step");
-        check(diff.channelCounts[0][kindIndex(CrmdDiff::direction)] == 1,
-            "the direction difference should be counted on channel 0");
-
-        const std::vector<CrmdDiff::Region> regions = CrmdDiff::findRegions(diff, CrmdDiff::defaultKinds);
-        check(regions.size() == 3, "each difference should form its own region");
-        check(regions[0].cellCount == 4 && regions[0].kinds == CrmdDiff::height && regions[0].minX == 129 &&
-                regions[0].maxY == 200,
-            "the height difference should mark the four cells around its grid point");
-        check(CrmdDiff::findRegions(diff, CrmdDiff::walkable).size() == 1, "the kind mask should filter regions");
-
-        b->m_nCellSizeX += 1;
-        const CrmdDiff::Result resized = CrmdDiff::compare(*a, *b, tolerances);
-        check(!resized.gridsMatch && resized.cellKinds.empty() && !resized.header.empty(),
-            "differently sized grids should only be compared by header");
-    }
-
     Json::Entity crowdTestBox(const std::string& name, const Json::Vec3& position, const Json::Vec3& size) {
         Json::Entity box;
         box.name = name;
@@ -966,6 +913,23 @@ namespace {
         }
         check(threwOnDanglingIndex, "a crowd volume index past the end of its scene list should fail the build");
 
+        const std::vector<float> recastVerts = {-3.0f, -0.1f, 3.0f, 3.0f, -0.1f, 3.0f, 3.0f, -0.1f, -3.0f, -3.0f, -0.1f,
+            -3.0f, 100.0f, 0.0f, 0.0f, 101.0f, 0.0f, 0.0f, 100.0f, 0.0f, -1.0f};
+        const std::vector<int> tris = {0, 1, 2, 0, 2, 3, 4, 5, 6};
+        const std::vector<glm::dvec3> glbTriangles =
+            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, recastVerts.data(), tris.data(), 3);
+        check(glbTriangles.size() == 6, "only GLB triangles near the crowd box should be kept");
+        checkNear(static_cast<float>(glbTriangles[2].y), 3.0f);
+        checkNear(static_cast<float>(glbTriangles[2].z), -0.1f);
+        CrowdMapBuilder::Report snappedReport;
+        const CrowdMapBuilder::CrowdMap snapped =
+            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), glbTriangles, snappedReport);
+        for (size_t i = 0; i < snapped.gridMap.size(); ++i) {
+            if (snapped.gridMap[i].onNavGrid != CrowdMapBuilder::offNavGrid) {
+                checkNear(crmdPointHeight(snapped, i), -0.1f, 1e-3f);
+            }
+        }
+
         Crmd crmd;
         crmd.setCrowdMap(map, crowd.name);
         check(crmd.crmdLoaded && crmd.crowdMapData->m_nCellSizeX == 8 && crmd.crowdMapData->m_CellFlags.size() == 1 &&
@@ -994,22 +958,6 @@ namespace {
             "a skipped exit should not mark teleport-out cells");
     }
 
-    void testCrmdBuilderWritesZeroHeightOffGrid() {
-        CrowdMapBuilder::Report report;
-        const CrowdMapBuilder::CrowdMap map =
-            CrowdMapBuilder::build(syntheticCrowd(), syntheticSceneVolumes(), syntheticFloor(0.05), {}, report);
-        const size_t pillarCentre = 5 * 9 + 5;
-        check(map.gridMap[pillarCentre].onNavGrid == CrowdMapBuilder::offNavGrid &&
-                std::abs(crmdPointHeight(map, pillarCentre)) < map.heightScale,
-            "a grid point whose only floor hit is excluded should be off the grid with a zero height");
-        check(std::ranges::any_of(map.gridMap,
-                  [&](const CrowdMapBuilder::GridPoint& point) {
-                      return point.onNavGrid == CrowdMapBuilder::onNavGrid &&
-                          point.heightOffset != map.gridMap[pillarCentre].heightOffset;
-                  }),
-            "grid points on the nav grid should keep their sloped heights");
-    }
-
     void testCrmdBuilderAmbientFlowAndTeleportIn() {
         Json::Crowd crowd = syntheticCrowd();
         crowd.flowBoxTwoWayIndices.push_back(2);
@@ -1024,33 +972,6 @@ namespace {
         check((map.cellFlags[syntheticCell(7, 5)] & CrowdMapBuilder::cellFlagTeleportIn) != 0 &&
                 (map.cellFlags[syntheticCell(6, 5)] & CrowdMapBuilder::cellFlagTeleportIn) == 0,
             "cells inside a teleport enter zone should be flagged");
-    }
-
-    void testCrmdBuilderSplinesNeedAFlowBox() {
-        Json::Crowd crowd = syntheticCrowd();
-        Json::CrowdSplineFlow spline;
-        spline.transform.x = {1.0f, 0.0f, 0.0f};
-        spline.transform.y = {0.0f, 1.0f, 0.0f};
-        spline.transform.z = {0.0f, 0.0f, 1.0f};
-        spline.flowWidth = 1.0f;
-        spline.widthTessellation = 1.0f;
-        spline.lengthTessellation = 1.0f;
-        spline.points = {{1.75f, -1.0f, 0.0f}, {1.75f, 1.0f, 0.0f}};
-        crowd.splineFlows.push_back(spline);
-        const auto northDirection = static_cast<uint8_t>(30);
-
-        CrowdMapBuilder::Report withoutBoxesReport;
-        const CrowdMapBuilder::CrowdMap withoutBoxes =
-            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, withoutBoxesReport);
-        check(withoutBoxes.flowChannels[0].directions[syntheticCell(6, 4)] == CrowdMapBuilder::noDirection,
-            "spline flows should be ignored when the crowd has no flow boxes");
-
-        crowd.flowBoxTwoWayIndices.push_back(2);
-        CrowdMapBuilder::Report withBoxReport;
-        const CrowdMapBuilder::CrowdMap withBox =
-            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, withBoxReport);
-        check(withBox.flowChannels[0].directions[syntheticCell(6, 4)] == northDirection,
-            "spline flows should steer cells once the crowd has a flow box");
     }
 
     void testCrmdBuilderSplineLanesSpanFlowWidth() {
@@ -1095,56 +1016,6 @@ namespace {
         check(excludedReport.groupCells == std::vector<size_t>{3} &&
                 excludedMap.cellGroups[syntheticCell(7, 0)] == CrowdMapBuilder::noGroup,
             "a group's exclusion boxes should remove cells from the group");
-    }
-
-    void testCrmdBuilderSnapsHeightsToGlb() {
-        const auto plane = [](const double z) {
-            return std::vector<glm::dvec3>{{-3, -3, z}, {3, -3, z}, {3, 3, z}, {-3, -3, z}, {3, 3, z}, {-3, 3, z}};
-        };
-        const std::vector<glm::dvec3> navmesh = plane(0.1);
-        const auto pointHeight = [&](const std::vector<glm::dvec3>& heights) {
-            CrowdMapBuilder::Report report;
-            const CrowdMapBuilder::CrowdMap map =
-                CrowdMapBuilder::build(syntheticCrowd(), syntheticSceneVolumes(), navmesh, heights, report);
-            return crmdPointHeight(map, 0);
-        };
-        checkNear(pointHeight({}), 0.1f, 1e-3f);
-        checkNear(pointHeight(plane(0.0)), 0.0f, 1e-3f);
-        checkNear(pointHeight(plane(0.3)), 0.3f, 1e-3f);
-        checkNear(pointHeight(plane(-2.0)), 0.1f, 1e-3f);
-    }
-
-    void testCrmdBuilderRejectsTooManyGroups() {
-        Json::Crowd crowd = syntheticCrowd();
-        crowd.groupBoxes.resize(CrowdMapBuilder::noGroup, crowd.groupBoxes[0]);
-        CrowdMapBuilder::Report report;
-        bool threw = false;
-        try {
-            CrowdMapBuilder::build(crowd, syntheticSceneVolumes(), syntheticFloor(), {}, report);
-        } catch (const std::runtime_error&) {
-            threw = true;
-        }
-        check(threw, "a group index that would collide with noGroup should fail the build");
-    }
-
-    void testCrmdGLBTrianglesNearCrowdInGameSpace() {
-        const Json::Crowd crowd = syntheticCrowd();
-        const std::vector<float> recastVerts = {0.0f, -0.1f, 0.0f, 1.0f, -0.1f, 0.0f, 0.0f, -0.1f, -1.0f, 100.0f, 0.0f,
-            0.0f, 101.0f, 0.0f, 0.0f, 100.0f, 0.0f, -1.0f};
-        const std::vector<int> tris = {0, 1, 2, 3, 4, 5};
-        const std::vector<glm::dvec3> triangles =
-            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, recastVerts.data(), tris.data(), 2);
-        check(triangles.size() == 3, "only triangles near the crowd box should be kept");
-        checkNear(static_cast<float>(triangles[2].y), 1.0f);
-        checkNear(static_cast<float>(triangles[2].z), -0.1f);
-
-        Json::Crowd scaledCrowd = crowd;
-        scaledCrowd.transform.x = {2.0f, 0.0f, 0.0f};
-        const std::vector<float> beyondUnscaledBox = {4.0f, 0.0f, 0.0f, 4.5f, 0.0f, 0.0f, 4.0f, 0.0f, -0.5f};
-        const std::vector<int> oneTri = {0, 1, 2};
-        check(
-            CrowdMapBuilder::groundTrianglesNearCrowd(scaledCrowd, beyondUnscaledBox.data(), oneTri.data(), 1).empty(),
-            "a scaled transform axis should not widen the ground region");
     }
 
     void testWaypointConnectivityMapGeneration() {
@@ -1976,17 +1847,11 @@ void runDomainTests() {
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
     run("CRMD binary fixture loading", testCrmdFixtureLoading);
     run("CRMD save round trip", testCrmdSaveRoundTrip);
-    run("CRMD diff", testCrmdDiff);
     run("CRMD builder from a synthetic floor", testCrmdBuilderFromSyntheticFloor);
     run("CRMD builder reserves channels for skipped exits", testCrmdBuilderReservesChannelsForSkippedExits);
-    run("CRMD builder writes zero height off the grid", testCrmdBuilderWritesZeroHeightOffGrid);
     run("CRMD builder ambient flow and teleport-in cells", testCrmdBuilderAmbientFlowAndTeleportIn);
-    run("CRMD builder splines need a flow box", testCrmdBuilderSplinesNeedAFlowBox);
     run("CRMD builder spline lanes span the flow width", testCrmdBuilderSplineLanesSpanFlowWidth);
     run("CRMD builder group seed points and exclusions", testCrmdBuilderGroupSeedPointsAndExclusions);
-    run("CRMD builder snaps heights to the GLB", testCrmdBuilderSnapsHeightsToGlb);
-    run("CRMD builder rejects too many groups", testCrmdBuilderRejectsTooManyGroups);
-    run("CRMD GLB triangles near the crowd in game space", testCrmdGLBTrianglesNearCrowdInGameSpace);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);

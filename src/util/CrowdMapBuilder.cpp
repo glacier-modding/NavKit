@@ -18,16 +18,11 @@ namespace {
     using glm::dvec3;
     using glm::vec2;
 
+    // Glacier values
     constexpr float unreachable = std::numeric_limits<float>::max();
-    constexpr double uprightTolerance = 1e-3;
-    constexpr double groundBucketSize = 2.0;
-    constexpr double groundRegionMargin = 1.0;
     constexpr double groundProbeDepth = 2.0;
     constexpr double groundEdgeTolerance = 0.05;
     constexpr double exclusionRetryDrop = 0.1;
-    constexpr double barycentricTolerance = 1e-6;
-    constexpr double heightSnapAbove = 0.25;
-    constexpr double heightSnapBelow = 0.5;
     constexpr float maxCellSlope = 1.25f;
     constexpr float straightStep = 1.0f;
     constexpr float diagonalStep = 1.7f;
@@ -43,6 +38,15 @@ namespace {
     constexpr uint32_t randomMultiplier = 0x10dcd;
     constexpr uint32_t tieBreakChances = 7;
     constexpr uint32_t tieBreakTakes = 5;
+
+    // Navkit values
+    constexpr double uprightTolerance = 1e-3;
+    constexpr double groundBucketSize = 2.0;
+    constexpr double barycentricTolerance = 1e-6;
+    constexpr double heightSnapAbove = 0.25;
+    constexpr double heightSnapBelow = 0.5;
+    constexpr double groundRegionPadding = 0.5;
+    constexpr double groundRegionMargin = std::max(heightSnapAbove, heightSnapBelow) + groundRegionPadding;
 
     struct NeighbourOffset {
         int dx;
@@ -164,7 +168,6 @@ namespace {
             }
         }
 
-        /// The first surface a ray cast straight down from @p top meets before @p bottom.
         std::optional<double> firstHitBelow(
             const double x, const double y, const double top, const double bottom) const {
             std::optional<double> highest;

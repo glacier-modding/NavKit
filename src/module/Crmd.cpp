@@ -15,7 +15,6 @@
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/render/CoreProfileDraw.h"
 #include "../../include/NavKit/util/Bin1.h"
-#include "../../include/NavKit/util/CrowdMapBuilder.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
 #include "../../include/NavKit/UiIds.h"

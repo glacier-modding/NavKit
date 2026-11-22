@@ -55,13 +55,13 @@ public:
     std::atomic<bool> saving;
     std::atomic<bool> building;
     bool showCrmd;
+    bool snapHeightsToGlb;
     std::string loadedCrmdText;
     static std::string selectedRpkgCrmd;
     static std::map<std::string, std::string> crmdHashIoiStringMap;
     static std::mutex crmdHashIoiStringMapMutex;
     static wxDialog* hCrmdDialog;
     static wxDialog* hCrmdSettingsDialog;
-    bool snapHeightsToGlb;
 
 private:
     void rebuildRenderGeometry();
