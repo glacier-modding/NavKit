@@ -466,6 +466,47 @@ Json::AiAreas::AiAreas(simdjson::ondemand::array aiAreasJson) {
         aiAreas.push_back(aiArea);
     }
 }
+void Json::Inclusions::writeJson(std::ostream& f) const {
+    f << R"({"type":")" << type << R"(","data":[")";
+    bool isFirst = true;
+    for (auto dataItem : data) {
+        if (!isFirst) {
+            f << ",";
+        }
+        f << dataItem;
+        isFirst = false;
+    }
+    f << R"("]})";
+}
+
+void Json::Inclusions::readJson(simdjson::ondemand::object json) {
+    type = getValue(json, "type");
+    data.clear();
+    for (simdjson::ondemand::array dataJson = json["data"]; auto dataItemJson : dataJson) {
+        data.push_back(std::string{std::string_view(dataItemJson)});
+    }
+}
+
+void Json::MapSpaceConfig::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << id << R"(","name":")" << name << R"(","inclusions":)";
+    inclusions.writeJson(f);
+    f << R"(})";
+}
+
+void Json::MapSpaceConfig::readJson(simdjson::ondemand::object json) {
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    inclusions.readJson(json["inclusions"]);
+}
+
+Json::MapSpaceConfigs::MapSpaceConfigs(simdjson::ondemand::array mapSpaceConfigsJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> mapSpaceConfigJsonResult : mapSpaceConfigsJson) {
+        simdjson::ondemand::value mapSpaceConfigJson = mapSpaceConfigJsonResult.value();
+        MapSpaceConfig mapSpaceConfig;
+        mapSpaceConfig.readJson(mapSpaceConfigJson.get_object().value());
+        mapSpaceConfigs.push_back(mapSpaceConfig);
+    }
+}
 
 Json::VolumeBoxes::VolumeBoxes(simdjson::ondemand::array volumeBoxesJson) {
     for (simdjson::simdjson_result<simdjson::ondemand::value> volumeBoxJsonResult : volumeBoxesJson) {

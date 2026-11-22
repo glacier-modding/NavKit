@@ -23,6 +23,25 @@ target_link_libraries(NavKitTests PRIVATE
         NavKitLib
 )
 
+add_executable(GfxBuilderTests
+        gfx_map_layer_tests.cpp
+        ../src/util/GfxMapAlignment.cpp
+        ../src/util/GfxMapLayerSwf.cpp
+)
+target_include_directories(GfxBuilderTests PRIVATE "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(GfxBuilderTests PRIVATE pugixml::pugixml glm::glm)
+if (WIN32)
+    set(PUGIXML_RUNTIME_PATH "${PROJECT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
+    add_custom_command(
+            TARGET GfxBuilderTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<IF:$<CONFIG:Debug>,${PUGIXML_RUNTIME_PATH}/debug/bin/pugixml.dll,${PUGIXML_RUNTIME_PATH}/bin/pugixml.dll>"
+            "$<TARGET_FILE_DIR:GfxBuilderTests>"
+            COMMENT "Copying runtime dependencies for GfxBuilderTests..."
+            VERBATIM
+    )
+endif ()
+
 option(NAVKIT_BUILD_INTEGRATION_TESTS "Build the manually run live game integration test" OFF)
 if (NAVKIT_BUILD_INTEGRATION_TESTS)
     add_executable(NavKitIntegrationTests
@@ -62,6 +81,9 @@ endif ()
 
 add_test(NAME NavKitTests COMMAND NavKitTests)
 set_tests_properties(NavKitTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+
+add_test(NAME GfxBuilderTests COMMAND GfxBuilderTests)
+set_tests_properties(GfxBuilderTests PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
 add_executable(UpdaterTests updater_tests.cpp)
 target_include_directories(UpdaterTests PRIVATE "${PROJECT_SOURCE_DIR}/include")

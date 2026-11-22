@@ -20,7 +20,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_TESTING "Build the tests" OFF)
-set(NAVKIT_RPKG_LIB_VERSION "v1.6.0" CACHE STRING "navkit-rpkg-lib release version (update SHA-256 values when changing)")
+set(NAVKIT_RPKG_LIB_VERSION "v1.10.0")
 set(FFDEC_VERSION "26.5.0")
 set(FFDEC_URL "https://github.com/jindrapetrik/jpexs-decompiler/releases/download/version26.5.0/ffdec_26.5.0.zip")
 set(FFDEC_SHA256 "8d00c2713a724bb3f7e6c9a64994836ce3a953b5ac264f405d98f92e7c266d33")

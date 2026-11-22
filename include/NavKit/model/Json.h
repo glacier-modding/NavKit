@@ -356,6 +356,45 @@ namespace Json {
         std::vector<AiArea> aiAreas{};
     };
 
+    class Inclusions {
+    public:
+        Inclusions() = default;
+
+        Inclusions(const std::string& type, const std::vector<std::string>& data) : type(type), data(data) {}
+
+        std::string type;
+        std::vector<std::string> data;
+
+        void writeJson(std::ostream& f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class MapSpaceConfig {
+    public:
+        MapSpaceConfig() = default;
+
+        MapSpaceConfig(const std::string& id, const std::string& name, const Inclusions& inclusions) :
+            id(id), name(name), inclusions(inclusions) {}
+
+        std::string id;
+        std::string name;
+        Inclusions inclusions;
+
+        void writeJson(std::ostream& f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class MapSpaceConfigs {
+    public:
+        MapSpaceConfigs() = default;
+
+        explicit MapSpaceConfigs(simdjson::ondemand::array mapSpaceConfigsJson);
+
+        std::vector<MapSpaceConfig> mapSpaceConfigs{};
+    };
+
     class VolumeBoxes {
     public:
         VolumeBoxes() = default;

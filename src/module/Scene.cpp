@@ -150,6 +150,8 @@ void Scene::loadRoomsAndVolumes(
         section = "Volume Spheres";
         Logger::log(NK_INFO, "Loading Volume Spheres.");
         volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"].get_array()).volumeSpheres;
+        Logger::log(NK_INFO, "Loading UI Map Space Configs.");
+        mapSpaceConfigs = Json::MapSpaceConfigs(jsonDocument["mapSpaceConfigs"].get_array()).mapSpaceConfigs;
     } catch (const std::exception& e) {
         recordLoadError(section + " (and every later section of gates/rooms/AI areas/volumes)", e.what());
     } catch (...) {
@@ -382,6 +384,14 @@ void Scene::saveScene(const std::string& fileName) const {
     for (auto& crowd : crowds) {
         ss << separator;
         crowd.writeJson(ss);
+        separator = ",";
+    }
+
+    ss << R"(],"mapSpaceConfigs":[)";
+    separator = "";
+    for (auto& mapSpaceConfig : mapSpaceConfigs) {
+        ss << separator;
+        mapSpaceConfig.writeJson(ss);
         separator = ",";
     }
     ss << "]}";

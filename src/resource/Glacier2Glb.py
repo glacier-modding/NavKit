@@ -9,6 +9,8 @@ from timeit import default_timer as timer
 
 import bmesh
 import bpy
+import contextlib
+import logging
 import mathutils
 import numpy as np
 from bpy.types import (
@@ -16,7 +18,9 @@ from bpy.types import (
 )
 
 glacier2glb_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "TRACE", "DEBUG", "INFO", "WARNING", "ERROR"
-
+gltf_logger = logging.getLogger("gltf2")
+gltf_logger.setLevel(logging.ERROR)
+gltf_logger.disabled = True
 
 # General
 
@@ -1375,7 +1379,7 @@ def load_prim_mesh(prim, prim_name: str, mesh_index: int, load_textures=True):
     return mesh, material_index
 
 
-def load_prim(filepath, lod_mask):
+def load_prim(filepath, lod_mask, temp_coll):
     """Imports a mesh from the given path"""
 
     prim_name = bpy.path.display_name_from_filepath(filepath)
@@ -1404,7 +1408,7 @@ def load_prim(filepath, lod_mask):
             continue
         mesh, material_index = load_prim_mesh(prim, prim_name, submesh_index)
         obj = bpy.data.objects.new(mesh.name, mesh)
-        bpy.context.scene.collection.objects.link(obj)
+        temp_coll.objects.link(obj)
         submeshes.append(obj)
         material_indices.append(material_index)
 
@@ -1941,9 +1945,21 @@ class Physics:
             log("TRACE", "Skipping header only ALOC: " + aloc_name, aloc_name)
             return -2
 
-        fp = os.fsencode(filepath)
-        file = open(fp, "rb")
+        try:
+            file = open(os.fsencode(filepath), "rb")
+        except OSError as err:
+            log("ERROR", "Unable to open ALOC " + aloc_name + ". Error message: " + str(err), aloc_name)
+            return -1
         br = BinaryReader(file)
+        try:
+            return self._read_contents(br, aloc_name)
+        except (OSError, struct.error, ValueError, UnicodeDecodeError) as err:
+            log("ERROR", "Error reading ALOC " + aloc_name + ". Error message: " + str(err), aloc_name)
+            return -1
+        finally:
+            br.close()
+
+    def _read_contents(self, br, aloc_name):
         # Header + MeshType Header: sizeof = 23
         self.data_type = br.readUInt()
         self.collision_type = br.readUInt()
@@ -2138,12 +2154,12 @@ def finalize_aloc_mesh(bm, obj):
     bm.free()
 
 
-def create_new_object(name, collision_type, data_type):
+def create_new_object(name, collision_type, data_type, temp_coll):
     log("TRACE", "Creating new object for ALOC: " + name + " with collision type: "
         + str(collision_type) + " and data type: " + str(data_type), "create_new_object")
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
-    bpy.context.scene.collection.objects.link(obj)
+    temp_coll.objects.link(obj)
     log("TRACE", "Finished Creating new object for ALOC: " + name, "create_new_object")
     return obj
 
@@ -2279,7 +2295,7 @@ def load_primitive_mesh_objects(aloc, aloc_name, bm):
                 mesh_index) + " and collision layer type: " + str(capsule.collision_layer), "load_aloc")
 
 
-def load_aloc(filepath):
+def load_aloc(filepath, temp_coll):
     """Imports an ALOC mesh from the given path"""
 
     aloc_name = bpy.path.display_name_from_filepath(filepath)
@@ -2293,7 +2309,7 @@ def load_aloc(filepath):
     log("TRACE", "Converting ALOC: " + aloc_name + " to blender mesh.", aloc_name)
 
     aloc_obj = create_new_object(aloc_name + "_original_" + str(aloc.collision_type) + "_" + str(aloc.data_type),
-                                 aloc.collision_type, aloc.data_type)
+                                 aloc.collision_type, aloc.data_type, temp_coll)
     bm = bmesh.new()
 
     if aloc.data_type == PhysicsDataType.CONVEX_MESH_AND_TRIANGLE_MESH:
@@ -2484,9 +2500,12 @@ def create_volume(name, col_name, pos, rot, scale, shape='CUBE'):
 def load_volume_boxes(json_data, volume_types):
     volume_boxes_coll = bpy.data.collections.new("Volume boxes")
     bpy.context.scene.collection.children.link(volume_boxes_coll)
+    log("INFO", "Loading volume boxes for types:", "glacier2glb")
     for volt in volume_types:
-        if volt not in json_data:
-            continue
+        log("INFO", "   " + volt, "glacier2glb")
+
+    for volt in volume_types:
+        log("INFO", "Creating " + volt + " collection.", "glacier2glb")
         if volt == "gates":
             if volt not in bpy.data.collections:
                 gates_coll = bpy.data.collections.new(volt)
@@ -2523,6 +2542,32 @@ def load_volume_boxes(json_data, volume_types):
                     [vol["roomExtentMin"]["data"][coord] for coord in coords[1:]])) / 2
                 pos += center
                 create_volume(vol["name"], rooms_coll.name, pos, rot, scale)
+        elif volt == "mapLevel":
+            log("INFO", "Handling mapLevel: " + volt, "glacier2glb")
+            if volt not in bpy.data.collections:
+                map_level_coll = bpy.data.collections.new(volt)
+                volume_boxes_coll.children.link(map_level_coll)
+                log("INFO", "Creating collection: " + volt, "glacier2glb")
+            else:
+                log("INFO", "Collection " + volt + " already exists", "glacier2glb")
+                map_level_coll = bpy.data.collections.get(volt)
+
+            map_level_volume_box_ids = []
+            log("INFO", "Getting mapSpaceConfigs.", "glacier2glb")
+            for map_space_config in json_data["mapSpaceConfigs"]:
+                log("INFO", "Found a mapSpaceConfig with name: " + map_space_config["name"] + " and id: " + map_space_config["id"], "glacier2glb")
+                for map_level_volume_box_id in map_space_config["inclusions"]["data"]:
+                    map_level_volume_box_ids.append(map_level_volume_box_id)
+            for vol in json_data["volumeBoxes"]:
+                if vol["id"] in map_level_volume_box_ids:
+                    log("INFO", "Found a map level volume with name: " + vol["name"] + " and id: " + vol["id"], "glacier2glb")
+                    coords = ["w", "x", "y", "z"]
+                    pos, rot, scale = [
+                        mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
+                        mathutils.Quaternion([vol["rotation"][coord] for coord in coords]),
+                        mathutils.Vector([vol["scale"]["data"][coord] for coord in coords[1:]]),
+                    ]
+                    create_volume(vol["name"], map_level_coll.name, pos, rot, scale)
         elif volt == "aiArea":
             # Blender collection names are display labels, not entity identities.
             # Different logical parents can have the same name (or be truncated
@@ -2534,10 +2579,10 @@ def load_volume_boxes(json_data, volume_types):
                 parent_collections[ai_area_world["id"]] = area_world_coll
             # Go through the volumes and prepare the hashmap
             id_to_trigger_volume = {}
-            for trig_vol in json_data["volumeBoxes"]:
-                id_to_trigger_volume[trig_vol["id"]] = trig_vol
-            for trig_vol in json_data["volumeSpheres"]:
-                id_to_trigger_volume[trig_vol["id"]] = trig_vol
+            for vol in json_data["volumeBoxes"]:
+                id_to_trigger_volume[vol["id"]] = vol
+            for vol in json_data["volumeSpheres"]:
+                id_to_trigger_volume[vol["id"]] = vol
             for ai_area in json_data[volt]:
                 area_coll = bpy.data.collections.new(ai_area["name"])
                 prev_coll = area_coll
@@ -2557,31 +2602,1082 @@ def load_volume_boxes(json_data, volume_types):
                     prev_coll = parent_coll
                 for vol_name in ai_area['areaVolumeNames']:
                     id = vol_name.split("(")[1].split(")")[0]  # name ex: VolumeBox_AIArea_02 (729b0d862bef84a2)
-                    trig_vol = id_to_trigger_volume[id]
+                    vol = id_to_trigger_volume[id]
                     coords = ["w", "x", "y", "z"]
                     pos, rot = [
-                        mathutils.Vector([trig_vol["position"][coord] for coord in coords[1:]]),
-                        mathutils.Quaternion([trig_vol["rotation"][coord] for coord in coords])
+                        mathutils.Vector([vol["position"][coord] for coord in coords[1:]]),
+                        mathutils.Quaternion([vol["rotation"][coord] for coord in coords])
                     ]
-                    if "radius" in trig_vol:  # sphere volume
+                    if "radius" in vol:  # sphere volume
                         try:
-                            scale = mathutils.Vector([trig_vol["radius"]["data"] for _ in range(3)])
+                            scale = mathutils.Vector([vol["radius"]["data"] for _ in range(3)])
                         except TypeError:
                             log("WARNING",
-                                "Problem reading sphere scale for id: " + id + " value: " + trig_vol["radius"]["data"],
+                                "Problem reading sphere scale for id: " + id + " value: " + vol["radius"]["data"],
                                 "load_volume_boxes")
                             scale = mathutils.Vector([1, 1, 1])
                         create_volume(vol_name, area_coll.name, pos, rot, scale, 'SPHERE')
                     else:  # box volume
-                        scale = mathutils.Vector([trig_vol["scale"]["data"][coord] for coord in coords[1:]])
+                        scale = mathutils.Vector([vol["scale"]["data"][coord] for coord in coords[1:]])
                         create_volume(vol_name, area_coll.name, pos, rot, scale)
 
 
-def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: str, lod_mask: str, build_type: str,
-                filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool):
+# The official map palette: the canvas (also water), floors not on the shown level, outdoor ground, indoor
+# floors, walls and solid objects, and stairs.
+GFX_BACKGROUND_COLOR = "#1c1e20"
+GFX_OTHER_LEVEL_COLOR = "#363a3d"
+GFX_EXTERIOR_FLOOR_COLOR = "#bec3c6"
+GFX_INTERIOR_FLOOR_COLOR = "#a7adb2"
+GFX_WALL_COLOR = "#767f86"
+GFX_STAIRS_COLOR = "#d5d8da"
+# Like the official map GFX files, the background is drawn as four quadrants with hairline gaps between them,
+# which show as a crosshair through the middle of the map.
+GFX_CROSSHAIR_GAP = 0.25
+# Map layers use one SVG pixel per metre, which matches the scale of the official map GFX files.
+# Like the official maps, walls are solid shapes: the cross-section of each wall, grown by this much on every
+# side so that thin walls still read, and without the pieces smaller than GFX_MINIMUM_WALL_AREA square metres
+# (columns, posts and railings).
+GFX_WALL_GROWTH = 0.1
+GFX_LINE_WALL_WIDTH = 0.7
+GFX_MINIMUM_WALL_AREA = 1.0
+# Low objects are drawn as solid blocks, cut halfway up, when their cross-section covers at least this many square
+# metres (garden beds, fountains and containers, not boxes and crates).
+GFX_MINIMUM_BLOCK_AREA = 6.0
+GFX_MINIMUM_BLOCK_HEIGHT = 0.3
+# Cross-sections are filled when they are solid (no thicker on average than this many metres, which covers walls
+# and blocks); hollow outlines, as of one-sided collision meshes around a room, are drawn as lines.
+GFX_MAXIMUM_SOLID_THICKNESS = 4.0
+# Outlines are simplified by this many metres (floors and walls), like the clean shapes of the official maps.
+GFX_FLOOR_TOLERANCE = 0.25
+GFX_WALL_TOLERANCE = 0.15
+# Objects whose entities are mostly plants are left out, as the official maps show no vegetation.
+GFX_VEGETATION_TOKENS = ("plant", "palm", "bamboo", "bush", "banyan", "tree", "flower", "hedge", "grass", "shrub",
+                         "foliage", "vegetation", "fern", "ivy", "leaves", "vine", "reed", "cactus", "boxwood",
+                         "plane_bundle")
+# Rocks and cliffs (such as the boulders along a river bank) are drawn as ground off the shown level, like the
+# band along the river of the official Bangkok map, rather than as walls and floors.
+GFX_ROCK_TOKENS = ("rock", "cliff", "boulder")
+# Vehicles are left out like the official maps do.
+GFX_VEHICLE_TOKENS = ("vehicle", "sedan", "_car_", "car_", "van_", "truck", "_bus_", "wheel", "motorbike", "scooter",
+                      "bicycle", "boat", "forklift")
+# Indoors, the official maps draw the walls that bound rooms, not the furniture in them: a cut object is kept when
+# at least GFX_ROOM_WALL_SHARE of its outline lies within GFX_ROOM_WALL_DISTANCE metres of a room's boundary.
+# Outdoors, an object needs an outline at least GFX_MINIMUM_OUTDOOR_OUTLINE metres long (a wall or a building,
+# not a parasol or a trunk).
+GFX_ROOM_WALL_DISTANCE = 1.0
+GFX_ROOM_WALL_SHARE = 0.3
+GFX_MINIMUM_OUTDOOR_OUTLINE = 3.0
+# Floors on other levels are drawn as smoothed areas of at least this many square metres.
+GFX_MINIMUM_OTHER_LEVEL_AREA = 25.0
+GFX_OTHER_LEVEL_SMOOTHING = 2.0
+# Land and water: the official maps paint the whole canvas as ground except for water. Water is found on a grid of
+# GFX_LAND_RESOLUTION metres as the gaps wider than GFX_WATER_MINIMUM_WIDTH between the positions of the scene's
+# objects (all of them, including those culled from the build) that lie within the area the objects enclose
+# (gaps narrower than GFX_WATER_ENCLOSURE). Only the bodies of water at least GFX_WATER_KEEP_FRACTION as large as
+# the largest are kept, which drops the gaps of thinly furnished ground. These settings recover the river of the
+# official Bangkok map.
+GFX_LAND_RESOLUTION = 1.0
+GFX_WATER_MINIMUM_WIDTH = 64.0
+GFX_WATER_ENCLOSURE = 400.0
+GFX_WATER_KEEP_FRACTION = 0.5
+GFX_MINIMUM_WATER_AREA = 4000.0
+# Like the ring around the official silo map, the shell ledge within this many metres of the land is drawn as a
+# band of indoor floor colour.
+GFX_SHELL_BAND = 4.0
+# Walls and props are drawn where they cross a horizontal plane this far above the floor they stand on.
+GFX_SECTION_HEIGHT = 1.2
+# Like the official maps, only walls are drawn: props whose footprint is smaller than this, or whose top is
+# less than this high above the floor they stand on (boxes, crates, furniture, leaning panels), are left out.
+GFX_MINIMUM_SECTION_FOOTPRINT = 0.75
+GFX_MINIMUM_WALL_HEIGHT = 2.6
+# Wall segments are only drawn where they border visible floor, so the far side of thick or enclosing
+# structures (such as the outer face of a silo wall) does not show.
+GFX_WALL_FLOOR_DISTANCE = 0.75
+# Objects at least this tall that rise above the top of every map layer are the shell of the level (silo
+# walls, cliffs). Their upward faces are ledges of the shell, not floors: they hide the floors below them
+# instead of being drawn.
+GFX_SHELL_MINIMUM_HEIGHT = 8.0
+# Patches of floor smaller than this many square metres that touch no other floor (such as the tops of props
+# standing on a shell ledge) are left out.
+GFX_MINIMUM_FLOOR_ISLAND = 10.0
+# Patches of outdoor floor smaller than this many square metres with indoor floor all around are drawn as
+# indoor floor: they are gaps between the room volumes of a building.
+GFX_MAXIMUM_ENCLOSED_EXTERIOR = 40.0
+# A run of at least this many treads, each rising by GFX_STAIR_RISE and going forward by GFX_STAIR_GOING
+# (centre to centre, so a landing between flights still counts) and at least GFX_STAIR_MINIMUM_WIDTH wide,
+# rising GFX_STAIR_MINIMUM_SPAN in total, is drawn as stairs.
+GFX_STAIR_MINIMUM_TREADS = 5
+GFX_STAIR_RISE = (0.08, 0.35)
+GFX_STAIR_GOING = (0.1, 1.6)
+GFX_STAIR_MINIMUM_WIDTH = 0.6
+GFX_STAIR_MINIMUM_SPAN = 0.9
+# Floors are merged on a grid of this many metres (or coarser for very large maps) before they are
+# traced back to polygons, so that overlapping meshes become one clean outline per colour.
+GFX_FLOOR_RESOLUTION = 0.1
+GFX_MAXIMUM_FLOOR_GRID = 4096
+
+GFX_FLOOR_NONE = 0
+GFX_FLOOR_EXTERIOR = 1
+GFX_FLOOR_INTERIOR = 2
+GFX_FLOOR_STAIRS = 3
+# Classified per map cell from the rooms of the level.
+GFX_FLOOR_BY_ROOM = 4
+# Hides the floors below it and draws nothing.
+GFX_FLOOR_HIDDEN = 5
+# A floor that is only on another level (above the shown one, or below every map layer).
+GFX_FLOOR_OTHER_LEVEL = 6
+GFX_FLOOR_WALL = 7
+
+
+def is_background_map_space_config(map_space_config):
+    """The background (satellite) map space: named "...Background" or "..._SAT" in the game's scenes."""
+    name = map_space_config.get("name", "").lower()
+    return "background" in name or name == "sat" or name.endswith("_sat")
+
+
+def rasterize_triangles(triangles, priorities, origin, resolution, shape):
+    """Return, for each grid cell, the index of the highest-priority triangle covering its centre (or -1)."""
+    height, width = shape
+    best = np.full(height * width, -1, dtype=np.int64)
+    if len(triangles) == 0:
+        return best.reshape(shape)
+    cells = (triangles - origin) / resolution - 0.5  # cell (i, j) has its centre at (i, j) in this space
+    x0 = np.clip(np.ceil(cells[:, :, 0].min(axis=1)), 0, width).astype(np.int64)
+    x1 = np.clip(np.floor(cells[:, :, 0].max(axis=1)) + 1, 0, width).astype(np.int64)
+    y0 = np.clip(np.ceil(cells[:, :, 1].min(axis=1)), 0, height).astype(np.int64)
+    y1 = np.clip(np.floor(cells[:, :, 1].max(axis=1)) + 1, 0, height).astype(np.int64)
+    counts = np.maximum(x1 - x0, 0) * np.maximum(y1 - y0, 0)
+    order = np.argsort(priorities, kind="stable")
+    rank = np.empty(len(order), dtype=np.int64)
+    rank[order] = np.arange(len(order))
+
+    a, b, c = cells[:, 0], cells[:, 1], cells[:, 2]
+    area = (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
+    candidates = np.nonzero((counts > 0) & (np.abs(area) > 1e-12))[0]
+    chunk_limit = 4_000_000
+    start = 0
+    while start < len(candidates):
+        total = 0
+        end = start
+        while end < len(candidates) and (total == 0 or total + counts[candidates[end]] <= chunk_limit):
+            total += counts[candidates[end]]
+            end += 1
+        chunk = candidates[start:end]
+        start = end
+        chunk_counts = counts[chunk]
+        owner = np.repeat(chunk, chunk_counts)
+        offsets = np.arange(len(owner)) - np.repeat(np.cumsum(chunk_counts) - chunk_counts, chunk_counts)
+        box_width = (x1 - x0)[owner]
+        px = x0[owner] + offsets % box_width
+        py = y0[owner] + offsets // box_width
+        sign = np.sign(area[owner])
+        inside = np.ones(len(owner), dtype=bool)
+        for p, q in ((a, b), (b, c), (c, a)):
+            edge = ((q[owner, 0] - p[owner, 0]) * (py - p[owner, 1]) -
+                    (q[owner, 1] - p[owner, 1]) * (px - p[owner, 0])) * sign
+            inside &= edge >= 0
+        np.maximum.at(best, py[inside] * width + px[inside], rank[owner[inside]])
+    covered = best >= 0
+    best[covered] = order[best[covered]]
+    return best.reshape(shape)
+
+
+def fill_sections(sections, origin, resolution, shape, maximum_half_thickness):
+    """Fill the cross-sections of closed objects on a grid by the non-zero winding rule.
+
+    `sections` holds one (N, 2, 2) array of oriented segments per object, in the grid's coordinates (cell (i, j)
+    has its centre at origin + ((j, i) + 0.5) * resolution). Each object is filled on its own, inside its own
+    bounding box, and a row whose crossings do not balance (an open mesh) is not filled, so no object can spill
+    across the map. Collision meshes are often one-sided surfaces rather than solids, which would fill whole
+    rooms, so an object is only filled when its area is at most `maximum_half_thickness` (in the grid's units)
+    times its outline's length, as for walls and blocks. Returns the filled interiors and, separately, the
+    segments drawn as lines.
+    """
+    filled = np.zeros(shape, dtype=bool)
+    lines = np.zeros(shape, dtype=bool)
+    height, width = shape
+    for segments in sections:
+        if len(segments) == 0:
+            continue
+        cells = (segments - origin) / resolution - 0.5
+        x0 = int(np.floor(cells[:, :, 0].min())); x1 = int(np.ceil(cells[:, :, 0].max())) + 1
+        y0 = int(np.floor(cells[:, :, 1].min())); y1 = int(np.ceil(cells[:, :, 1].max())) + 1
+        if x1 <= 0 or y1 <= 0 or x0 >= width or y0 >= height:
+            continue
+        box_w, box_h = x1 - x0 + 1, y1 - y0 + 1
+        start, end = cells[:, 0] - (x0, y0), cells[:, 1] - (x0, y0)
+        low_y, high_y = np.minimum(start[:, 1], end[:, 1]), np.maximum(start[:, 1], end[:, 1])
+        first_row = np.ceil(low_y).astype(np.int64)
+        last_row = np.ceil(high_y).astype(np.int64) - 1  # rows whose centre lies in [low_y, high_y)
+        counts = np.maximum(last_row - first_row + 1, 0)
+        winding = np.zeros((box_h, box_w + 1), dtype=np.int32)
+        if counts.sum():
+            owner = np.repeat(np.arange(len(segments)), counts)
+            rows = first_row[owner] + np.arange(int(counts.sum())) - np.repeat(np.cumsum(counts) - counts, counts)
+            t = (rows - start[owner, 1]) / (end[owner, 1] - start[owner, 1])
+            crossing_x = start[owner, 0] + t * (end[owner, 0] - start[owner, 0])
+            columns = np.clip(np.ceil(crossing_x), 0, box_w).astype(np.int64)
+            signs = np.where(end[owner, 1] > start[owner, 1], 1, -1)
+            np.add.at(winding, (rows, columns), signs)
+        balanced = winding.sum(axis=1) == 0
+        inside = (np.cumsum(winding, axis=1)[:, :box_w] != 0) & balanced[:, None]
+        lengths = np.linalg.norm(end - start, axis=1)
+        if np.count_nonzero(inside) > maximum_half_thickness / resolution * lengths.sum():
+            inside[:] = False
+        # Draw the segments as well, sampled every half cell.
+        samples = np.maximum(np.ceil(lengths * 2).astype(np.int64), 1) + 1
+        owner = np.repeat(np.arange(len(segments)), samples)
+        fraction = (np.arange(int(samples.sum())) - np.repeat(np.cumsum(samples) - samples, samples)) / \
+            np.repeat(samples - 1, samples).clip(min=1)
+        points = start[owner] + (end[owner] - start[owner]) * fraction[:, None]
+        px = np.clip(np.round(points[:, 0]).astype(np.int64), 0, box_w - 1)
+        py = np.clip(np.round(points[:, 1]).astype(np.int64), 0, box_h - 1)
+        drawn = np.zeros_like(inside)
+        drawn[py, px] = True
+        gy0, gx0 = max(y0, 0), max(x0, 0)
+        gy1, gx1 = min(y0 + box_h, height), min(x0 + box_w, width)
+        filled[gy0:gy1, gx0:gx1] |= inside[gy0 - y0:gy1 - y0, gx0 - x0:gx1 - x0]
+        lines[gy0:gy1, gx0:gx1] |= drawn[gy0 - y0:gy1 - y0, gx0 - x0:gx1 - x0]
+    return filled, lines
+
+
+def label_regions(mask):
+    """Label the 4-connected regions of a boolean grid: (labels with -1 outside the mask, cells per label)."""
+    labels = np.full(mask.shape, -1, dtype=np.int64)
+    padded = np.pad(mask, ((0, 0), (1, 1)))
+    changes = np.diff(padded.astype(np.int8), axis=1)
+    run_rows, run_starts = np.nonzero(changes == 1)
+    _, run_ends = np.nonzero(changes == -1)  # exclusive; nonzero is row-major, so the runs pair up in order
+    if len(run_rows) == 0:
+        return labels, np.empty(0)
+    parents = list(range(len(run_rows)))
+
+    def find(run):
+        while parents[run] != run:
+            parents[run] = parents[parents[run]]
+            run = parents[run]
+        return run
+
+    row_bounds = np.searchsorted(run_rows, np.arange(mask.shape[0] + 1)).tolist()
+    starts, ends = run_starts.tolist(), run_ends.tolist()
+    for row in range(mask.shape[0] - 1):
+        a, a_end = row_bounds[row], row_bounds[row + 1]
+        b, b_end = a_end, row_bounds[row + 2]
+        while a < a_end and b < b_end:
+            if starts[a] < ends[b] and starts[b] < ends[a]:
+                root_a, root_b = find(a), find(b)
+                if root_a != root_b:
+                    parents[root_b] = root_a
+            if ends[a] < ends[b]:
+                a += 1
+            else:
+                b += 1
+    _, run_labels = np.unique([find(run) for run in range(len(parents))], return_inverse=True)
+    lengths = run_ends - run_starts
+    run_of_cell = np.repeat(np.arange(len(run_rows)), lengths)
+    columns = np.arange(int(lengths.sum())) - np.repeat(np.cumsum(lengths) - lengths, lengths) +         np.repeat(run_starts, lengths)
+    labels[run_rows[run_of_cell], columns] = run_labels[run_of_cell]
+    return labels, np.bincount(run_labels, weights=lengths)
+
+
+def remove_small_islands(mask, minimum_cells):
+    """Clear the 4-connected regions of a boolean grid that have fewer than `minimum_cells` cells."""
+    labels, sizes = label_regions(mask)
+    return mask & (labels >= 0) & (sizes[np.maximum(labels, 0)] >= minimum_cells) if len(sizes) else mask
+
+
+def trace_mask(mask, minimum_cells=4.0, tolerance=0.75):
+    """Trace a boolean grid into closed rings (in cell units, y down) that fill the mask with even-odd."""
+    padded = np.pad(mask, 1)
+    inside = padded[1:-1, 1:-1]
+    edges = []
+    # Each boundary edge is oriented clockwise around the inside cells (in y-down grid coordinates).
+    ys, xs = np.nonzero(inside & ~padded[:-2, 1:-1])
+    edges.append(np.stack((xs, ys, xs + 1, ys), axis=1))
+    ys, xs = np.nonzero(inside & ~padded[1:-1, 2:])
+    edges.append(np.stack((xs + 1, ys, xs + 1, ys + 1), axis=1))
+    ys, xs = np.nonzero(inside & ~padded[2:, 1:-1])
+    edges.append(np.stack((xs + 1, ys + 1, xs, ys + 1), axis=1))
+    ys, xs = np.nonzero(inside & ~padded[1:-1, :-2])
+    edges.append(np.stack((xs, ys + 1, xs, ys), axis=1))
+    edges = np.concatenate(edges)
+    if len(edges) == 0:
+        return []
+    outgoing = {}
+    for index, (sx, sy, _, _) in enumerate(edges.tolist()):
+        outgoing.setdefault((sx, sy), []).append(index)
+    used = np.zeros(len(edges), dtype=bool)
+    edge_list = edges.tolist()
+    rings = []
+    for first in range(len(edge_list)):
+        if used[first]:
+            continue
+        ring = []
+        current = first
+        while not used[current]:
+            used[current] = True
+            sx, sy, ex, ey = edge_list[current]
+            ring.append((sx, sy))
+            options = [option for option in outgoing[(ex, ey)] if not used[option]]
+            if not options:
+                break
+            if len(options) > 1:
+                # At a corner shared by two diagonal cells, turn right to keep the regions separate.
+                dx, dy = ex - sx, ey - sy
+                options.sort(key=lambda option: (edge_list[option][2] - ex) * dy -
+                             (edge_list[option][3] - ey) * dx)
+            current = options[0]
+        if len(ring) >= 4:
+            rings.append(ring)
+
+    simplified = []
+    for ring in rings:
+        points = np.array(ring, dtype=np.float64)
+        area = 0.5 * np.sum(points[:, 0] * np.roll(points[:, 1], -1) - np.roll(points[:, 0], -1) * points[:, 1])
+        if abs(area) < minimum_cells:
+            continue
+        points = simplify_ring(points, tolerance)
+        if len(points) >= 3:
+            simplified.append(points)
+    return simplified
+
+
+def simplify_ring(points, tolerance):
+    """Remove collinear points, then apply Douglas-Peucker to the closed ring."""
+    direction = np.roll(points, -1, axis=0) - points
+    previous = np.roll(direction, 1, axis=0)
+    turning = (direction[:, 0] * previous[:, 1] - direction[:, 1] * previous[:, 0]) != 0
+    points = points[turning]
+    if len(points) <= 4:
+        return points
+    distances = np.linalg.norm(points - points[0], axis=1)
+    split = int(np.argmax(distances))
+    keep = np.zeros(len(points), dtype=bool)
+    keep[0] = keep[split] = True
+    closed = np.vstack((points, points[:1]))
+    stack = [(0, split), (split, len(points))]
+    while stack:
+        start, end = stack.pop()
+        if end - start < 2:
+            continue
+        a, b = closed[start], closed[end]
+        segment = b - a
+        length = np.hypot(*segment)
+        between = closed[start + 1:end]
+        if length < 1e-12:
+            offsets = np.linalg.norm(between - a, axis=1)
+        else:
+            offsets = np.abs(segment[0] * (between[:, 1] - a[1]) - segment[1] * (between[:, 0] - a[0])) / length
+        index = int(np.argmax(offsets))
+        if offsets[index] > tolerance:
+            middle = start + 1 + index
+            keep[middle % len(points)] = True
+            stack.append((start, middle))
+            stack.append((middle, end))
+    return points[keep]
+
+
+def render_map_layers_for_gfx(json_data, output_path):
+    """Write one SVG floor plan per map space config, plus a shared background, for the GFX builder.
+
+    The slice SVGs are written as output_NN.svg, numbered in the order of the non-background map space
+    configs. The background config (if any) is written as output_background.svg and also defines the
+    extent of the map canvas; like the official maps, its fill leaves a crosshair of hairline gaps
+    through the middle of the canvas. One SVG unit is one metre.
+    """
+    volumes = {volume["id"]: volume for volume in json_data.get("volumeBoxes", [])}
+
+    def find_volume(volume_id):
+        volume = volumes.get(volume_id)
+        if volume is not None:
+            return volume
+        # Some exports drop the leading digit of entity IDs in references; accept an unambiguous match.
+        matches = [volume for candidate_id, volume in volumes.items()
+                   if len(candidate_id) > len(volume_id) and candidate_id.endswith(volume_id)]
+        if len(matches) == 1:
+            log("WARNING", "Map space volume " + volume_id + " matched by suffix to " + matches[0]["id"],
+                "render_map_layers_for_gfx")
+            return matches[0]
+        log("WARNING", "Map space volume not found: " + volume_id, "render_map_layers_for_gfx")
+        return None
+
+    def oriented_box(position, rotation, minimum, maximum):
+        """An oriented box as (world-to-local 4x4, local min, local max, world AABB min, world AABB max)."""
+        rotation = rotation.to_matrix().to_4x4()
+        matrix = np.array(mathutils.Matrix.Translation(position) @ rotation)
+        corners = np.array([(x, y, z, 1.0) for x in (minimum[0], maximum[0]) for y in (minimum[1], maximum[1])
+                            for z in (minimum[2], maximum[2])]) @ matrix.T
+        return (np.linalg.inv(matrix), np.array(minimum), np.array(maximum),
+                corners[:, :3].min(axis=0), corners[:, :3].max(axis=0))
+
+    def volume_box(volume):
+        position = mathutils.Vector([volume["position"][axis] for axis in ("x", "y", "z")])
+        rotation = mathutils.Quaternion([volume["rotation"][axis] for axis in ("w", "x", "y", "z")])
+        half = np.array([abs(volume["scale"]["data"][axis]) / 2 for axis in ("x", "y", "z")])
+        return oriented_box(position, rotation, -half, half)
+
+    def boxes_contain(boxes, points, tolerance=(0.0, 0.0, 0.0), upper_tolerance=None):
+        inside = np.zeros(len(points), dtype=bool)
+        if len(points) == 0:
+            return inside
+        homogeneous = np.hstack((points, np.ones((len(points), 1))))
+        lower_tolerance = np.array(tolerance)
+        upper_tolerance = lower_tolerance if upper_tolerance is None else np.array(upper_tolerance)
+        for inverse, minimum, maximum, _, _ in boxes:
+            local = (homogeneous @ inverse.T)[:, :3]
+            inside |= np.all((local >= minimum - lower_tolerance) & (local <= maximum + upper_tolerance), axis=1)
+        return inside
+
+    class Slice:
+        def __init__(self, boxes):
+            self.boxes = boxes
+            self.floor_triangles = []
+            self.floor_elevations = []
+            self.floor_kinds = []
+            # The kind each floor has when it is seen from a higher slice, where stairs are plain floor.
+            self.floor_base_kinds = []
+            self.section_candidates = []  # (instance min z, instance max z, exterior by name, world triangles)
+            self.levels = []
+            # One (oriented segments, outdoors) pair per object cut by the section plane.
+            self.wall_sections = []
+            # The slice's place among the slices that share out the canvas by height (see band_owner).
+            self.band_index = -1
+
+        def overlaps(self, lower, upper):
+            if any(np.all(lower <= box_max) and np.all(upper >= box_min)
+                   for _, _, _, box_min, box_max in self.boxes):
+                return True
+            if self.band_index < 0:
+                return False
+            low, high = self.z_range()
+            return bool(np.all(lower[:2] <= canvas_max) and np.all(upper[:2] >= canvas_min) and
+                        lower[2] <= high and upper[2] >= low)
+
+        def contains(self, points, owner=None):
+            inside = boxes_contain(self.boxes, points)
+            if self.band_index >= 0:
+                inside |= (band_owner(points) if owner is None else owner) == self.band_index
+            return inside
+
+        def z_range(self):
+            return (min(box[3][2] for box in self.boxes), max(box[4][2] for box in self.boxes))
+
+        def floors(self, base_kinds=False):
+            if not self.floor_triangles:
+                return np.empty((0, 3, 2)), np.empty(0), np.empty(0, dtype=np.int64)
+            return (np.concatenate(self.floor_triangles), np.concatenate(self.floor_elevations),
+                    np.concatenate(self.floor_base_kinds if base_kinds else self.floor_kinds))
+
+    slices = []
+    background = Slice([])
+    for map_space_config in json_data.get("mapSpaceConfigs", []):
+        boxes = [volume_box(volume) for volume in map(find_volume, map_space_config["inclusions"]["data"])
+                 if volume is not None]
+        if is_background_map_space_config(map_space_config):
+            background.boxes.extend(boxes)
+        else:
+            slices.append(Slice(boxes))
+    all_slices = [layer for layer in slices + [background] if layer.boxes]
+
+    canvas_boxes = background.boxes or [box for layer in slices for box in layer.boxes]
+    if canvas_boxes:
+        canvas_min = np.min([box[3] for box in canvas_boxes], axis=0)[:2]
+        canvas_max = np.max([box[4] for box in canvas_boxes], axis=0)[:2]
+    else:
+        canvas_min, canvas_max = np.array([-50.0, -50.0]), np.array([50.0, 50.0])
+    canvas_max = np.maximum(canvas_max, canvas_min + 1.0)
+    width, height = (float(value) for value in canvas_max - canvas_min)
+
+    # The official maps' slice volumes span the whole map, so that they only split it by height. Where a
+    # scene's volumes leave part of the canvas out (a slice volume around just one area), what lies there
+    # goes to the slice whose height band holds it, so that a floor still shows on its own level.
+    band_slices = [layer for layer in slices if layer.boxes]
+    for band_index, layer in enumerate(band_slices):
+        layer.band_index = band_index
+
+    def band_owner(points):
+        """For each point, the band index of the slice it falls to by height alone: -1 when it is inside any
+        slice's own volumes (or off the canvas, or in no slice's height band). Where bands overlap, the slice
+        whose band is centred nearest takes it."""
+        owner = np.full(len(points), -1, dtype=np.int64)
+        if len(points) == 0 or not band_slices:
+            return owner
+        free = np.all((points[:, :2] >= canvas_min) & (points[:, :2] <= canvas_max), axis=1)
+        for layer in band_slices:
+            free[free] &= ~boxes_contain(layer.boxes, points[free])
+        best = np.full(len(points), np.inf)
+        for layer in band_slices:
+            low, high = layer.z_range()
+            distance = np.abs(points[:, 2] - (low + high) / 2)
+            better = free & (points[:, 2] >= low) & (points[:, 2] <= high) & (distance < best)
+            owner[better] = layer.band_index
+            best[better] = distance[better]
+        return owner
+    map_top = max((layer.z_range()[1] for layer in slices if layer.boxes), default=np.inf)
+
+    interior_tokens = ("indoor", "interior", "inside")
+    exterior_tokens = ("outdoor", "outside", "exterior", "terrain")
+
+    indoor_rooms = []
+    for room in json_data.get("rooms", []):
+        if any(token in room.get("name", "").lower() for token in exterior_tokens):
+            continue
+        try:
+            indoor_rooms.append(oriented_box(
+                mathutils.Vector([room["position"][axis] for axis in ("x", "y", "z")]),
+                mathutils.Quaternion([room["rotation"][axis] for axis in ("w", "x", "y", "z")]),
+                [room["roomExtentMin"]["data"][axis] for axis in ("x", "y", "z")],
+                [room["roomExtentMax"]["data"][axis] for axis in ("x", "y", "z")]))
+        except (KeyError, TypeError):
+            log("WARNING", "Skipping room with incomplete extents: " + room.get("name", ""),
+                "render_map_layers_for_gfx")
+    use_rooms = bool(json_data.get("rooms"))
+
+    def room_boundary_distance(points):
+        """For each point, its distance to the boundary of the indoor room it is in (inf when in none)."""
+        distance = np.full(len(points), np.inf)
+        if len(points) == 0:
+            return distance
+        homogeneous = np.hstack((points, np.ones((len(points), 1))))
+        for inverse, minimum, maximum, _, _ in indoor_rooms:
+            local = (homogeneous @ inverse.T)[:, :3]
+            inside = np.all((local >= minimum - (0, 0, 0.3)) & (local <= maximum + (0, 0, np.inf)), axis=1)
+            margin = np.minimum(local[:, :2] - minimum[:2], maximum[:2] - local[:, :2]).min(axis=1)
+            distance[inside] = np.minimum(distance[inside], margin[inside])
+        return distance
+
+    def interior_points(points):
+        """Classify points as indoor floors: inside an indoor room, or above one (the upper floors and roofs
+        of a building, and the tops of tall props in a double-height hall)."""
+        return boxes_contain(indoor_rooms, points, (0.0, 0.0, 0.3), (0.0, 0.0, np.inf))
+
+    collection_parents = {}
+    for collection in bpy.data.collections:
+        for child in collection.children:
+            collection_parents.setdefault(child.as_pointer(), []).append(collection)
+
+    def object_name_fragments(obj):
+        """The object's name followed by its collections, nearest first."""
+        names = [obj.name.lower()]
+        pending = list(obj.users_collection)
+        seen = set()
+        while pending:
+            next_pending = []
+            for collection in pending:
+                pointer = collection.as_pointer()
+                if pointer in seen:
+                    continue
+                seen.add(pointer)
+                names.append(collection.name.lower())
+                next_pending.extend(collection_parents.get(pointer, ()))
+            pending = next_pending
+        return names
+
+    def exterior_by_name(names):
+        for name in names:
+            if any(token in name for token in interior_tokens):
+                return False
+            if any(token in name for token in exterior_tokens):
+                return True
+        return False
+
+    mesh_cache = {}
+
+    def mesh_data(obj):
+        key = (obj.original.name, obj.data.name if obj.data else "")
+        if key not in mesh_cache:
+            mesh = obj.to_mesh()
+            try:
+                mesh.calc_loop_triangles()
+                vertices = np.empty(len(mesh.vertices) * 3)
+                mesh.vertices.foreach_get("co", vertices)
+                triangles = np.empty(len(mesh.loop_triangles) * 3, dtype=np.int64)
+                mesh.loop_triangles.foreach_get("vertices", triangles)
+            finally:
+                obj.to_mesh_clear()
+            names = object_name_fragments(obj.original)
+            mesh_cache[key] = (vertices.reshape(-1, 3), triangles.reshape(-1, 3), exterior_by_name(names))
+        return mesh_cache[key]
+
+    def stair_step_mask(triangles, normals, up):
+        """The treads of a flight of stairs in the mesh: a run of flat faces rising in even steps.
+
+        Only the treads are marked, so the landings and the rest of the room stay plain floor. Names are
+        not used, since whole rooms are often named after their stairs.
+        """
+        treads = up & (normals[:, 2] >= 0.94)
+        if np.count_nonzero(treads) < GFX_STAIR_MINIMUM_TREADS:
+            return np.zeros_like(up)
+        elevations = triangles[:, :, 2].mean(axis=1)
+        values = np.unique(np.round(elevations[treads], 2))
+        # Faces of one tread can differ by a centimetre or two; each cluster of elevations is one step.
+        cluster_starts = np.concatenate(([True], np.diff(values) > 0.04))
+        cluster_of_value = np.cumsum(cluster_starts) - 1
+        step_low = values[cluster_starts]
+        step_high = np.maximum.reduceat(values, np.nonzero(cluster_starts)[0])
+        tread_indices = np.nonzero(treads)[0]
+        tread_steps = cluster_of_value[np.searchsorted(values, np.round(elevations[tread_indices], 2))]
+        areas = 0.5 * np.linalg.norm(np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]),
+                                     axis=1)
+        step_count = len(step_low)
+        weights = np.bincount(tread_steps, weights=areas[tread_indices], minlength=step_count)
+        centres = np.stack([np.bincount(tread_steps, weights=areas[tread_indices] *
+                                        triangles[tread_indices, :, axis].mean(axis=1), minlength=step_count)
+                            for axis in (0, 1)], axis=1) / np.maximum(weights, 1e-12)[:, None]
+
+        def climbs(step):
+            """Whether going from `step` to the next one is a stair step: an even rise, a short way forward,
+            and a tread at least GFX_STAIR_MINIMUM_WIDTH wide across the way up (not the top of a beam)."""
+            rise = step_low[step + 1] - step_low[step]
+            if not GFX_STAIR_RISE[0] <= rise <= GFX_STAIR_RISE[1]:
+                return False
+            forward = centres[step + 1] - centres[step]
+            going = float(np.hypot(*forward))
+            if not GFX_STAIR_GOING[0] <= going <= GFX_STAIR_GOING[1]:
+                return False
+            across = np.array([-forward[1], forward[0]]) / going
+            for tread in (step, step + 1):
+                corners = triangles[tread_indices[tread_steps == tread], :, :2].reshape(-1, 2) @ across
+                if corners.max() - corners.min() < GFX_STAIR_MINIMUM_WIDTH:
+                    return False
+            return True
+
+        even = [climbs(step) for step in range(step_count - 1)]
+        stairs = np.zeros_like(up)
+        start = 0
+        while start < len(even):
+            if not even[start]:
+                start += 1
+                continue
+            end = start
+            while end < len(even) and even[end]:
+                end += 1
+            low, high = step_low[start], step_high[end]
+            if end - start >= GFX_STAIR_MINIMUM_TREADS and high - low >= GFX_STAIR_MINIMUM_SPAN:
+                stairs |= treads & (elevations >= low - 0.03) & (elevations <= high + 0.03)
+            start = end
+        return stairs
+
+    # Meshes whose entities are mostly plants, by ALOC/PRIM hash (object names start with the hash).
+    hash_names = {}
+    for mesh in json_data.get("meshes", []):
+        name = (mesh.get("entity") or {}).get("name", "").lower()
+        for key in ("alocHash", "primHash"):
+            if mesh.get(key):
+                hash_names.setdefault(mesh[key].upper(), []).append(name)
+    def hashes_named(tokens):
+        return {mesh_hash for mesh_hash, names in hash_names.items()
+                if sum(any(token in name for token in tokens) for name in names) * 2 > len(names)}
+
+    vegetation_hashes = hashes_named(GFX_VEGETATION_TOKENS) | hashes_named(GFX_VEHICLE_TOKENS)
+    rock_hashes = hashes_named(GFX_ROCK_TOKENS) - vegetation_hashes
+    slice_bottom = min((layer.z_range()[0] for layer in slices if layer.boxes), default=-np.inf)
+    # Floors below every map layer, shown in GFX_OTHER_LEVEL_COLOR (as (2D triangle, elevation) arrays).
+    under_floors = []
+    # Where the scene has anything at all (object positions and floors), for finding land and water.
+    scene_points = [np.array([[(mesh.get("entity") or {}).get("position", {}).get(axis, 0.0) for axis in ("x", "y")]
+                              for mesh in json_data.get("meshes", []) if mesh.get("entity")]).reshape(-1, 2)]
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    seen_instances = set()
+    for instance in depsgraph.object_instances:
+        obj = instance.object
+        if obj.type != "MESH":
+            continue
+        if obj.original.name.split("_")[0].upper() in vegetation_hashes:
+            continue
+        matrix = np.array(instance.matrix_world)
+        instance_key = (obj.original.name, matrix.round(5).tobytes())
+        if instance_key in seen_instances:
+            continue
+        seen_instances.add(instance_key)
+        local_vertices, triangle_indices, exterior = mesh_data(obj)
+        if len(triangle_indices) == 0:
+            continue
+        local_min, local_max = local_vertices.min(axis=0), local_vertices.max(axis=0)
+        corners = np.array([(x, y, z, 1.0) for x in (local_min[0], local_max[0])
+                            for y in (local_min[1], local_max[1]) for z in (local_min[2], local_max[2])]) @ matrix.T
+        lower, upper = corners[:, :3].min(axis=0), corners[:, :3].max(axis=0)
+        matching = [layer for layer in all_slices if layer.overlaps(lower, upper)]
+        below = lower[2] < slice_bottom
+        if not matching and not below:
+            continue
+
+        world_vertices = local_vertices @ matrix[:3, :3].T + matrix[:3, 3]
+        triangles = world_vertices[triangle_indices]
+        if np.linalg.det(matrix[:3, :3]) < 0:
+            triangles = triangles[:, [0, 2, 1]]  # keep the faces pointing outward in a mirrored instance
+        cross = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
+        lengths = np.linalg.norm(cross, axis=1)
+        valid = lengths > 1e-9
+        normals = np.zeros_like(cross)
+        normals[valid] = cross[valid] / lengths[valid, None]
+        up = valid & (normals[:, 2] > 0.85)
+        shell = upper[2] > map_top and upper[2] - lower[2] >= GFX_SHELL_MINIMUM_HEIGHT
+        stairs = np.zeros_like(up) if shell else stair_step_mask(triangles, normals, up)
+        # Every face that is not flat takes part in the cross-sections, so that they close.
+        sloped = valid & (np.abs(normals[:, 2]) < 0.99)
+        footprint = max(upper[0] - lower[0], upper[1] - lower[1])
+        centroids = triangles.mean(axis=1)
+        if obj.original.name.split("_")[0].upper() in rock_hashes:
+            if np.any(up):
+                under_floors.append((triangles[up][:, :, :2], centroids[up, 2]))
+            continue
+        if not shell and np.any(up):
+            scene_points.append(centroids[up, :2])
+            if below:
+                under = up & (centroids[:, 2] < slice_bottom)
+                if np.any(under):
+                    under_floors.append((triangles[under][:, :, :2], centroids[under, 2]))
+        if shell:
+            base_kind = GFX_FLOOR_HIDDEN
+        elif use_rooms:
+            base_kind = GFX_FLOOR_BY_ROOM
+        else:
+            base_kind = GFX_FLOOR_EXTERIOR if exterior else GFX_FLOOR_INTERIOR
+
+        owner = band_owner(centroids) if np.any(up) else None
+        for layer in matching:
+            floor_mask = up & layer.contains(centroids, owner) if owner is not None else up
+            if np.any(floor_mask):
+                base_kinds = np.full(int(floor_mask.sum()), base_kind)
+                kinds = base_kinds.copy()
+                kinds[stairs[floor_mask]] = GFX_FLOOR_STAIRS
+                layer.floor_triangles.append(triangles[floor_mask][:, :, :2])
+                layer.floor_elevations.append(centroids[floor_mask, 2])
+                layer.floor_kinds.append(kinds)
+                layer.floor_base_kinds.append(base_kinds)
+            if footprint >= GFX_MINIMUM_SECTION_FOOTPRINT and np.any(sloped):
+                layer.section_candidates.append((float(lower[2]), float(upper[2]), exterior, triangles[sloped]))
+
+    def floor_levels(layer):
+        """Elevations that carry a significant share of the slice's walkable floor area."""
+        triangles, elevations, kinds = layer.floors()
+        walkable = kinds != GFX_FLOOR_HIDDEN
+        triangles, elevations = triangles[walkable], elevations[walkable]
+        if len(triangles) == 0:
+            return []
+        areas = 0.5 * np.abs((triangles[:, 1, 0] - triangles[:, 0, 0]) * (triangles[:, 2, 1] - triangles[:, 0, 1]) -
+                             (triangles[:, 2, 0] - triangles[:, 0, 0]) * (triangles[:, 1, 1] - triangles[:, 0, 1]))
+        bins = np.round(elevations / 0.25).astype(np.int64)
+        unique, inverse = np.unique(bins, return_inverse=True)
+        totals = np.bincount(inverse, weights=areas)
+        levels = []
+        for index in np.argsort(-totals):
+            if totals[index] < totals.max() * 0.1:
+                break
+            level = unique[index] * 0.25
+            if all(abs(level - existing) > 0.5 for existing in levels):
+                levels.append(level)
+        return sorted(levels)
+
+    def section_segments(triangles, cut):
+        heights = triangles[:, :, 2] - cut
+        crossing = (heights.min(axis=1) < 0) & (heights.max(axis=1) > 0)
+        if not np.any(crossing):
+            return np.empty((0, 2, 2))
+        triangles, heights = triangles[crossing], heights[crossing]
+        ends, end_heights = np.roll(triangles, -1, axis=1), np.roll(heights, -1, axis=1)
+        crosses = (heights < 0) != (end_heights < 0)
+        t = np.where(crosses, heights / np.where(crosses, heights - end_heights, 1.0), 0.0)
+        points = triangles[:, :, :2] + (ends[:, :, :2] - triangles[:, :, :2]) * t[:, :, None]
+        # Every crossing triangle has exactly two crossing edges; a stable sort brings them to the front.
+        order = np.argsort(~crosses, axis=1, kind="stable")[:, :2]
+        segments = np.take_along_axis(points, order[:, :, None], axis=1)
+        # Orient each segment with the outside of the object on its right, for filling by winding.
+        normals = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])[:, :2]
+        direction = segments[:, 1] - segments[:, 0]
+        flip = direction[:, 1] * normals[:, 0] - direction[:, 0] * normals[:, 1] < 0
+        segments[flip] = segments[flip][:, ::-1]
+        return segments
+
+    for layer in all_slices:
+        layer.levels = floor_levels(layer)
+        if not layer.levels:
+            continue
+        top = layer.z_range()[1]
+        for lowest_z, highest_z, exterior, triangles in layer.section_candidates:
+            supporting = [level for level in layer.levels if level <= lowest_z + 0.25]
+            level = supporting[-1] if supporting else layer.levels[0]
+            standing = highest_z - max(level, lowest_z)
+            if standing >= GFX_MINIMUM_WALL_HEIGHT:
+                cut = min(level + GFX_SECTION_HEIGHT, top - 0.01) + 1e-4
+                block = False
+            elif standing >= GFX_MINIMUM_BLOCK_HEIGHT:
+                cut = (max(level, lowest_z) + highest_z) / 2 + 1e-4
+                block = True
+            else:
+                continue
+            found = section_segments(triangles, cut)
+            if len(found) == 0:
+                continue
+            if block:
+                # A low object counts only as a large solid block (by the area its oriented outline encloses).
+                area = 0.5 * abs(np.sum(found[:, 0, 0] * found[:, 1, 1] - found[:, 1, 0] * found[:, 0, 1]))
+                length = np.linalg.norm(found[:, 1] - found[:, 0], axis=1).sum()
+                if area < GFX_MINIMUM_BLOCK_AREA or area > GFX_MAXIMUM_SOLID_THICKNESS / 2 * length:
+                    continue
+            midpoints = np.hstack((found.mean(axis=1), np.full((len(found), 1), cut)))
+            inside = layer.contains(midpoints)
+            if not np.any(inside):
+                continue
+            if use_rooms:
+                boundary = room_boundary_distance(midpoints[inside])
+                outdoors = np.mean(np.isinf(boundary)) > 0.5
+                if not outdoors and np.mean(boundary <= GFX_ROOM_WALL_DISTANCE) < GFX_ROOM_WALL_SHARE:
+                    continue  # furniture inside a room
+            else:
+                outdoors = exterior
+            if outdoors and np.linalg.norm(found[:, 1] - found[:, 0], axis=1).sum() < GFX_MINIMUM_OUTDOOR_OUTLINE:
+                continue
+            # Keep the whole outline of an object that is mostly inside the layer, so that it stays closed.
+            layer.wall_sections.append((found if np.mean(inside) > 0.5 else found[inside], outdoors))
+        layer.section_candidates = []
+
+    def to_canvas(points):
+        return np.stack((points[..., 0] - canvas_min[0], canvas_max[1] - points[..., 1]), axis=-1)
+
+    def dilate(mask, reach):
+        """Grow a boolean grid by `reach` cells in every direction (a square window)."""
+        if reach <= 0:
+            return mask
+        for axis in (0, 1):
+            counts = np.cumsum(np.pad(mask, [(reach + 1, reach) if a == axis else (0, 0) for a in (0, 1)]),
+                               axis=axis, dtype=np.int32)
+            length = mask.shape[axis]
+            upper = np.take(counts, np.arange(2 * reach + 1, 2 * reach + 1 + length), axis=axis)
+            lower = np.take(counts, np.arange(0, length), axis=axis)
+            mask = upper - lower > 0
+        return mask
+
+    def erode(mask, reach):
+        return ~dilate(~mask, reach)
+
+    def classify_by_room(visible, winners, lower, resolution, elevations):
+        """Resolve GFX_FLOOR_BY_ROOM cells to interior or exterior from the rooms they lie in."""
+        rows, columns = np.nonzero(visible == GFX_FLOOR_BY_ROOM)
+        if len(rows) == 0:
+            return
+        owners = winners[rows, columns]
+        canvas_x = lower[0] + (columns + 0.5) * resolution
+        canvas_y = lower[1] + (rows + 0.5) * resolution
+        points = np.stack((canvas_x + canvas_min[0], canvas_max[1] - canvas_y, elevations[owners]), axis=1)
+        visible[rows, columns] = np.where(interior_points(points), GFX_FLOOR_INTERIOR, GFX_FLOOR_EXTERIOR)
+
+    def mask_path(mask, lower, resolution, tolerance, minimum_area):
+        rings = trace_mask(mask, minimum_cells=minimum_area / resolution ** 2, tolerance=tolerance / resolution)
+        return "".join("M" + " ".join("{:.2f} {:.2f}".format(*point) for point in ring * resolution + lower) + "Z"
+                       for ring in rings)
+
+    def layer_paths(triangles, elevations, kinds, priorities, other_triangles, other_elevations, other_kinds,
+                    wall_sections):
+        """The coloured paths of one map layer, in painting order.
+
+        The topmost floor (by `priorities`) wins each cell of a fine grid, and GFX_FLOOR_BY_ROOM cells are
+        classified there rather than per triangle, so a large triangle never carries the colour of the room its
+        centroid happens to lie in across the rooms around it. Floors that are only on other levels
+        (`other_*`: indoor floors above this layer, and floors below every layer) show where this layer has no
+        floor. Walls are the filled cross-sections of `wall_sections`, kept where they border floor.
+        """
+        canvas_triangles = to_canvas(triangles) if len(triangles) else np.empty((0, 3, 2))
+        canvas_other = to_canvas(other_triangles) if len(other_triangles) else np.empty((0, 3, 2))
+        if len(canvas_triangles) + len(canvas_other) == 0:
+            return []
+        points = np.concatenate((canvas_triangles.reshape(-1, 2), canvas_other.reshape(-1, 2)))
+        lower = np.maximum(points.min(axis=0) - 1.0, 0.0)
+        upper = np.minimum(points.max(axis=0) + 1.0, (width, height))
+        if np.any(upper <= lower):
+            return []
+        resolution = max(GFX_FLOOR_RESOLUTION, float(np.max(upper - lower)) / GFX_MAXIMUM_FLOOR_GRID)
+        shape = tuple(int(np.ceil(value / resolution)) + 1 for value in (upper - lower)[::-1])
+
+        winners = rasterize_triangles(canvas_triangles, priorities, lower, resolution, shape)
+        visible = (np.where(winners >= 0, kinds[np.maximum(winners, 0)], GFX_FLOOR_NONE) if len(kinds)
+                   else np.full(shape, GFX_FLOOR_NONE, dtype=np.int64))
+        classify_by_room(visible, winners, lower, resolution, elevations)
+        # Shell ledges are out of bounds: hide whatever stands on them too, at any height.
+        hidden = kinds == GFX_FLOOR_HIDDEN
+        out_of_bounds = np.zeros(shape, dtype=bool)
+        if np.any(hidden):
+            out_of_bounds = rasterize_triangles(canvas_triangles[hidden], elevations[hidden], lower, resolution,
+                                                shape) >= 0
+            visible[out_of_bounds] = GFX_FLOOR_NONE
+        visible[visible == GFX_FLOOR_HIDDEN] = GFX_FLOOR_NONE
+        floor = visible != GFX_FLOOR_NONE
+        visible[floor & ~remove_small_islands(floor, GFX_MINIMUM_FLOOR_ISLAND / resolution ** 2)] = GFX_FLOOR_NONE
+        # Small patches of outdoor floor with indoor floor all around are gaps between room volumes.
+        exterior = visible == GFX_FLOOR_EXTERIOR
+        labels, sizes = label_regions(exterior)
+        if len(sizes):
+            pockets = sizes < GFX_MAXIMUM_ENCLOSED_EXTERIOR / resolution ** 2
+            open_ground = np.pad(visible == GFX_FLOOR_NONE, 1, constant_values=True)
+            pockets[np.unique(labels[dilate(open_ground, 1)[1:-1, 1:-1] & exterior])] = False
+            visible[exterior & pockets[np.maximum(labels, 0)]] = GFX_FLOOR_INTERIOR
+        floor = visible != GFX_FLOOR_NONE
+
+        # Floors on other levels, where this layer has none.
+        if len(canvas_other):
+            other_winners = rasterize_triangles(canvas_other, other_elevations, lower, resolution, shape)
+            other = np.where(other_winners >= 0, other_kinds[np.maximum(other_winners, 0)], GFX_FLOOR_NONE)
+            classify_by_room(other, other_winners, lower, resolution, other_elevations)
+            other_level = other != GFX_FLOOR_NONE
+            reach = int(np.ceil(GFX_OTHER_LEVEL_SMOOTHING / resolution))
+            other_level = erode(dilate(other_level, reach), reach) & ~floor & ~out_of_bounds
+            other_level = remove_small_islands(other_level, GFX_MINIMUM_OTHER_LEVEL_AREA / resolution ** 2)
+            visible[other_level] = GFX_FLOOR_OTHER_LEVEL
+
+        # Walls: the filled cross-sections, grown a little, where they border this layer's floor.
+        solids, lines = fill_sections([to_canvas(segments) for segments in wall_sections], lower, resolution, shape,
+                                      GFX_MAXIMUM_SOLID_THICKNESS / 2)
+        # Outlines of hollow objects (one-sided walls) are drawn as thick as the official maps' walls.
+        walls = dilate(solids | lines, int(round(GFX_WALL_GROWTH / resolution))) |             dilate(lines, int(round(GFX_LINE_WALL_WIDTH / 2 / resolution)))
+        walls &= dilate(floor, int(np.ceil(GFX_WALL_FLOOR_DISTANCE / resolution))) & ~out_of_bounds
+        walls = remove_small_islands(walls, GFX_MINIMUM_WALL_AREA / resolution ** 2)
+
+        paths = []
+        for color, mask, tolerance in (
+                (GFX_OTHER_LEVEL_COLOR, visible == GFX_FLOOR_OTHER_LEVEL, GFX_OTHER_LEVEL_SMOOTHING / 4),
+                # Paint every floor as exterior first so that interior and stair outlines never leave seams.
+                (GFX_EXTERIOR_FLOOR_COLOR, floor, GFX_FLOOR_TOLERANCE),
+                (GFX_INTERIOR_FLOOR_COLOR, visible == GFX_FLOOR_INTERIOR, GFX_FLOOR_TOLERANCE),
+                (GFX_STAIRS_COLOR, visible == GFX_FLOOR_STAIRS, GFX_FLOOR_TOLERANCE),
+                (GFX_WALL_COLOR, walls, GFX_WALL_TOLERANCE)):
+            path = mask_path(mask, lower, resolution, tolerance, 4 * resolution ** 2)
+            if path:
+                paths.append((color, path))
+        return paths
+
+    def write_paths(svg, paths):
+        for color, path in paths:
+            svg.write('<path fill="' + color + '" fill-rule="evenodd" d="' + path + '"/>\n')
+
+    def land_mask():
+        """Land on a grid over the canvas: everything but water, and nothing outside an enclosing shell.
+
+        Water is a gap wider than GFX_WATER_MINIMUM_WIDTH between the scene's objects and floors inside the area
+        they enclose; further away from the scene the official maps still show land. Where shell ledges (a silo
+        wall) enclose the scene, the canvas outside them is not land, and the ledge next to the land is returned
+        as a band, as (land, band, resolution).
+        """
+        resolution = GFX_LAND_RESOLUTION
+        shape = (int(np.ceil(height / resolution)), int(np.ceil(width / resolution)))
+        points = to_canvas(np.concatenate(scene_points)) if scene_points else np.empty((0, 2))
+        cells = np.floor(points / resolution).astype(np.int64)
+        inside = (cells[:, 0] >= 0) & (cells[:, 0] < shape[1]) & (cells[:, 1] >= 0) & (cells[:, 1] < shape[0])
+        occupied = np.zeros(shape, dtype=bool)
+        occupied[cells[inside, 1], cells[inside, 0]] = True
+        if not occupied.any():
+            return np.ones(shape, dtype=bool), np.zeros(shape, dtype=bool), resolution
+        barrier = np.zeros(shape, dtype=bool)
+        for layer in all_slices:
+            triangles, elevations, kinds = layer.floors()
+            hidden = kinds == GFX_FLOOR_HIDDEN
+            if np.any(hidden):
+                barrier |= rasterize_triangles(to_canvas(triangles[hidden]), elevations[hidden], np.zeros(2),
+                                               resolution, shape) >= 0
+        void = np.zeros(shape, dtype=bool)
+        if barrier.any():
+            labels, _ = label_regions(~barrier)
+            reached = np.unique(labels[occupied & ~barrier])
+            void = barrier | (~barrier & ~np.isin(labels, reached[reached >= 0]))
+
+        def close(mask, width):
+            # Past the canvas edge counts as closed, so water may run off the canvas like a river does.
+            reach = int(np.ceil(width / 2 / resolution))
+            return erode(dilate(mask, reach), reach)
+
+        water = ~close(occupied, GFX_WATER_MINIMUM_WIDTH) & close(occupied, GFX_WATER_ENCLOSURE) & ~void
+        labels, sizes = label_regions(water)
+        if len(sizes):
+            keep = sizes >= max(GFX_WATER_KEEP_FRACTION * sizes.max(), GFX_MINIMUM_WATER_AREA / resolution ** 2)
+            water &= keep[np.maximum(labels, 0)]
+        land = ~water & ~void
+        band = void & dilate(land, int(round(GFX_SHELL_BAND / resolution))) if barrier.any() else barrier
+        return land, band, resolution
+
+    def write_svg(path, writer):
+        with open(path, "w", encoding="utf-8") as svg:
+            svg.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            svg.write('<svg xmlns="http://www.w3.org/2000/svg" width="{0:g}" height="{1:g}" '
+                      'viewBox="0 0 {0:g} {1:g}">\n'.format(width, height))
+            writer(svg)
+            svg.write("</svg>\n")
+
+    output_dir = os.path.abspath(os.path.dirname(output_path))
+    os.makedirs(output_dir, exist_ok=True)
+    if under_floors:
+        under_triangles = np.concatenate([triangles for triangles, _ in under_floors])
+        under_elevations = np.concatenate([elevations for _, elevations in under_floors])
+    else:
+        under_triangles, under_elevations = np.empty((0, 3, 2)), np.empty(0)
+
+    def write_background(svg):
+        centre_x, centre_y = width / 2, height / 2
+        half_gap = GFX_CROSSHAIR_GAP / 2
+        for left, top, right, bottom in ((0.0, 0.0, centre_x - half_gap, centre_y - half_gap),
+                                         (centre_x + half_gap, 0.0, width, centre_y - half_gap),
+                                         (0.0, centre_y + half_gap, centre_x - half_gap, height),
+                                         (centre_x + half_gap, centre_y + half_gap, width, height)):
+            svg.write('<rect x="{:g}" y="{:g}" width="{:g}" height="{:g}" fill="{}"/>\n'.format(
+                left, top, right - left, bottom - top, GFX_BACKGROUND_COLOR))
+        # The official maps paint the ground over the whole canvas, leaving out only the water.
+        land, band, land_resolution = land_mask()
+        for color, mask in ((GFX_INTERIOR_FLOOR_COLOR, band), (GFX_EXTERIOR_FLOOR_COLOR, land)):
+            path = mask_path(mask, np.zeros(2), land_resolution, land_resolution, 4 * land_resolution ** 2)
+            if path:
+                svg.write('<path fill="' + color + '" fill-rule="evenodd" d="' + path + '"/>\n')
+        triangles, elevations, kinds = background.floors()
+        write_paths(svg, layer_paths(triangles, elevations, kinds, elevations, np.empty((0, 3, 2)), np.empty(0),
+                                     np.empty(0, dtype=np.int64),
+                                     [segments for segments, _ in background.wall_sections]))
+
+    background_path = os.path.join(output_dir, "output_background.svg")
+    write_svg(background_path, write_background)
+    log("INFO", "Rendered map background to " + background_path, "render_map_layers_for_gfx")
+
+    for layer_number, layer in enumerate(slices):
+        def write_layer(svg, layer_number=layer_number, layer=layer):
+            # A transparent canvas-sized rectangle keeps empty layers importable and pins the shape bounds.
+            svg.write('<rect width="{:g}" height="{:g}" fill="#000000" fill-opacity="0"/>\n'.format(
+                width, height))
+            # Lower slices show through with their outdoor walls, like the official maps: their indoor floors
+            # stay dark grey, while their stairs become plain floor.
+            triangles, elevations, kinds = layer.floors()
+            priorities = elevations
+            lower_slices = slices[:layer_number]
+            for lower in lower_slices:
+                lower_triangles, lower_elevations, lower_kinds = lower.floors(base_kinds=True)
+                triangles = np.concatenate((lower_triangles, triangles))
+                elevations = np.concatenate((lower_elevations, elevations))
+                # Keep lower floors underneath this slice's floors regardless of their elevations.
+                priorities = np.concatenate((lower_elevations - 1e6, priorities))
+                kinds = np.concatenate((lower_kinds, kinds))
+            # Floors only on other levels: those of the slices above, and every floor below all slices.
+            other_triangles, other_elevations = [under_triangles], [under_elevations]
+            other_kinds = [np.full(len(under_elevations), GFX_FLOOR_OTHER_LEVEL)]
+            for upper_slice in slices[layer_number + 1:]:
+                upper_triangles, upper_elevations, upper_kinds = upper_slice.floors(base_kinds=True)
+                other_triangles.append(upper_triangles)
+                other_elevations.append(upper_elevations)
+                other_kinds.append(upper_kinds)
+            sections = [segments for lower in lower_slices for segments, outdoors in lower.wall_sections
+                        if outdoors] + [segments for segments, _ in layer.wall_sections]
+            write_paths(svg, layer_paths(triangles, elevations, kinds, priorities,
+                                         np.concatenate(other_triangles), np.concatenate(other_elevations),
+                                         np.concatenate(other_kinds), sections))
+
+        svg_path = os.path.join(output_dir, "output_" + str(layer_number).zfill(2) + ".svg")
+        write_svg(svg_path, write_layer)
+        log("INFO", "Rendered map layer " + str(layer_number) + " (floor levels " +
+            ", ".join("{:.2f}".format(level) for level in layer.levels) + ") to " + svg_path,
+            "render_map_layers_for_gfx")
+
+
+def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mask: str, build_type: str,
+                filter_to_include_box: bool, apply_textures: bool, output_to_blend: bool, should_build_gfx: bool):
     start = timer()
-    log("INFO", "Loading scenario.", "glacier2obj")
-    log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2obj")
+    log("INFO", "Loading scenario.", "glacier2glb")
+    log("INFO", "Nav.Json file: " + path_to_nav_json, "glacier2glb")
     f = open(path_to_nav_json, "r")
     data = json.loads(f.read())
     f.close()
@@ -2592,8 +3688,11 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
     room_color_index = 0
     room_folder_color_index = 0
 
+    temp_coll = bpy.data.collections.new("Temporary")
+    bpy.context.scene.collection.children.link(temp_coll)
+
     if output_to_blend:
-        load_volume_boxes(data, ["gates", "rooms", "aiArea"])
+        load_volume_boxes(data, ["gates", "rooms", "aiArea", "mapLevel"])
 
     # Get the "pathfinding include" box
     pf_include_box_info = None
@@ -2626,13 +3725,13 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
     if build_type == "instance":
         # link the geonode
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
-        log("DEBUG", "Loading geometry node from the resource blend file: " + filepath, "glacier2obj")
+        log("DEBUG", "Loading geometry node from the resource blend file: " + filepath, "glacier2glb")
         with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
             if geo_node_name in data_from.node_groups:
                 data_to.node_groups.append(geo_node_name)
             else:
                 log("ERROR", "=========================== Error Loading the resource blend file ================",
-                    "glacier2obj")
+                    "glacier2glb")
                 assert 0
     matis = {}
     prim_matis = {}
@@ -2647,12 +3746,12 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
         # link the shading node
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res.blend")
         with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
-            log("DEBUG", "Loading shading material from the resource blend file: " + filepath, "glacier2obj")
+            log("DEBUG", "Loading shading material from the resource blend file: " + filepath, "glacier2glb")
             if shading_mat_name in data_from.materials:
                 data_to.materials.append(shading_mat_name)
             else:
-                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "glacier2obj")
-        log("DEBUG", "Adding light", "glacier2obj")
+                log("WARNING", "Shading material " + shading_mat_name + " not found in res.blend", "glacier2glb")
+        log("DEBUG", "Adding light", "glacier2glb")
 
         light_data = bpy.data.lights.new(name="Sun", type='SUN')
         light_object = bpy.data.objects.new(name="Sun", object_data=light_data)
@@ -2661,6 +3760,13 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
         light_data.energy = 2.5
         light_data.angle = math.radians(180)
         light_object.rotation_euler = (0, 0, 0)
+    root_coll = bpy.data.collections.get("Collection")
+    if root_coll:
+        root_coll.name = "Environment"
+    else:
+        root_coll = bpy.data.collections.new("Environment")
+        bpy.context.scene.collection.children.link(root_coll)
+
 
     for hash_and_entity in data['meshes']:
         if mesh_type == "ALOC":
@@ -2673,10 +3779,10 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             coll = bpy.data.collections.get(room_folder_name)
             if coll is None:
                 coll = bpy.data.collections.new(room_folder_name)
-                bpy.context.scene.collection.children.link(coll)
+                root_coll.children.link(coll)
                 coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
                 room_folder_color_index += 1
-                log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2obj")
+                log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2glb")
             room_folder_collections[room_folder_name] = coll
 
         room_folder_coll = room_folder_collections[room_folder_name]
@@ -2688,7 +3794,7 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             room_folder_coll.children.link(coll)
             coll.color_tag = "COLOR_0" + str(room_color_index % 8 + 1)
             room_color_index += 1
-            log("DEBUG", "Adding new collection for room name: " + room_name, "glacier2obj")
+            log("DEBUG", "Adding new collection for room name: " + room_name, "glacier2glb")
             room_collections[room_collection_key] = coll
 
         entity = hash_and_entity['entity']
@@ -2700,9 +3806,9 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             mesh_room_collections[mesh_hash] = []
         transforms[mesh_hash].append(transform)
         mesh_room_collections[mesh_hash].append(room_collections[room_collection_key])
-    output_dir = os.path.abspath(os.path.dirname(path_to_output_glb_file))
+    output_dir = os.path.abspath(os.path.dirname(output_path))
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
-    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2obj")
+    log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2glb")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
     aloc_or_prim_list = [item for item in file_list if item.lower().endswith('.' + mesh_type.lower())]
 
@@ -2730,8 +3836,8 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
     mesh_i = 0
     current_mesh_in_scene_index = 0
     error_alocs = []
-    log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2obj")
-    log("INFO", "Mesh count: " + str(mesh_count), "glacier2obj")
+    log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2glb")
+    log("INFO", "Mesh count: " + str(mesh_count), "glacier2glb")
     log_threshold = max(1, round(meshes_in_scenario_count / 10, -2))
     for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
         aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
@@ -2745,31 +3851,31 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             continue
         aloc_or_prim_path = os.path.join(path_to_aloc_or_prim_dir, aloc_or_prim_filename)
 
-        log("DEBUG", "Loading " + mesh_type + ": " + mesh_hash, "glacier2obj")
+        log("DEBUG", "Loading " + mesh_type + ": " + mesh_hash, "glacier2glb")
         if current_mesh_in_scene_index % log_threshold == 0:
-            log("INFO", "Loaded " + str(current_mesh_in_scene_index) + " " + mesh_type + "s...", "glacier2obj")
+            log("INFO", "Loaded " + str(current_mesh_in_scene_index) + " " + mesh_type + "s...", "glacier2glb")
         collision_type = None
         material_indices = []
         try:
             if mesh_type == "ALOC":
-                aloc, submeshes = load_aloc(aloc_or_prim_path)
+                aloc, submeshes = load_aloc(aloc_or_prim_path, temp_coll)
                 if aloc == -2:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                        mesh_hash) + " ================", "glacier2obj")
+                        mesh_hash) + " ================", "glacier2glb")
                     error_alocs.append(mesh_hash)
                     continue
                 if aloc == -1:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                        mesh_hash) + " ================", "glacier2obj")
+                        mesh_hash) + " ================", "glacier2glb")
                     error_alocs.append(mesh_hash)
                     continue
                 collision_type = aloc.collision_type
             else:
-                submeshes, material_indices = load_prim(aloc_or_prim_path, lod_mask)
-        except struct.error as err:
+                submeshes, material_indices = load_prim(aloc_or_prim_path, lod_mask, temp_coll)
+        except (struct.error, OSError) as err:
             error_alocs.append("Problem Loading " + mesh_type + ": " + str(mesh_hash) + " Exception: " + str(err))
             log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
-                mesh_hash) + " Exception: " + str(err) + " ================", "glacier2obj")
+                mesh_hash) + " Exception: " + str(err) + " ================", "glacier2glb")
             continue
         mesh_transforms = transforms[mesh_hash]
         mesh_instance_count = len(mesh_transforms)
@@ -2777,22 +3883,22 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
             for mesh_index in range(0, mesh_instance_count):
                 log("DEBUG", "Skipping RigidBody " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "]", "glacier2obj")
+                    mesh_i + 1) + "/" + str(mesh_count) + "]", "glacier2glb")
                 mesh_i += 1
             continue
         if len(submeshes) == 0:
-            log("TRACE", "No submeshes for " + str(mesh_hash), "glacier2obj")
+            log("TRACE", "No submeshes for " + str(mesh_hash), "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
         if not submeshes:
             log("WARNING", "-------------------- Error Loading " + mesh_type + ":" + mesh_hash + " ----------------------",
-                "glacier2obj")
+                "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
         if collision_type in excluded_collision_types:
             log("TRACE",
                 "Skipping Non-collidable " + mesh_type + ": " + mesh_hash + " with collision type: " + str(
-                    collision_type), "glacier2obj")
+                    collision_type), "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
         if build_type == "instance":
@@ -2861,11 +3967,11 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                 submesh.hide_viewport = True
 
                 if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
-                    log("TRACE", "Adding texture", "glacier2obj")
+                    log("TRACE", "Adding texture", "glacier2glb")
                     try:
                         add_textures(submesh, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_indices[submesh_i])
                     except struct.error as err:
-                        log("ERROR", "Error adding texture " + str(err), "glacier2obj")
+                        log("ERROR", "Error adding texture " + str(err), "glacier2glb")
         else:
             current_submesh = None
             mesh_positions = [mathutils.Vector(
@@ -2906,9 +4012,9 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                 mesh_instance_id = transforms[mesh_hash][mesh_index]["id"]
                 log("DEBUG", "Transforming " + mesh_type + " [" + str(current_mesh_in_scene_index) + "/" + str(
                     meshes_in_scenario_count) + "]: " + mesh_hash + " #" + str(mesh_index) + " Mesh: [" + str(
-                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_collection.name, "glacier2obj")
+                    mesh_i + 1) + "/" + str(mesh_count) + "] Room name: " + room_collection.name, "glacier2glb")
                 mesh_i += 1
-                log("TRACE", "Total submeshes: " + str(submesh_count), "glacier2obj")
+                log("TRACE", "Total submeshes: " + str(submesh_count), "glacier2glb")
                 for submesh_instance_index in range(submesh_count):
                     submesh = submeshes[submesh_instance_index]
                     if not unlinked[submesh_instance_index]:
@@ -2940,22 +4046,40 @@ def glacier2glb(path_to_nav_json: str, path_to_output_glb_file: str, mesh_type: 
                         try:
                             add_textures(current_submesh, matis, mesh_hash, output_dir, prim_matis, submesh_instance_index, material_indices[submesh_instance_index])
                         except struct.error as err:
-                            log("ERROR", "Error adding texture " + str(err), "glacier2obj")
+                            log("ERROR", "Error adding texture " + str(err), "glacier2glb")
                     if current_submesh:
                         current_submesh.select_set(False)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
     if len(missing_mesh_hashes) > 0:
         for missing_mesh_hash in missing_mesh_hashes:
-            log("ERROR", "Missing one or more Meshes. Missing Mesh hashes:", "glacier2obj")
-            log("ERROR", "Missing Mesh: " + missing_mesh_hash, "glacier2obj")
+            log("ERROR", "Missing one or more Meshes. Missing Mesh hashes:", "glacier2glb")
+            log("ERROR", "Missing Mesh: " + missing_mesh_hash, "glacier2glb")
 
     end = timer()
     if len(error_alocs) > 0:
-        log("ERROR", "Problem loading one or more ALOCs. ALOC hashes with problems:", "glacier2obj")
+        log("ERROR", "Problem loading one or more ALOCs. ALOC hashes with problems:", "glacier2glb")
         for error_aloc in error_alocs:
-            log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2obj")
-    log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2obj")
+            log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2glb")
+    log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2glb")
+
+    # The map layers are rendered before saving, because saving a glTF bakes every placement's instances into
+    # one mesh, and the renderer judges each instance (its size, whether it is stairs or the level's shell) on
+    # its own.
+    if should_build_gfx:
+        start = timer()
+        log("INFO", "Rendering map layers for GFX build...", "glacier2glb")
+        render_map_layers_for_gfx(data, output_path)
+        end = timer()
+        log("INFO", "Finished rendering map layers for GFX build in " + str(end - start) + " seconds.", "glacier2glb")
+
+    if output_path.endswith('.both') or output_path.endswith('.bothWithGfx'):
+        save_blend_file(output_path[:-4] + "blend")
+        save_gltf_file(output_path[:-4] + "gltf")
+    elif output_path.endswith('.blend'):
+        save_blend_file(output_path)
+    else:
+        save_gltf_file(output_path)
     return 0
 
 
@@ -2984,7 +4108,7 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
 
 def main():
     log("TRACE",
-        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.gltf path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <debug logs enabled (true | false)>",
+        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.gltf path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <export to gfx (true | false)> <debug logs enabled (true | false)>",
         "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
@@ -2996,7 +4120,8 @@ def main():
     build_type = argv[4]
     filter_to_include_box = argv[5] == "true"
     apply_textures = argv[6] == "true"
-    if len(argv) > 7 and argv[7] == "true":
+    should_build_gfx = argv[7] == "true"
+    if len(argv) > 8 and argv[8] == "true":
         log("INFO", "Enabling debug logs", "main"),
         glacier2glb_enabled_log_levels.append("TRACE")
         glacier2glb_enabled_log_levels.append("TRACE")
@@ -3009,17 +4134,10 @@ def main():
     bpy.context.scene.render.engine = 'BLENDER_EEVEE_NEXT'
     output_to_blend = output_path.endswith('.both') or output_path.endswith('.blend')
     scenario = glacier2glb(scene_path, output_path, mesh_type, lod_mask, build_type, filter_to_include_box,
-                             apply_textures, output_to_blend)
+                             apply_textures, output_to_blend, should_build_gfx)
     if scenario == 1:
         log("INFO", 'Failed to import scenario "%s"' % scene_path, "main")
         return 1
-    if output_path.endswith('.both'):
-        save_blend_file(output_path[:-4] + "blend")
-        save_gltf_file(output_path[:-4] + "gltf")
-    elif output_path.endswith('.blend'):
-        save_blend_file(output_path)
-    else:
-        save_gltf_file(output_path)
 
     log("INFO", "Script finished, waiting...", "main")
     try:
@@ -3081,7 +4199,10 @@ def bake_geometry_node_instances():
 def save_gltf_file(output_path: str):
     log("INFO", "Attempting to save glTF file to :" + output_path, "main")
     bake_geometry_node_instances()
-    bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLTF_SEPARATE', export_apply=True)
+    with open(os.devnull, "w") as devnull, \
+            contextlib.redirect_stdout(devnull), \
+            contextlib.redirect_stderr(devnull):
+        bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLTF_SEPARATE', export_apply=True)
 
 
 def save_blend_file(output_path: str):

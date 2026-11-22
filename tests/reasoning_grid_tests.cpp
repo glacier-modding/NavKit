@@ -784,11 +784,25 @@ int main(const int argc, char** argv) {
         testWaypointConnectionsWallObstacle();
         testWaypointConnectionsSquareDiagonals();
         testWaypointConnectionsSquareBlockedByWall();
+        // Game files are not part of this repository: these tests run where they have been provided.
+        const auto hasGameFile = [](const std::filesystem::path& path) {
+            const bool exists = std::filesystem::exists(path);
+            if (!exists) {
+                std::cout << "[skip] needs game file " << path.generic_string() << std::endl;
+            }
+            return exists;
+        };
         const std::filesystem::path realAirgPath = fixtures.empty() ? resourceDir / "intro.airg" : fixtures[0];
-        testRealBin1Airg(realAirgPath);
-        testExactBin1RoundTrip(realAirgPath);
-        testExactBin1RoundTrip(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo_official.airg");
-        testOfficialIntelDeadEnd(fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo_official.airg");
+        if (hasGameFile(realAirgPath)) {
+            testRealBin1Airg(realAirgPath);
+            testExactBin1RoundTrip(realAirgPath);
+        }
+        const std::filesystem::path officialAirgPath =
+            fixtures.size() > 1 ? fixtures[1] : resourceDir / "intelcpudemo_official.airg";
+        if (hasGameFile(officialAirgPath)) {
+            testExactBin1RoundTrip(officialAirgPath);
+            testOfficialIntelDeadEnd(officialAirgPath);
+        }
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

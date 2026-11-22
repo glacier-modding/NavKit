@@ -18,6 +18,7 @@
 
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
+#include "../../include/NavKit/module/Gfxf.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
@@ -31,20 +32,20 @@
 #include <wx/checkbox.h>
 #include <wx/radiobut.h>
 #include <wx/sizer.h>
+#include <navkit-rpkg-lib.h>
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/util/CommandRunner.h"
 #include "../../include/NavKit/util/FileUtil.h"
-#include "../../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 #include "../../include/NavWeakness/NavPower.h"
 
 SceneMesh::SceneMesh() :
     loadGlbName("Load GLB"), saveGlbName("Save GLB"), lastGlbFileName("Load GLB"), lastSaveGlbFileName("Save GLB"),
     glbLoaded(false), showGlb(true), loadGlb(false), startedSceneMeshGeneration(false),
     blenderSceneMeshBuildStarted(false), blenderSceneMeshGenerationDone(false), blendFileOnlyBuild(false),
-    blendFileAndGlbBuild(false), filterToIncludeBox(true), onlyCollidable(true), errorBuilding(false),
-    skipExtractingAlocsOrPrims(false), errorExtracting(false), extractingResources(false),
+    blendFileAndGlbBuild(false), blendFileAndGlbAndGfxBuild(false), filterToIncludeBox(true), onlyCollidable(true),
+    errorBuilding(false), skipExtractingAlocsOrPrims(false), errorExtracting(false), extractingResources(false),
     doneExtractingAlocsOrPrims(false), doGlbHitTest(false), meshTypeForBuild(ALOC), sceneMeshBuildType(COPY),
     primLods{true, true, true, true, true, true, true, true}, blendFileBuilt(false), extractTextures(false),
     applyTextures(false) {}
@@ -362,6 +363,12 @@ void SceneMesh::buildSceneMeshFromScene() {
         command += " false";
     }
 
+    if (blendFileAndGlbAndGfxBuild) {
+        command += " true";
+    } else {
+        command += " false";
+    }
+
     if (NavKitSettings::getInstance().showDebugLogs) {
         command += " true";
     }
@@ -378,8 +385,11 @@ void SceneMesh::buildSceneMeshFromScene() {
             Logger::log(NK_INFO, "Finished generating %s from nav.json file in %lld ms.", buildOutputFileType.c_str(),
                 duration.count());
             blenderSceneMeshGenerationDone = true;
-            if (blendFileAndGlbBuild || blendFileOnlyBuild) {
+            if (blendFileAndGlbAndGfxBuild || blendFileAndGlbBuild || blendFileOnlyBuild) {
                 blendFileBuilt = true;
+                if (blendFileAndGlbAndGfxBuild) {
+                    Gfxf::getInstance().startGfxBuild();
+                }
             }
         },
         [this] { errorBuilding = true; });
@@ -763,11 +773,22 @@ void SceneMesh::handleBuildGlbFromSceneClicked() {
 
 void SceneMesh::handleBuildBlendFromSceneClicked() {
     blendFileOnlyBuild = true;
+    blendFileAndGlbBuild = false;
+    blendFileAndGlbAndGfxBuild = false;
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
 void SceneMesh::handleBuildBlendAndGlbFromSceneClicked() {
+    blendFileOnlyBuild = false;
     blendFileAndGlbBuild = true;
+    blendFileAndGlbAndGfxBuild = false;
+    backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
+}
+
+void SceneMesh::handleBuildBlendAndGlbAndGfxFromSceneClicked() {
+    blendFileOnlyBuild = false;
+    blendFileAndGlbBuild = false;
+    blendFileAndGlbAndGfxBuild = true;
     backgroundWorker.emplace(&SceneMesh::extractResourcesAndStartSceneMeshBuild, this);
 }
 
@@ -896,6 +917,7 @@ void SceneMesh::clear() {
     blenderSceneMeshGenerationDone = false;
     blendFileOnlyBuild = false;
     blendFileAndGlbBuild = false;
+    blendFileAndGlbAndGfxBuild = false;
     blendFileBuilt = false;
     errorBuilding = false;
     skipExtractingAlocsOrPrims = false;

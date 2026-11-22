@@ -64,7 +64,7 @@ void showHelpDialog() {
                     "Clears the loaded NavPower navigation mesh.", ""},
                 {"New Airg", "Clears the loaded AIRG file.", "Clears the loaded AIRG file.", ""},
                 {"New Crmd", "Clears the loaded CRMD file.", "Clears the loaded crowd-map data.", ""},
-                {"New GFXF", "Clears the loaded GFXF file.", "Clears the displayed SWF-backed map.", ""},
+                {"New Gfxf", "Clears the loaded Gfxf file.", "Clears the displayed SWF-backed map.", ""},
                 {"Open Scene", "Loads a NavKit scene file.",
                     "Provides scene geometry for inspection and as input to builds.", ""},
                 {"Open GLB", "Loads a glTF binary scene mesh.",
@@ -88,13 +88,17 @@ void showHelpDialog() {
                     "Loads game-packaged crowd-map data directly, without a separate manual extraction step.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version so the "
                     "package index is ready."},
-                {"Open GFXF from File", "Loads a GFXF/GFX/SWF file and displays its map layer.",
+                {"Open Gfxf from File", "Loads a Gfxf/GFX/SWF file and displays its map layer.",
                     "FFDec CLI exports named ZMapView sprites when available, otherwise the first SWF frame.",
                     "FFDec is bundled with NavKit. Java 8 or newer is required at runtime; set FFDEC_PATH to "
                     "override."},
-                {"Open GFXF from Rpkg", "Extracts a GFXF resource from game packages and displays its map layer.",
-                    "NavKit extracts the GFXF payload as SWF, then uses FFDec CLI to export its map layer.",
+                {"Open Gfxf from Rpkg", "Extracts a Gfxf resource from game packages and displays its map layer.",
+                    "NavKit extracts the Gfxf payload as SWF, then uses FFDec CLI to export its map layer.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version."},
+                {"Open Gfx", "Loads a raw GFX file and displays its map layers.",
+                    "Opens a map outside its Gfxf container, and makes it available to Save Gfx and Save Gfxf.",
+                    "FFDec is bundled with NavKit. Java 8 or newer is required at runtime; set FFDEC_PATH to "
+                    "override."},
                 {"Save Scene", "Saves the currently loaded scene.", "Preserves changes made to the scene.",
                     "Load a scene."},
                 {"Save GLB", "Saves the loaded scene mesh as a GLB file with embedded materials and textures.",
@@ -107,6 +111,11 @@ void showHelpDialog() {
                     "Load an AIRG and make sure no AIRG save is in progress."},
                 {"Save Crmd", "Saves the loaded Crmd data.", "Preserves changes made to CRMD data.",
                     "Load a CRMD and make sure no CRMD save is in progress."},
+                {"Save Gfxf", "Packs the current GFX into a Gfxf file.", "Creates a Gfxf map resource for use in game.",
+                    "Build a GFX from a scene or open a Gfx or Gfxf, and make sure no save is in progress."},
+                {"Save Gfx", "Saves the current map as a raw GFX file.",
+                    "Writes the GFX without its Gfxf container, for inspection or editing in other tools.",
+                    "Build a GFX from a scene or open a Gfx or Gfxf, and make sure no save is in progress."},
                 {"Exit", "Closes NavKit.", "Ends the current NavKit session.", ""},
             }},
         {"Edit", "These commands change navigation data or control AIRG waypoint editing modes.",
@@ -188,9 +197,9 @@ void showHelpDialog() {
                     ""},
                 {"Show GLB", "Shows or hides the loaded GLB scene mesh.",
                     "Makes it easier to compare scene mesh geometry with navigation data.", ""},
-                {"Show GFXF", "Shows or hides the loaded GFXF map layer.",
+                {"Show Gfxf", "Shows or hides the loaded Gfxf map layer.",
                     "Displays the SWF-backed map as a 2D viewport overlay.", ""},
-                {"Select GFXF Layer", "Chooses which extracted map level to display.",
+                {"Select Gfxf Layer", "Chooses which extracted map level to display.",
                     "For Hitman maps, named ZMapView sprites are listed by level.", ""},
                 {"Show Log", "Shows or hides the application log panel.",
                     "Displays operation progress, warnings, and errors.", ""},
@@ -227,6 +236,13 @@ void showHelpDialog() {
                 {"Build Blend from Scene", "Builds a Blender scene from the loaded scene.",
                     "Exports scene geometry and supported scene content to Blender.",
                     "Meet the same scene, game resource, and Blender setup requirements as Build GLB from Scene."},
+                {"Build GFX from Scene", "Builds a layered GFX map from the loaded scene.",
+                    "Exports one transparent map layer per map-space configuration (the background configuration "
+                    "becomes every layer's background), then combines them into output.gfx in the game's map GFX "
+                    "format, packs it into output.gfxf, and loads output.gfxf. SVG layers are also saved as "
+                    "output_00.svg, output_01.svg, and so on.",
+                    "Load a scene, set Blender and the output folder in NavKit Settings, and make sure FFDec is "
+                    "available. Map layers use the configured map-level volume boxes."},
                 {"Build Navp from GLB and Scene", "Builds a Navp using scene geometry and a loaded GLB.",
                     "Creates a navigation mesh from the loaded scene geometry and GLB.",
                     "Load a scene and GLB, generate Recast input geometry (for example, by building a GLB from the "

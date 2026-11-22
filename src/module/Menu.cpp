@@ -31,7 +31,7 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_NEW_NAVP, "New &Navp");
     file->Append(IDM_FILE_NEW_AIRG, "New &Airg");
     file->Append(IDM_FILE_NEW_CRMD, "New &Crmd");
-    file->Append(IDM_FILE_NEW_GFXF, "New GFXF");
+    file->Append(IDM_FILE_NEW_GFXF, "New Gfxf");
     file->AppendSeparator();
     file->Append(IDM_FILE_OPEN_SCENE, "Open &Scene");
     file->Append(IDM_FILE_OPEN_GLB, "Open &GLB");
@@ -41,8 +41,9 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_OPEN_AIRG_FROM_RPKG, "Open Airg from &Rpkg");
     file->Append(IDM_FILE_OPEN_CRMD, "Open &Crmd");
     file->Append(IDM_FILE_OPEN_CRMD_FROM_RPKG, "Open Crmd from &Rpkg");
-    file->Append(IDM_FILE_OPEN_GFXF, "Open GFXF");
-    file->Append(IDM_FILE_OPEN_GFXF_FROM_RPKG, "Open GFXF from &Rpkg");
+    file->Append(IDM_FILE_OPEN_GFXF, "Open Gfxf");
+    file->Append(IDM_FILE_OPEN_GFXF_FROM_RPKG, "Open Gfxf from &Rpkg");
+    file->Append(IDM_FILE_OPEN_GFX, "Open Gfx");
     file->AppendSeparator();
     file->Append(IDM_FILE_SAVE_SCENE, "Save &Scene");
     file->Append(IDM_FILE_SAVE_GLB, "Save &GLB");
@@ -50,6 +51,8 @@ wxMenuBar* Menu::createMenuBar() {
     file->Append(IDM_FILE_SAVE_NAVP, "Save &Navp");
     file->Append(IDM_FILE_SAVE_AIRG, "Save &Airg");
     file->Append(IDM_FILE_SAVE_CRMD, "Save &Crmd");
+    file->Append(IDM_FILE_SAVE_GFXF, "Save Gfxf");
+    file->Append(IDM_FILE_SAVE_GFX, "Save Gfx");
     file->AppendSeparator();
     file->Append(IDM_FILE_EXIT, "E&xit");
     bar->Append(file, "&File");
@@ -67,7 +70,7 @@ wxMenuBar* Menu::createMenuBar() {
     settings->Append(IDM_SETTINGS_RECAST, "&Recast Settings");
     settings->Append(IDM_SETTINGS_SCENE_MESH, "&Scene Mesh Settings");
     settings->Append(IDM_SETTINGS_AIRG, "&Airg Settings");
-    settings->Append(IDM_SETTINGS_GFXF, "&GFXF Settings");
+    settings->Append(IDM_SETTINGS_GFXF, "&Gfxf Settings");
     settings->Append(IDM_SETTINGS_CRMD, "&Crmd Settings");
     bar->Append(settings, "&Settings");
 
@@ -115,6 +118,7 @@ wxMenuBar* Menu::createMenuBar() {
     build->Append(IDM_BUILD_GLB_FROM_SCENE, "Build GLB from &Scene");
     build->Append(IDM_BUILD_GLB_FROM_NAVP, "Build GLB from &Navp");
     build->Append(IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, "Build GLB and Blend from &Scene");
+    build->Append(IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE, "Build GLB and Blend and GFX from &Scene");
     build->Append(IDM_BUILD_BLEND_FROM_SCENE, "Build Blend from &Scene");
     build->AppendSeparator();
     build->Append(IDM_BUILD_NAVP, "Build &Navp from GLB and Scene");
@@ -217,11 +221,14 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmd.saving && !crmd.building);
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmd.saving && !crmd.building);
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF, gfxf.canLoad());
+    setMenuItemEnabled(IDM_FILE_OPEN_GFX, gfxf.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF_FROM_RPKG, Rpkg::canExtract() && gfxf.canLoad() && hasGfxfResources);
     setMenuItemEnabled(IDM_FILE_SAVE_SCENE, isSceneLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_NAVP, isNavpLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_AIRG, airg.canSave());
     setMenuItemEnabled(IDM_FILE_SAVE_CRMD, crmd.canSave());
+    setMenuItemEnabled(IDM_FILE_SAVE_GFXF, gfxf.canSave());
+    setMenuItemEnabled(IDM_FILE_SAVE_GFX, gfxf.canSave());
     setMenuItemEnabled(IDM_FILE_SAVE_GLB, isGlbLoaded);
     setMenuItemEnabled(IDM_FILE_SAVE_BLEND, obj.canSaveBlend());
 
@@ -237,6 +244,7 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_BUILD_GLB_FROM_NAVP, obj.canBuildGlbFromNavp());
     setMenuItemEnabled(IDM_BUILD_BLEND_FROM_SCENE, obj.canBuildBlendFromScene());
     setMenuItemEnabled(IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, obj.canBuildBlendAndGlbFromScene());
+    setMenuItemEnabled(IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE, obj.canBuildBlendAndGlbFromScene());
 
     setMenuItemEnabled(IDM_EXTRACT_SCENE, sceneExtract.canExtractFromGame());
     setMenuItemEnabled(IDM_EXTRACT_SCENE_AND_BUILD_GLB, sceneExtract.canExtractFromGameAndBuildGlb());
@@ -305,7 +313,7 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_NEW_GFXF:
         Gfxf::getInstance().clear();
         updateMenuState();
-        Logger::log(NK_DEBUG, "File -> New GFXF clicked");
+        Logger::log(NK_DEBUG, "File -> New Gfxf clicked");
         break;
     case IDM_FILE_OPEN_SCENE:
         Scene::getInstance().handleOpenSceneClicked();
@@ -341,11 +349,15 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_FILE_OPEN_GFXF:
         Gfxf::getInstance().handleOpenGfxfClicked();
-        Logger::log(NK_DEBUG, "File -> Open GFXF from File clicked");
+        Logger::log(NK_DEBUG, "File -> Open Gfxf from File clicked");
         break;
     case IDM_FILE_OPEN_GFXF_FROM_RPKG:
         Gfxf::getInstance().showExtractGfxfDialog();
-        Logger::log(NK_DEBUG, "File -> Open GFXF from Rpkg clicked");
+        Logger::log(NK_DEBUG, "File -> Open Gfxf from Rpkg clicked");
+        break;
+    case IDM_FILE_OPEN_GFX:
+        Gfxf::getInstance().handleOpenGfxClicked();
+        Logger::log(NK_DEBUG, "File -> Open Gfx clicked");
         break;
     case IDM_FILE_SAVE_SCENE:
         Scene::getInstance().handleSaveSceneClicked();
@@ -370,6 +382,14 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_FILE_SAVE_CRMD:
         Crmd::getInstance().handleSaveCrmdClicked();
         Logger::log(NK_DEBUG, "File -> Save Crmd clicked");
+        break;
+    case IDM_FILE_SAVE_GFXF:
+        Gfxf::getInstance().handleSaveGfxfClicked();
+        Logger::log(NK_DEBUG, "File -> Save Gfxf clicked");
+        break;
+    case IDM_FILE_SAVE_GFX:
+        Gfxf::getInstance().handleSaveGfxClicked();
+        Logger::log(NK_DEBUG, "File -> Save Gfx clicked");
         break;
 
     case IDM_FILE_EXIT:
@@ -448,7 +468,7 @@ int Menu::handleMenuClicked(const int menuId) {
         handleCheckboxMenuItem(IDM_VIEW_GLB_SHOW_GLB, SceneMesh::getInstance().showGlb, "Show GLB");
         break;
     case IDM_VIEW_GFXF_SHOW_GFXF:
-        handleCheckboxMenuItem(IDM_VIEW_GFXF_SHOW_GFXF, Gfxf::getInstance().showGfxf, "Show GFXF");
+        handleCheckboxMenuItem(IDM_VIEW_GFXF_SHOW_GFXF, Gfxf::getInstance().showGfxf, "Show Gfxf");
         break;
     case IDM_VIEW_AIRG_SHOW_AIRG:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg, "Show Airg");
@@ -485,6 +505,9 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_BUILD_BLEND_AND_GLB_FROM_SCENE:
         obj.handleBuildBlendAndGlbFromSceneClicked();
+        break;
+    case IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE:
+        obj.handleBuildBlendAndGlbAndGfxFromSceneClicked();
         break;
     case IDM_BUILD_GLB_FROM_SCENE:
         obj.handleBuildGlbFromSceneClicked();

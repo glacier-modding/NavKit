@@ -80,6 +80,7 @@ public:
     std::vector<Json::VolumeSphere> volumeSpheres;
     std::vector<Json::VolumeShape> volumeShapes;
     std::vector<Json::Crowd> crowds;
+    std::vector<Json::MapSpaceConfig> mapSpaceConfigs;
     std::vector<Json::Mesh> meshes;
     std::vector<Json::Mesh> prims;
     Json::PfBox includeBox;

@@ -14,13 +14,16 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
 
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <stb_image.h>
 #include <wx/app.h>
 #include <wx/arrstr.h>
@@ -33,13 +36,18 @@
 #include <wx/stattext.h>
 #include <wx/utils.h>
 
+#include <navkit-rpkg-lib.h>
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Rpkg.h"
+#include "../../include/NavKit/module/SceneMesh.h"
+#include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/util/FileUtil.h"
+#include "../../include/NavKit/util/GfxMapAlignment.h"
+#include "../../include/NavKit/util/GfxMapLayerSwf.h"
 #include "../../include/NavKit/render/Mesh.h"
 
 std::map<std::string, std::string> Gfxf::gfxfHashIoiStringMap{};
@@ -58,6 +66,17 @@ namespace {
             return {};
         }
         return std::vector<unsigned char>(bytes.begin(), bytes.end());
+    }
+
+    // Whether an RGBA pixel of an exported map layer is its backdrop: transparent, or the canvas and water colour
+    // the official maps fill their background with. Floors and walls never use it, so it can be cleared to show the
+    // scene through. (A map's corner pixel is no guide: where land reaches the corner it is floor-coloured.)
+    bool isMapBackdrop(const unsigned char* rgba) {
+        constexpr std::array<int, 3> backdrop = {0x1c, 0x1e, 0x20};
+        constexpr int tolerance = 8;
+        return rgba[3] == 0 ||
+            (std::abs(rgba[0] - backdrop[0]) <= tolerance && std::abs(rgba[1] - backdrop[1]) <= tolerance &&
+                std::abs(rgba[2] - backdrop[2]) <= tolerance);
     }
 
     bool prepareFfdecInput(const std::filesystem::path& inputPath, const std::filesystem::path& outputDirectory,
@@ -144,6 +163,22 @@ namespace {
         return std::filesystem::is_regular_file(path, error) && !error;
     }
 
+    bool isGfxfContainer(const std::filesystem::path& path) {
+        std::ifstream input(path, std::ios::binary);
+        std::array<char, 4> signature{};
+        input.read(signature.data(), static_cast<std::streamsize>(signature.size()));
+        return input.gcount() == static_cast<std::streamsize>(signature.size()) &&
+            std::string_view(signature.data(), signature.size()) == "BIN1";
+    }
+
+    bool isRawGfx(const std::filesystem::path& path) {
+        std::ifstream input(path, std::ios::binary);
+        std::array<char, 3> signature{};
+        input.read(signature.data(), static_cast<std::streamsize>(signature.size()));
+        return input.gcount() == static_cast<std::streamsize>(signature.size()) &&
+            std::string_view(signature.data(), signature.size()) == "GFX";
+    }
+
     std::string pathToUtf8(const std::filesystem::path& path) {
         const auto value = path.u8string();
         return {reinterpret_cast<const char*>(value.data()), value.size()};
@@ -186,7 +221,7 @@ namespace {
         return {};
     }
 
-    long executeFfdec(const std::array<wxString, 9>& arguments) {
+    long executeFfdec(const std::vector<wxString>& arguments) {
         if (wxTheApp == nullptr) {
             return -1;
         }
@@ -212,10 +247,12 @@ namespace {
                 processState->terminatedCondition.notify_one();
             });
 
-            std::array<const wxChar*, 10> argv{};
-            for (size_t i = 0; i < arguments.size(); ++i) {
-                argv[i] = arguments[i].c_str();
+            std::vector<const wxChar*> argv;
+            argv.reserve(arguments.size() + 1);
+            for (const wxString& argument : arguments) {
+                argv.push_back(argument.c_str());
             }
+            argv.push_back(nullptr);
             const long processId = wxExecute(argv.data(), wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE, process);
             if (processId <= 0) {
                 delete process;
@@ -327,6 +364,99 @@ namespace {
         return "Level " + folderName.substr(numberStart, numberEnd - numberStart);
     }
 
+    // FFDec renders map layers at this many pixels per canvas unit (one unit is one metre in the game's maps).
+    constexpr float ffdecZoom = 2.0f;
+    // Walls are matched where they cross this far above a layer's floor, like the GFX builder draws them.
+    constexpr float sectionHeight = 1.2f;
+    // A geometry placement is used only when it is this much better than a random one.
+    constexpr float minimumAlignmentConfidence = 1.5f;
+
+    struct Bounds {
+        glm::vec3 minimum{std::numeric_limits<float>::max()};
+        glm::vec3 maximum{std::numeric_limits<float>::lowest()};
+
+        void add(const Bounds& other) {
+            minimum = glm::min(minimum, other.minimum);
+            maximum = glm::max(maximum, other.maximum);
+        }
+
+        [[nodiscard]] bool valid() const {
+            return minimum.x <= maximum.x;
+        }
+    };
+
+    // The world bounds of a map space config's volume boxes. Some exports drop the leading digit of entity IDs in
+    // references, so an unambiguous suffix match is accepted, like the GFX builder does.
+    Bounds mapSpaceBounds(const Json::MapSpaceConfig& config, const std::vector<Json::Entity>& volumeBoxes) {
+        Bounds bounds;
+        for (const std::string& id : config.inclusions.data) {
+            if (id.empty()) {
+                continue;
+            }
+            const Json::Entity* volume = nullptr;
+            int matches = 0;
+            for (const Json::Entity& candidate : volumeBoxes) {
+                if (candidate.id == id) {
+                    volume = &candidate;
+                    matches = 1;
+                    break;
+                }
+                if (candidate.id.size() > id.size() && candidate.id.ends_with(id)) {
+                    volume = &candidate;
+                    ++matches;
+                }
+            }
+            if (volume == nullptr || matches != 1) {
+                continue;
+            }
+            const glm::quat rotation(volume->rotation.w, volume->rotation.x, volume->rotation.y, volume->rotation.z);
+            const glm::vec3 half =
+                glm::abs(glm::vec3(volume->scale.data.x, volume->scale.data.y, volume->scale.data.z)) * 0.5f;
+            const glm::vec3 centre(volume->position.x, volume->position.y, volume->position.z);
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 local((corner & 1 ? 1.0f : -1.0f) * half.x, (corner & 2 ? 1.0f : -1.0f) * half.y,
+                    (corner & 4 ? 1.0f : -1.0f) * half.z);
+                const glm::vec3 point = centre + rotation * local;
+                bounds.minimum = glm::min(bounds.minimum, point);
+                bounds.maximum = glm::max(bounds.maximum, point);
+            }
+        }
+        return bounds;
+    }
+
+    // The bounds of each map layer's volumes, in the order of the GFX builder's slices, and the canvas: the
+    // background volumes, or else all of the layers' volumes.
+    std::pair<std::vector<Bounds>, Bounds> sceneMapSpaces() {
+        const Scene& scene = Scene::getInstance();
+        std::vector<Bounds> slices;
+        Bounds background;
+        Bounds all;
+        for (const Json::MapSpaceConfig& config : scene.mapSpaceConfigs) {
+            const Bounds bounds = mapSpaceBounds(config, scene.volumeBoxes);
+            if (GfxMapLayerSwf::isBackgroundMapSpaceName(config.name)) {
+                if (bounds.valid()) {
+                    background.add(bounds);
+                }
+                continue;
+            }
+            slices.push_back(bounds);
+            if (bounds.valid()) {
+                all.add(bounds);
+            }
+        }
+        return {slices, background.valid() ? background : all};
+    }
+
+    int layerSliceNumber(const std::string& layerName) {
+        if (!layerName.starts_with("Level ")) {
+            return -1;
+        }
+        try {
+            return std::stoi(layerName.substr(6));
+        } catch (const std::exception&) {
+            return -1;
+        }
+    }
 } // namespace
 
 bool Gfxf::canLoad() const {
@@ -342,12 +472,346 @@ void Gfxf::handleOpenGfxfClicked() {
     }
 }
 
+void Gfxf::handleOpenGfxClicked() {
+    const nfdu8filteritem_t filter = {"GFX files", "gfx"};
+    if (char* fileName = FileUtil::openNfdLoadDialog(&filter, 1)) {
+        const std::string path = fileName;
+        NFD_FreePathU8(fileName);
+        loadGfxfFromFile(path);
+    }
+}
+
 void Gfxf::loadGfxfFromFile(const std::string& fileName) {
     if (!isRegularFile(std::filesystem::u8path(fileName))) {
         showGfxfError("The selected GFXF/GFX/SWF file does not exist or is not a regular file.");
         return;
     }
     startLoad(fileName);
+}
+
+bool Gfxf::canSave() const {
+    return gfxBuilt && !saving;
+}
+
+char* Gfxf::openSaveGfxfFileDialog() {
+    const nfdu8filteritem_t filter = {"GFXF files", "gfxf"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.gfxf");
+}
+
+std::vector<unsigned char> Gfxf::extractGfxFromGfxf(const std::vector<unsigned char>& gfxfBytes) {
+    // GFXF resources are BIN1 containers: a 16-byte header with a big-endian data size, then a data section whose
+    // first two 64-bit fields are the GFX payload's offset (relative to the data section) and its size.
+    // The game's own GFXF files put a 32-bit element count directly before the payload (offset 0x44), but the
+    // glacier_bin1 serializer that navkit-rpkg-lib uses leaves it out (offset 0x40); the game reads both, so the
+    // payload is located through its offset rather than at a fixed position.
+    constexpr size_t dataSectionOffset = 16;
+    const auto readLittleEndian = [&gfxfBytes](const size_t offset) {
+        std::uint64_t value = 0;
+        for (size_t i = 0; i < 8; ++i) {
+            value |= static_cast<std::uint64_t>(gfxfBytes[offset + i]) << (8 * i);
+        }
+        return value;
+    };
+    if (gfxfBytes.size() < dataSectionOffset + 16 || !std::equal(gfxfBytes.begin(), gfxfBytes.begin() + 4, "BIN1")) {
+        throw std::runtime_error("The GFXF file is missing its BIN1 header.");
+    }
+    const std::uint64_t dataSize = static_cast<std::uint64_t>(gfxfBytes[8]) << 24 |
+        static_cast<std::uint64_t>(gfxfBytes[9]) << 16 | static_cast<std::uint64_t>(gfxfBytes[10]) << 8 |
+        static_cast<std::uint64_t>(gfxfBytes[11]);
+    if (dataSize > gfxfBytes.size() - dataSectionOffset) {
+        throw std::runtime_error("The GFXF data section extends beyond the end of the file.");
+    }
+    const std::uint64_t gfxOffset = readLittleEndian(dataSectionOffset);
+    const std::uint64_t gfxSize = readLittleEndian(dataSectionOffset + 8);
+    if (gfxOffset > dataSize || gfxSize > dataSize - gfxOffset) {
+        throw std::runtime_error("The GFXF payload extends beyond its data section.");
+    }
+    const auto gfxBegin = gfxfBytes.begin() + static_cast<std::ptrdiff_t>(dataSectionOffset + gfxOffset);
+    std::vector<unsigned char> gfxBytes(gfxBegin, gfxBegin + static_cast<std::ptrdiff_t>(gfxSize));
+    if (gfxBytes.size() < 8 || !std::equal(gfxBytes.begin(), gfxBytes.begin() + 3, "GFX")) {
+        throw std::runtime_error("The GFXF payload is not a GFX file.");
+    }
+    const std::uint32_t declaredLength = static_cast<std::uint32_t>(gfxBytes[4]) |
+        static_cast<std::uint32_t>(gfxBytes[5]) << 8 | static_cast<std::uint32_t>(gfxBytes[6]) << 16 |
+        static_cast<std::uint32_t>(gfxBytes[7]) << 24;
+    if (declaredLength != gfxBytes.size()) {
+        throw std::runtime_error("The GFXF payload's GFX header does not match its size.");
+    }
+    return gfxBytes;
+}
+
+std::vector<unsigned char> Gfxf::loadGfxFromFile(const std::string& fileName) {
+    std::vector<unsigned char> bytes = readFileBytes(std::filesystem::u8path(fileName));
+    if (bytes.empty()) {
+        throw std::runtime_error("Could not read GFX/GFXF file: " + fileName);
+    }
+    if (bytes.size() >= 4 && std::equal(bytes.begin(), bytes.begin() + 4, "BIN1")) {
+        return extractGfxFromGfxf(bytes);
+    }
+    if (bytes.size() < 8 || !std::equal(bytes.begin(), bytes.begin() + 3, "GFX")) {
+        throw std::runtime_error("The file is neither a GFX nor a GFXF file: " + fileName);
+    }
+    return bytes;
+}
+
+bool Gfxf::packGfxToGfxfFile(const std::vector<unsigned char>& gfxBytes, const std::string& fileName) {
+    return !gfxBytes.empty() &&
+        pack_gfx_to_gfxf(gfxBytes.data(), gfxBytes.size(), fileName.c_str(), Logger::rustLogCallback) == 0;
+}
+
+void Gfxf::setGfxData(std::vector<unsigned char> bytes) {
+    {
+        std::lock_guard lock(gfxDataMutex);
+        gfxData = std::move(bytes);
+        gfxBuilt = !gfxData.empty();
+    }
+    Menu::updateMenuState();
+}
+
+void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
+    saving = true;
+    Menu::updateMenuState();
+    const auto start = std::chrono::high_resolution_clock::now();
+    Logger::log(NK_INFO, "Saving Gfxf to file: '%s'...", fileName.c_str());
+
+    {
+        std::lock_guard lock(gfxDataMutex);
+        if (gfxData.empty()) {
+            Logger::log(NK_ERROR, "No built GFX is available to save as Gfxf.");
+        } else if (!packGfxToGfxfFile(gfxData, fileName)) {
+            Logger::log(NK_ERROR, "Error saving Gfxf file '%s'.", fileName.c_str());
+        } else {
+            const auto end = std::chrono::high_resolution_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            Logger::log(NK_INFO, "Finished saving Gfxf in %lld ms.", duration.count());
+        }
+    }
+
+    saving = false;
+    Menu::updateMenuState();
+}
+
+void Gfxf::handleSaveGfxfClicked() {
+    if (char* fileName = openSaveGfxfFileDialog()) {
+        const std::string path = fileName;
+        NFD_FreePathU8(fileName);
+        saveWorker.emplace(&Gfxf::exportGfxfToGfxfFile, this, path);
+    }
+}
+
+void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
+    saving = true;
+    Menu::updateMenuState();
+    Logger::log(NK_INFO, "Saving Gfx to file: '%s'...", fileName.c_str());
+
+    {
+        std::lock_guard lock(gfxDataMutex);
+        if (gfxData.empty()) {
+            Logger::log(NK_ERROR, "No GFX is available to save.");
+        } else {
+            std::ofstream output(std::filesystem::u8path(fileName), std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(gfxData.data()), static_cast<std::streamsize>(gfxData.size()));
+            output.close();
+            if (output) {
+                Logger::log(NK_INFO, "Finished saving Gfx.");
+            } else {
+                Logger::log(NK_ERROR, "Error saving Gfx file '%s'.", fileName.c_str());
+            }
+        }
+    }
+
+    saving = false;
+    Menu::updateMenuState();
+}
+
+void Gfxf::handleSaveGfxClicked() {
+    const nfdu8filteritem_t filter = {"GFX files", "gfx"};
+    if (char* fileName = FileUtil::openNfdSaveDialog(&filter, 1, "output.gfx")) {
+        const std::string path = fileName;
+        NFD_FreePathU8(fileName);
+        saveWorker.emplace(&Gfxf::exportGfxToGfxFile, this, path);
+    }
+}
+
+void Gfxf::buildGfx() {
+    const std::time_t startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    Logger::log(NK_INFO, "Starting GFX build at %s", std::ctime(&startTime));
+    const auto start = std::chrono::high_resolution_clock::now();
+    const auto& mapSpaceConfigs = Scene::getInstance().mapSpaceConfigs;
+    std::string error;
+    std::filesystem::path temporaryDirectory;
+    std::filesystem::path gfxfPath;
+    try {
+        // Blender writes one output_NN.svg per map-space config that is not the background, which it writes as
+        // output_background.svg instead.
+        const size_t layerCount = static_cast<size_t>(std::ranges::count_if(mapSpaceConfigs,
+            [](const auto& config) { return !GfxMapLayerSwf::isBackgroundMapSpaceName(config.name); }));
+        if (layerCount == 0) {
+            throw std::runtime_error("The loaded scene has no map-space configurations for map layers.");
+        }
+
+        const std::string ffdecExecutable = findFfdecExecutable();
+        if (ffdecExecutable.empty()) {
+            throw std::runtime_error(
+                "The bundled FFDec CLI is missing. Repair the NavKit installation or set FFDEC_PATH to an "
+                "FFDec CLI executable.");
+        }
+
+        const std::filesystem::path templatePath = FileUtil::getApplicationResourcePath("map_template.gfx");
+        if (!isRegularFile(templatePath)) {
+            throw std::runtime_error("The GFX template is missing: " + pathToUtf8(templatePath));
+        }
+
+        const std::filesystem::path outputDirectory =
+            std::filesystem::u8path(NavKitSettings::getInstance().outputFolder);
+        std::error_code filesystemError;
+        std::filesystem::create_directories(outputDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the GFX output folder: " + filesystemError.message());
+        }
+
+        static std::atomic_uint64_t outputCounter = 0;
+        temporaryDirectory = std::filesystem::temp_directory_path() / "NavKit" / "gfx-build" /
+            (std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "-" +
+                std::to_string(++outputCounter));
+        std::filesystem::create_directories(temporaryDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the temporary GFX build folder: " + filesystemError.message());
+        }
+
+        const std::filesystem::path templateXml = temporaryDirectory / "template.xml";
+        const auto runFfdec = [&ffdecExecutable](std::vector<wxString> arguments, const std::string& action) {
+            arguments.insert(arguments.begin(), wxString::FromUTF8(ffdecExecutable));
+            const long exitCode = executeFfdec(arguments);
+            if (exitCode != 0) {
+                throw std::runtime_error(
+                    "FFDec failed while " + action + " (exit code " + std::to_string(exitCode) + ").");
+            }
+        };
+        const auto asWxPath = [](const std::filesystem::path& path) { return wxString::FromUTF8(pathToUtf8(path)); };
+        const auto readText = [](const std::filesystem::path& path, const std::string& description) {
+            std::ifstream input(path, std::ios::binary);
+            if (!input) {
+                throw std::runtime_error("FFDec did not write the " + description + ".");
+            }
+            return std::string{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+        };
+        runFfdec({"-swf2xml", asWxPath(templatePath), asWxPath(templateXml)}, "opening the GFX template");
+
+        // Every map SVG shares the background's canvas, at one unit per metre.
+        const std::filesystem::path backgroundPath = outputDirectory / "output_background.svg";
+        if (!isRegularFile(backgroundPath)) {
+            throw std::runtime_error("The Blender map background SVG is missing: " + pathToUtf8(backgroundPath));
+        }
+        const auto canvasSize = GfxMapLayerSwf::svgCanvasSize(readText(backgroundPath, "map background SVG"));
+        if (!canvasSize) {
+            throw std::runtime_error("The map background SVG has no canvas size: " + pathToUtf8(backgroundPath));
+        }
+        const std::string generatedXml = GfxMapLayerSwf::createMapLayerSwfXml(
+            readText(templateXml, "GFX template XML"), layerCount, canvasSize->first, canvasSize->second);
+        const std::filesystem::path generatedXmlPath = temporaryDirectory / "generated.xml";
+        std::ofstream generatedXmlOutput(generatedXmlPath, std::ios::binary | std::ios::trunc);
+        generatedXmlOutput.write(generatedXml.data(), static_cast<std::streamsize>(generatedXml.size()));
+        generatedXmlOutput.close();
+        if (!generatedXmlOutput) {
+            throw std::runtime_error("Could not write the generated GFX shell.");
+        }
+
+        const std::filesystem::path shapeDirectory = temporaryDirectory / "shapes";
+        std::filesystem::create_directories(shapeDirectory, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not create the temporary GFX shape folder: " + filesystemError.message());
+        }
+        const auto stageShape = [&](const std::filesystem::path& svgPath, const unsigned int shapeId) {
+            const std::filesystem::path shapePath = shapeDirectory / (std::to_string(shapeId) + ".svg");
+            std::filesystem::copy_file(
+                svgPath, shapePath, std::filesystem::copy_options::overwrite_existing, filesystemError);
+            if (filesystemError) {
+                throw std::runtime_error(
+                    "Could not stage map-layer SVG " + pathToUtf8(svgPath) + ": " + filesystemError.message());
+            }
+        };
+        for (size_t layerIndex = 0; layerIndex < layerCount; ++layerIndex) {
+            const std::string layerNumber =
+                layerIndex < 10 ? "0" + std::to_string(layerIndex) : std::to_string(layerIndex);
+            const std::filesystem::path svgPath = outputDirectory / ("output_" + layerNumber + ".svg");
+            if (!isRegularFile(svgPath)) {
+                throw std::runtime_error("The Blender map-layer SVG is missing: " + pathToUtf8(svgPath));
+            }
+            if (const auto layerSize = GfxMapLayerSwf::svgCanvasSize(readText(svgPath, "map-layer SVG")); !layerSize ||
+                std::abs(layerSize->first - canvasSize->first) > 0.01 ||
+                std::abs(layerSize->second - canvasSize->second) > 0.01) {
+                throw std::runtime_error("The map-layer SVG " + pathToUtf8(svgPath) +
+                    " is not the size of the map background; rebuild the map from the scene.");
+            }
+            stageShape(backgroundPath, GfxMapLayerSwf::backgroundShapeId(layerIndex));
+            stageShape(svgPath, GfxMapLayerSwf::layerShapeId(layerIndex));
+        }
+
+        const std::filesystem::path baseGfx = temporaryDirectory / "base.gfx";
+        runFfdec({"-xml2swf", asWxPath(generatedXmlPath), asWxPath(baseGfx)}, "creating map-layer sprites");
+        const std::filesystem::path importedGfx = temporaryDirectory / "imported.gfx";
+        runFfdec({"-importShapes", asWxPath(baseGfx), asWxPath(importedGfx), asWxPath(shapeDirectory)},
+            "importing map-layer SVGs");
+
+        const std::filesystem::path importedXml = temporaryDirectory / "imported.xml";
+        runFfdec({"-swf2xml", asWxPath(importedGfx), asWxPath(importedXml)}, "validating map-layer sprites");
+        if (const std::string validationError =
+                GfxMapLayerSwf::validateMapLayerSwfXml(readText(importedXml, "generated GFX XML"), layerCount);
+            !validationError.empty()) {
+            throw std::runtime_error("FFDec produced an invalid map GFX: " + validationError);
+        }
+
+        std::vector<unsigned char> builtGfx = readFileBytes(importedGfx);
+        if (builtGfx.size() < 21 || !std::equal(builtGfx.begin(), builtGfx.begin() + 3, "GFX")) {
+            throw std::runtime_error("FFDec did not produce a valid output.gfx file.");
+        }
+        const std::filesystem::path outputPath = outputDirectory / "output.gfx";
+        std::filesystem::copy_file(
+            importedGfx, outputPath, std::filesystem::copy_options::overwrite_existing, filesystemError);
+        if (filesystemError) {
+            throw std::runtime_error("Could not save output.gfx: " + filesystemError.message());
+        }
+        Logger::log(NK_INFO, "Built GFX with %zu map layers at %s", layerCount, pathToUtf8(outputPath).c_str());
+
+        // Pack the GFX into output.gfxf and make sure it reads back to the same GFX before loading it.
+        const std::filesystem::path outputGfxfPath = outputDirectory / "output.gfxf";
+        if (!packGfxToGfxfFile(builtGfx, pathToUtf8(outputGfxfPath))) {
+            throw std::runtime_error("Could not save output.gfxf.");
+        }
+        if (loadGfxFromFile(pathToUtf8(outputGfxfPath)) != builtGfx) {
+            throw std::runtime_error("output.gfxf does not read back to the built GFX.");
+        }
+        Logger::log(NK_INFO, "Saved Gfxf to %s", pathToUtf8(outputGfxfPath).c_str());
+        setGfxData(std::move(builtGfx));
+        gfxfPath = outputGfxfPath;
+    } catch (const std::exception& exception) {
+        error = "Failed to build output.gfxf: " + std::string(exception.what());
+    }
+
+    if (!temporaryDirectory.empty()) {
+        std::error_code cleanupError;
+        std::filesystem::remove_all(temporaryDirectory, cleanupError);
+        if (cleanupError) {
+            Logger::log(NK_WARN, "Could not remove temporary GFX build files: %s", cleanupError.message().c_str());
+        }
+    }
+    if (!error.empty()) {
+        Logger::log(NK_ERROR, "%s", error.c_str());
+        if (wxTheApp != nullptr) {
+            wxTheApp->CallAfter([error] {
+                wxMessageBox(wxString::FromUTF8(error), "GFX build failed", wxOK | wxICON_ERROR, getMainFrame());
+            });
+        }
+    }
+
+    const auto end = std::chrono::high_resolution_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    Logger::log(NK_INFO, "Finished GFX build in %s seconds", std::to_string(duration.count()).c_str());
+    if (!gfxfPath.empty() && wxTheApp != nullptr) {
+        wxTheApp->CallAfter([gfxfPath] { getInstance().loadGfxfFromFile(pathToUtf8(gfxfPath)); });
+    }
+    building = false;
 }
 
 void Gfxf::startLoad(const std::string& fileName) {
@@ -369,9 +833,12 @@ void Gfxf::startLoad(const std::string& fileName) {
     gfxfLoaded = false;
     loadedFile.clear();
     layerNames.clear();
+    layerImages.clear();
+    layerPlacements.clear();
     selectedLayerIndex = 0;
     loading = true;
-    Menu::updateMenuState();
+    // Saving must only ever write the map on screen, so the previous GFX goes until this one has loaded.
+    setGfxData({});
 
     static std::atomic_uint64_t outputCounter = 0;
     const std::string inputFile = fileName;
@@ -384,9 +851,25 @@ void Gfxf::startLoad(const std::string& fileName) {
                     std::to_string(++outputCounter));
             std::filesystem::create_directories(outputDirectory);
 
+            // FFDec cannot read the BIN1 container of a GFXF, so hand it the GFX payload instead.
+            std::filesystem::path gfxInput = std::filesystem::u8path(inputFile);
+            if (isGfxfContainer(gfxInput)) {
+                result.gfx = loadGfxFromFile(inputFile);
+                gfxInput = outputDirectory / "gfxf-payload.gfx";
+                std::ofstream payload(gfxInput, std::ios::binary | std::ios::trunc);
+                payload.write(
+                    reinterpret_cast<const char*>(result.gfx.data()), static_cast<std::streamsize>(result.gfx.size()));
+                payload.close();
+                if (!payload) {
+                    throw std::runtime_error("Could not write the GFXF's GFX payload for FFDec.");
+                }
+            } else if (isRawGfx(gfxInput)) {
+                result.gfx = loadGfxFromFile(inputFile);
+            }
+
             std::filesystem::path ffdecInput;
-            if (prepareFfdecInput(std::filesystem::u8path(inputFile), outputDirectory, ffdecInput, result.error)) {
-                const std::array<wxString, 9> arguments = {wxString::FromUTF8(ffdecExecutable), "-zoom", "2", "-format",
+            if (prepareFfdecInput(gfxInput, outputDirectory, ffdecInput, result.error)) {
+                const std::vector<wxString> arguments = {wxString::FromUTF8(ffdecExecutable), "-zoom", "2", "-format",
                     "frame:png,sprite:png", "-export", "frame,sprite", wxString::FromUTF8(pathToUtf8(outputDirectory)),
                     wxString::FromUTF8(pathToUtf8(ffdecInput))};
                 const long exitCode = executeFfdec(arguments);
@@ -618,9 +1101,17 @@ void Gfxf::showGfxfSettingsDialog() {
     controls->Add(offsetZValue, 0, wxALIGN_CENTER_VERTICAL);
     controls->AddGrowableCol(1, 1);
     content->Add(controls, 0, wxEXPAND | wxALL, 10);
+    auto* align = new wxButton(dialog, wxID_ANY, "Align to Scene");
+    align->SetToolTip("Place the map on the loaded GLB's geometry (or, without one, on the scene's map space "
+                      "volumes). The offsets above move it from there.");
+    align->Enable(gfxfLoaded && !aligning);
     auto* reset = new wxButton(dialog, IDC_BUTTON_RESET_DEFAULTS, "Reset Defaults");
+    auto* buttonRow = new wxBoxSizer(wxHORIZONTAL);
+    buttonRow->Add(align, 0, wxRIGHT, 8);
+    buttonRow->Add(reset, 0);
     dialog->SetSizer(content);
-    content->Add(reset, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    content->Add(buttonRow, 0, wxALIGN_RIGHT | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    align->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { getInstance().alignToScene(); });
 
     scaleSlider->Bind(wxEVT_SLIDER, [this, scaleValue](wxCommandEvent& event) {
         renderScale = static_cast<float>(event.GetInt()) / 100.0f;
@@ -668,6 +1159,7 @@ void Gfxf::resetDefaults() {
 }
 
 void Gfxf::finalizeLoad() {
+    finalizeAlignment();
     std::optional<ExportResult> result;
     {
         std::lock_guard lock(resultMutex);
@@ -694,6 +1186,8 @@ void Gfxf::finalizeLoad() {
 
     GLint maxTextureSize = 0;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    layerImages.clear();
+    layerPlacements.clear();
     for (size_t layerIndex = 0; layerIndex < result->layers.size(); ++layerIndex) {
         const auto& [layerName, pngBytes] = result->layers[layerIndex];
         int width = 0;
@@ -706,6 +1200,8 @@ void Gfxf::finalizeLoad() {
             }
             model.cleanup();
             layerNames.clear();
+            layerImages.clear();
+            layerPlacements.clear();
             selectedLayerIndex = 0;
             showGfxfError("Could not decode an FFDec PNG layer or its dimensions exceed the OpenGL texture limit.");
             Menu::updateMenuState();
@@ -723,19 +1219,17 @@ void Gfxf::finalizeLoad() {
         const bool mapLayer = layerName.starts_with("Level ");
         texture.width = width;
         texture.height = height;
+        LayerPlacement placement;
+        placement.slice = layerSliceNumber(layerName);
         if (mapLayer) {
             int minX = width;
             int minY = height;
             int maxX = -1;
             int maxY = -1;
-            const unsigned char* background = pixels;
             for (int y = 0; y < height; ++y) {
                 for (int x = 0; x < width; ++x) {
                     const size_t pixel = (static_cast<size_t>(y) * width + x) * 4;
-                    const int colorDifference =
-                        std::max({std::abs(pixels[pixel] - background[0]), std::abs(pixels[pixel + 1] - background[1]),
-                            std::abs(pixels[pixel + 2] - background[2]), std::abs(pixels[pixel + 3] - background[3])});
-                    if (colorDifference > 8) {
+                    if (!isMapBackdrop(pixels + pixel)) {
                         minX = std::min(minX, x);
                         minY = std::min(minY, y);
                         maxX = std::max(maxX, x);
@@ -757,6 +1251,7 @@ void Gfxf::finalizeLoad() {
             }
             texture.width = maxX - minX + 1;
             texture.height = maxY - minY + 1;
+            placement.cropOffset = glm::vec2(static_cast<float>(minX), static_cast<float>(minY)) / ffdecZoom;
             texture.data.resize(static_cast<size_t>(texture.width) * texture.height * 4);
             for (int y = 0; y < texture.height; ++y) {
                 const size_t sourceOffset = (static_cast<size_t>(minY + y) * width + minX) * 4;
@@ -765,10 +1260,7 @@ void Gfxf::finalizeLoad() {
                     texture.data.data() + destinationOffset);
             }
             for (size_t pixel = 0; pixel < texture.data.size(); pixel += 4) {
-                const int colorDifference = std::max(
-                    {std::abs(texture.data[pixel] - background[0]), std::abs(texture.data[pixel + 1] - background[1]),
-                        std::abs(texture.data[pixel + 2] - background[2])});
-                if (colorDifference <= 8) {
+                if (isMapBackdrop(texture.data.data() + pixel)) {
                     texture.data[pixel + 3] = 0;
                 }
             }
@@ -783,6 +1275,10 @@ void Gfxf::finalizeLoad() {
             }
         }
         stbi_image_free(pixels);
+        placement.size = glm::vec2(static_cast<float>(texture.width), static_cast<float>(texture.height)) / ffdecZoom;
+        layerPlacements.push_back(placement);
+        // The pixels go to the GPU below; keep a copy for placing the map on the scene's geometry.
+        layerImages.push_back({texture.width, texture.height, texture.data, ffdecZoom});
         const float scale = 5.0f;
         const std::vector<Vertex> vertices = {
             {{-scale, 0.0f, scale}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
@@ -799,8 +1295,113 @@ void Gfxf::finalizeLoad() {
     selectedLayerIndex = 0;
     loadedFile = std::move(result->sourceFile);
     gfxfLoaded = true;
-    Menu::updateMenuState();
+    setGfxData(std::move(result->gfx));
     Logger::log(NK_INFO, "GFXF load complete: %s (%zu map layers)", loadedFile.c_str(), layerNames.size());
+    alignToScene();
+}
+
+void Gfxf::placeFromScene() {
+    // A map built by NavKit has its canvas on the background (or else the layers') volumes, at one unit per
+    // metre, and each layer on its slice's floor.
+    const auto [slices, canvas] = sceneMapSpaces();
+    canvasOrigin = canvas.valid() ? glm::vec2(canvas.minimum.x, -canvas.maximum.y) : glm::vec2(0.0f);
+    for (LayerPlacement& placement : layerPlacements) {
+        const bool known = placement.slice >= 0 && static_cast<size_t>(placement.slice) < slices.size() &&
+            slices[placement.slice].valid();
+        placement.elevation = known ? slices[placement.slice].minimum.z : 0.0f;
+    }
+}
+
+void Gfxf::alignToScene() {
+    if (!gfxfLoaded || aligning || layerImages.empty()) {
+        return;
+    }
+    placeFromScene();
+    const SceneMesh& sceneMesh = SceneMesh::getInstance();
+    if (!sceneMesh.glbLoaded || sceneMesh.model.meshes.empty()) {
+        Logger::log(NK_INFO, "GFXF placed from the scene's map space volumes (no GLB is loaded to align it to).");
+        return;
+    }
+
+    // The GLB is y-up (glTF): the game's (x, y, z) is the GLB's (x, -z, y).
+    std::vector<glm::vec3> triangles;
+    for (const Mesh& mesh : sceneMesh.model.meshes) {
+        for (const unsigned int index : mesh.indices) {
+            const glm::vec3& position = mesh.vertices[index].position;
+            triangles.emplace_back(position.x, -position.z, position.y);
+        }
+    }
+    const auto [slices, canvas] = sceneMapSpaces();
+    std::vector<std::optional<std::pair<float, float>>> sliceHeights;
+    for (const LayerPlacement& placement : layerPlacements) {
+        if (placement.slice >= 0 && static_cast<size_t>(placement.slice) < slices.size() &&
+            slices[placement.slice].valid()) {
+            sliceHeights.emplace_back(std::pair{slices[placement.slice].minimum.z, slices[placement.slice].maximum.z});
+        } else {
+            sliceHeights.emplace_back(std::nullopt);
+        }
+    }
+    aligning = true;
+    alignWorker.reset();
+    alignWorker.emplace([this, generation = loadGeneration, images = layerImages, placements = layerPlacements,
+                            triangles = std::move(triangles), sliceHeights = std::move(sliceHeights)](std::stop_token) {
+        AlignmentResult result{generation, std::nullopt, 0.0f, {}};
+        // Each layer's floor: the main floor level inside its slice, or else the slice-th level of the scene.
+        const std::vector<float> sceneLevels = GfxMapAlignment::floorLevels(
+            triangles, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), 2.5f);
+        for (size_t layer = 0; layer < images.size(); ++layer) {
+            float elevation = 0.0f;
+            if (sliceHeights[layer]) {
+                const auto [bottom, top] = *sliceHeights[layer];
+                const auto levels = GfxMapAlignment::floorLevels(triangles, bottom - 0.5f, top, 2.5f);
+                elevation = levels.empty() ? bottom : levels.front();
+            } else if (!sceneLevels.empty()) {
+                const size_t level = placements[layer].slice >= 0 ? static_cast<size_t>(placements[layer].slice) : 0;
+                elevation = sceneLevels[std::min(level, sceneLevels.size() - 1)];
+            }
+            result.elevations.push_back(elevation);
+            const auto placement = GfxMapAlignment::placeLayer(
+                images[layer], GfxMapAlignment::sectionSegments(triangles, elevation + sectionHeight));
+            if (placement && placement->confidence > result.confidence) {
+                result.confidence = placement->confidence;
+                result.canvasOrigin = placement->topLeft - placements[layer].cropOffset;
+            }
+        }
+        if (result.confidence < minimumAlignmentConfidence) {
+            result.canvasOrigin.reset();
+        }
+        std::lock_guard lock(resultMutex);
+        completedAlignment = std::move(result);
+    });
+    Logger::log(NK_INFO, "Aligning the GFXF map with the loaded GLB...");
+}
+
+void Gfxf::finalizeAlignment() {
+    std::optional<AlignmentResult> result;
+    {
+        std::lock_guard lock(resultMutex);
+        result.swap(completedAlignment);
+    }
+    if (!result) {
+        return;
+    }
+    alignWorker.reset();
+    aligning = false;
+    if (result->generation != loadGeneration || result->elevations.size() != layerPlacements.size()) {
+        return;
+    }
+    for (size_t layer = 0; layer < layerPlacements.size(); ++layer) {
+        layerPlacements[layer].elevation = result->elevations[layer];
+    }
+    if (result->canvasOrigin) {
+        canvasOrigin = *result->canvasOrigin;
+        Logger::log(NK_INFO, "Aligned the GFXF map with the GLB geometry (canvas origin %.1f, %.1f; match %.1fx).",
+            canvasOrigin.x, -canvasOrigin.y, result->confidence);
+    } else {
+        Logger::log(NK_WARN,
+            "Could not align the GFXF map with the GLB geometry; it stays where the scene's map "
+            "space volumes put it.");
+    }
 }
 
 void Gfxf::render(const Shader& shader, const glm::mat4& view, const glm::mat4& projection) const {
@@ -812,15 +1413,18 @@ void Gfxf::render(const Shader& shader, const glm::mat4& view, const glm::mat4& 
     if (mesh.textures.empty() || mesh.textures.front().height <= 0) {
         return;
     }
-    const float imageAspect =
-        static_cast<float>(mesh.textures.front().width) / static_cast<float>(mesh.textures.front().height);
-    const float width = 88.0f * renderScale;
-    const float height = width / imageAspect;
-    const glm::vec3 center{0.0f, 0.0f, 0.0f};
-    const glm::vec3 offset{static_cast<float>(offsetX), static_cast<float>(-offsetZ), static_cast<float>(offsetY)};
-    glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), center + offset);
+    // The layer lies on the map plane at one metre per canvas unit: u is the GLB's x and v its z (the game's -y),
+    // with the image's top row at the smallest v. The quad spans 10 units, its first texel at (-5, -5) once turned.
+    const LayerPlacement placement =
+        selectedLayerIndex < layerPlacements.size() ? layerPlacements[selectedLayerIndex] : LayerPlacement{};
+    const glm::vec2 centre = canvasOrigin + placement.cropOffset + placement.size * 0.5f;
+    const glm::vec3 offset{static_cast<float>(offsetX), static_cast<float>(offsetZ), static_cast<float>(offsetY)};
+    // Just above the floor so that the map shows over it.
+    const glm::vec3 position = glm::vec3(centre.x, placement.elevation + 0.05f, centre.y) + offset;
+    glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), position);
     modelMatrix = glm::rotate(modelMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    modelMatrix = glm::scale(modelMatrix, glm::vec3(width, 1.0f, height));
+    modelMatrix = glm::scale(
+        modelMatrix, glm::vec3(placement.size.x / 10.0f * renderScale, 1.0f, placement.size.y / 10.0f * renderScale));
     shader.use();
     shader.setBool("useFlatColor", true);
     shader.setBool("useVertexColor", true);
@@ -879,8 +1483,11 @@ void Gfxf::clear() {
     gfxfLoaded = false;
     loadedFile.clear();
     layerNames.clear();
+    layerImages.clear();
+    layerPlacements.clear();
     selectedLayerIndex = 0;
     model.cleanup();
+    setGfxData({});
     if (backgroundWorker) {
         loading = true;
     } else {
@@ -888,4 +1495,14 @@ void Gfxf::clear() {
         std::lock_guard lock(resultMutex);
         completedLoad.reset();
     }
+}
+
+void Gfxf::startGfxBuild() {
+    if (building) {
+        return;
+    }
+    // The previous build, if any, has finished; join its thread before starting the next one.
+    buildWorker.reset();
+    building = true;
+    buildWorker.emplace(&Gfxf::buildGfx, this);
 }

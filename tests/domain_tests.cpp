@@ -800,6 +800,177 @@ namespace {
         crmd.crowdMapData = nullptr;
     }
 
+    std::vector<unsigned char> readGfxfTestBytes(const std::filesystem::path& path) {
+        std::ifstream stream(path, std::ios::binary);
+        return std::vector<unsigned char>(std::istreambuf_iterator<char>(stream), {});
+    }
+
+    std::filesystem::path gfxfTestTempPath(const std::string& name) {
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        return std::filesystem::temp_directory_path() / ("navkit-gfxf-" + std::to_string(stamp) + "-" + name);
+    }
+
+    void testGfxfLoadExtractsGfx() {
+        const std::vector<unsigned char> gfx =
+            Gfxf::loadGfxFromFile("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
+        const std::vector<unsigned char> extracted =
+            Gfxf::extractGfxFromGfxf(readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf"));
+
+        check(gfx == extracted, "loading a GFXF should yield the GFX extracted from its container");
+        check(gfx.size() == 29682, "extracted GFX should have the vanilla payload size");
+        check(std::equal(gfx.begin(), gfx.begin() + 3, "GFX"), "extracted GFX should start with the GFX signature");
+        const std::uint32_t declaredLength = static_cast<std::uint32_t>(gfx[4]) |
+            static_cast<std::uint32_t>(gfx[5]) << 8 | static_cast<std::uint32_t>(gfx[6]) << 16 |
+            static_cast<std::uint32_t>(gfx[7]) << 24;
+        check(declaredLength == gfx.size(), "extracted GFX header length should match its payload size");
+    }
+
+    void testGfxLoadReadsRawGfx() {
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("src/resource/map_template.gfx");
+        check(gfx == readGfxfTestBytes("src/resource/map_template.gfx"), "loading a raw GFX should return its bytes");
+    }
+
+    void testGfxfRejectsInvalidContainers() {
+        const auto throws = [](const std::vector<unsigned char>& bytes) {
+            try {
+                Gfxf::extractGfxFromGfxf(bytes);
+            } catch (const std::runtime_error&) {
+                return true;
+            }
+            return false;
+        };
+        check(throws(readGfxfTestBytes("src/resource/map_template.gfx")), "a raw GFX is not a GFXF container");
+        std::vector<unsigned char> truncated =
+            readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
+        truncated.resize(truncated.size() / 2);
+        check(throws(truncated), "a truncated GFXF should be rejected");
+    }
+
+    constexpr size_t gfxfDataSectionOffset = 16;
+
+    std::uint64_t readGfxfPayloadOffset(const std::vector<unsigned char>& gfxf) {
+        std::uint64_t value = 0;
+        for (size_t i = 0; i < 8; ++i) {
+            value |= static_cast<std::uint64_t>(gfxf[gfxfDataSectionOffset + i]) << (8 * i);
+        }
+        return value;
+    }
+
+    std::uint32_t readGfxfDataSize(const std::vector<unsigned char>& gfxf) {
+        return static_cast<std::uint32_t>(gfxf[8]) << 24 | static_cast<std::uint32_t>(gfxf[9]) << 16 |
+            static_cast<std::uint32_t>(gfxf[10]) << 8 | static_cast<std::uint32_t>(gfxf[11]);
+    }
+
+    // The game's GFXF files store a 32-bit element count directly before the GFX payload. The glacier_bin1
+    // serializer leaves array and string counts out, which the game accepts. Returns the vanilla GFXF as that
+    // serializer writes it: without the count, with the payload offset and data size 4 bytes smaller.
+    std::vector<unsigned char> withoutBin1ArrayCount(std::vector<unsigned char> gfxf) {
+        const std::uint64_t payloadOffset = readGfxfPayloadOffset(gfxf);
+        const std::uint32_t dataSize = readGfxfDataSize(gfxf);
+        const size_t countPosition = gfxfDataSectionOffset + static_cast<size_t>(payloadOffset) - 4;
+        gfxf.erase(gfxf.begin() + static_cast<std::ptrdiff_t>(countPosition),
+            gfxf.begin() + static_cast<std::ptrdiff_t>(countPosition + 4));
+        const std::uint64_t newOffset = payloadOffset - 4;
+        for (size_t i = 0; i < 8; ++i) {
+            gfxf[gfxfDataSectionOffset + i] = static_cast<unsigned char>(newOffset >> (8 * i));
+        }
+        const std::uint32_t newSize = dataSize - 4;
+        for (size_t i = 0; i < 4; ++i) {
+            gfxf[8 + i] = static_cast<unsigned char>(newSize >> (8 * (3 - i)));
+        }
+        return gfxf;
+    }
+
+    void testGfxfSaveMatchesVanillaGfxf() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("vanilla.gfxf");
+        const std::vector<unsigned char> vanilla =
+            readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
+        const std::vector<unsigned char> gfx = Gfxf::extractGfxFromGfxf(vanilla);
+
+        // The vanilla file carries the count the serializer leaves out: the payload size, right before the payload.
+        const std::uint64_t vanillaOffset = readGfxfPayloadOffset(vanilla);
+        check(vanillaOffset == 0x44, "the vanilla GFXF payload should follow its 32-bit element count");
+        const size_t countPosition = gfxfDataSectionOffset + static_cast<size_t>(vanillaOffset) - 4;
+        const std::uint32_t vanillaCount = static_cast<std::uint32_t>(vanilla[countPosition]) |
+            static_cast<std::uint32_t>(vanilla[countPosition + 1]) << 8 |
+            static_cast<std::uint32_t>(vanilla[countPosition + 2]) << 16 |
+            static_cast<std::uint32_t>(vanilla[countPosition + 3]) << 24;
+        check(vanillaCount == gfx.size(), "the vanilla GFXF element count should be the GFX payload size");
+
+        check(Gfxf::packGfxToGfxfFile(gfx, savedPath.string()), "packing the extracted GFX should succeed");
+        const std::vector<unsigned char> repacked = readGfxfTestBytes(savedPath);
+        std::filesystem::remove(savedPath);
+        check(readGfxfPayloadOffset(repacked) == 0x40, "the serializer should write the payload without a count");
+        check(repacked.size() + 4 == vanilla.size(), "the repacked GFXF should only lack the 4-byte count");
+        check(repacked == withoutBin1ArrayCount(vanilla),
+            "repacking a vanilla GFXF's GFX should match the vanilla GFXF apart from the missing count");
+        check(Gfxf::extractGfxFromGfxf(repacked) == gfx, "the repacked GFXF should read back to the vanilla GFX");
+    }
+
+    void testGfxfReadsBothCountLayouts() {
+        const std::vector<unsigned char> vanilla =
+            readGfxfTestBytes("tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf");
+        const std::vector<unsigned char> withoutCount = withoutBin1ArrayCount(vanilla);
+        const std::vector<unsigned char> gfx = Gfxf::extractGfxFromGfxf(vanilla);
+        check(Gfxf::extractGfxFromGfxf(withoutCount) == gfx,
+            "a GFXF without the array count should read to the same GFX as one with it");
+
+        std::vector<unsigned char> wrongSize = vanilla;
+        const size_t sizeField = gfxfDataSectionOffset + 8;
+        wrongSize[sizeField] = static_cast<unsigned char>(wrongSize[sizeField] - 1);
+        bool rejected = false;
+        try {
+            Gfxf::extractGfxFromGfxf(wrongSize);
+        } catch (const std::runtime_error&) {
+            rejected = true;
+        }
+        check(rejected, "a GFXF whose payload size disagrees with the GFX header should be rejected");
+    }
+
+    void testGfxPackRoundTrip() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("roundtrip.gfxf");
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("src/resource/map_template.gfx");
+
+        check(Gfxf::packGfxToGfxfFile(gfx, savedPath.string()), "packing the GFX should succeed");
+        const std::vector<unsigned char> reloaded = Gfxf::loadGfxFromFile(savedPath.string());
+        std::filesystem::remove(savedPath);
+        check(reloaded == gfx, "a GFX packed into a GFXF should extract back unchanged");
+    }
+
+    void testGfxfSaveFromStoredGfx() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("saved.gfxf");
+        Gfxf& gfxf = Gfxf::getInstance();
+        gfxf.setGfxData(Gfxf::loadGfxFromFile("src/resource/map_template.gfx"));
+
+        check(gfxf.canSave(), "Save Gfxf should be enabled once GFX data is stored");
+        gfxf.exportGfxfToGfxfFile(savedPath.string());
+        const std::vector<unsigned char> reloaded = Gfxf::loadGfxFromFile(savedPath.string());
+        std::filesystem::remove(savedPath);
+        gfxf.setGfxData({});
+        check(!gfxf.saving, "Save Gfxf should clear the saving flag when it finishes");
+        check(reloaded == readGfxfTestBytes("src/resource/map_template.gfx"),
+            "Save Gfxf should write the stored GFX into the GFXF");
+    }
+
+    void testGfxSaveFromStoredGfx() {
+        const std::filesystem::path savedPath = gfxfTestTempPath("saved.gfx");
+        Gfxf& gfxf = Gfxf::getInstance();
+        const std::vector<unsigned char> gfx = Gfxf::loadGfxFromFile("src/resource/map_template.gfx");
+        gfxf.setGfxData(gfx);
+
+        check(gfxf.canSave(), "Save Gfx should be enabled once GFX data is stored");
+        gfxf.exportGfxToGfxFile(savedPath.string());
+        const std::vector<unsigned char> saved = readGfxfTestBytes(savedPath);
+        const std::vector<unsigned char> reloaded = Gfxf::loadGfxFromFile(savedPath.string());
+        std::filesystem::remove(savedPath);
+        check(!gfxf.saving, "Save Gfx should clear the saving flag when it finishes");
+        check(saved == gfx, "Save Gfx should write the raw GFX, without a Gfxf container");
+        check(reloaded == gfx, "a saved GFX should load back unchanged");
+
+        gfxf.clear();
+        check(!gfxf.canSave(), "clearing the map should leave nothing to save");
+    }
+
     Json::Entity crowdTestBox(const std::string& name, const Json::Vec3& position, const Json::Vec3& size) {
         Json::Entity box;
         box.name = name;
@@ -1824,9 +1995,20 @@ namespace {
         test();
         std::cout << "[pass] " << name << std::endl;
     }
+
+    // Game files are not part of this repository: tests that compare against one run where it has been provided.
+    void runWithGameFile(const std::string_view name, const std::filesystem::path& gameFile, const auto& test) {
+        if (!std::filesystem::exists(gameFile)) {
+            std::cout << "[skip] " << name << " (needs " << gameFile.generic_string() << ")" << std::endl;
+            return;
+        }
+        run(name, test);
+    }
 } // namespace
 
 void runDomainTests() {
+    const std::filesystem::path vanillaGfxf = "tests/resources/polarbear005 00B7DDECA456B2EE official.gfxf";
+    const std::filesystem::path crmdFixture = "tests/resources/yacht.crmd";
     run("Math vector and plane operations", testMathFunctions);
     run("Math ray/AABB intersections", testMathRayAabbIntersection);
     run("Pathfinding segment, neighbor, and intersection helpers", testPathfindingHelpers);
@@ -1845,13 +2027,19 @@ void runDomainTests() {
     run("Grid bounds from AIRG", testGridBoundsFromAirg);
     run("Reasoning grid AIRG persistence", testReasoningGridAirgRoundTrip);
     run("Reasoning grid rejects invalid AIRG", testReasoningGridRejectsInvalidAirg);
-    run("CRMD binary fixture loading", testCrmdFixtureLoading);
-    run("CRMD save round trip", testCrmdSaveRoundTrip);
+    runWithGameFile("CRMD binary fixture loading", crmdFixture, testCrmdFixtureLoading);
+    runWithGameFile("CRMD save round trip", crmdFixture, testCrmdSaveRoundTrip);
     run("CRMD builder from a synthetic floor", testCrmdBuilderFromSyntheticFloor);
     run("CRMD builder reserves channels for skipped exits", testCrmdBuilderReservesChannelsForSkippedExits);
     run("CRMD builder ambient flow and teleport-in cells", testCrmdBuilderAmbientFlowAndTeleportIn);
     run("CRMD builder spline lanes span the flow width", testCrmdBuilderSplineLanesSpanFlowWidth);
     run("CRMD builder group seed points and exclusions", testCrmdBuilderGroupSeedPointsAndExclusions);
+    runWithGameFile("GFXF load extracts GFX", vanillaGfxf, testGfxfLoadExtractsGfx);
+    run("GFX load reads raw GFX", testGfxLoadReadsRawGfx);
+    runWithGameFile("GFXF rejects invalid containers", vanillaGfxf, testGfxfRejectsInvalidContainers);
+    run("GFX pack round trip", testGfxPackRoundTrip);
+    run("GFXF save from stored GFX", testGfxfSaveFromStoredGfx);
+    run("GFX save from stored GFX", testGfxSaveFromStoredGfx);
     run("Waypoint connectivity-map generation", testWaypointConnectivityMapGeneration);
     run("Waypoint layer generation", testWaypointLayerGeneration);
     run("AIRG visibility type mapping", testVisionDataTypes);
@@ -1868,4 +2056,7 @@ void runDomainTests() {
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
     run("Clear and New Project file menu options", testClearAndNewProjectOptions);
+    runWithGameFile(
+        "GFXF save matches vanilla GFXF apart from the array count", vanillaGfxf, testGfxfSaveMatchesVanillaGfxf);
+    runWithGameFile("GFXF reads payloads with and without the array count", vanillaGfxf, testGfxfReadsBothCountLayouts);
 }
