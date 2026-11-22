@@ -953,11 +953,11 @@ void Crmd::saveCrmdAndReport(const std::string& fileName) {
 }
 
 char* Crmd::openSaveCrmdFileDialog() {
-    nfdu8filteritem_t filter = {"Crmd files", "crmd"};
-    return FileUtil::openNfdSaveDialog(&filter, 1, "output.crmd");
+    nfdu8filteritem_t filter = {"Crmd files", "CRMD"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.CRMD");
 }
 
 char* Crmd::openLoadCrmdFileDialog() {
-    nfdu8filteritem_t filters[1] = {{"Crmd files", "crmd"}};
+    nfdu8filteritem_t filters[1] = {{"Crmd files", "CRMD"}};
     return FileUtil::openNfdLoadDialog(filters, 1);
 }

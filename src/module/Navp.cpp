@@ -368,13 +368,13 @@ void Navp::renderExclusionBoxesForHitTest() const {
 }
 
 char* Navp::openLoadNavpFileDialog() {
-    nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
+    nfdu8filteritem_t filters[2] = {{"Navp files", "NAVP"}, {"Navp.json files", "navp.json"}};
     return FileUtil::openNfdLoadDialog(filters, 2);
 }
 
 char* Navp::openSaveNavpFileDialog() {
-    nfdu8filteritem_t filters[2] = {{"Navp files", "navp"}, {"Navp.json files", "navp.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 2, "output.navp");
+    nfdu8filteritem_t filters[2] = {{"Navp files", "NAVP"}, {"Navp.json files", "navp.json"}};
+    return FileUtil::openNfdSaveDialog(filters, 2, "output.NAVP");
 }
 
 void Navp::updateExclusionBoxConvexVolumes() {

@@ -678,7 +678,7 @@ char* SceneMesh::openSaveGlbFileDialog() {
 
 char* SceneMesh::openSaveBlendFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Blend files", "blend"}};
-    return FileUtil::openNfdSaveDialog(filters, 1, "output");
+    return FileUtil::openNfdSaveDialog(filters, 1, "output.blend");
 }
 
 void SceneMesh::setLastLoadFileName(const char* fileName) {

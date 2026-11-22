@@ -43,7 +43,7 @@ char* Scene::openLoadSceneFileDialog() {
 
 char* Scene::openSaveSceneFileDialog() {
     nfdu8filteritem_t filters[1] = {{"Nav.json files", "nav.json"}};
-    return FileUtil::openNfdSaveDialog(filters, 1, "output");
+    return FileUtil::openNfdSaveDialog(filters, 1, "output.nav.json");
 }
 
 void Scene::setLastLoadFileName(char* fileName) {

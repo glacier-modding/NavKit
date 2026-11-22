@@ -384,13 +384,13 @@ void Airg::disconnectWaypoints(const int startWaypointIndex, const int endWaypoi
 }
 
 char* Airg::openAirgFileDialog() {
-    nfdu8filteritem_t filter = {"Airg files", "airg"};
+    nfdu8filteritem_t filter = {"Airg files", "AIRG"};
     return FileUtil::openNfdLoadDialog(&filter, 1);
 }
 
 char* Airg::openSaveAirgFileDialog() {
-    nfdu8filteritem_t filter = {"Airg files", "airg"};
-    return FileUtil::openNfdSaveDialog(&filter, 1, "output.airg");
+    nfdu8filteritem_t filter = {"Airg files", "AIRG"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.AIRG");
 }
 
 void Airg::addWaypointGeometry(std::vector<AirgVertex>& triVerts, std::vector<AirgVertex>& lineVerts,
