@@ -119,7 +119,7 @@ set(THIRD_PARTY_DLL_PATHS
         "$<TARGET_FILE:unofficial::brotli::brotlienc>"
         "$<TARGET_FILE_DIR:assimp::assimp>/poly2tri.dll"
         "$<TARGET_FILE_DIR:assimp::assimp>/pugixml.dll"
-        "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:assimp::assimp>/kubazipd.dll,$<TARGET_FILE_DIR:assimp::assimp>/kubazip.dll>"
+        "$<TARGET_FILE_DIR:assimp::assimp>/kubazip.dll"
         "$<IF:$<CONFIG:Debug>,$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2d.dll,$<TARGET_FILE_DIR:BZip2::BZip2>/../bin/bz2.dll>"
         "$<TARGET_FILE_DIR:OpenSSL::Crypto>/../bin/libcrypto-3-x64.dll"
         "$<TARGET_FILE_DIR:OpenSSL::SSL>/../bin/libssl-3-x64.dll"
