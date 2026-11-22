@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <initializer_list>
-#include <cmath>
 #include <type_traits>
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Scene.h"
@@ -808,10 +807,8 @@ void Json::CrowdSplineFlow::readJson(simdjson::ondemand::object json) {
     CrowdEntityIdentity::readJson(json);
     readObject(json, "transform", transform);
     flowWidth = getValue(json, "flowWidth");
-    const float lengthTessellationJson = getValue(json, "lengthTessellation");
-    lengthTessellation = static_cast<int>(std::lround(lengthTessellationJson));
-    const float widthTessellationJson = getValue(json, "widthTessellation");
-    widthTessellation = static_cast<int>(std::lround(widthTessellationJson));
+    lengthTessellation = getValue(json, "lengthTessellation");
+    widthTessellation = getValue(json, "widthTessellation");
     extrusionHeight = getValue(json, "extrusionHeight");
     closed = getValue(json, "closed");
     points = readArray<Vec3>(json, "points");

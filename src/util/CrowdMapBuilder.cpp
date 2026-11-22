@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 namespace {
     using glm::dmat3;
@@ -37,7 +38,7 @@ namespace {
     constexpr float costHalfRange = 32767.0f;
     constexpr float twoPi = 6.2831855f;
     constexpr int directionCount = 120;
-    constexpr double splineSampleStep = 0.1;
+    constexpr float splineSampleStep = 0.1f;
     constexpr uint32_t initialRandomSeed = 0;
     constexpr uint32_t randomMultiplier = 0x10dcd;
     constexpr uint32_t tieBreakChances = 7;
@@ -256,12 +257,14 @@ namespace {
     Volume shapeVolume(const Json::VolumeShape& shape) {
         const OrientedBox frame{toDvec3(shape.transform.t), transformRotation(shape.transform), dvec3(0.0)};
         std::vector<dvec2> outline;
+        double low = std::numeric_limits<double>::max();
+        double high = std::numeric_limits<double>::lowest();
         for (const Json::Vec3& point : shape.points) {
             outline.emplace_back(point.x, point.y);
+            low = std::min(low, static_cast<double>(point.z));
+            high = std::max(high, static_cast<double>(point.z));
         }
-        const double extrusion = shape.flipSurfaceNormal ? -shape.extrusionHeight : shape.extrusionHeight;
-        const double low = std::min(0.0, extrusion);
-        const double high = std::max(0.0, extrusion);
+        high += shape.extrusionHeight;
         return {[frame, outline = std::move(outline), low, high](const dvec3& point) {
                     const dvec3 local = frame.local(point);
                     return outline.size() >= 3 && low <= local.z && local.z <= high &&
@@ -728,6 +731,133 @@ namespace {
         return directionVector(direction) + flow;
     }
 
+    struct SplineNeighbours {
+        size_t previous;
+        size_t next;
+    };
+
+    SplineNeighbours splineNeighbours(const size_t index, const size_t count, const bool closed) {
+        if (closed) {
+            return {(index == 0 ? count : index) - 1, index + 1 == count ? 0 : index + 1};
+        }
+        return {index == 0 ? 0 : index - 1, index + 1 < count ? index + 1 : index};
+    }
+
+    dvec3 normaliseOrZero(const dvec3& vector) {
+        const double length = glm::length(vector);
+        return length == 0.0 ? dvec3(0.0) : vector / length;
+    }
+
+    struct BezierCurve {
+        dvec3 start;
+        dvec3 startHandle;
+        dvec3 endHandle;
+        dvec3 end;
+
+        dvec3 position(const double t) const {
+            const double u = 1.0 - t;
+            return u * u * u * start + 3.0 * u * u * t * startHandle + 3.0 * u * t * t * endHandle + t * t * t * end;
+        }
+
+        dvec3 velocity(const double t) const {
+            const double u = 1.0 - t;
+            return 3.0 * u * u * (startHandle - start) + 6.0 * u * t * (endHandle - startHandle) +
+                3.0 * t * t * (end - endHandle);
+        }
+    };
+
+    /// ZBezierSpline after SetControlPointsWithoutTime: each curve spans one unit of parameter.
+    class BezierSpline {
+    public:
+        BezierSpline(const std::vector<dvec3>& points, const bool closed) {
+            const size_t count = points.size();
+            std::vector<dvec3> inTangents(count);
+            std::vector<dvec3> outTangents(count);
+            for (size_t i = 0; i < count; ++i) {
+                const auto [previous, next] = splineNeighbours(i, count, closed);
+                const dvec3 direction = normaliseOrZero(points[next] - points[previous]);
+                inTangents[i] = direction * handleLength(points, i, previous);
+                outTangents[i] = direction * handleLength(points, i, next);
+            }
+            const size_t curveCount = count < 2 ? 0 : count - (closed ? 0 : 1);
+            for (size_t i = 0; i < curveCount; ++i) {
+                const size_t j = (i + 1) % count;
+                curves.push_back(
+                    {points[i], points[i] + outTangents[i] / 3.0, points[j] - inTangents[j] / 3.0, points[j]});
+            }
+        }
+
+        float duration() const {
+            return static_cast<float>(curves.size());
+        }
+
+        dvec3 position(const float t) const {
+            const auto [curve, local] = locate(t);
+            return curves[curve].position(local);
+        }
+
+        dvec3 velocity(const float t) const {
+            const auto [curve, local] = locate(t);
+            return curves[curve].velocity(local);
+        }
+
+    private:
+        std::vector<BezierCurve> curves;
+
+        static double handleLength(const std::vector<dvec3>& points, const size_t index, const size_t neighbour) {
+            return neighbour == index ? 1.0 : std::min(glm::distance(points[index], points[neighbour]) * 1.35, 1.0);
+        }
+
+        /// ZBezierSpline::ZEvaluator::Move
+        std::pair<size_t, float> locate(float t) const {
+            size_t curve = 0;
+            while (t >= 1.0f) {
+                if (curve + 1 >= curves.size()) {
+                    return {curve, 1.0f};
+                }
+                t -= 1.0f;
+                ++curve;
+            }
+            return {curve, t};
+        }
+    };
+
+    /// ZSplineCrowdFlowEntity::UpdateSplines: lanes across flowWidth, each resampled every lengthTessellation.
+    std::vector<BezierSpline> splineFlowLanes(const Json::CrowdSplineFlow& spline) {
+        std::vector<BezierSpline> lanes;
+        const size_t count = spline.points.size();
+        if (!(spline.widthTessellation > 0.0f) || !(spline.lengthTessellation > 0.0f) || count < 2) {
+            return lanes;
+        }
+        const auto laneCount = static_cast<uint32_t>(spline.flowWidth / spline.widthTessellation);
+        if (laneCount == 0) {
+            return lanes;
+        }
+        const double laneSpacing = spline.flowWidth / static_cast<float>(laneCount);
+        std::vector<std::vector<dvec3>> lanePoints(laneCount);
+        for (size_t i = 0; i < count; ++i) {
+            const auto [previous, next] = splineNeighbours(i, count, spline.closed);
+            const dvec3 along = normaliseOrZero(toDvec3(spline.points[next]) - toDvec3(spline.points[previous]));
+            const dvec3 across(along.y, -along.x, 0.0);
+            const dvec3 edge = toDvec3(spline.points[i]) - across * (spline.flowWidth * 0.5);
+            for (uint32_t lane = 0; lane < laneCount; ++lane) {
+                lanePoints[lane].push_back(edge + across * (laneSpacing * lane));
+            }
+        }
+        for (const std::vector<dvec3>& points : lanePoints) {
+            const BezierSpline controlCurve(points, spline.closed);
+            std::vector<dvec3> samples;
+            for (float t = 0.0f;; t += spline.lengthTessellation) {
+                samples.push_back(controlCurve.position(std::clamp(t, 0.0f, controlCurve.duration())));
+                if (!(t < controlCurve.duration())) {
+                    break;
+                }
+            }
+            lanes.emplace_back(samples, spline.closed);
+        }
+        return lanes;
+    }
+
     /// ZCrowdMap::BuildAmbientFlow: channel 0, steered by flow boxes and spline flows.
     std::vector<uint8_t> ambientFlow(const CrowdFrame& frame, const std::vector<FlowBox>& flowBoxes,
         const std::vector<FlowBox>& flowBoxesTwoWay, const std::vector<Json::CrowdSplineFlow>& splineFlows,
@@ -761,25 +891,18 @@ namespace {
         for (const Json::CrowdSplineFlow& spline : splineFlows) {
             const dmat3 rotation = transformRotation(spline.transform);
             const dvec3 origin = toDvec3(spline.transform.t);
-            const size_t segments = spline.points.size() < 2 ? 0 : spline.points.size() - (spline.closed ? 0 : 1);
-            for (size_t s = 0; s < segments; ++s) {
-                const dvec3 from = toDvec3(spline.points[s]);
-                const dvec3 to = toDvec3(spline.points[(s + 1) % spline.points.size()]);
-                const double length = glm::distance(from, to);
-                if (length == 0.0) {
-                    continue;
-                }
-                const dvec3 tangent = (to - from) / length;
-                const vec2 flow = frame.localDirection(rotation * tangent);
-                for (double t = 0.0;; t += splineSampleStep) {
-                    const dvec3 local = frame.local(origin + rotation * (from + tangent * std::min(t, length)));
+            for (const BezierSpline& lane : splineFlowLanes(spline)) {
+                for (float t = 0.0f;; t += splineSampleStep) {
+                    const float clamped = std::min(t, lane.duration());
+                    const dvec3 local = frame.local(origin + rotation * lane.position(clamped));
                     const int x = static_cast<int>(std::floor(local.x / frame.cell));
                     const int y = static_cast<int>(std::floor(local.y / frame.cell));
                     if (frame.inGrid(x, y) && walkable(frame.cellIndex(x, y))) {
                         const size_t i = frame.cellIndex(x, y);
+                        const vec2 flow = frame.localDirection(rotation * lane.velocity(clamped));
                         directions[i] = quantiseDirection(steer(directions[i], flow));
                     }
-                    if (!(t < length)) {
+                    if (!(t < lane.duration())) {
                         break;
                     }
                 }

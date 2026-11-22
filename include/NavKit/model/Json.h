@@ -505,8 +505,8 @@ namespace Json {
     public:
         Transform transform{};
         float flowWidth = 0;
-        int lengthTessellation = 0;
-        int widthTessellation = 0;
+        float lengthTessellation = 0;
+        float widthTessellation = 0;
         float extrusionHeight = 0;
         bool closed = false;
         std::vector<Vec3> points{};
