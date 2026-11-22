@@ -37,6 +37,7 @@
 #include "../include/NavKit/module/Logger.h"
 #include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/Navp.h"
+#include "../include/NavKit/module/Crmd.h"
 #include "../include/NavKit/module/SceneMesh.h"
 #include "../include/NavKit/module/PersistedSettings.h"
 #include "../include/NavKit/module/Renderer.h"
@@ -60,6 +61,7 @@ void runFrameIteration() {
     Navp::getInstance().finalizeBuild();
     SceneMesh::getInstance().finalizeLoad();
     Gfxf::getInstance().finalizeLoad();
+    Crmd::getInstance().updateCompareDialog();
     Airg::getInstance().finalizeSave();
     SceneMesh::getInstance().finalizeExtractResources();
     Renderer::getInstance().finalizeFrame();

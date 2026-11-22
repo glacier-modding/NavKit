@@ -7,6 +7,7 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
+#include <array>
 #include <deque>
 #include <string>
 
@@ -63,6 +64,13 @@ void Gui::drawGui() {
         if (crmd.crmdLoaded && !crmd.loadedCrmdText.empty()) {
             const std::string loadedCrmdText = "Loaded Crmd: " + fileNameFromPath(crmd.loadedCrmdText);
             imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, loadedCrmdText.c_str(), imguiRGBA(255, 255, 255, 128));
+            resourceTextY -= 20;
+        }
+        if (crmd.canCompare()) {
+            constexpr std::array<const char*, 3> viewNames = {"loaded", "comparison", "differences"};
+            const std::string comparisonText = "Comparison Crmd: " + fileNameFromPath(crmd.loadedComparisonText) +
+                " (showing " + viewNames[static_cast<size_t>(crmd.compareView)] + ", C: flip)";
+            imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, comparisonText.c_str(), imguiRGBA(255, 255, 255, 128));
             resourceTextY -= 20;
         }
         const Gfxf& gfxf = Gfxf::getInstance();

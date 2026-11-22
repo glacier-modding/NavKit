@@ -4,6 +4,7 @@
 #include "../util/Math.h"
 #include "../render/Shader.h"
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 #include <SDL.h>
 
 typedef double GLdouble;
@@ -71,6 +72,8 @@ public:
     void handleResize();
 
     void toggleOrthographicTopView();
+
+    void focusOn(const glm::vec3& target, float distance);
 
     void persistWindowSettings();
 

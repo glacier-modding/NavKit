@@ -88,6 +88,12 @@ void showHelpDialog() {
                     "Loads game-packaged crowd-map data directly, without a separate manual extraction step.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version so the "
                     "package index is ready."},
+                {"Open Comparison Crmd", "Loads a second CRMD to compare with the loaded one.",
+                    "Offers the matching _built/_vanilla file next to the loaded CRMD when there is one.",
+                    "Load a CRMD first."},
+                {"Open Comparison Crmd from Rpkg", "Extracts and loads a second CRMD from game resource packages.",
+                    "Compares a built CRMD with the one the game ships.",
+                    "Load a CRMD first, and set the HITMAN game directory in NavKit Settings."},
                 {"Open GFXF from File", "Loads a GFXF/GFX/SWF file and displays its map layer.",
                     "FFDec CLI exports named ZMapView sprites when available, otherwise the first SWF frame.",
                     "FFDec is bundled with NavKit. Java 8 or newer is required at runtime; set FFDEC_PATH to "
@@ -143,6 +149,10 @@ void showHelpDialog() {
                     "Selects which game meshes are included and how the exported scene mesh is built.", ""},
                 {"Airg Settings", "Configures AIRG grid spacing and offsets.",
                     "Controls the grid used to build AIRG data from a Navp.", ""},
+                {"Diff Settings", "Configures the tolerances and difference kinds used by comparison views.",
+                    "The Crmd section sets the height and flow direction tolerances, and which differences are drawn "
+                    "and grouped into regions.",
+                    ""},
             }},
         {"View",
             "Toggle these options to focus on the scene details you need. Data-specific options are most useful "
@@ -172,6 +182,13 @@ void showHelpDialog() {
                     ""},
                 {"Show Crmd", "Shows or hides the loaded CRMD crowd map.",
                     "Displays the CRMD map and cell layers, with flow arrows only on walkable cells.", ""},
+                {"Crmd Compare",
+                    "Opens a window to choose between the loaded CRMD, the comparison CRMD, or their "
+                    "differences, and to jump the camera to each region of differences.",
+                    "Press C in the viewport to flip between loaded and comparison. The differences view colours cells "
+                    "and grid points by kind; where flow directions differ, the loaded CRMD's arrows are white and the "
+                    "comparison's orange. Double-click a region, or use Previous and Next, to move the camera to it.",
+                    "Load a comparison CRMD. Cells are only compared when both grids are the same size."},
                 {"Show Airg Indices", "Shows or hides AIRG cell and waypoint indices.",
                     "Displays indices to identify AIRG elements during inspection and editing.", ""},
                 {"Show Grid", "Shows or hides the generated grid overlay.",

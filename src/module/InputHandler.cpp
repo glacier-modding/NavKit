@@ -1,6 +1,7 @@
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Gui.h"
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/Navp.h"
@@ -223,6 +224,12 @@ bool InputHandler::handleKeyDown(const int keyCode, const bool altDown) {
         gui.showMenu = !gui.showMenu;
         return true;
     }
+    case 'C':
+        if (!Crmd::getInstance().canCompare()) {
+            return false;
+        }
+        Crmd::getInstance().flipCompareView();
+        return true;
     case WXK_RETURN:
     case WXK_NUMPAD_ENTER:
         if (!altDown) {

@@ -24,6 +24,8 @@ set(NAVWEAKNESS_SOURCES
 set(MODULE_SOURCES
         module/Airg.cpp
         module/Crmd.cpp
+        module/CrmdCompareDialog.cpp
+        module/DiffSettings.cpp
         module/GameConnection.cpp
         module/Gfxf.cpp
         module/Grid.cpp
@@ -52,6 +54,7 @@ set(RENDER_SOURCES
 set(UTIL_SOURCES
         util/BridgeJoiner.cpp
         util/CommandRunner.cpp
+        util/CrmdDiff.cpp
         util/CrowdMapBuilder.cpp
         util/ErrorHandler.cpp
         util/FileUtil.cpp

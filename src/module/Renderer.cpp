@@ -321,6 +321,26 @@ void Renderer::toggleOrthographicTopView() {
     orthographicTopView = true;
 }
 
+void Renderer::focusOn(const glm::vec3& target, const float distance) {
+    if (orthographicTopView) {
+        cameraPos[0] = target.x;
+        cameraPos[1] = std::clamp(target.y + distance, 2.0f, camr * 0.5f);
+        cameraPos[2] = target.z;
+        return;
+    }
+    constexpr float focusPitchDegrees = 60.0f;
+    cameraEulers[0] = focusPitchDegrees;
+    origCameraEulers[0] = focusPitchDegrees;
+    origCameraEulers[1] = cameraEulers[1];
+    const float pitch = glm::radians(cameraEulers[0]);
+    const float yaw = glm::radians(cameraEulers[1]);
+    const glm::vec3 direction{-std::sin(yaw) * std::cos(pitch), -std::sin(pitch), std::cos(yaw) * std::cos(pitch)};
+    const glm::vec3 position = target - direction * distance;
+    cameraPos[0] = position.x;
+    cameraPos[1] = position.y;
+    cameraPos[2] = position.z;
+}
+
 void Renderer::persistWindowSettings() {
     PersistedSettings& persistedSettings = PersistedSettings::getInstance();
     persistedSettings.setValue("Renderer", "windowWidth", std::to_string(width));

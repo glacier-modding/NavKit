@@ -15,6 +15,9 @@
 #include "../../include/NavKit/module/WxApplication.h"
 #include "../../include/NavKit/render/CoreProfileDraw.h"
 #include "../../include/NavKit/util/Bin1.h"
+#include "../../include/NavKit/module/CrmdCompareDialog.h"
+#include "../../include/NavKit/module/DiffSettings.h"
+#include "../../include/NavKit/util/CrmdDiff.h"
 #include "../../include/NavKit/util/CrowdMapBuilder.h"
 #include "../../include/NavKit/util/ErrorHandler.h"
 #include "../../include/NavKit/util/FileUtil.h"
@@ -26,6 +29,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -34,12 +38,14 @@
 #include <memory>
 #include <mutex>
 #include <numbers>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 #include <cpptrace/from_current.hpp>
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choicdlg.h>
+#include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
@@ -420,65 +426,168 @@ namespace {
         }
         return "[" + joined + "]";
     }
+
+    struct RenderGrid {
+        size_t pointsX;
+        size_t pointsY;
+        size_t cellsX;
+        size_t cellsY;
+        float cellWidth;
+        float cellHeight;
+    };
+
+    std::optional<RenderGrid> renderGridFor(const SCrowdMapData& data) {
+        RenderGrid grid{data.m_nGridSizeX, data.m_nGridSizeY, data.m_nCellSizeX, data.m_nCellSizeY,
+            data.m_nGridCellSize, data.m_nGridCellSize};
+        if (grid.pointsX == 0 || grid.pointsY == 0 ||
+            grid.pointsX > std::numeric_limits<size_t>::max() / grid.pointsY || grid.cellsX == 0 || grid.cellsY == 0 ||
+            grid.cellsX > std::numeric_limits<size_t>::max() / grid.cellsY) {
+            return std::nullopt;
+        }
+        if (!(grid.cellWidth > 0.0f) || !std::isfinite(grid.cellWidth)) {
+            grid.cellWidth =
+                data.m_vGlobalSize.x > 0.0f ? data.m_vGlobalSize.x / static_cast<float>(grid.pointsX) : 1.0f;
+        }
+        if (!(grid.cellHeight > 0.0f) || !std::isfinite(grid.cellHeight)) {
+            grid.cellHeight =
+                data.m_vGlobalSize.y > 0.0f ? data.m_vGlobalSize.y / static_cast<float>(grid.pointsY) : 1.0f;
+        }
+        if (!(grid.cellWidth > 0.0f) || !(grid.cellHeight > 0.0f) || !std::isfinite(grid.cellWidth) ||
+            !std::isfinite(grid.cellHeight)) {
+            return std::nullopt;
+        }
+        return grid;
+    }
+
+    glm::mat4 renderModelFor(const SCrowdMapData& data, const RenderGrid& grid) {
+        constexpr float displayLiftAboveGround = 0.25f;
+        return glm::translate(crowdMapTransform(data),
+            glm::vec3(-0.5f * static_cast<float>(grid.cellsX) * grid.cellWidth,
+                -0.5f * static_cast<float>(grid.cellsY) * grid.cellHeight, displayLiftAboveGround));
+    }
+
+    void addFlowArrow(std::vector<CoreProfileVertex>& arrows, const CrowdGridHeights& heights, const RenderGrid& grid,
+        const size_t cellIndex, const uint8_t flowVector, const glm::vec4& color) {
+        constexpr uint8_t unitCircleSplitCount = 120;
+        const uint8_t vectorIndex = flowVector & 0x7f;
+        if (vectorIndex >= unitCircleSplitCount) {
+            return;
+        }
+        constexpr glm::vec3 arrowNormal(0.0f, 0.0f, 1.0f);
+        const float arrowLength = std::min(grid.cellWidth, grid.cellHeight) * 0.38f;
+        const float arrowHeadLength = arrowLength * 0.25f;
+        const float arrowHeadWidth = arrowLength * 0.18f;
+        const float angle = static_cast<float>(vectorIndex) *
+            (2.0f * std::numbers::pi_v<float> / static_cast<float>(unitCircleSplitCount));
+        const glm::vec2 direction(std::cos(angle), std::sin(angle));
+        const glm::vec2 perpendicular(-direction.y, direction.x);
+        const glm::vec2 center((static_cast<float>(cellIndex % grid.cellsX) + 0.5f) * grid.cellWidth,
+            (static_cast<float>(cellIndex / grid.cellsX) + 0.5f) * grid.cellHeight);
+        const glm::vec2 tip = center + direction * arrowLength;
+        const glm::vec2 headBase = tip - direction * arrowHeadLength;
+        const glm::vec2 leftWing = headBase + perpendicular * arrowHeadWidth;
+        const glm::vec2 rightWing = headBase - perpendicular * arrowHeadWidth;
+        const float arrowZ = heights.at(center.x, center.y) + 0.06f;
+        arrows.insert(arrows.end(),
+            {{glm::vec3(center, arrowZ), arrowNormal, color, {}}, {glm::vec3(tip, arrowZ), arrowNormal, color, {}},
+                {glm::vec3(tip, arrowZ), arrowNormal, color, {}}, {glm::vec3(leftWing, arrowZ), arrowNormal, color, {}},
+                {glm::vec3(tip, arrowZ), arrowNormal, color, {}},
+                {glm::vec3(rightWing, arrowZ), arrowNormal, color, {}}});
+    }
+
+    bool isWalkableCell(const SCrowdMapData& data, const size_t index) {
+        const uint8_t flags = getPackedCellValue(data.m_CellFlags, index);
+        return flags != 0xff && (flags & static_cast<uint8_t>(CrowdMapImpl_CellFlags::CELLFLAG_WALKABLE)) != 0;
+    }
+
+    bool hasExtension(const std::string& fileName, const std::string& upperCaseExtension) {
+        std::string extension = std::filesystem::u8path(fileName).extension().string();
+        std::ranges::transform(extension, extension.begin(), ::toupper);
+        return extension == upperCaseExtension;
+    }
+
+    std::optional<std::string> pairedCrmdFile(const std::string& fileName) {
+        const std::filesystem::path path = std::filesystem::u8path(fileName);
+        const std::string stem = path.stem().string();
+        for (const auto& [from, to] : {std::pair{"_built", "_vanilla"}, std::pair{"_vanilla", "_built"}}) {
+            const std::string suffix = from;
+            if (stem.size() > suffix.size() && stem.ends_with(suffix)) {
+                const std::filesystem::path paired =
+                    path.parent_path() / (stem.substr(0, stem.size() - suffix.size()) + to + path.extension().string());
+                if (std::filesystem::is_regular_file(paired)) {
+                    return paired.string();
+                }
+            }
+        }
+        return std::nullopt;
+    }
 } // namespace
 
 Crmd::Crmd() :
-    crmdLoaded(false), loading(false), saving(false), building(false), showCrmd(true), snapHeightsToGlb(true) {}
+    crmdLoaded(false), comparisonLoaded(false), loading(false), saving(false), building(false), showCrmd(true),
+    compareView(CompareView::loaded), snapHeightsToGlb(true) {}
+
+std::unique_ptr<SCrowdMapData> Crmd::readCrowdMapFile(const std::string& fileName) {
+    return readCrowdMap(fileName);
+}
 
 wxDialog* Crmd::hCrmdDialog = nullptr;
 wxDialog* Crmd::hCrmdSettingsDialog = nullptr;
+CrmdCompareDialog* Crmd::hCompareDialog = nullptr;
 std::string Crmd::selectedRpkgCrmd{};
 std::map<std::string, std::string> Crmd::crmdHashIoiStringMap;
 std::mutex Crmd::crmdHashIoiStringMapMutex;
 ZHMArena ZHMArenas::g_Arenas[8];
 
+void Crmd::RenderLayer::draw() const {
+    const Renderer& renderer = Renderer::getInstance();
+    cellTriangleBuffer.draw(GL_TRIANGLES, model, renderer.view, renderer.projection);
+    flowArrowLineBuffer.draw(GL_LINES, model, renderer.view, renderer.projection);
+}
+
 void Crmd::renderCrowdMapData() {
     if (loading || !crmdLoaded || !crowdMapData || crowdMapData->m_nGridSizeX == 0 || crowdMapData->m_nGridSizeY == 0) {
         return;
     }
-    if (renderGeometryDirty.exchange(false)) {
-        rebuildRenderGeometry();
+    if (compareView == CompareView::comparison && canCompare()) {
+        if (comparisonLayer.dirty.exchange(false)) {
+            rebuildRenderGeometry(*comparisonCrowdMapData, comparisonLayer);
+        }
+        comparisonLayer.draw();
+        return;
     }
-    const Renderer& renderer = Renderer::getInstance();
-    cellTriangleBuffer.draw(GL_TRIANGLES, renderModel, renderer.view, renderer.projection);
-    flowArrowLineBuffer.draw(GL_LINES, renderModel, renderer.view, renderer.projection);
+    if (compareView == CompareView::differences && canCompare()) {
+        refreshDiff();
+        if (diffLayer.dirty.exchange(false)) {
+            rebuildDiffGeometry();
+        }
+        diffLayer.draw();
+        return;
+    }
+    if (loadedLayer.dirty.exchange(false)) {
+        rebuildRenderGeometry(*crowdMapData, loadedLayer);
+    }
+    loadedLayer.draw();
 }
 
-void Crmd::rebuildRenderGeometry() {
-    cellTriangleBuffer.upload({});
-    flowArrowLineBuffer.upload({});
-    const SCrowdMapData& data = *crowdMapData;
-    const size_t gridWidth = data.m_nGridSizeX;
-    const size_t gridHeight = data.m_nGridSizeY;
-    if (gridWidth > std::numeric_limits<size_t>::max() / gridHeight) {
+void Crmd::rebuildRenderGeometry(const SCrowdMapData& data, RenderLayer& layer) {
+    layer.cellTriangleBuffer.upload({});
+    layer.flowArrowLineBuffer.upload({});
+    const std::optional<RenderGrid> grid = renderGridFor(data);
+    if (!grid) {
         return;
     }
-    const size_t mapCount = gridWidth * gridHeight;
-    const size_t cellGridWidth = data.m_nCellSizeX;
-    const size_t cellGridHeight = data.m_nCellSizeY;
-    if (cellGridWidth == 0 || cellGridHeight == 0 ||
-        cellGridWidth > std::numeric_limits<size_t>::max() / cellGridHeight) {
-        return;
-    }
-    const size_t cellCount = cellGridWidth * cellGridHeight;
+    const size_t mapCount = grid->pointsX * grid->pointsY;
+    const size_t cellCount = grid->cellsX * grid->cellsY;
     const auto packedCellCount = [](const size_t count) {
         return count > std::numeric_limits<size_t>::max() / 128 ? std::numeric_limits<size_t>::max() : count * 128;
     };
     const size_t renderCellCount = std::min(
         cellCount, std::max(packedCellCount(data.m_CellFlags.size()), packedCellCount(data.m_CellGroups.size())));
     const size_t renderMapCount = std::min(mapCount, data.m_GridMap.size());
-    float cellWidth = data.m_nGridCellSize;
-    float cellHeight = data.m_nGridCellSize;
-    if (!(cellWidth > 0.0f) || !std::isfinite(cellWidth)) {
-        cellWidth = data.m_vGlobalSize.x > 0.0f ? data.m_vGlobalSize.x / static_cast<float>(gridWidth) : 1.0f;
-    }
-    if (!(cellHeight > 0.0f) || !std::isfinite(cellHeight)) {
-        cellHeight = data.m_vGlobalSize.y > 0.0f ? data.m_vGlobalSize.y / static_cast<float>(gridHeight) : 1.0f;
-    }
-    if (!(cellWidth > 0.0f) || !(cellHeight > 0.0f) || !std::isfinite(cellWidth) || !std::isfinite(cellHeight)) {
-        return;
-    }
-    const CrowdGridHeights heights(data, gridWidth, gridHeight, cellWidth, cellHeight);
+    const float cellWidth = grid->cellWidth;
+    const float cellHeight = grid->cellHeight;
+    const CrowdGridHeights heights(data, grid->pointsX, grid->pointsY, cellWidth, cellHeight);
 
     constexpr std::array<glm::vec4, 8> groupColors = {glm::vec4(0.35f, 0.85f, 0.45f, 0.48f),
         glm::vec4(0.95f, 0.68f, 0.25f, 0.48f), glm::vec4(0.7f, 0.45f, 0.9f, 0.48f), glm::vec4(0.2f, 0.8f, 0.8f, 0.48f),
@@ -491,12 +600,11 @@ void Crmd::rebuildRenderGeometry() {
     }
     rectangles.reserve(renderCellCount * 12 + renderMapCount * 6);
     for (size_t i = 0; i < renderMapCount; ++i) {
-        const size_t xIndex = i % gridWidth;
-        const size_t yIndex = i / gridWidth;
+        const size_t xIndex = i % grid->pointsX;
+        const size_t yIndex = i / grid->pointsX;
         const float x = (static_cast<float>(xIndex) - 0.5f) * cellWidth;
         const float y = (static_cast<float>(yIndex) - 0.5f) * cellHeight;
-        const uint8_t onNavGrid = data.m_GridMap[i].m_nOnNavGrid;
-        if (onNavGrid == 0) {
+        if (data.m_GridMap[i].m_nOnNavGrid == 0) {
             continue;
         }
         const glm::vec4 mapColor = glm::vec4(0.2f, 0.45f, 0.9f, 0.3f);
@@ -504,8 +612,8 @@ void Crmd::rebuildRenderGeometry() {
     }
 
     for (size_t i = 0; i < renderCellCount; ++i) {
-        const size_t xIndex = i % cellGridWidth;
-        const size_t yIndex = i / cellGridWidth;
+        const size_t xIndex = i % grid->cellsX;
+        const size_t yIndex = i / grid->cellsX;
         const float x = static_cast<float>(xIndex) * cellWidth;
         const float y = static_cast<float>(yIndex) * cellHeight;
         const uint8_t flags = getPackedCellValue(data.m_CellFlags, i);
@@ -537,20 +645,13 @@ void Crmd::rebuildRenderGeometry() {
         }
     }
 
-    constexpr float displayLiftAboveGround = 0.25f;
-    renderModel = glm::translate(crowdMapTransform(data),
-        glm::vec3(-0.5f * static_cast<float>(cellGridWidth) * cellWidth,
-            -0.5f * static_cast<float>(cellGridHeight) * cellHeight, displayLiftAboveGround));
-    cellTriangleBuffer.upload(rectangles);
+    layer.model = renderModelFor(data, *grid);
+    layer.cellTriangleBuffer.upload(rectangles);
 
     constexpr std::array<glm::vec4, 8> flowChannelColors = {glm::vec4(1.0f, 0.65f, 0.9f, 0.95f),
         glm::vec4(1.0f, 0.72f, 0.25f, 0.95f), glm::vec4(0.35f, 0.85f, 1.0f, 0.95f), glm::vec4(0.95f, 0.9f, 0.3f, 0.95f),
         glm::vec4(0.75f, 0.55f, 1.0f, 0.95f), glm::vec4(0.4f, 1.0f, 0.55f, 0.95f), glm::vec4(1.0f, 0.45f, 0.35f, 0.95f),
         glm::vec4(0.45f, 0.95f, 0.85f, 0.95f)};
-    constexpr glm::vec3 arrowNormal(0.0f, 0.0f, 1.0f);
-    const float arrowLength = std::min(cellWidth, cellHeight) * 0.38f;
-    const float arrowHeadLength = arrowLength * 0.25f;
-    const float arrowHeadWidth = arrowLength * 0.18f;
     std::vector<CoreProfileVertex> arrows;
     for (size_t channelIndex = 0; channelIndex < data.m_aFlowChannels.size(); ++channelIndex) {
         const SCrowdFlowChannel& channel = data.m_aFlowChannels[channelIndex];
@@ -561,34 +662,109 @@ void Crmd::rebuildRenderGeometry() {
         }
         arrows.reserve(arrows.size() + vectorCount * 6);
         for (size_t i = 0; i < vectorCount; ++i) {
-            constexpr uint8_t unitCircleSplitCount = 120;
-            const uint8_t vectorIndex = channel.m_aFlowVectorIndex[i] & 0x7f;
-            const uint8_t flags = getPackedCellValue(data.m_CellFlags, i);
-            if (vectorIndex >= unitCircleSplitCount || flags == 0xff ||
-                (flags & static_cast<uint8_t>(CrowdMapImpl_CellFlags::CELLFLAG_WALKABLE)) == 0) {
-                continue;
+            if (isWalkableCell(data, i)) {
+                addFlowArrow(arrows, heights, *grid, i, channel.m_aFlowVectorIndex[i], arrowColor);
             }
-            const float angle = static_cast<float>(vectorIndex) *
-                (2.0f * std::numbers::pi_v<float> / static_cast<float>(unitCircleSplitCount));
-            const glm::vec2 direction(std::cos(angle), std::sin(angle));
-            const glm::vec2 perpendicular(-direction.y, direction.x);
-            const glm::vec2 center((static_cast<float>(i % cellGridWidth) + 0.5f) * cellWidth,
-                (static_cast<float>(i / cellGridWidth) + 0.5f) * cellHeight);
-            const glm::vec2 tip = center + direction * arrowLength;
-            const glm::vec2 headBase = tip - direction * arrowHeadLength;
-            const glm::vec2 leftWing = headBase + perpendicular * arrowHeadWidth;
-            const glm::vec2 rightWing = headBase - perpendicular * arrowHeadWidth;
-            const float arrowZ = heights.at(center.x, center.y) + 0.06f;
-            arrows.insert(arrows.end(),
-                {{glm::vec3(center, arrowZ), arrowNormal, arrowColor, {}},
-                    {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
-                    {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
-                    {glm::vec3(leftWing, arrowZ), arrowNormal, arrowColor, {}},
-                    {glm::vec3(tip, arrowZ), arrowNormal, arrowColor, {}},
-                    {glm::vec3(rightWing, arrowZ), arrowNormal, arrowColor, {}}});
         }
     }
-    flowArrowLineBuffer.upload(arrows);
+    layer.flowArrowLineBuffer.upload(arrows);
+}
+
+bool Crmd::refreshDiff() {
+    if (!canCompare() || !diffDirty.exchange(false)) {
+        return false;
+    }
+    const DiffSettings& settings = DiffSettings::getInstance();
+    const uint16_t kindMask = settings.crmdKinds;
+    diffResult = CrmdDiff::compare(*crowdMapData, *comparisonCrowdMapData, settings.crmdTolerances);
+    diffRegions = CrmdDiff::findRegions(diffResult, kindMask);
+    ++diffGeneration;
+    diffLayer.dirty = true;
+    constexpr size_t maxLoggedRegions = 20;
+    Logger::log(
+        NK_INFO, "Crmd differences, loaded %s vs comparison %s:", loadedCrmdText.c_str(), loadedComparisonText.c_str());
+    for (const std::string& line :
+        CrmdDiff::summarize(diffResult, diffRegions, *crowdMapData, kindMask, maxLoggedRegions)) {
+        Logger::log(NK_INFO, "  %s", line.c_str());
+    }
+    return true;
+}
+
+void Crmd::focusOnDiffRegion(const size_t regionIndex) const {
+    if (!canCompare() || regionIndex >= diffRegions.size()) {
+        return;
+    }
+    const CrmdDiff::Region& region = diffRegions[regionIndex];
+    const glm::dvec3 centre = CrmdDiff::gridToWorld(
+        *crowdMapData, (region.minX + region.maxX + 1) * 0.5, (region.minY + region.maxY + 1) * 0.5);
+    const uint32_t extentCells = std::max(region.maxX - region.minX, region.maxY - region.minY) + 1;
+    const float extent = static_cast<float>(extentCells) * crowdMapData->m_nGridCellSize;
+    const glm::vec3 renderCentre(centre.x, centre.z, -centre.y);
+    Renderer::getInstance().focusOn(renderCentre, std::max(extent * 1.5f, 10.0f));
+}
+
+void Crmd::rebuildDiffGeometry() {
+    diffLayer.cellTriangleBuffer.upload({});
+    diffLayer.flowArrowLineBuffer.upload({});
+    const SCrowdMapData& loadedData = *crowdMapData;
+    const SCrowdMapData& comparisonData = *comparisonCrowdMapData;
+    const uint16_t kindMask = DiffSettings::getInstance().crmdKinds;
+    const CrmdDiff::Result& diff = diffResult;
+
+    const std::optional<RenderGrid> grid = renderGridFor(loadedData);
+    if (!diff.gridsMatch || !grid) {
+        return;
+    }
+    const float cellWidth = grid->cellWidth;
+    const float cellHeight = grid->cellHeight;
+    const CrowdGridHeights heights(loadedData, grid->pointsX, grid->pointsY, cellWidth, cellHeight);
+    const glm::vec4 walkableContextColor(0.7f, 0.7f, 0.7f, 0.12f);
+    std::vector<CoreProfileVertex> rectangles;
+    for (size_t i = 0; i < diff.cellKinds.size(); ++i) {
+        const float x = static_cast<float>(i % grid->cellsX) * cellWidth;
+        const float y = static_cast<float>(i / grid->cellsX) * cellHeight;
+        if (const uint16_t kinds = diff.cellKinds[i] & kindMask; kinds != 0) {
+            addCellRectangle(rectangles, heights, x, y, cellWidth, cellHeight,
+                CrmdDiff::kindColor(static_cast<size_t>(std::countr_zero(kinds))), 0.02f);
+        } else if (isWalkableCell(loadedData, i)) {
+            addCellRectangle(rectangles, heights, x, y, cellWidth, cellHeight, walkableContextColor);
+        }
+    }
+    for (size_t p = 0; p < diff.pointKinds.size(); ++p) {
+        const uint16_t kinds = diff.pointKinds[p] & kindMask & CrmdDiff::gridPointKinds;
+        if (kinds == 0) {
+            continue;
+        }
+        const float x = (static_cast<float>(p % grid->pointsX) - 0.25f) * cellWidth;
+        const float y = (static_cast<float>(p / grid->pointsX) - 0.25f) * cellHeight;
+        addCellRectangle(rectangles, heights, x, y, cellWidth * 0.5f, cellHeight * 0.5f,
+            CrmdDiff::kindColor(static_cast<size_t>(std::countr_zero(kinds))), 0.05f);
+    }
+    diffLayer.model = renderModelFor(loadedData, *grid);
+    diffLayer.cellTriangleBuffer.upload(rectangles);
+
+    if ((kindMask & CrmdDiff::direction) == 0) {
+        return;
+    }
+    const glm::vec4 loadedArrowColor(1.0f, 1.0f, 1.0f, 0.95f);
+    const glm::vec4 comparisonArrowColor(1.0f, 0.5f, 0.1f, 0.95f);
+    std::vector<CoreProfileVertex> arrows;
+    for (size_t c = 0; c < diff.channelCellKinds.size(); ++c) {
+        const SCrowdFlowChannel& loadedChannel = loadedData.m_aFlowChannels[c];
+        const SCrowdFlowChannel& comparisonChannel = comparisonData.m_aFlowChannels[c];
+        for (size_t i = 0; i < diff.channelCellKinds[c].size(); ++i) {
+            if ((diff.channelCellKinds[c][i] & CrmdDiff::direction) == 0) {
+                continue;
+            }
+            if (i < loadedChannel.m_aFlowVectorIndex.size()) {
+                addFlowArrow(arrows, heights, *grid, i, loadedChannel.m_aFlowVectorIndex[i], loadedArrowColor);
+            }
+            if (i < comparisonChannel.m_aFlowVectorIndex.size()) {
+                addFlowArrow(arrows, heights, *grid, i, comparisonChannel.m_aFlowVectorIndex[i], comparisonArrowColor);
+            }
+        }
+    }
+    diffLayer.flowArrowLineBuffer.upload(arrows);
 }
 void Crmd::loadCrmdFromFile(const std::string& fileName) {
     Logger::log(NK_INFO, ("Loading Crmd from file: " + fileName).c_str());
@@ -605,58 +781,146 @@ void Crmd::loadCrmdFromFile(const std::string& fileName) {
     }
 }
 void Crmd::loadCrowdMapData(const std::string& fileName) {
+    loadInto(fileName, false);
+}
+
+void Crmd::loadComparisonCrowdMapData(const std::string& fileName) {
+    loadInto(fileName, true);
+}
+
+void Crmd::loadInto(const std::string& fileName, const bool asComparison) {
+    const char* const role = asComparison ? "comparison Crmd" : "Crmd";
     const std::time_t start_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string msg = "Loading Crmd from file at ";
-    msg += std::ctime(&start_time);
-    Logger::log(NK_INFO, msg.c_str());
+    Logger::log(NK_INFO, "Loading %s from file at %s", role, std::ctime(&start_time));
     const auto start = std::chrono::high_resolution_clock::now();
     loading = true;
     CPPTRACE_TRY {
         std::unique_ptr<SCrowdMapData> loadedData = readCrowdMap(fileName);
-        delete crowdMapData;
-        crowdMapData = loadedData.release();
+        SCrowdMapData*& target = asComparison ? comparisonCrowdMapData : crowdMapData;
+        delete target;
+        target = loadedData.release();
     }
     CPPTRACE_CATCH(const std::exception& e) {
         loading = false;
         Menu::updateMenuState();
-        ErrorHandler::openErrorDialog("Error loading Crmd file '" + std::string(fileName) +
-            "': " + std::string(e.what()) + "\n\nStack Trace:\n" + cpptrace::from_current_exception().to_string());
-        msg = "Error loading Crmd file '";
-        msg += fileName;
-        msg += "': ";
-        msg += e.what();
-        msg += " Stack trace: ";
-        msg += cpptrace::from_current_exception().to_string();
-        Logger::log(NK_ERROR, msg.c_str());
+        const std::string stackTrace = cpptrace::from_current_exception().to_string();
+        ErrorHandler::openErrorDialog("Error loading " + std::string(role) + " file '" + fileName +
+            "': " + std::string(e.what()) + "\n\nStack Trace:\n" + stackTrace);
+        Logger::log(NK_ERROR, "Error loading %s file '%s': %s Stack trace: %s", role, fileName.c_str(), e.what(),
+            stackTrace.c_str());
         return;
     }
     catch (...) {
         loading = false;
         Menu::updateMenuState();
-        msg = "Invalid Crmd file: '";
-        msg += fileName;
-        msg += "'...";
-        Logger::log(NK_ERROR, msg.c_str());
+        Logger::log(NK_ERROR, "Invalid %s file: '%s'...", role, fileName.c_str());
         return;
     }
 
-    const auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    msg = "Finished loading Crmd in ";
-    msg += std::to_string(duration.count());
-    msg += " seconds";
-    Logger::log(NK_INFO, msg.c_str());
+    const auto duration =
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - start);
+    Logger::log(NK_INFO, "Finished loading %s in %lld seconds", role, static_cast<long long>(duration.count()));
+    if (asComparison) {
+        comparisonLayer.dirty = true;
+        comparisonLoaded = true;
+    } else {
+        loadedLayer.dirty = true;
+        crmdLoaded = true;
+    }
+    diffDirty = true;
     loading = false;
-    renderGeometryDirty = true;
-    crmdLoaded = true;
     Menu::updateMenuState();
 }
+
 void Crmd::handleOpenCrmdClicked() {
     if (const char* fileName = openLoadCrmdFileDialog()) {
         loadedCrmdText = fileName;
         loadCrmdFromFile(fileName);
     }
 }
+
+void Crmd::loadComparisonCrmdFromFile(const std::string& fileName) {
+    if (!hasExtension(fileName, ".CRMD")) {
+        Logger::log(NK_ERROR, "Not a Crmd file: '%s'", fileName.c_str());
+        return;
+    }
+    Logger::log(NK_INFO, "Loading comparison Crmd file: '%s'...", fileName.c_str());
+    backgroundWorker.emplace(&Crmd::loadComparisonCrowdMapData, this, fileName);
+}
+
+void Crmd::handleOpenComparisonCrmdClicked() {
+    if (crmdLoaded && hasExtension(lastLoadCrmdFile, ".CRMD")) {
+        if (const std::optional<std::string> paired = pairedCrmdFile(lastLoadCrmdFile)) {
+            const int answer = wxMessageBox("Compare with " + wxString::FromUTF8(paired->c_str()) + "?",
+                "Open Comparison Crmd", wxYES_NO | wxCANCEL | wxICON_QUESTION, getMainFrame());
+            if (answer == wxCANCEL) {
+                return;
+            }
+            if (answer == wxYES) {
+                loadedComparisonText = *paired;
+                loadComparisonCrmdFromFile(*paired);
+                return;
+            }
+        }
+    }
+    if (char* fileName = openLoadCrmdFileDialog()) {
+        loadedComparisonText = fileName;
+        loadComparisonCrmdFromFile(fileName);
+        NFD_FreePathU8(fileName);
+    }
+}
+
+void Crmd::clearComparison() {
+    delete comparisonCrowdMapData;
+    comparisonCrowdMapData = nullptr;
+    comparisonLoaded = false;
+    loadedComparisonText.clear();
+    comparisonLayer.dirty = true;
+    diffDirty = true;
+    setCompareView(CompareView::loaded);
+}
+
+bool Crmd::canLoadComparison() const {
+    return crmdLoaded && !loading && !saving && !building;
+}
+
+bool Crmd::canCompare() const {
+    return crmdLoaded && comparisonLoaded && !loading && crowdMapData != nullptr && comparisonCrowdMapData != nullptr;
+}
+
+void Crmd::setCompareView(const CompareView view) {
+    compareView = view;
+}
+
+void Crmd::flipCompareView() {
+    if (!canCompare()) {
+        return;
+    }
+    const CompareView next = compareView == CompareView::comparison ? CompareView::loaded : CompareView::comparison;
+    setCompareView(next);
+    Logger::log(NK_INFO, "Showing %s Crmd", next == CompareView::comparison ? "comparison" : "loaded");
+}
+
+void Crmd::markDiffDirty() {
+    diffDirty = true;
+}
+
+void Crmd::showCompareDialog() {
+    if (hCompareDialog != nullptr) {
+        hCompareDialog->Show();
+        hCompareDialog->Raise();
+        return;
+    }
+    hCompareDialog = new CrmdCompareDialog(getMainFrame(), [] { hCompareDialog = nullptr; });
+    hCompareDialog->Show();
+}
+
+void Crmd::updateCompareDialog() {
+    if (hCompareDialog != nullptr) {
+        hCompareDialog->update();
+    }
+}
+
 void Crmd::setLastLoadFileName(const char* fileName) {
     Logger::log(NK_INFO, ("Setting last Crmd loaded file name: " + std::string(fileName)).c_str());
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
@@ -668,12 +932,13 @@ void Crmd::setLastLoadFileName(const char* fileName) {
 void Crmd::clear() {
     delete crowdMapData;
     crowdMapData = new SCrowdMapData();
-    renderGeometryDirty = true;
+    loadedLayer.dirty = true;
     crmdLoaded = false;
     loading = false;
     loadedCrmdText.clear();
     loadCrmdName = "Load Crmd";
     lastLoadCrmdFile = loadCrmdName;
+    clearComparison();
 }
 
 void Crmd::updateCrmdDialogControls(wxDialog* dialog) {
@@ -689,17 +954,26 @@ void Crmd::updateCrmdDialogControls(wxDialog* dialog) {
     picker->setItems(std::move(items));
 }
 void Crmd::showExtractCrmdDialog() {
+    showExtractDialog(false);
+}
+
+void Crmd::showExtractComparisonCrmdDialog() {
+    showExtractDialog(true);
+}
+
+void Crmd::showExtractDialog(const bool asComparison) {
     if (hCrmdDialog) {
         hCrmdDialog->Raise();
         return;
     }
-    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "Load Crmd from resource package", wxDefaultPosition,
-        wxSize(750, 450), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY,
+        asComparison ? "Load comparison Crmd from resource package" : "Load Crmd from resource package",
+        wxDefaultPosition, wxSize(750, 450), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     hCrmdDialog = dialog;
     auto* picker = new FilteredListPicker(dialog, IDC_COMBOBOX_CRMD);
     updateCrmdDialogControls(dialog);
     auto* buttons = new wxStdDialogButtonSizer();
-    auto* open = new wxButton(dialog, wxID_OK, "Open Crmd");
+    auto* open = new wxButton(dialog, wxID_OK, asComparison ? "Open Comparison Crmd" : "Open Crmd");
     auto* cancel = new wxButton(dialog, wxID_CANCEL, "Cancel");
     buttons->AddButton(open);
     buttons->AddButton(cancel);
@@ -710,17 +984,18 @@ void Crmd::showExtractCrmdDialog() {
     sizer->Add(picker, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
     sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
     dialog->SetSizer(sizer);
-    open->Bind(wxEVT_BUTTON, [dialog, picker](wxCommandEvent&) {
+    open->Bind(wxEVT_BUTTON, [dialog, picker, asComparison](wxCommandEvent&) {
         selectedRpkgCrmd = picker->getSelection();
+        std::string& loadedText = asComparison ? getInstance().loadedComparisonText : getInstance().loadedCrmdText;
         for (auto& [hash, ioiString] : crmdHashIoiStringMap) {
             if (hash == selectedRpkgCrmd) {
-                getInstance().loadedCrmdText = hash;
+                loadedText = hash;
             } else if (ioiString == selectedRpkgCrmd) {
-                getInstance().loadedCrmdText = ioiString;
+                loadedText = ioiString;
             } else {
                 continue;
             }
-            extractCrmdFromRpkgs(hash);
+            extractCrmdFromRpkgs(hash, asComparison);
         }
         dialog->Close();
     });
@@ -741,12 +1016,16 @@ void Crmd::showExtractCrmdDialog() {
     dialog->Show();
 }
 
-void Crmd::extractCrmdFromRpkgs(const std::string& hash) {
+void Crmd::extractCrmdFromRpkgs(const std::string& hash, const bool asComparison) {
     if (!Rpkg::extractResourcesFromRpkgs({hash}, CRMD)) {
         const std::string fileName =
             (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "crmd" / (hash + ".CRMD")).string();
         Logger::log(NK_INFO, ("Loading Crmd from file: " + fileName).c_str());
-        getInstance().loadCrmdFromFile(fileName);
+        if (asComparison) {
+            getInstance().loadComparisonCrmdFromFile(fileName);
+        } else {
+            getInstance().loadCrmdFromFile(fileName);
+        }
     }
 }
 
@@ -901,7 +1180,8 @@ void Crmd::setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& 
     delete crowdMapData;
     crowdMapData = data.release();
     loadedCrmdText = name;
-    renderGeometryDirty = true;
+    loadedLayer.dirty = true;
+    diffDirty = true;
     crmdLoaded = true;
     loading = false;
 }
