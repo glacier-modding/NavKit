@@ -98,11 +98,11 @@ class CollectionHierarchyTests(unittest.TestCase):
             }],
         }
         with tempfile.TemporaryDirectory() as output_dir:
-            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.glb"))
             svg = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
         bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.003, location=(0, 0, 0))
         with tempfile.TemporaryDirectory() as output_dir:
-            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.glb"))
             svg_with_speck = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
         # The cube's top is a floor (indoor, as nothing names it outdoor); the cube outside the volume is left out.
         self.assertIn(glacier.GFX_INTERIOR_FLOOR_COLOR, svg)
@@ -138,7 +138,7 @@ class CollectionHierarchyTests(unittest.TestCase):
             ],
         }
         with tempfile.TemporaryDirectory() as output_dir:
-            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.glb"))
             first_layer = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
             empty_layer = (Path(output_dir) / "output_01.svg").read_text(encoding="utf-8")
             background = (Path(output_dir) / "output_background.svg").read_text(encoding="utf-8")
@@ -182,7 +182,7 @@ class CollectionHierarchyTests(unittest.TestCase):
                                 {"name": "MapSpaceConfig_F1", "inclusions": {"data": ["upper"]}}],
         }
         with tempfile.TemporaryDirectory() as output_dir:
-            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.glb"))
             ground = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
         floor_path = [line for line in ground.splitlines() if glacier.GFX_INTERIOR_FLOOR_COLOR in line][0]
         floor_y = [float(value) for value in
@@ -242,9 +242,9 @@ class InstanceBuildCullingTests(unittest.TestCase):
                 (output_dir / "prim" / (prim_hash + ".prim")).write_bytes(b"")
             nav_json = output_dir / "scene.nav.json"
             nav_json.write_text(json.dumps(nav_data), encoding="utf-8")
-            self.assertEqual(glacier.glacier2glb(str(nav_json), str(output_dir / "output.gltf"), "PRIM", "11111111",
+            self.assertEqual(glacier.glacier2glb(str(nav_json), str(output_dir / "output.glb"), "PRIM", "11111111",
                                                  "instance", True, False, False, False), 0)
-            self.assertTrue((output_dir / "output.gltf").exists())
+            self.assertTrue((output_dir / "output.glb").exists())
 
         vertices = [obj.matrix_world @ vertex.co for obj in bpy.context.scene.objects if obj.type == "MESH"
                     for vertex in obj.data.vertices]

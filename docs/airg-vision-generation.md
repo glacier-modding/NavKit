@@ -4,7 +4,7 @@ Build AIRG with the scene GLB loaded. The GLB must contain collision geometry ex
 
 The generation policy is explicit:
 
-- Game coordinates have Z up; collision rays convert to Recast/glTF coordinates `(x, z, -y)`.
+- Game coordinates have Z up; collision rays convert to Recast/GLB coordinates `(x, z, -y)`.
 - High visibility is channel 0 at 1.6 m above both waypoint positions; low visibility is channel 1 at 0.6 m. These are configurable arguments to `ReasoningGrid::generateVisionData`, and are chosen defaults rather than confirmed engine constants.
 - Cells use `floor((position - grid minimum) / spacing)`, matching the reader. Actual waypoint positions supply ray endpoints. The first waypoint in list order represents duplicate destinations in the same cell and layer.
 - Each source includes its own layer implicitly, followed by sorted signed 16-bit IDs of other layers with waypoints inside the square neighborhood. Empty cells remain false. The square includes its corners; no radial cutoff is applied.

@@ -328,7 +328,7 @@ void SceneMesh::buildSceneMeshFromScene() {
     glbLoaded = false;
     Menu::updateMenuState();
     startedSceneMeshGeneration = true;
-    std::string buildOutputFileType = blendFileAndGlbBuild ? "both" : blendFileOnlyBuild ? "blend" : "gltf";
+    std::string buildOutputFileType = blendFileAndGlbBuild ? "both" : blendFileOnlyBuild ? "blend" : "glb";
     Logger::log(NK_INFO, "Generating %s from nav.json file.", buildOutputFileType.c_str());
     std::string command = "\"";
     command += navKitSettings.blenderPath;
@@ -375,7 +375,7 @@ void SceneMesh::buildSceneMeshFromScene() {
     blenderSceneMeshBuildStarted = true;
     Gui& gui = Gui::getInstance();
     gui.showLog = true;
-    generatedGlbName = "output.gltf";
+    generatedGlbName = "output.glb";
 
     backgroundWorker.emplace(
         &CommandRunner::runCommand, std::ref(CommandRunner::getInstance()), command, "Glacier2Glb.log",
@@ -560,24 +560,7 @@ void SceneMesh::saveGlbMesh(char* glbToCopy, char* newFileName) {
     Logger::log(NK_INFO, msg.data());
     const std::string sourcePath = glbToCopy;
     const std::string destinationPath = newFileName;
-    if (std::filesystem::u8path(sourcePath).extension() == ".gltf") {
-        backgroundWorker.emplace([sourcePath, destinationPath] {
-            Assimp::Importer importer;
-            const aiScene* scene = importer.ReadFile(sourcePath, 0);
-            if (!scene) {
-                Logger::log(NK_ERROR, "Failed to load glTF '%s' for GLB export: %s", sourcePath.c_str(),
-                    importer.GetErrorString());
-                return;
-            }
-            Assimp::Exporter exporter;
-            if (exporter.Export(scene, "glb2", destinationPath) != AI_SUCCESS) {
-                Logger::log(
-                    NK_ERROR, "Failed to export GLB '%s': %s", destinationPath.c_str(), exporter.GetErrorString());
-            }
-        });
-    } else {
-        backgroundWorker.emplace(&SceneMesh::copyFile, sourcePath, destinationPath, "GLB");
-    }
+    backgroundWorker.emplace(&SceneMesh::copyFile, sourcePath, destinationPath, "GLB");
 }
 
 void SceneMesh::saveBlendMesh(std::string blendToCopy, std::string newFileName) {
@@ -677,12 +660,12 @@ void SceneMesh::renderGlbUsingRecast() {
 }
 
 char* SceneMesh::openLoadGlbFileDialog() {
-    nfdu8filteritem_t filters[2] = {{"glTF Binary files", "glb"}, {"glTF files", "gltf"}};
-    return FileUtil::openNfdLoadDialog(filters, 2);
+    nfdu8filteritem_t filters[1] = {{"GLB files", "glb"}};
+    return FileUtil::openNfdLoadDialog(filters, 1);
 }
 
 char* SceneMesh::openSaveGlbFileDialog() {
-    nfdu8filteritem_t filters[1] = {{"glTF Binary files", "glb"}};
+    nfdu8filteritem_t filters[1] = {{"GLB files", "glb"}};
     return FileUtil::openNfdSaveDialog(filters, 1, "output.glb");
 }
 

@@ -5,6 +5,7 @@ import math
 import os
 import struct
 import sys
+import urllib.parse
 from timeit import default_timer as timer
 
 import bmesh
@@ -18,9 +19,9 @@ from bpy.types import (
 )
 
 glacier2glb_enabled_log_levels = ["ERROR", "WARNING", "INFO"]  # Log levels are "TRACE", "DEBUG", "INFO", "WARNING", "ERROR"
-gltf_logger = logging.getLogger("gltf2")
-gltf_logger.setLevel(logging.ERROR)
-gltf_logger.disabled = True
+glb_logger = logging.getLogger("gltf2")
+glb_logger.setLevel(logging.ERROR)
+glb_logger.disabled = True
 
 # General
 
@@ -3939,7 +3940,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
 
                 if not room_instances:
                     # Every instance is outside the include box. Without a placement object nothing removes this
-                    # source object before saving, and glTF export ignores hide_viewport, so it would show up at the
+                    # source object before saving, and GLB export ignores hide_viewport, so it would show up at the
                     # origin.
                     bpy.data.objects.remove(submesh, do_unlink=True)
                     continue
@@ -4076,7 +4077,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
             log("ERROR", "Problem loading ALOC: " + error_aloc, "glacier2glb")
     log("INFO", "Finished loading scenario in " + str(end - start) + " seconds.", "glacier2glb")
 
-    # The map layers are rendered before saving, because saving a glTF bakes every placement's instances into
+    # The map layers are rendered before saving, because saving a GLB bakes every placement's instances into
     # one mesh, and the renderer judges each instance (its size, whether it is stairs or the level's shell) on
     # its own.
     if should_build_gfx:
@@ -4088,11 +4089,11 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
 
     if output_path.endswith('.both') or output_path.endswith('.bothWithGfx'):
         save_blend_file(output_path[:-4] + "blend")
-        save_gltf_file(output_path[:-4] + "gltf")
+        save_glb_file(output_path[:-4] + "glb")
     elif output_path.endswith('.blend'):
         save_blend_file(output_path)
     else:
-        save_gltf_file(output_path)
+        save_glb_file(output_path)
     return 0
 
 
@@ -4121,7 +4122,7 @@ def add_textures(obj, matis, mesh_hash, output_dir, prim_matis, submesh_i, mater
 
 def main():
     log("TRACE",
-        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.gltf path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <export to gfx (true | false)> <debug logs enabled (true | false)>",
+        "Usage: blender -b -P Glacier2Glb.py -- <nav.json path> <output.glb path> <mesh type (ALOC | PRIM)> <LOD Mask e.g. 11111111> <Build Type (copy | instance)> <Culling enabled (true | false)> <apply textures (true | false)> <export to gfx (true | false)> <debug logs enabled (true | false)>",
         "main")
     argv = sys.argv
     argv = argv[argv.index("--") + 1:]
@@ -4209,17 +4210,64 @@ def bake_geometry_node_instances():
         bpy.data.objects.remove(source_object, do_unlink=True)
 
 
-def save_gltf_file(output_path: str):
-    log("INFO", "Attempting to save glTF file to :" + output_path, "main")
+def save_glb_file(output_path: str):
+    log("INFO", "Saving GLB file to: " + output_path, "main")
     bake_geometry_node_instances()
+    # Blender's GLB export always embeds every texture, so each scene mesh would carry its own copy of shared
+    # textures. Export a separate glTF instead, which writes each texture once beside it, then pack its JSON and
+    # binary buffer into the GLB, keeping the textures as references to those files.
+    temp_gltf_path = os.path.splitext(output_path)[0] + ".tmp.gltf"
     with open(os.devnull, "w") as devnull, \
             contextlib.redirect_stdout(devnull), \
             contextlib.redirect_stderr(devnull):
-        bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLTF_SEPARATE', export_apply=True)
+        bpy.ops.export_scene.gltf(filepath=temp_gltf_path, export_format='GLTF_SEPARATE', export_apply=True)
+    pack_gltf_into_glb(temp_gltf_path, output_path)
+
+
+def pack_gltf_into_glb(gltf_path: str, glb_path: str):
+    gltf_dir = os.path.dirname(os.path.abspath(gltf_path))
+    with open(gltf_path, "r", encoding="utf-8") as gltf_file:
+        gltf = json.load(gltf_file)
+
+    buffers = gltf.get("buffers", [])
+    if len(buffers) > 1:
+        raise RuntimeError("Expected at most one buffer in exported glTF, found " + str(len(buffers)))
+    bin_data = b""
+    bin_path = None
+    if buffers:
+        bin_path = os.path.join(gltf_dir, buffers[0].pop("uri"))
+        with open(bin_path, "rb") as bin_file:
+            bin_data = bin_file.read()
+        buffers[0]["byteLength"] = len(bin_data)
+
+    # Point each texture at its absolute path, so the GLB still finds its textures after it is copied elsewhere.
+    # The path is written as a plain path, not percent-encoded, because Assimp uses an image uri as a file path
+    # without decoding it.
+    for image in gltf.get("images", []):
+        if "uri" in image and not image["uri"].startswith("data:"):
+            texture_path = os.path.abspath(os.path.join(gltf_dir, urllib.parse.unquote(image["uri"])))
+            image["uri"] = texture_path.replace("\\", "/")
+
+    json_data = json.dumps(gltf, separators=(",", ":")).encode("utf-8")
+    json_data += b" " * (-len(json_data) % 4)
+    bin_data += b"\x00" * (-len(bin_data) % 4)
+
+    total_length = 12 + 8 + len(json_data) + (8 + len(bin_data) if bin_data else 0)
+    with open(glb_path, "wb") as glb_file:
+        glb_file.write(struct.pack("<4sII", b"glTF", 2, total_length))
+        glb_file.write(struct.pack("<I4s", len(json_data), b"JSON"))
+        glb_file.write(json_data)
+        if bin_data:
+            glb_file.write(struct.pack("<I4s", len(bin_data), b"BIN\x00"))
+            glb_file.write(bin_data)
+
+    os.remove(gltf_path)
+    if bin_path:
+        os.remove(bin_path)
 
 
 def save_blend_file(output_path: str):
-    log("INFO", "Attempting to save blender file to :" + output_path, "main")
+    log("INFO", "Saving blender file to: " + output_path, "main")
     bpy.ops.wm.save_as_mainfile(filepath=output_path, relative_remap=False)
 
 
