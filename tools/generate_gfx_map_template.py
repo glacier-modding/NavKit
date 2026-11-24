@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 # The identifiers a generated map has always had; the game's map system is not known to need any others.
-PACKAGE = "_Scene_Mission_Polarbear_Module_005"
+PACKAGE = "Generated_Map"
 MAIN_CLASS = PACKAGE + "_Main"
 
 PACKAGE_NAMESPACE = 0x16
