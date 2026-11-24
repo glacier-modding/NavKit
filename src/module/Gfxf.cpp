@@ -838,8 +838,29 @@ void Gfxf::buildGfx() {
         if (!canvasSize) {
             throw std::runtime_error("The map background SVG has no canvas size: " + pathToUtf8(backgroundPath));
         }
+        // The scene's map-layer ZUIControlEntity class names ("<package>.SLICE_NN") give the package that replaces
+        // the template's Generated_Map, so the GFX defines the classes the scene's map layers name.
+        std::string mapPackage;
+        for (const Json::UIControl& uiControl : Scene::getInstance().uiControls) {
+            const std::string package = GfxMapLayerSwf::mapLayerPackage(uiControl.className);
+            if (package.empty()) {
+                continue;
+            }
+            if (mapPackage.empty()) {
+                mapPackage = package;
+            } else if (package != mapPackage) {
+                Logger::log(NK_WARN, "Map layer class '%s' is not in package '%s'; using '%s' for the GFX.",
+                    uiControl.className.c_str(), mapPackage.c_str(), mapPackage.c_str());
+            }
+        }
+        if (mapPackage.empty()) {
+            Logger::log(NK_WARN,
+                "The loaded scene has no map-layer UI control class names; the GFX keeps the template's package.");
+        } else {
+            Logger::log(NK_INFO, "Using map class package '%s' for the GFX.", mapPackage.c_str());
+        }
         const std::string generatedXml = GfxMapLayerSwf::createMapLayerSwfXml(
-            readText(templateXml, "GFX template XML"), layerCount, canvasSize->first, canvasSize->second);
+            readText(templateXml, "GFX template XML"), layerCount, canvasSize->first, canvasSize->second, mapPackage);
         const std::filesystem::path generatedXmlPath = temporaryDirectory / "generated.xml";
         std::ofstream generatedXmlOutput(generatedXmlPath, std::ios::binary | std::ios::trunc);
         generatedXmlOutput.write(generatedXml.data(), static_cast<std::streamsize>(generatedXml.size()));

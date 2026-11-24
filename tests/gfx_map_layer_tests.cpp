@@ -278,6 +278,49 @@ namespace {
             "slice names use two-digit layer numbers");
     }
 
+    void testMapLayerPackage() {
+        check(GfxMapLayerSwf::mapLayerPackage("_Scene_Mission_Polarbear_Module_005.SLICE_00") ==
+                "_Scene_Mission_Polarbear_Module_005",
+            "the package is the class name before .SLICE_NN");
+        check(GfxMapLayerSwf::mapLayerPackage("Map_HUD").empty(), "other UI controls name no map package");
+        check(GfxMapLayerSwf::mapLayerPackage("Pkg.SLICE_0").empty(), "slice numbers have two digits");
+        check(GfxMapLayerSwf::mapLayerPackage("Pkg.SLICE_00_ZMapView").empty(), "only SLICE_NN names a layer");
+        check(GfxMapLayerSwf::isValidMapPackageName("_Scene_Mission_Polarbear_Module_005"), "identifiers are valid");
+        check(!GfxMapLayerSwf::isValidMapPackageName("a.b"), "packages with dots are not valid");
+        check(!GfxMapLayerSwf::isValidMapPackageName("5abc"), "identifiers do not start with a digit");
+    }
+
+    void testRenamedPackage() {
+        const std::string package = "_Scene_Mission_Polarbear_Module_005";
+        const std::string xml = GfxMapLayerSwf::createMapLayerSwfXml(templateXml, 4, 900.0, 900.0, package);
+        check(xml.find("_Pkg") == std::string::npos, "the template package must be renamed everywhere");
+        check(GfxMapLayerSwf::validateMapLayerSwfXml(xml, 4).empty(), "the renamed GFX must be valid");
+
+        const pugi::xml_document document = parse(xml);
+        const pugi::xml_node tags = document.child("swf").child("tags");
+        for (const pugi::xml_node item : tags.children("item")) {
+            if (std::string_view(item.attribute("type").value()) != "SymbolClassTag") {
+                continue;
+            }
+            const auto pairs = namePairs(item);
+            check(pairs.size() == 5, "four layers and the document class are bound");
+            for (size_t layer = 0; layer < 4; ++layer) {
+                check(pairs[layer].second == package + "." + GfxMapLayerSwf::sliceName(layer) + "_ZMapView",
+                    "layer sprites bind the scene's classes");
+            }
+            check(pairs.back().first == 0 && pairs.back().second == package + "_Main",
+                "the document class is in the scene's package");
+        }
+
+        bool threw = false;
+        try {
+            GfxMapLayerSwf::createMapLayerSwfXml(templateXml, 2, 900.0, 900.0, "bad.package");
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        check(threw, "a package that is not an identifier must be rejected");
+    }
+
     // Wall rectangles (left, top, right, bottom) of a made-up floor plan, in metres on the map plane.
     const std::vector<std::array<float, 4>> planWalls = {
         {10, 10, 70, 11},
@@ -438,6 +481,8 @@ int main(const int argc, char** argv) {
         testFewerMapLayers();
         testValidationRejectsOtherFormats();
         testBackgroundMapSpaceNames();
+        testMapLayerPackage();
+        testRenamedPackage();
         testCanvasSizedShapes();
         testMapLayerPlacement();
         testSectionsAndFloorLevels();

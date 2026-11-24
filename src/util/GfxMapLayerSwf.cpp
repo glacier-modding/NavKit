@@ -177,6 +177,24 @@ namespace {
         return copy;
     }
 
+    // Replaces `from` with `to` in every attribute value and text of `node` and its descendants.
+    void renameEverywhere(pugi::xml_node node, const std::string_view from, const std::string_view to) {
+        for (pugi::xml_attribute attribute : node.attributes()) {
+            if (const std::string value = attribute.value(); value.find(from) != std::string::npos) {
+                attribute.set_value(replaceAll(value, from, to).c_str());
+            }
+        }
+        for (pugi::xml_node child : node.children()) {
+            if (child.type() == pugi::node_pcdata || child.type() == pugi::node_cdata) {
+                if (const std::string value = child.value(); value.find(from) != std::string::npos) {
+                    child.set_value(replaceAll(value, from, to).c_str());
+                }
+            } else {
+                renameEverywhere(child, from, to);
+            }
+        }
+    }
+
     std::string formatTwoDigits(const size_t value) {
         std::ostringstream text;
         text.width(2);
@@ -209,6 +227,28 @@ namespace GfxMapLayerSwf {
         // The game's scenes name it "...Background" or, with a satellite image, "..._SAT".
         return lower.find("background") != std::string::npos || lower == "sat" ||
             (lower.size() > 4 && lower.ends_with("_sat"));
+    }
+
+    std::string mapLayerPackage(const std::string_view className) {
+        const size_t slice = className.rfind(".SLICE_");
+        if (slice == std::string_view::npos || slice == 0) {
+            return {};
+        }
+        const std::string_view digits = className.substr(slice + 7);
+        if (digits.size() < 2 ||
+            !std::ranges::all_of(digits, [](const char c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
+            return {};
+        }
+        return std::string(className.substr(0, slice));
+    }
+
+    bool isValidMapPackageName(const std::string_view package) {
+        const auto isIdentifierStart = [](const char c) {
+            return std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '$';
+        };
+        return !package.empty() && isIdentifierStart(package.front()) &&
+            std::ranges::all_of(package,
+                [&](const char c) { return isIdentifierStart(c) || std::isdigit(static_cast<unsigned char>(c)); });
     }
 
     std::optional<std::pair<double, double>> svgCanvasSize(const std::string_view svg) {
@@ -252,7 +292,7 @@ namespace GfxMapLayerSwf {
     }
 
     std::string createMapLayerSwfXml(const std::string_view templateXml, const size_t layerCount,
-        const double canvasWidth, const double canvasHeight) {
+        const double canvasWidth, const double canvasHeight, const std::string_view newPackage) {
         if (layerCount == 0) {
             throw std::runtime_error("The loaded scene has no map layers.");
         }
@@ -311,6 +351,17 @@ namespace GfxMapLayerSwf {
         }
         if (package.empty() || mainClass.empty() || !templateSlices.contains(0)) {
             throw std::runtime_error("The GFX template does not bind a document class and SLICE_00 map layer.");
+        }
+        if (!newPackage.empty() && newPackage != package) {
+            if (!isValidMapPackageName(newPackage)) {
+                throw std::runtime_error(
+                    "The map class package '" + std::string(newPackage) + "' is not an ActionScript identifier.");
+            }
+            // The package names the ActionScript namespace and classes, the SymbolClass and export names, the
+            // document class and the ABC tag, so it is renamed wherever the template has it.
+            renameEverywhere(swf, package, newPackage);
+            mainClass = replaceAll(mainClass, package, newPackage);
+            package = std::string(newPackage);
         }
 
         const pugi::xml_document shapeCopy = copyNode(shapeTemplate);

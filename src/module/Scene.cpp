@@ -132,6 +132,7 @@ void Scene::loadRoomsAndVolumes(
     volumeBoxes.clear();
     volumeSpheres.clear();
     mapSpaceConfigs.clear();
+    uiControls.clear();
     std::string section = "Gates";
     try {
         Logger::log(NK_INFO, "Loading Gates.");
@@ -160,8 +161,19 @@ void Scene::loadRoomsAndVolumes(
         } else {
             Logger::log(NK_INFO, "No UI Map Space Configs found in scene file.");
         }
+        section = "UI Controls";
+        Logger::log(NK_INFO, "Loading UI Controls.");
+        // Optional: scenes extracted before this field existed don't have it.
+        if (simdjson::ondemand::array uiControlsJson;
+            jsonDocument["uiControls"].get_array().get(uiControlsJson) == simdjson::SUCCESS) {
+            uiControls = Json::UIControls(uiControlsJson).uiControls;
+        } else {
+            Logger::log(NK_INFO, "No UI Controls found in scene file.");
+        }
     } catch (const std::exception& e) {
-        recordLoadError(section + " (and every later section of gates/rooms/AI areas/volumes)", e.what());
+        recordLoadError(
+            section + " (and every later section of gates/rooms/AI areas/volumes). Are you using the latest ZHMModSDK?",
+            e.what());
     } catch (...) {
         recordLoadError(section, "unknown error");
         errorCallback();
@@ -402,6 +414,14 @@ void Scene::saveScene(const std::string& fileName) const {
         mapSpaceConfig.writeJson(ss);
         separator = ",";
     }
+
+    ss << R"(],"uiControls":[)";
+    separator = "";
+    for (auto& uiControl : uiControls) {
+        ss << separator;
+        uiControl.writeJson(ss);
+        separator = ",";
+    }
     ss << "]}";
 
     std::ofstream f(fileName);
@@ -487,6 +507,7 @@ void Scene::clear() {
     volumeSpheres.clear();
     volumeShapes.clear();
     crowds.clear();
+    uiControls.clear();
     meshes.clear();
     prims.clear();
     includeBox = {};

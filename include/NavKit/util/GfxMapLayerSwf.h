@@ -24,12 +24,22 @@ namespace GfxMapLayerSwf {
     // the shared background, not a layer (case-insensitive).
     bool isBackgroundMapSpaceName(std::string_view name);
 
+    // The package of a map layer's ZUIControlEntity m_sClassName "<package>.SLICE_NN", such as
+    // "_Scene_Mission_Polarbear_Module_005" for "_Scene_Mission_Polarbear_Module_005.SLICE_00", or an empty string
+    // when the class name does not name a map layer.
+    std::string mapLayerPackage(std::string_view className);
+
+    // Whether `package` can replace the template's package: an ActionScript identifier without dots, since the
+    // document class "<package>_Main" is in the top-level package.
+    bool isValidMapPackageName(std::string_view package);
+
     // Turns FFDec XML of a template map GFX into the XML of a GFX with `layerCount` empty map layers whose shapes
     // FFDec's -importShapes then fills from <shape id>.svg files. FFDec fits each SVG into the shape's existing
     // bounds, so the shapes are made the size of the map canvas (`canvasWidth` x `canvasHeight` units, one per
-    // metre) for the map to keep its scale and proportions.
-    std::string createMapLayerSwfXml(
-        std::string_view templateXml, size_t layerCount, double canvasWidth, double canvasHeight);
+    // metre) for the map to keep its scale and proportions. A non-empty `package` replaces the template's package
+    // (Generated_Map) everywhere it is named, including the document class "<package>_Main".
+    std::string createMapLayerSwfXml(std::string_view templateXml, size_t layerCount, double canvasWidth,
+        double canvasHeight, std::string_view package = {});
 
     // The width and height of an SVG document (from its viewBox, or else its width and height attributes).
     std::optional<std::pair<double, double>> svgCanvasSize(std::string_view svg);

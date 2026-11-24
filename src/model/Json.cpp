@@ -508,6 +508,34 @@ Json::MapSpaceConfigs::MapSpaceConfigs(simdjson::ondemand::array mapSpaceConfigs
     }
 }
 
+void Json::UIControl::writeJson(std::ostream& f) const {
+    f << R"({"id":")" << escaped(id) << R"(","name":")" << escaped(name)
+      << R"(","m_sClassName":{"type":"ZString","value":")" << escaped(className) << R"("}})";
+}
+
+void Json::UIControl::readJson(simdjson::ondemand::object json) {
+    id = getValue(json, "id");
+    name = getValue(json, "name");
+    className.clear();
+    // The Editor writes the property like its entity details do: {"type":"ZString","value":"..."}, with a null value
+    // when the property could not be read.
+    if (simdjson::ondemand::object classNameJson;
+        json["m_sClassName"].get_object().get(classNameJson) == simdjson::SUCCESS) {
+        if (std::string_view value; classNameJson["value"].get_string().get(value) == simdjson::SUCCESS) {
+            className = std::string(value);
+        }
+    }
+}
+
+Json::UIControls::UIControls(simdjson::ondemand::array uiControlsJson) {
+    for (simdjson::simdjson_result<simdjson::ondemand::value> uiControlJsonResult : uiControlsJson) {
+        simdjson::ondemand::value uiControlJson = uiControlJsonResult.value();
+        UIControl uiControl;
+        uiControl.readJson(uiControlJson.get_object().value());
+        uiControls.push_back(uiControl);
+    }
+}
+
 Json::VolumeBoxes::VolumeBoxes(simdjson::ondemand::array volumeBoxesJson) {
     for (simdjson::simdjson_result<simdjson::ondemand::value> volumeBoxJsonResult : volumeBoxesJson) {
         simdjson::ondemand::value volumeBoxJson = volumeBoxJsonResult.value();

@@ -451,6 +451,46 @@ namespace {
         scene.volumeSpheres = originalSpheres;
     }
 
+    void testUiControlsLoadAndSave() {
+        Scene& scene = Scene::getInstance();
+        const std::vector<Json::UIControl> originalControls = scene.uiControls;
+        const auto load = [&scene](const std::string& uiControlsField) {
+            const std::string json =
+                R"({"gates":[],"rooms":[],"aiAreaWorld":[],"aiArea":[],"volumeBoxes":[],"volumeSpheres":[])" +
+                uiControlsField + "}";
+            const simdjson::padded_string input(json);
+            simdjson::ondemand::parser parser;
+            auto document = parser.iterate(input);
+            const size_t errorsBefore = scene.getLoadErrors().size();
+            scene.loadRoomsAndVolumes([] {}, document);
+            return scene.getLoadErrors().size() - errorsBefore;
+        };
+
+        check(
+            load(R"(,"uiControls":[{"id":"19ff0b745b2d8b47","name":"_Scene_Mission_Polarbear_Module_005_SLICE_00",)"
+                 R"("tblu":"00ABCDEF","m_sClassName":{"type":"ZString",)"
+                 R"("value":"_Scene_Mission_Polarbear_Module_005.SLICE_00"}},)"
+                 R"({"id":"f060a5f7c4f5266c","name":"Unreadable","m_sClassName":{"type":"ZString","value":null}}])") ==
+                0,
+            "a scene with UI controls should load without errors");
+        check(scene.uiControls.size() == 2, "UI controls should be read");
+        check(scene.uiControls[0].id == "19ff0b745b2d8b47" &&
+                scene.uiControls[0].className == "_Scene_Mission_Polarbear_Module_005.SLICE_00",
+            "the UI control class name should be read from m_sClassName");
+        check(scene.uiControls[1].className.empty(), "an unreadable class name should be empty");
+
+        std::ostringstream written;
+        scene.uiControls[0].writeJson(written);
+        check(written.str() ==
+                R"({"id":"19ff0b745b2d8b47","name":"_Scene_Mission_Polarbear_Module_005_SLICE_00",)"
+                R"("m_sClassName":{"type":"ZString",)"
+                R"("value":"_Scene_Mission_Polarbear_Module_005.SLICE_00"}})",
+            "UI controls should be saved in the format the Editor exports");
+
+        check(load("") == 0 && scene.uiControls.empty(), "scenes without UI controls should load and clear them");
+        scene.uiControls = originalControls;
+    }
+
     void testPlannerExcludedBridgeBoxParsing() {
         Scene& scene = Scene::getInstance();
         const Json::PfBox originalInclude = scene.includeBox;
@@ -2054,6 +2094,7 @@ void runDomainTests() {
     run("JSON material-record round trips", testJsonMaterialRecords);
     run("Pathfinding box aggregation and fallback", testPathfindingBoxAggregation);
     run("Rooms and volumes load without map space configs", testRoomsAndVolumesLoadWithoutMapSpaceConfigs);
+    run("UI controls load and save", testUiControlsLoadAndSave);
     run("Planner-excluded bridge box parsing", testPlannerExcludedBridgeBoxParsing);
     run("Planner-excluded area usage", testPlannerExcludedAreaUsage);
     run("Unpartitioned bridge area region assignment", testUnpartitionedAreaRegionAssignment);

@@ -395,6 +395,32 @@ namespace Json {
         std::vector<MapSpaceConfig> mapSpaceConfigs{};
     };
 
+    // A ZUIControlEntity from the scene. Map layers are named "<package>.SLICE_NN" by their m_sClassName.
+    class UIControl {
+    public:
+        UIControl() = default;
+
+        UIControl(const std::string& id, const std::string& name, const std::string& className) :
+            id(id), name(name), className(className) {}
+
+        std::string id;
+        std::string name;
+        std::string className;
+
+        void writeJson(std::ostream& f) const;
+
+        void readJson(simdjson::ondemand::object json);
+    };
+
+    class UIControls {
+    public:
+        UIControls() = default;
+
+        explicit UIControls(simdjson::ondemand::array uiControlsJson);
+
+        std::vector<UIControl> uiControls{};
+    };
+
     class VolumeBoxes {
     public:
         VolumeBoxes() = default;

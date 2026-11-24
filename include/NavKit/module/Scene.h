@@ -81,6 +81,7 @@ public:
     std::vector<Json::VolumeShape> volumeShapes;
     std::vector<Json::Crowd> crowds;
     std::vector<Json::MapSpaceConfig> mapSpaceConfigs;
+    std::vector<Json::UIControl> uiControls;
     std::vector<Json::Mesh> meshes;
     std::vector<Json::Mesh> prims;
     Json::PfBox includeBox;
