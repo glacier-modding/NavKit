@@ -470,25 +470,7 @@ namespace {
     }
 
     std::string spriteLayerName(const std::filesystem::path& path) {
-        const std::string folderName = pathToUtf8(path.parent_path().filename());
-        const size_t slicePosition = folderName.find("SLICE_");
-        const size_t floorPosition = folderName.find(".F");
-        size_t numberStart = std::string::npos;
-        if (slicePosition != std::string::npos) {
-            numberStart = slicePosition + 6;
-        } else if (floorPosition != std::string::npos) {
-            numberStart = floorPosition + 2;
-        } else {
-            return {};
-        }
-        size_t numberEnd = numberStart;
-        while (numberEnd < folderName.size() && std::isdigit(static_cast<unsigned char>(folderName[numberEnd]))) {
-            ++numberEnd;
-        }
-        if (numberEnd == numberStart || folderName.find("ZMapView", numberEnd) == std::string::npos) {
-            return {};
-        }
-        return "Level " + folderName.substr(numberStart, numberEnd - numberStart);
+        return GfxMapLayerSwf::spriteLayerName(pathToUtf8(path.parent_path().filename()));
     }
 
     // FFDec renders map layers at this many pixels per canvas unit (one unit is one metre in the game's maps).
@@ -574,16 +556,6 @@ namespace {
         return {slices, background.valid() ? background : all};
     }
 
-    int layerSliceNumber(const std::string& layerName) {
-        if (!layerName.starts_with("Level ")) {
-            return -1;
-        }
-        try {
-            return std::stoi(layerName.substr(6));
-        } catch (const std::exception&) {
-            return -1;
-        }
-    }
 } // namespace
 
 bool Gfxf::canLoad() const {
@@ -1382,11 +1354,11 @@ void Gfxf::finalizeLoad() {
         texture.internalFormat = GL_RGBA8;
         texture.uploadFormat = GL_RGBA;
         texture.loaded = true;
-        const bool mapLayer = layerName.starts_with("Level ");
+        LayerPlacement placement;
+        placement.slice = GfxMapLayerSwf::layerSliceNumber(layerName);
+        const bool mapLayer = placement.slice >= 0;
         texture.width = width;
         texture.height = height;
-        LayerPlacement placement;
-        placement.slice = layerSliceNumber(layerName);
         if (mapLayer) {
             int minX = width;
             int minY = height;

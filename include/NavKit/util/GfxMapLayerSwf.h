@@ -29,6 +29,14 @@ namespace GfxMapLayerSwf {
     // when the class name does not name a map layer.
     std::string mapLayerPackage(std::string_view className);
 
+    // The settings dialog's name for a map layer FFDec exported to the folder "DefineSprite_<id>_<class>_<class>",
+    // where the class is "<package>.SLICE_NN_ZMapView" or "<package>.FNN_ZMapView": "<package>: Level NN", or
+    // "Level NN" without a package. Returns an empty string for a sprite that is not a map layer.
+    std::string spriteLayerName(std::string_view folderName);
+
+    // The slice number of a map layer named by spriteLayerName, or -1 for other layers.
+    int layerSliceNumber(std::string_view layerName);
+
     // Whether `package` can replace the template's package: an ActionScript identifier without dots, since the
     // document class "<package>_Main" is in the top-level package.
     bool isValidMapPackageName(std::string_view package);
