@@ -8,6 +8,11 @@
 
 #include "Shader.h"
 
+// The material Glacier2Glb gives water surfaces in the scene mesh. Water is drawn as WATER_COLOR and is kept out of
+// the navmesh.
+inline constexpr const char* WATER_MATERIAL_NAME = "NavKitWater";
+inline constexpr glm::vec4 WATER_COLOR{0.2f, 0.45f, 0.95f, 1.0f};
+
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
@@ -40,6 +45,9 @@ public:
 
     bool isTransparent = false;
     bool isBlended = false;
+    // Multiplies the lit colour, as for water surfaces.
+    bool tinted = false;
+    glm::vec4 tint{1.0f};
 
     Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices,
         const std::vector<Texture>& textures);

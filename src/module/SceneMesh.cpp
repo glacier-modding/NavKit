@@ -15,6 +15,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <memory>
+#include <set>
 
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/adapter/RecastAdapter.h"
@@ -426,6 +427,23 @@ void SceneMesh::extractResourcesAndStartSceneMeshBuild() {
             Logger::log(NK_ERROR, "Error extracting %ss from Rpkg files.", meshFileType.c_str());
             errorExtracting = true;
             return;
+        }
+        if (meshTypeForBuild == ALOC) {
+            // Water surfaces seldom have collision, so an ALOC build takes their shape from their PRIMs.
+            std::set<std::string> waterPrimHashes;
+            for (const auto& mesh : scene.meshes) {
+                // ZPrimitiveProxyEntity meshes carry a <TBLU> reference rather than a PRIM hash.
+                if (mesh.isWater && !mesh.primHash.empty() && mesh.primHash.front() != '<') {
+                    waterPrimHashes.insert(mesh.primHash);
+                }
+            }
+            if (!waterPrimHashes.empty()) {
+                Logger::log(NK_INFO, "Extracting %zu water PRIMs from Rpkg files.", waterPrimHashes.size());
+                const std::vector<std::string> hashes(waterPrimHashes.begin(), waterPrimHashes.end());
+                if (Rpkg::extractResourcesFromRpkgs(hashes, PRIM_RESOURCE) != 0) {
+                    Logger::log(NK_WARN, "Error extracting water PRIMs. Water will be missing from the scene mesh.");
+                }
+            }
         }
     }
     std::set<std::string> neededTextHashes{};

@@ -70,9 +70,15 @@ void Mesh::draw(const Shader& shader) const {
         shader.setBool("useFlatColor", false);
     }
 
+    if (tinted) {
+        shader.setVec4("flatColor", tint);
+    }
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
+    if (tinted) {
+        shader.setVec4("flatColor", glm::vec4(1.0f));
+    }
 
     glActiveTexture(GL_TEXTURE0);
 }

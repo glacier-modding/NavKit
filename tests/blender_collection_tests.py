@@ -1,6 +1,7 @@
 """Run with blender -b --factory-startup --python-exit-code 1 -P this_file."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -163,6 +164,47 @@ class CollectionHierarchyTests(unittest.TestCase):
         self.assertNotIn(glacier.GFX_STAIRS_COLOR, empty_layer)
         self.assertIn(glacier.GFX_BACKGROUND_COLOR, background)
 
+    def test_background_leaves_flagged_water_out_of_the_land(self):
+        rooms = bpy.data.collections.new("Rooms")
+        bpy.context.scene.collection.children.link(rooms)
+        self.add_box("west_floor", rooms, (-10, -5, -0.2), (0, 5, 0))
+        # A water surface over the east half of the canvas, below the floor.
+        water_data = bpy.data.meshes.new("00000000000000CC_0")
+        water_data.from_pydata([(0, -5, -0.5), (10, -5, -0.5), (10, 5, -0.5), (0, 5, -0.5)], [], [(0, 1, 2, 3)])
+        water_data.update()
+        water = bpy.data.objects.new("00000000000000CC_0", water_data)
+        rooms.objects.link(water)
+        nav_data = {
+            "volumeBoxes": [{"id": "map-volume", "position": {"x": 0, "y": 0, "z": 0},
+                             "rotation": {"w": 1, "x": 0, "y": 0, "z": 0},
+                             "scale": {"data": {"x": 20, "y": 10, "z": 4}}}],
+            "mapSpaceConfigs": [{"name": "MapSpaceConfig_00", "inclusions": {"data": ["map-volume"]}},
+                                {"name": "MapSpaceConfig_SAT", "inclusions": {"data": ["map-volume"]}}],
+        }
+
+        def render():
+            with tempfile.TemporaryDirectory() as output_dir:
+                glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.gltf"))
+                return ((Path(output_dir) / "output_background.svg").read_text(encoding="utf-8"),
+                        (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8"))
+
+        def land_x_range(background):
+            land_path = [line for line in background.splitlines()
+                         if 'fill="' + glacier.GFX_EXTERIOR_FLOOR_COLOR + '"' in line][0]
+            numbers = re.findall(r"-?\d+(?:\.\d+)?", land_path.split('d="')[1].split('"')[0])
+            xs = [float(value) for value in numbers[0::2]]
+            return min(xs), max(xs)
+
+        # Without the flag the surface is plain ground; with it, the land stops where the water starts.
+        unflagged_background, _ = render()
+        glacier.apply_water_material(water)
+        self.assertTrue(glacier.is_water_object(water))
+        background, layer = render()
+        self.assertGreater(land_x_range(unflagged_background)[1], 15.0)
+        self.assertLessEqual(land_x_range(background)[1], 11.0)
+        # The water is not drawn as a floor of the layer either.
+        self.assertNotIn(glacier.GFX_OTHER_LEVEL_COLOR, layer)
+
     def test_floor_outside_every_volume_goes_to_the_slice_of_its_height(self):
         # The ground floor's volume covers only the south half of the canvas, while the upper floor's covers
         # all of it: a ground-level floor in the north half is in no volume, but is still on the ground floor.
@@ -318,6 +360,28 @@ class InstanceBuildCullingTests(unittest.TestCase):
         self.assertTrue(all(abs(vertex.x - 100.0) <= 1.0 for vertex in vertices),
                         "only the instance inside the include box should be exported, at its own position")
         self.assertNotIn("00000000000000BB", [obj.name for obj in bpy.context.scene.objects])
+
+    def test_water_in_an_aloc_build_comes_from_its_prim_with_the_water_material(self):
+        water = self.mesh_entry("00000000000000CC", "water", 0.0)
+        water["isWater"] = True
+        nav_data = {"pfBoxes": [], "meshes": [water]}
+        with tempfile.TemporaryDirectory() as output_dir:
+            output_dir = Path(output_dir)
+            (output_dir / "aloc").mkdir()
+            (output_dir / "prim").mkdir()
+            (output_dir / "prim" / "00000000000000CC.PRIM").write_bytes(b"")
+            # A PRIM extracted for an earlier PRIM build that this ALOC build must not pick up.
+            (output_dir / "prim" / "00000000000000DD.PRIM").write_bytes(b"")
+            nav_json = output_dir / "scene.nav.json"
+            nav_json.write_text(json.dumps(nav_data), encoding="utf-8")
+            self.assertEqual(glacier.glacier2glb(str(nav_json), str(output_dir / "output.gltf"), "ALOC", "11111111",
+                                                 "instance", False, False, False, False), 0)
+            gltf = json.loads((output_dir / "output.gltf").read_text(encoding="utf-8"))
+
+        self.assertEqual([material["name"] for material in gltf.get("materials", [])],
+                         [glacier.NAVKIT_WATER_MATERIAL])
+        self.assertEqual(len(gltf["meshes"]), 1)
+        self.assertTrue(all(primitive.get("material") == 0 for primitive in gltf["meshes"][0]["primitives"]))
 
     def test_rooms_nest_under_their_folder_and_empty_rooms_are_removed(self):
         def entry(prim_hash, entity_id, x, folder, room):

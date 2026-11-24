@@ -198,6 +198,28 @@ namespace {
         check(Json::toString(int64_t{42}) == "42", "JSON integer formatting is incorrect");
     }
 
+    void testJsonMeshWaterFlag() {
+        Json::Mesh water;
+        water.alocHash = "aloc";
+        water.primHash = "prim";
+        water.isWater = true;
+        water.entity.id = "water-id";
+        water.entity.scale = {"SVector3", {1.0f, 1.0f, 1.0f}};
+        std::ostringstream waterJson;
+        water.writeJson(waterJson);
+        const auto readMesh = [](Json::Mesh& value, simdjson::ondemand::object object) { value.readJson(object); };
+        const Json::Mesh parsedWater = readJsonObject<Json::Mesh>(waterJson.str(), readMesh);
+        check(parsedWater.isWater && parsedWater.primHash == "prim", "mesh water flag did not round trip");
+
+        // Editor SDK mods older than the water flag send no "isWater" field.
+        const Json::Mesh legacy = readJsonObject<Json::Mesh>(
+            R"({"alocHash":"aloc","primHash":"prim","roomName":"","roomFolderName":"","entity":{"id":"1",)"
+            R"("name":"","position":{"x":0,"y":0,"z":0},"rotation":{"x":0,"y":0,"z":0,"w":1},)"
+            R"("scale":{"type":"SVector3","data":{"x":1,"y":1,"z":1}}}})",
+            readMesh);
+        check(!legacy.isWater && legacy.entity.id == "1", "a mesh without the water flag should not be water");
+    }
+
     void testJsonSceneRecordRoundTrips() {
         Json::Gate gate{"gate-id", "gate-name", {1.0f, 2.0f, 3.0f}, {0.0f, 0.0f, 0.0f, 1.0f}, {4.0f, 5.0f, 6.0f},
             {7.0f, 8.0f, 9.0f}};
@@ -1392,6 +1414,7 @@ namespace {
         mesh.primHash = "prim";
         mesh.roomName = "room";
         mesh.roomFolderName = "folder";
+        mesh.isWater = true;
         mesh.entity.id = "mesh-id";
         mesh.entity.name = "mesh-name";
         mesh.entity.position = {1.0f, 2.0f, 3.0f};
@@ -1409,6 +1432,8 @@ namespace {
             check(serialized.find(R"("version":17)") != std::string::npos, "saved scene has the wrong version");
             check(serialized.find(R"("alocHash":"aloc")") != std::string::npos,
                 "saved scene did not serialize its mesh list");
+            check(serialized.find(R"("isWater":true)") != std::string::npos,
+                "saved scene did not serialize the mesh water flag");
             check(serialized.find(R"("pfSeedPoints":[])") != std::string::npos,
                 "empty scene collections should serialize as empty arrays");
         }
@@ -2091,6 +2116,7 @@ void runDomainTests() {
     run("Pathfinding segment, neighbor, and intersection helpers", testPathfindingHelpers);
     run("JSON entity serialization and parsing", testJsonSerializationAndParsing);
     run("JSON scene-record round trips", testJsonSceneRecordRoundTrips);
+    run("JSON mesh water flag", testJsonMeshWaterFlag);
     run("JSON material-record round trips", testJsonMaterialRecords);
     run("Pathfinding box aggregation and fallback", testPathfindingBoxAggregation);
     run("Rooms and volumes load without map space configs", testRoomsAndVolumesLoadWithoutMapSpaceConfigs);

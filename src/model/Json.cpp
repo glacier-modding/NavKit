@@ -179,14 +179,18 @@ void Json::Mesh::readJson(simdjson::ondemand::object json) {
     primHash = getValue(json, "primHash");
     roomName = getValue(json, "roomName");
     roomFolderName = getValue(json, "roomFolderName");
+    // Older Editor SDK mods do not send the water flag.
+    bool water = false;
+    isWater = json["isWater"].get_bool().get(water) == simdjson::SUCCESS && water;
     const simdjson::ondemand::object entityJson = json["entity"];
     entity.readJson(entityJson);
 }
 
 void Json::Mesh::writeJson(std::ostream& f) const {
     f << R"({"alocHash":")" << escaped(alocHash) << R"(","primHash":")" << escaped(primHash) << R"(","roomName":")"
-      << escaped(roomName) << R"(","roomFolderName":")" << escaped(roomFolderName) << R"(","entity":{"id":")"
-      << escaped(entity.id) << R"(","name":")" << escaped(entity.name) << R"(",)";
+      << escaped(roomName) << R"(","roomFolderName":")" << escaped(roomFolderName) << R"(","isWater":)"
+      << (isWater ? "true" : "false") << R"(,"entity":{"id":")" << escaped(entity.id) << R"(","name":")"
+      << escaped(entity.name) << R"(",)";
     entity.position.writeJson(f);
     f << ",";
     entity.rotation.writeJson(f);

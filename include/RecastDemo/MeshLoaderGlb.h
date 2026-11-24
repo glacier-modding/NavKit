@@ -20,36 +20,58 @@
 #define MESHLOADER_GLB
 
 #include <string>
+#include <vector>
 
-class rcMeshLoaderGlb
-{
+class rcMeshLoaderGlb {
 public:
-	rcMeshLoaderGlb();
-	~rcMeshLoaderGlb();
-	
-	bool load(const std::string& fileName);
+    rcMeshLoaderGlb();
+    ~rcMeshLoaderGlb();
 
-	const float* getVerts() const { return m_verts; }
-	const float* getNormals() const { return m_normals; }
-	const int* getTris() const { return m_tris; }
-	int getVertCount() const { return m_vertCount; }
-	int getTriCount() const { return m_triCount; }
-	const std::string& getFileName() const { return m_filename; }
+    bool load(const std::string& fileName);
 
-	// Explicitly disabled copy constructor and copy assignment operator.
-	rcMeshLoaderGlb(const rcMeshLoaderGlb&);
-	rcMeshLoaderGlb& operator=(const rcMeshLoaderGlb&);
-	
-	void addVertex(float x, float y, float z, int& cap);
-	void addTriangle(int a, int b, int c, int& cap);
-	
-	std::string m_filename;
-	float m_scale;	
-	float* m_verts;
-	int* m_tris;
-	float* m_normals;
-	int m_vertCount;
-	int m_triCount;
+    const float* getVerts() const {
+        return m_verts;
+    }
+    const float* getNormals() const {
+        return m_normals;
+    }
+    const int* getTris() const {
+        return m_tris;
+    }
+    int getVertCount() const {
+        return m_vertCount;
+    }
+    int getTriCount() const {
+        return m_triCount;
+    }
+    // One flag per triangle: whether it is a water surface (its material is WATER_MATERIAL_NAME). Null when the
+    // mesh has no water.
+    const unsigned char* getWaterTris() const {
+        return m_waterTriCount ? m_waterTris.data() : nullptr;
+    }
+    int getWaterTriCount() const {
+        return m_waterTriCount;
+    }
+    const std::string& getFileName() const {
+        return m_filename;
+    }
+
+    // Explicitly disabled copy constructor and copy assignment operator.
+    rcMeshLoaderGlb(const rcMeshLoaderGlb&);
+    rcMeshLoaderGlb& operator=(const rcMeshLoaderGlb&);
+
+    void addVertex(float x, float y, float z, int& cap);
+    void addTriangle(int a, int b, int c, int& cap);
+
+    std::string m_filename;
+    float m_scale;
+    float* m_verts;
+    int* m_tris;
+    float* m_normals;
+    int m_vertCount;
+    int m_triCount;
+    std::vector<unsigned char> m_waterTris;
+    int m_waterTriCount;
 };
 
 #endif // MESHLOADER_GLB
