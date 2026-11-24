@@ -1,5 +1,6 @@
 """Run with blender -b --factory-startup --python-exit-code 1 -P this_file."""
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -191,6 +192,70 @@ class CollectionHierarchyTests(unittest.TestCase):
         self.assertLessEqual(max(floor_y), 5.2)
 
 
-suite = unittest.defaultTestLoader.loadTestsFromTestCase(CollectionHierarchyTests)
+class InstanceBuildCullingTests(unittest.TestCase):
+    """The instance build with the include-box filter, using a stand-in for PRIM loading."""
+
+    def setUp(self):
+        for obj in list(bpy.data.objects):
+            bpy.data.objects.remove(obj, do_unlink=True)
+        for collection in list(bpy.data.collections):
+            bpy.data.collections.remove(collection)
+        self.original_load_prim = glacier.load_prim
+
+        def load_unit_cube(filepath, lod_mask, temp_coll):
+            name = Path(filepath).stem
+            data = bpy.data.meshes.new(name)
+            data.from_pydata([(x, y, z) for x in (-0.5, 0.5) for y in (-0.5, 0.5) for z in (-0.5, 0.5)], [],
+                             [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)])
+            data.update()
+            obj = bpy.data.objects.new(name, data)
+            temp_coll.objects.link(obj)
+            return [obj], [0]
+
+        glacier.load_prim = load_unit_cube
+
+    def tearDown(self):
+        glacier.load_prim = self.original_load_prim
+
+    @staticmethod
+    def mesh_entry(prim_hash, entity_id, x):
+        return {"alocHash": "", "primHash": prim_hash, "roomName": "Room", "roomFolderName": "Folder",
+                "entity": {"id": entity_id, "name": prim_hash, "position": {"x": x, "y": 0.0, "z": 0.0},
+                           "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                           "scale": {"type": "SVector3", "data": {"x": 1.0, "y": 1.0, "z": 1.0}}}}
+
+    def test_mesh_with_every_instance_culled_is_not_left_at_the_origin(self):
+        # Like Hantu Port's backdrop skyscrapers: a mesh whose every instance is far outside the include box.
+        nav_data = {
+            "pfBoxes": [{"id": "include", "type": {"data": "PFBT_INCLUDE_MESH_COLLISION"},
+                         "position": {"x": 100.0, "y": 0.0, "z": 0.0},
+                         "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                         "scale": {"data": {"x": 10.0, "y": 10.0, "z": 10.0}}}],
+            "meshes": [self.mesh_entry("00000000000000AA", "near", 100.0),
+                       self.mesh_entry("00000000000000BB", "far-a", 2000.0),
+                       self.mesh_entry("00000000000000BB", "far-b", -2000.0)],
+        }
+        with tempfile.TemporaryDirectory() as output_dir:
+            output_dir = Path(output_dir)
+            (output_dir / "prim").mkdir()
+            for prim_hash in ("00000000000000AA", "00000000000000BB"):
+                (output_dir / "prim" / (prim_hash + ".prim")).write_bytes(b"")
+            nav_json = output_dir / "scene.nav.json"
+            nav_json.write_text(json.dumps(nav_data), encoding="utf-8")
+            self.assertEqual(glacier.glacier2glb(str(nav_json), str(output_dir / "output.gltf"), "PRIM", "11111111",
+                                                 "instance", True, False, False, False), 0)
+            self.assertTrue((output_dir / "output.gltf").exists())
+
+        vertices = [obj.matrix_world @ vertex.co for obj in bpy.context.scene.objects if obj.type == "MESH"
+                    for vertex in obj.data.vertices]
+        self.assertTrue(vertices, "the instance inside the include box should be exported")
+        self.assertTrue(all(abs(vertex.x - 100.0) <= 1.0 for vertex in vertices),
+                        "only the instance inside the include box should be exported, at its own position")
+        self.assertNotIn("00000000000000BB", [obj.name for obj in bpy.context.scene.objects])
+
+
+suite = unittest.TestSuite()
+for test_case in (CollectionHierarchyTests, InstanceBuildCullingTests):
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(test_case))
 if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
     raise RuntimeError("Blender collection regression tests failed")

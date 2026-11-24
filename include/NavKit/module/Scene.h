@@ -101,6 +101,10 @@ public:
 
     static inline const std::string OUTPUT_SCENE_FILE_NAME = "output.nav.json";
 
+    const std::vector<std::string>& getLoadErrors() const {
+        return loadErrors;
+    }
+
 private:
     void recordLoadError(const std::string& section, const std::string& error);
 

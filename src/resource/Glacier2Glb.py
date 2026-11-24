@@ -3939,6 +3939,13 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                         room_instances.append(room_group)
                     room_group[1].append(mesh_index)
 
+                if not room_instances:
+                    # Every instance is outside the include box. Without a placement object nothing removes this
+                    # source object before saving, and glTF export ignores hide_viewport, so it would show up at the
+                    # origin.
+                    bpy.data.objects.remove(submesh, do_unlink=True)
+                    continue
+
                 for room_collection, instance_indices in room_instances:
                     positions = [mesh_positions[i] for i in instance_indices]
                     rotations = [mesh_rotations[i] for i in instance_indices]

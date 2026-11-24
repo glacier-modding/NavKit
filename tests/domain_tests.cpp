@@ -414,6 +414,43 @@ namespace {
         scene.exclusionBoxes = originalExclusions;
     }
 
+    void testRoomsAndVolumesLoadWithoutMapSpaceConfigs() {
+        Scene& scene = Scene::getInstance();
+        const std::vector<Json::MapSpaceConfig> originalConfigs = scene.mapSpaceConfigs;
+        const std::vector<Json::VolumeSphere> originalSpheres = scene.volumeSpheres;
+        const auto loadRoomsAndVolumes = [&scene](const std::string& mapSpaceConfigsField) {
+            const std::string json =
+                R"({"gates":[],"rooms":[],"aiAreaWorld":[],"aiArea":[],"volumeBoxes":[],)"
+                R"("volumeSpheres":[{"id":"sphere-a","name":"Head Collision",)"
+                R"("position":{"x":1.0,"y":2.0,"z":3.0},"rotation":{"x":0.0,"y":0.0,"z":0.0,"w":1.0},)"
+                R"("radius":{"type":"float32","data":0.5}}])" +
+                mapSpaceConfigsField + "}";
+            const simdjson::padded_string input(json);
+            simdjson::ondemand::parser parser;
+            auto document = parser.iterate(input);
+            const size_t errorsBefore = scene.getLoadErrors().size();
+            bool errorCallbackCalled = false;
+            scene.loadRoomsAndVolumes([&errorCallbackCalled] { errorCallbackCalled = true; }, document);
+            check(!errorCallbackCalled, "loading rooms and volumes should not call the error callback");
+            return scene.getLoadErrors().size() - errorsBefore;
+        };
+
+        check(loadRoomsAndVolumes(R"(,"mapSpaceConfigs":[{"id":"map-a","name":"MapSpaceConfig_00",)"
+                                  R"("inclusions":{"type":"TArray<ZEntityReference>","data":["volume-a"]}}])") == 0,
+            "a scene with map space configs should load without errors");
+        check(scene.mapSpaceConfigs.size() == 1 && scene.mapSpaceConfigs.front().name == "MapSpaceConfig_00",
+            "map space configs should be read");
+
+        // Scenes without a UI map (such as Hantu Port) have no mapSpaceConfigs field.
+        check(loadRoomsAndVolumes("") == 0, "a scene without map space configs should load without errors");
+        check(scene.volumeSpheres.size() == 1 && scene.volumeSpheres.front().id == "sphere-a",
+            "volume spheres should load when map space configs are missing");
+        check(scene.mapSpaceConfigs.empty(), "map space configs from the previous scene should be cleared");
+
+        scene.mapSpaceConfigs = originalConfigs;
+        scene.volumeSpheres = originalSpheres;
+    }
+
     void testPlannerExcludedBridgeBoxParsing() {
         Scene& scene = Scene::getInstance();
         const Json::PfBox originalInclude = scene.includeBox;
@@ -2016,6 +2053,7 @@ void runDomainTests() {
     run("JSON scene-record round trips", testJsonSceneRecordRoundTrips);
     run("JSON material-record round trips", testJsonMaterialRecords);
     run("Pathfinding box aggregation and fallback", testPathfindingBoxAggregation);
+    run("Rooms and volumes load without map space configs", testRoomsAndVolumesLoadWithoutMapSpaceConfigs);
     run("Planner-excluded bridge box parsing", testPlannerExcludedBridgeBoxParsing);
     run("Planner-excluded area usage", testPlannerExcludedAreaUsage);
     run("Unpartitioned bridge area region assignment", testUnpartitionedAreaRegionAssignment);

@@ -131,6 +131,7 @@ void Scene::loadRoomsAndVolumes(
     aiAreas.clear();
     volumeBoxes.clear();
     volumeSpheres.clear();
+    mapSpaceConfigs.clear();
     std::string section = "Gates";
     try {
         Logger::log(NK_INFO, "Loading Gates.");
@@ -150,8 +151,15 @@ void Scene::loadRoomsAndVolumes(
         section = "Volume Spheres";
         Logger::log(NK_INFO, "Loading Volume Spheres.");
         volumeSpheres = Json::VolumeSpheres(jsonDocument["volumeSpheres"].get_array()).volumeSpheres;
+        section = "UI Map Space Configs";
         Logger::log(NK_INFO, "Loading UI Map Space Configs.");
-        mapSpaceConfigs = Json::MapSpaceConfigs(jsonDocument["mapSpaceConfigs"].get_array()).mapSpaceConfigs;
+        // Optional: scenes without a UI map (and scenes extracted before this field existed) don't have it.
+        if (simdjson::ondemand::array mapSpaceConfigsJson;
+            jsonDocument["mapSpaceConfigs"].get_array().get(mapSpaceConfigsJson) == simdjson::SUCCESS) {
+            mapSpaceConfigs = Json::MapSpaceConfigs(mapSpaceConfigsJson).mapSpaceConfigs;
+        } else {
+            Logger::log(NK_INFO, "No UI Map Space Configs found in scene file.");
+        }
     } catch (const std::exception& e) {
         recordLoadError(section + " (and every later section of gates/rooms/AI areas/volumes)", e.what());
     } catch (...) {
