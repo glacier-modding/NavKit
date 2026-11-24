@@ -80,9 +80,9 @@ public:
 
     void finalizeFrame() const;
 
-    void drawBounds();
+    void drawBounds(float brightness = 1.0f);
 
-    void drawAxes();
+    void drawAxes(float brightness = 1.0f, bool drawLabels = true);
 
     HitTestResult hitTestRender(int mx, int my) const;
 

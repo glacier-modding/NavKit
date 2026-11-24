@@ -467,12 +467,24 @@ void Renderer::renderFrame() {
     Gfxf::getInstance().render(shader, view, projection);
 
     glUseProgram(0);
-    glDisable(GL_DEPTH_TEST);
-    if (scene.showBBox) {
-        drawBounds();
-    }
-    if (scene.showAxes) {
-        drawAxes();
+    if (scene.showBBox || scene.showAxes) {
+        // Two depth-tested passes: occluded segments are drawn darker, visible segments in their normal color
+        constexpr float occludedBrightness = 0.5f;
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_GREATER);
+        if (scene.showBBox) {
+            drawBounds(occludedBrightness);
+        }
+        if (scene.showAxes) {
+            drawAxes(occludedBrightness, false);
+        }
+        glDepthFunc(GL_LEQUAL);
+        if (scene.showBBox) {
+            drawBounds();
+        }
+        if (scene.showAxes) {
+            drawAxes();
+        }
     }
     glEnable(GL_DEPTH_TEST);
 }
@@ -519,7 +531,7 @@ void drawLine(const Vec3 s, const Vec3 e, Shader& shader, const glm::mat4& view,
     glUseProgram(0);
 }
 
-void Renderer::drawBounds() {
+void Renderer::drawBounds(const float brightness) {
     glDepthMask(GL_FALSE);
     Scene& scene = Scene::getInstance();
     const float* p = scene.bBoxPos;
@@ -538,7 +550,7 @@ void Renderer::drawBounds() {
     const Vec3 rfd = {r, f, d};
     const Vec3 lbd = {l, b, d};
     const Vec3 rbd = {r, b, d};
-    const Vec3 cyan = {0.0f, 1.0f, 1.0f};
+    const Vec3 cyan = Vec3{0.0f, 1.0f, 1.0f} * brightness;
 
     // Offset the lines slightly so they don't Z-fight with the mesh they enclose
     glPolygonOffset(-1.0f, -1.0f);
@@ -560,20 +572,21 @@ void Renderer::drawBounds() {
     glDepthMask(GL_TRUE);
 }
 
-void Renderer::drawAxes() {
+void Renderer::drawAxes(const float brightness, const bool drawLabels) {
     const Vec3 o = {0, 0, 0};
     const Vec3 x = {1, 0, 0};
     const Vec3 y = {0, 1, 0};
     const Vec3 z = {0, 0, 1};
 
-    drawLine(o, x, shader, view, projection, x);
-    drawText("X", x, x);
+    drawLine(o, x, shader, view, projection, x * brightness);
+    drawLine(o, y, shader, view, projection, y * brightness);
+    drawLine(o, z * -1, shader, view, projection, z * brightness);
 
-    drawLine(o, y, shader, view, projection, y);
-    drawText("Y", y, y);
-
-    drawLine(o, z * -1, shader, view, projection, z);
-    drawText("Z", z * -1, z);
+    if (drawLabels) {
+        drawText("X", x, x);
+        drawText("Y", y, y);
+        drawText("Z", z * -1, z);
+    }
 }
 
 void Renderer::drawText(const std::string& text, const Vec3 pos, const Vec3 color, const double size) const {
