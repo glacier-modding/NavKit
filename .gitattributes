@@ -19,3 +19,5 @@
 *.tar binary
 *.airg binary
 *.AIRG binary
+*.gfx binary
+*.gfxf binary
