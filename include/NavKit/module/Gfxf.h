@@ -25,6 +25,7 @@ class Gfxf {
         std::vector<std::pair<std::string, std::vector<unsigned char>>> layers;
         std::vector<unsigned char> gfx; // the GFX that was loaded; empty for a SWF, which cannot be saved
         std::string error;
+        bool javaMissing = false; // FFDec could not start because Java is missing
     };
 
     // Where a layer image lies: its map plane position comes from the canvas origin (the position of the uncropped

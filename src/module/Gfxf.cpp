@@ -28,6 +28,7 @@
 #include <wx/app.h>
 #include <wx/arrstr.h>
 #include <wx/button.h>
+#include <wx/hyperlink.h>
 #include <wx/listbox.h>
 #include <wx/msgdlg.h>
 #include <wx/process.h>
@@ -281,19 +282,121 @@ namespace {
         return processState->exitCode;
     }
 
-    std::string findFfdecExecutable() {
+    // How to start FFDec's CLI: the program and the arguments that go before FFDec's own. Empty when FFDec is missing.
+    struct FfdecCommand {
+        std::vector<wxString> prefix;
+    };
+
+    // Thrown when FFDec could not be started because no suitable Java could be found or started.
+    struct JavaMissingError : std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
+
+    constexpr int minimumJavaVersion = 8;
+    constexpr auto javaDownloadUrl = "https://adoptium.net/temurin/releases/?os=windows&arch=x64&package=jre";
+
+    wxString pathToWx(const std::filesystem::path& path) {
+        return wxString::FromUTF8(pathToUtf8(path));
+    }
+
+    // Whether an FFDec run that ended with `exitCode` means Java is missing: the process did not start, or the
+    // bundled Windows launcher found no suitable Java (it exits with -1 then).
+    bool isJavaMissingExit(const long exitCode) {
+        return exitCode == -1;
+    }
+
+    // The Java major version named by the release file of a Java home, or 0 when it has none.
+    int javaHomeMajorVersion(const std::filesystem::path& javaHome) {
+        std::ifstream input(javaHome / "release");
+        std::string line;
+        constexpr std::string_view key = "JAVA_VERSION=";
+        while (std::getline(input, line)) {
+            if (!line.starts_with(key)) {
+                continue;
+            }
+            std::string value = line.substr(key.size());
+            std::erase(value, '"');
+            if (value.starts_with("1.")) {
+                value.erase(0, 2); // 1.8.0_392 is Java 8
+            }
+            int major = 0;
+            for (const char character : value) {
+                if (!std::isdigit(static_cast<unsigned char>(character)) || major > 1000) {
+                    break;
+                }
+                major = major * 10 + (character - '0');
+            }
+            return major;
+        }
+        return 0;
+    }
+
+    // Java from JAVA_HOME or the PATH that is new enough for FFDec, or an empty path.
+    std::filesystem::path findJavaExecutable() {
+#ifdef _WIN32
+        const wxString javaName = "java.exe";
+#else
+        const wxString javaName = "java";
+#endif
+        std::vector<std::filesystem::path> candidates;
+        wxString javaHome;
+        if (wxGetEnv("JAVA_HOME", &javaHome) && !javaHome.empty()) {
+            const auto homeBuffer = javaHome.ToUTF8();
+            const auto nameBuffer = javaName.ToUTF8();
+            if (homeBuffer && nameBuffer) {
+                candidates.push_back(
+                    std::filesystem::u8path(homeBuffer.data()) / "bin" / std::filesystem::u8path(nameBuffer.data()));
+            }
+        }
+        candidates.push_back(findExecutableInPath(javaName));
+
+        for (const auto& candidate : candidates) {
+            if (candidate.empty() || !isRegularFile(candidate)) {
+                continue;
+            }
+            // Resolve links, such as those in Oracle's javapath folder, to the Java home they belong to.
+            std::error_code error;
+            std::filesystem::path resolved = std::filesystem::canonical(candidate, error);
+            if (error) {
+                resolved = candidate;
+            }
+            const int version = javaHomeMajorVersion(resolved.parent_path().parent_path());
+            // A java with no release file beside it is a shim or an unusual layout; trust it to be new enough.
+            if (version == 0 || version >= minimumJavaVersion) {
+                return candidate;
+            }
+            Logger::log(NK_WARN, "Ignoring Java %d at %s: FFDec needs Java %d or newer.", version,
+                pathToUtf8(candidate).c_str(), minimumJavaVersion);
+        }
+        return {};
+    }
+
+    FfdecCommand findFfdecCommand() {
         wxString configuredPath;
         if (wxGetEnv("FFDEC_PATH", &configuredPath) && !configuredPath.empty()) {
             const auto buffer = configuredPath.ToUTF8();
             if (buffer) {
                 const std::filesystem::path path = std::filesystem::u8path(buffer.data());
                 if (isRegularFile(path)) {
-                    return pathToUtf8(path);
+                    return {{pathToWx(path)}};
                 }
             }
         }
 
         const std::filesystem::path bundledDirectory = FileUtil::getApplicationResourcePath("ffdec");
+#ifdef _WIN32
+        // The bundled ffdec-cli.exe launcher finds Java only through the registry entries Java installers write, so
+        // it misses Java from a zip, a package manager or an IDE. Run FFDec's jar with Java from JAVA_HOME or the
+        // PATH when there is one, and leave the registry search to the launcher otherwise.
+        const std::filesystem::path bundledJar = bundledDirectory / "ffdec-cli.jar";
+        if (isRegularFile(bundledJar)) {
+            const std::filesystem::path java = findJavaExecutable();
+            if (!java.empty()) {
+                return {{pathToWx(java), "-Djava.net.preferIPv4Stack=true", "-Djna.nosys=true",
+                    "-Djava.util.Arrays.useLegacyMergeSort=true", "-jar", pathToWx(bundledJar)}};
+            }
+        }
+#endif
         const std::array<wxString, 3> executableNames = {
 #ifdef _WIN32
             "ffdec-cli.exe", "ffdec.exe", "ffdec-cli"
@@ -307,12 +410,12 @@ namespace {
                 const std::filesystem::path bundledCandidate =
                     bundledDirectory / std::filesystem::u8path(nameBuffer.data());
                 if (isRegularFile(bundledCandidate)) {
-                    return pathToUtf8(bundledCandidate);
+                    return {{pathToWx(bundledCandidate)}};
                 }
             }
             const std::filesystem::path pathCandidate = findExecutableInPath(executableName);
             if (!pathCandidate.empty()) {
-                return pathToUtf8(pathCandidate);
+                return {{pathToWx(pathCandidate)}};
             }
         }
 
@@ -322,11 +425,35 @@ namespace {
             std::filesystem::path("C:/Program Files/FFDec/ffdec-cli.exe")};
         for (const auto& path : commonInstallPaths) {
             if (isRegularFile(path)) {
-                return pathToUtf8(path);
+                return {{pathToWx(path)}};
             }
         }
 #endif
         return {};
+    }
+
+    // Tells the user to install Java, with a link to a recommended download. Call on the main thread.
+    void showJavaRequiredDialog(const wxString& title) {
+        Logger::log(
+            NK_ERROR, "FFDec could not run because no Java %d or newer could be found or started.", minimumJavaVersion);
+        wxDialog dialog(getMainFrame(), wxID_ANY, title);
+        auto* sizer = new wxBoxSizer(wxVERTICAL);
+        const wxString message = wxString::Format(
+            "NavKit uses FFDec to open and build GFX map files, and FFDec needs Java %d or newer. No suitable Java "
+            "installation could be found or started.\n\n"
+            "Install Java, then try again. A recommended version is Eclipse Adoptium Temurin: on its download page, "
+            "choose the "
+            "Windows x64 JRE and download the .msi installer.",
+            minimumJavaVersion);
+        auto* text = new wxStaticText(&dialog, wxID_ANY, message);
+        text->Wrap(dialog.FromDIP(440));
+        sizer->Add(text, 0, wxALL, dialog.FromDIP(12));
+        sizer->Add(new wxHyperlinkCtrl(&dialog, wxID_ANY, "Download Adoptium Temurin", javaDownloadUrl), 0,
+            wxLEFT | wxRIGHT | wxBOTTOM, dialog.FromDIP(12));
+        sizer->Add(dialog.CreateStdDialogButtonSizer(wxOK), 0, wxEXPAND | wxALL, dialog.FromDIP(8));
+        dialog.SetSizerAndFit(sizer);
+        dialog.CentreOnParent();
+        dialog.ShowModal();
     }
 
     void showGfxfError(const std::string& message) {
@@ -641,6 +768,7 @@ void Gfxf::buildGfx() {
     std::string error;
     std::filesystem::path temporaryDirectory;
     std::filesystem::path gfxfPath;
+    bool javaMissing = false;
     try {
         // Blender writes one output_NN.svg per map-space config that is not the background, which it writes as
         // output_background.svg instead.
@@ -650,8 +778,8 @@ void Gfxf::buildGfx() {
             throw std::runtime_error("The loaded scene has no map-space configurations for map layers.");
         }
 
-        const std::string ffdecExecutable = findFfdecExecutable();
-        if (ffdecExecutable.empty()) {
+        const FfdecCommand ffdecCommand = findFfdecCommand();
+        if (ffdecCommand.prefix.empty()) {
             throw std::runtime_error(
                 "The bundled FFDec CLI is missing. Repair the NavKit installation or set FFDEC_PATH to an "
                 "FFDec CLI executable.");
@@ -680,9 +808,12 @@ void Gfxf::buildGfx() {
         }
 
         const std::filesystem::path templateXml = temporaryDirectory / "template.xml";
-        const auto runFfdec = [&ffdecExecutable](std::vector<wxString> arguments, const std::string& action) {
-            arguments.insert(arguments.begin(), wxString::FromUTF8(ffdecExecutable));
+        const auto runFfdec = [&ffdecCommand](std::vector<wxString> arguments, const std::string& action) {
+            arguments.insert(arguments.begin(), ffdecCommand.prefix.begin(), ffdecCommand.prefix.end());
             const long exitCode = executeFfdec(arguments);
+            if (isJavaMissingExit(exitCode)) {
+                throw JavaMissingError("FFDec could not start while " + action + ": Java was not found.");
+            }
             if (exitCode != 0) {
                 throw std::runtime_error(
                     "FFDec failed while " + action + " (exit code " + std::to_string(exitCode) + ").");
@@ -785,6 +916,9 @@ void Gfxf::buildGfx() {
         Logger::log(NK_INFO, "Saved Gfxf to %s", pathToUtf8(outputGfxfPath).c_str());
         setGfxData(std::move(builtGfx));
         gfxfPath = outputGfxfPath;
+    } catch (const JavaMissingError& exception) {
+        javaMissing = true;
+        error = "Failed to build output.gfxf: " + std::string(exception.what());
     } catch (const std::exception& exception) {
         error = "Failed to build output.gfxf: " + std::string(exception.what());
     }
@@ -798,7 +932,9 @@ void Gfxf::buildGfx() {
     }
     if (!error.empty()) {
         Logger::log(NK_ERROR, "%s", error.c_str());
-        if (wxTheApp != nullptr) {
+        if (wxTheApp != nullptr && javaMissing) {
+            wxTheApp->CallAfter([] { showJavaRequiredDialog("GFX build failed"); });
+        } else if (wxTheApp != nullptr) {
             wxTheApp->CallAfter([error] {
                 wxMessageBox(wxString::FromUTF8(error), "GFX build failed", wxOK | wxICON_ERROR, getMainFrame());
             });
@@ -820,8 +956,8 @@ void Gfxf::startLoad(const std::string& fileName) {
     }
     closeGfxfSettingsDialog();
 
-    const std::string ffdecExecutable = findFfdecExecutable();
-    if (ffdecExecutable.empty()) {
+    const FfdecCommand ffdecCommand = findFfdecCommand();
+    if (ffdecCommand.prefix.empty()) {
         showGfxfError("The bundled FFDec CLI is missing. Repair the NavKit installation or set FFDEC_PATH to an "
                       "FFDec CLI executable.");
         return;
@@ -842,7 +978,7 @@ void Gfxf::startLoad(const std::string& fileName) {
 
     static std::atomic_uint64_t outputCounter = 0;
     const std::string inputFile = fileName;
-    backgroundWorker.emplace([this, generation, ffdecExecutable, inputFile](std::stop_token) {
+    backgroundWorker.emplace([this, generation, ffdecCommand, inputFile](std::stop_token) {
         ExportResult result{generation, inputFile, {}, {}};
         std::filesystem::path outputDirectory;
         try {
@@ -869,11 +1005,15 @@ void Gfxf::startLoad(const std::string& fileName) {
 
             std::filesystem::path ffdecInput;
             if (prepareFfdecInput(gfxInput, outputDirectory, ffdecInput, result.error)) {
-                const std::vector<wxString> arguments = {wxString::FromUTF8(ffdecExecutable), "-zoom", "2", "-format",
-                    "frame:png,sprite:png", "-export", "frame,sprite", wxString::FromUTF8(pathToUtf8(outputDirectory)),
-                    wxString::FromUTF8(pathToUtf8(ffdecInput))};
+                std::vector<wxString> arguments = ffdecCommand.prefix;
+                arguments.insert(arguments.end(),
+                    {"-zoom", "2", "-format", "frame:png,sprite:png", "-export", "frame,sprite",
+                        pathToWx(outputDirectory), pathToWx(ffdecInput)});
                 const long exitCode = executeFfdec(arguments);
-                if (exitCode != 0) {
+                if (isJavaMissingExit(exitCode)) {
+                    result.javaMissing = true;
+                    result.error = "FFDec CLI could not start: Java was not found (exit code -1).";
+                } else if (exitCode != 0) {
                     result.error =
                         "FFDec CLI failed to export SWF map layers (exit code " + std::to_string(exitCode) + ").";
                 } else {
@@ -1175,6 +1315,11 @@ void Gfxf::finalizeLoad() {
     backgroundWorker.reset();
     loading = false;
     if (result->generation != loadGeneration) {
+        Menu::updateMenuState();
+        return;
+    }
+    if (result->javaMissing) {
+        showJavaRequiredDialog("GFXF load failed");
         Menu::updateMenuState();
         return;
     }

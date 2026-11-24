@@ -90,15 +90,15 @@ void showHelpDialog() {
                     "package index is ready."},
                 {"Open Gfxf from File", "Loads a Gfxf/GFX/SWF file and displays its map layer.",
                     "FFDec CLI exports named ZMapView sprites when available, otherwise the first SWF frame.",
-                    "FFDec is bundled with NavKit. Java 8 or newer is required at runtime; set FFDEC_PATH to "
-                    "override."},
+                    "FFDec is bundled with NavKit. Java 8 or newer is required at runtime, from JAVA_HOME, the PATH or "
+                    "a Java installer; set FFDEC_PATH to override."},
                 {"Open Gfxf from Rpkg", "Extracts a Gfxf resource from game packages and displays its map layer.",
                     "NavKit extracts the Gfxf payload as SWF, then uses FFDec CLI to export its map layer.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version."},
                 {"Open Gfx", "Loads a raw GFX file and displays its map layers.",
                     "Opens a map outside its Gfxf container, and makes it available to Save Gfx and Save Gfxf.",
-                    "FFDec is bundled with NavKit. Java 8 or newer is required at runtime; set FFDEC_PATH to "
-                    "override."},
+                    "FFDec is bundled with NavKit. Java 8 or newer is required at runtime, from JAVA_HOME, the PATH or "
+                    "a Java installer; set FFDEC_PATH to override."},
                 {"Save Scene", "Saves the currently loaded scene.", "Preserves changes made to the scene.",
                     "Load a scene."},
                 {"Save GLB", "Saves the loaded scene mesh as a GLB file with embedded materials and textures.",
