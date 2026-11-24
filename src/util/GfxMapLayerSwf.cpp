@@ -242,6 +242,63 @@ namespace GfxMapLayerSwf {
         return std::string(className.substr(0, slice));
     }
 
+    std::string spriteLayerName(const std::string_view folderName) {
+        const size_t slicePosition = folderName.find(".SLICE_");
+        const size_t floorPosition = folderName.find(".F");
+        size_t dotPosition = std::string_view::npos;
+        size_t numberStart = std::string_view::npos;
+        if (slicePosition != std::string_view::npos) {
+            dotPosition = slicePosition;
+            numberStart = slicePosition + 7;
+        } else if (floorPosition != std::string_view::npos) {
+            dotPosition = floorPosition;
+            numberStart = floorPosition + 2;
+        } else if (const size_t bareSlice = folderName.find("SLICE_"); bareSlice != std::string_view::npos) {
+            // A class without a package.
+            numberStart = bareSlice + 6;
+        } else {
+            return {};
+        }
+        size_t numberEnd = numberStart;
+        while (numberEnd < folderName.size() && std::isdigit(static_cast<unsigned char>(folderName[numberEnd]))) {
+            ++numberEnd;
+        }
+        if (numberEnd == numberStart || folderName.find("ZMapView", numberEnd) == std::string_view::npos) {
+            return {};
+        }
+        const std::string level = "Level " + std::string(folderName.substr(numberStart, numberEnd - numberStart));
+
+        // FFDec prefixes the class name with "DefineSprite_<id>_".
+        size_t packageStart = 0;
+        if (constexpr std::string_view prefix = "DefineSprite_"; folderName.starts_with(prefix)) {
+            size_t idEnd = prefix.size();
+            while (idEnd < folderName.size() && std::isdigit(static_cast<unsigned char>(folderName[idEnd]))) {
+                ++idEnd;
+            }
+            if (idEnd < folderName.size() && folderName[idEnd] == '_') {
+                packageStart = idEnd + 1;
+            }
+        }
+        if (dotPosition == std::string_view::npos || dotPosition <= packageStart) {
+            return level;
+        }
+        return std::string(folderName.substr(packageStart, dotPosition - packageStart)) + ": " + level;
+    }
+
+    int layerSliceNumber(const std::string_view layerName) {
+        const size_t levelPosition = layerName.rfind("Level ");
+        if (levelPosition == std::string_view::npos ||
+            (levelPosition != 0 && !layerName.substr(0, levelPosition).ends_with(": "))) {
+            return -1;
+        }
+        const std::string_view digits = layerName.substr(levelPosition + 6);
+        if (digits.empty() ||
+            !std::ranges::all_of(digits, [](const char c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
+            return -1;
+        }
+        return std::stoi(std::string(digits));
+    }
+
     bool isValidMapPackageName(const std::string_view package) {
         const auto isIdentifierStart = [](const char c) {
             return std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '$';

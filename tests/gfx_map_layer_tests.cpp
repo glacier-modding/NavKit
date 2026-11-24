@@ -290,6 +290,28 @@ namespace {
         check(!GfxMapLayerSwf::isValidMapPackageName("5abc"), "identifiers do not start with a digit");
     }
 
+    void testSpriteLayerNames() {
+        const std::string package = "_Scene_Mission_Polarbear_Module_002";
+        check(GfxMapLayerSwf::spriteLayerName(
+                  "DefineSprite_6__Scene_Mission_Polarbear_Module_002.SLICE_01_ZMapView_"
+                  "_Scene_Mission_Polarbear_Module_002.SLICE_01_ZMapView") == package + ": Level 01",
+            "map layers are named after their class package and slice");
+        check(GfxMapLayerSwf::spriteLayerName("DefineSprite_3_Generated_Map.SLICE_00_ZMapView_Generated_Map.SLICE_00_"
+                                              "ZMapView") == "Generated_Map: Level 00",
+            "the template package names its layers too");
+        check(GfxMapLayerSwf::spriteLayerName("DefineSprite_4_pkg.F02_ZMapView") == "pkg: Level 02",
+            "floor-numbered map layers are named after their package");
+        check(GfxMapLayerSwf::spriteLayerName("DefineSprite_3_SLICE_00_ZMapView") == "Level 00",
+            "a class without a package is named by its level alone");
+        check(GfxMapLayerSwf::spriteLayerName("DefineSprite_5_hud.Compass").empty(), "other sprites are not layers");
+        check(GfxMapLayerSwf::spriteLayerName("DefineSprite_7_pkg.SLICE_00").empty(), "layers are ZMapView sprites");
+
+        check(GfxMapLayerSwf::layerSliceNumber(package + ": Level 01") == 1, "the slice follows the package");
+        check(GfxMapLayerSwf::layerSliceNumber("Level 03") == 3, "a level without a package has a slice");
+        check(GfxMapLayerSwf::layerSliceNumber("Frame 1") == -1, "other layers have no slice");
+        check(GfxMapLayerSwf::layerSliceNumber("pkgLevel 01") == -1, "the level must follow \": \"");
+    }
+
     void testRenamedPackage() {
         const std::string package = "_Scene_Mission_Polarbear_Module_005";
         const std::string xml = GfxMapLayerSwf::createMapLayerSwfXml(templateXml, 4, 900.0, 900.0, package);
@@ -532,6 +554,7 @@ int main(const int argc, char** argv) {
         testBackgroundMapSpaceNames();
         testMapLayerPackage();
         testRenamedPackage();
+        testSpriteLayerNames();
         testShippedTemplateIsWellFormed();
         testCanvasSizedShapes();
         testMapLayerPlacement();
