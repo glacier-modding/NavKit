@@ -34,8 +34,6 @@ jobs:
 
       - name: Update version and prepare release notes
         id: release
-        env:
-          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
         run: |
           python - <<'PY'
           import os
@@ -55,15 +53,31 @@ jobs:
               raise SystemExit(f"Latest tag is not a supported semantic version: {previous_tag}")
           major, minor, patch = map(int, match.groups())
 
-          subject = os.environ["COMMIT_SUBJECT"]
-          if subject.lower().startswith("feat!:"):
+          subjects = git("log", "--format=%s", f"{previous_tag}..HEAD").splitlines()
+          conventional = re.compile(r"^(feat|fix)(?:\([^)]*\))?(!?):\s*(.+)$", re.IGNORECASE)
+
+          # Use the most important conventional commit since the last release:
+          # breaking change > feat > fix.
+          bump = 0
+          for message in subjects:
+              parsed = conventional.match(message)
+              if not parsed:
+                  continue
+              if parsed.group(2):
+                  bump = max(bump, 3)
+              elif parsed.group(1).lower() == "feat":
+                  bump = max(bump, 2)
+              else:
+                  bump = max(bump, 1)
+
+          if bump == 3:
               major, minor, patch = major + 1, 0, 0
-          elif subject.lower().startswith("feat:"):
+          elif bump == 2:
               minor, patch = minor + 1, 0
-          elif subject.lower().startswith("fix:"):
+          elif bump == 1:
               patch += 1
           else:
-              raise SystemExit(f"Unsupported release commit: {subject}")
+              raise SystemExit(f"No feat or fix commits found since {previous_tag}.")
 
           tag = f"v{major}.{minor}.{patch}"
           cmake_path = "CMakeLists.txt"
@@ -95,16 +109,14 @@ jobs:
                   raise SystemExit(f"Could not update {component} in {config_path}.")
           open(config_path, "w", encoding="utf-8", newline="").write(config)
 
-          subjects = git("log", "--format=%s", f"{previous_tag}..HEAD").splitlines()
           enhancements = []
           fixes = []
           other = []
-          conventional = re.compile(r"^(feat|fix)(?:\([^)]*\))?!?:\s*(.+)$")
           for message in subjects:
               parsed = conventional.match(message)
               if parsed:
-                  entry = parsed.group(2)
-                  (fixes if parsed.group(1) == "fix" else enhancements).append(entry)
+                  entry = parsed.group(3)
+                  (fixes if parsed.group(1).lower() == "fix" else enhancements).append(entry)
               else:
                   other.append(message)
 
