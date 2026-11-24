@@ -1461,7 +1461,7 @@ void Gfxf::alignToScene() {
         return;
     }
 
-    // The GLB is y-up (glTF): the game's (x, y, z) is the GLB's (x, -z, y).
+    // The GLB is y-up: the game's (x, y, z) is the GLB's (x, -z, y).
     std::vector<glm::vec3> triangles;
     for (const Mesh& mesh : sceneMesh.model.meshes) {
         for (const unsigned int index : mesh.indices) {
