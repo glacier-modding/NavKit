@@ -191,6 +191,72 @@ class CollectionHierarchyTests(unittest.TestCase):
         self.assertGreaterEqual(min(floor_y), 0.8)
         self.assertLessEqual(max(floor_y), 5.2)
 
+    def test_tall_ship_over_indoor_rooms_is_not_the_shell(self):
+        # Like the Polarbear yacht: one hull mesh whose mast rises far above every map layer. Its deck lies over
+        # the indoor rooms in the hull, so it stays a floor. A tall wall with a ledge and no room is still shell.
+        rooms = bpy.data.collections.new("Rooms")
+        bpy.context.scene.collection.children.link(rooms)
+        self.add_boxes("ship_hull", rooms, [((-5, -3, 0), (5, 3, 3)), ((-0.2, -0.2, 3), (0.2, 0.2, 15))])
+        self.add_boxes("shell_wall", rooms, [((15, -3, 0), (20, 3, 2)), ((20, -3, 0), (21, 3, 15))])
+        nav_data = {
+            "volumeBoxes": [{"id": "map-volume", "position": {"x": 8, "y": 0, "z": 3},
+                             "rotation": {"w": 1, "x": 0, "y": 0, "z": 0},
+                             "scale": {"data": {"x": 30, "y": 8, "z": 6}}}],
+            "mapSpaceConfigs": [{"name": "MapSpaceConfig_Slice0", "inclusions": {"data": ["map-volume"]}}],
+            "rooms": [{"name": "101_Room_Indoor_Cabin", "position": {"x": 0, "y": 0, "z": 0},
+                       "rotation": {"w": 1, "x": 0, "y": 0, "z": 0},
+                       "roomExtentMin": {"data": {"x": -4, "y": -2, "z": 0}},
+                       "roomExtentMax": {"data": {"x": 4, "y": 2, "z": 2.9}}}],
+        }
+        with tempfile.TemporaryDirectory() as output_dir:
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.glb"))
+            layer = (Path(output_dir) / "output_00.svg").read_text(encoding="utf-8")
+        floor_path = [line for line in layer.splitlines() if glacier.GFX_EXTERIOR_FLOOR_COLOR in line][0]
+        floor_x = [float(value) for value in
+                   floor_path.split('d="')[1].split('"')[0].replace("M", " ").replace("Z", " ").split()[0::2]]
+        # Canvas x is world x + 7: the deck is at canvas x 2 to 12, and the ledge (canvas x 22 to 27) is hidden.
+        self.assertLessEqual(min(floor_x), 2.2)
+        self.assertGreaterEqual(max(floor_x), 11.8)
+        self.assertLess(max(floor_x), 20)
+
+    def test_props_outside_the_shell_do_not_make_it_land(self):
+        # Like the Polarbear arena: a ring of tall walls with ledges encloses the floor, and backstage scaffolding
+        # stands outside it, high above every map layer. Only the inside of the ring is land.
+        rooms = bpy.data.collections.new("Rooms")
+        bpy.context.scene.collection.children.link(rooms)
+        self.add_box("inside_floor", rooms, (-5, -5, -0.2), (5, 5, 0))
+        for side in range(4):
+            def turn(x0, y0, x1, y1, z0, z1):
+                corners = [(x0, y0), (x1, y1)] if side % 2 == 0 else [(y0, x0), (y1, x1)]
+                if side >= 2:
+                    corners = [(-x, -y) for x, y in corners]
+                (ax, ay), (bx, by) = corners
+                return (min(ax, bx), min(ay, by), z0), (max(ax, bx), max(ay, by), z1)
+            self.add_boxes("shell_wall_" + str(side), rooms,
+                           [turn(17, -22, 20, 22, 0, 1), turn(20, -22, 22, 22, 0, 15)])
+        self.add_box("scaffolding", rooms, (38, 38, 20), (42, 42, 22))
+
+        def volume(name, z, size, depth):
+            return {"id": name, "position": {"x": 0, "y": 0, "z": z}, "rotation": {"w": 1, "x": 0, "y": 0, "z": 0},
+                    "scale": {"data": {"x": size, "y": size, "z": depth}}}
+
+        nav_data = {
+            "volumeBoxes": [volume("background", -10, 100, 2), volume("slice", 3, 60, 6)],
+            "mapSpaceConfigs": [{"name": "MapSpaceConfig_Background", "inclusions": {"data": ["background"]}},
+                                {"name": "MapSpaceConfig_Slice0", "inclusions": {"data": ["slice"]}}],
+            "meshes": [{"alocHash": "", "primHash": "00000000000000AA", "entity": {
+                "name": "plywood_support", "position": {"x": 40, "y": 40, "z": 20}}}],
+        }
+        with tempfile.TemporaryDirectory() as output_dir:
+            glacier.render_map_layers_for_gfx(nav_data, str(Path(output_dir) / "output.glb"))
+            background = (Path(output_dir) / "output_background.svg").read_text(encoding="utf-8")
+        land_path = [line for line in background.splitlines() if glacier.GFX_EXTERIOR_FLOOR_COLOR in line][0]
+        land = [float(value) for value in land_path.split('d="')[1].split('"')[0].replace("M", " ")
+                .replace("Z", " ").split()]
+        # Canvas coordinates are world + 50: the ring's inside is canvas 30 to 70.
+        self.assertGreaterEqual(min(land), 28)
+        self.assertLessEqual(max(land), 72)
+
 
 class InstanceBuildCullingTests(unittest.TestCase):
     """The instance build with the include-box filter, using a stand-in for PRIM loading."""
