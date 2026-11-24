@@ -4277,12 +4277,14 @@ def save_glb_file(output_path: str):
     bake_geometry_node_instances()
     # Blender's GLB export always embeds every texture, so each scene mesh would carry its own copy of shared
     # textures. Export a separate glTF instead, which writes each texture once beside it, then pack its JSON and
-    # binary buffer into the GLB, keeping the textures as references to those files.
+    # binary buffer into the GLB, keeping the textures as references to those files. The textures go in a
+    # subfolder so they don't clutter the output folder.
     temp_gltf_path = os.path.splitext(output_path)[0] + ".tmp.gltf"
     with open(os.devnull, "w") as devnull, \
             contextlib.redirect_stdout(devnull), \
             contextlib.redirect_stderr(devnull):
-        bpy.ops.export_scene.gltf(filepath=temp_gltf_path, export_format='GLTF_SEPARATE', export_apply=True)
+        bpy.ops.export_scene.gltf(filepath=temp_gltf_path, export_format='GLTF_SEPARATE',
+                                  export_texture_dir="textures", export_apply=True)
     pack_gltf_into_glb(temp_gltf_path, output_path)
 
 
