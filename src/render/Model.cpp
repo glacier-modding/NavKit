@@ -200,7 +200,15 @@ Mesh Model::processBatchedMeshes(const std::vector<aiMesh*>& batch, const aiScen
         textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
     }
 
-    return Mesh(vertices, indices, textures);
+    Mesh result(vertices, indices, textures);
+    if (!batch.empty() && scene) {
+        if (const aiMaterial* material = scene->mMaterials[batch[0]->mMaterialIndex];
+            material->GetName() == aiString(WATER_MATERIAL_NAME)) {
+            result.tinted = true;
+            result.tint = WATER_COLOR;
+        }
+    }
+    return result;
 }
 
 std::vector<Texture> Model::loadMaterialTexturesStatic(aiMaterial* mat, aiTextureType type, std::string typeName,

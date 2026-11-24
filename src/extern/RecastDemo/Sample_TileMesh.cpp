@@ -40,6 +40,34 @@
 #define snprintf _snprintf
 #endif
 
+namespace {
+    // While a tile with water is rasterized, walkable triangles are marked with these areas instead of
+    // RC_WALKABLE_AREA. Where spans merge, Recast keeps the larger area, so a water surface wins over a floor just
+    // under it (a fountain basin, the shallows along a bank) instead of the floor showing through as walkable.
+    constexpr unsigned char RASTER_GROUND_AREA = RC_WALKABLE_AREA - 1;
+    constexpr unsigned char RASTER_WATER_AREA = RC_WALKABLE_AREA;
+
+    // Turns the raster areas back into RC_WALKABLE_AREA and SAMPLE_POLYAREA_WATER, and makes the bed under each
+    // water span (the span right below it: a river bed, the bottom of a pool) water too, so that it is not walkable
+    // either. Only the bed is marked, so floors further down, such as a room under a rooftop pool, are kept.
+    void resolveWaterAreas(const rcHeightfield& heightfield) {
+        for (int column = 0; column < heightfield.width * heightfield.height; ++column) {
+            rcSpan* below = nullptr;
+            for (rcSpan* span = heightfield.spans[column]; span; span = span->next) {
+                if (span->area == RASTER_GROUND_AREA) {
+                    span->area = RC_WALKABLE_AREA;
+                } else if (span->area == RASTER_WATER_AREA) {
+                    span->area = SAMPLE_POLYAREA_WATER;
+                    if (below && below->area != RC_NULL_AREA) {
+                        below->area = SAMPLE_POLYAREA_WATER;
+                    }
+                }
+                below = span;
+            }
+        }
+    }
+} // namespace
+
 inline unsigned int nextPow2(unsigned int v) {
     v--;
     v |= v >> 1;
@@ -735,6 +763,19 @@ unsigned char* Sample_TileMesh::buildTileMesh(
 
     m_tileTriCount = 0;
 
+    // Water surfaces (flagged by the scene mesh's water material) become SAMPLE_POLYAREA_WATER, whose polygons are
+    // disabled and left out of the navp.
+    const unsigned char* waterTris = m_geom->getMesh()->getWaterTris();
+    bool tileHasWater = false;
+    if (waterTris) {
+        for (int i = 0; i < ncid && !tileHasWater; ++i) {
+            const rcChunkyTriMeshNode& node = chunkyMesh->nodes[cid[i]];
+            for (int j = 0; j < node.n && !tileHasWater; ++j) {
+                tileHasWater = waterTris[chunkyMesh->triIds[node.i + j]] != 0;
+            }
+        }
+    }
+
     for (int i = 0; i < ncid; ++i) {
         const rcChunkyTriMeshNode& node = chunkyMesh->nodes[cid[i]];
         const int* ctris = &chunkyMesh->tris[node.i * 3];
@@ -744,9 +785,21 @@ unsigned char* Sample_TileMesh::buildTileMesh(
 
         memset(m_triareas, 0, nctris * sizeof(unsigned char));
         rcMarkWalkableTriangles(m_ctx, m_cfg.walkableSlopeAngle, verts, nverts, ctris, nctris, m_triareas);
+        if (tileHasWater) {
+            const int* ctriIds = &chunkyMesh->triIds[node.i];
+            for (int j = 0; j < nctris; ++j) {
+                if (m_triareas[j] == RC_WALKABLE_AREA) {
+                    m_triareas[j] = waterTris[ctriIds[j]] ? RASTER_WATER_AREA : RASTER_GROUND_AREA;
+                }
+            }
+        }
 
         if (!rcRasterizeTriangles(m_ctx, verts, nverts, ctris, m_triareas, nctris, *m_solid, m_cfg.walkableClimb))
             return 0;
+    }
+
+    if (tileHasWater) {
+        resolveWaterAreas(*m_solid);
     }
 
     if (!m_keepInterResults) {

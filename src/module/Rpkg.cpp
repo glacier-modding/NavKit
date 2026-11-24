@@ -344,6 +344,7 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
             : type == AIRG                            ? "airg"
             : type == CRMD                            ? "crmd"
             : type == GFXF                            ? "gfxf"
+            : type == PRIM_RESOURCE                   ? "prim"
                                                       : "tga";
         const std::string resourceFolder =
             (std::filesystem::u8path(navKitSettings.outputFolder) / resourceFolderName).string();
@@ -353,11 +354,12 @@ int Rpkg::extractResourcesFromRpkgs(const std::vector<std::string>& hashes, cons
         }
         extract_resources_from_rpkg(runtimeFolder.c_str(), hashPtrs.data(), hashes.size(), partitionManager,
             resourceFolder.c_str(),
-            type == NAVP       ? "NAVP"
-                : type == AIRG ? "AIRG"
-                : type == CRMD ? "CRMD"
-                : type == GFXF ? "GFXF"
-                               : "TEXT",
+            type == NAVP                ? "NAVP"
+                : type == AIRG          ? "AIRG"
+                : type == CRMD          ? "CRMD"
+                : type == GFXF          ? "GFXF"
+                : type == PRIM_RESOURCE ? "PRIM"
+                                        : "TEXT",
             Logger::rustLogCallback);
     }
     CPPTRACE_CATCH(const std::exception& e) {

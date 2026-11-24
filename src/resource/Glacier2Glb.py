@@ -2346,6 +2346,38 @@ def load_aloc(filepath, temp_coll):
 texture_to_material_map = {}
 
 
+# Water surfaces (meshes the Editor SDK mod flags with "isWater") get this material in the scene mesh. NavKit reads it
+# to keep water out of the navmesh and to draw it blue, and the GFX map builder reads it to find the water.
+NAVKIT_WATER_MATERIAL = "NavKitWater"
+NAVKIT_WATER_COLOR = (0.2, 0.45, 0.95, 1.0)
+
+
+def water_material():
+    material = bpy.data.materials.get(NAVKIT_WATER_MATERIAL)
+    if material is None:
+        material = bpy.data.materials.new(NAVKIT_WATER_MATERIAL)
+        material.diffuse_color = NAVKIT_WATER_COLOR
+        if material.node_tree is None:
+            material.use_nodes = True
+        bsdf = material.node_tree.nodes.get("Principled BSDF") if material.node_tree else None
+        if bsdf is not None:
+            bsdf.inputs["Base Color"].default_value = NAVKIT_WATER_COLOR
+    return material
+
+
+def apply_water_material(obj):
+    obj.data.materials.clear()
+    obj.data.materials.append(water_material())
+    for polygon in obj.data.polygons:
+        polygon.material_index = 0
+
+
+def is_water_object(obj):
+    data = obj.original.data if obj.original is not None else obj.data
+    return data is not None and any(
+        material is not None and material.name == NAVKIT_WATER_MATERIAL for material in data.materials)
+
+
 def add_texture(obj, path_to_tga_dir, mati_hash, diffuse_hash, normal_hash, specular_hash):
     diffuse_tga_path = os.path.join(path_to_tga_dir, diffuse_hash + ".TGA")
     normal_tga_path = os.path.join(path_to_tga_dir, normal_hash + ".TGA")
@@ -2671,17 +2703,10 @@ GFX_MINIMUM_OUTDOOR_OUTLINE = 3.0
 # Floors on other levels are drawn as smoothed areas of at least this many square metres.
 GFX_MINIMUM_OTHER_LEVEL_AREA = 25.0
 GFX_OTHER_LEVEL_SMOOTHING = 2.0
-# Land and water: the official maps paint the whole canvas as ground except for water. Water is found on a grid of
-# GFX_LAND_RESOLUTION metres as the gaps wider than GFX_WATER_MINIMUM_WIDTH between the positions of the scene's
-# objects (all of them, including those culled from the build) that lie within the area the objects enclose
-# (gaps narrower than GFX_WATER_ENCLOSURE). Only the bodies of water at least GFX_WATER_KEEP_FRACTION as large as
-# the largest are kept, which drops the gaps of thinly furnished ground. These settings recover the river of the
-# official Bangkok map.
+# Land and water: the official maps paint the whole canvas as ground except for water, which is left as the canvas
+# colour. Water is where the scene's water surfaces (the meshes with NAVKIT_WATER_MATERIAL, which the Editor SDK mod
+# flags) cover a grid of GFX_LAND_RESOLUTION metres.
 GFX_LAND_RESOLUTION = 1.0
-GFX_WATER_MINIMUM_WIDTH = 64.0
-GFX_WATER_ENCLOSURE = 400.0
-GFX_WATER_KEEP_FRACTION = 0.5
-GFX_MINIMUM_WATER_AREA = 4000.0
 # Like the ring around the official silo map, the shell ledge within this many metres of the land is drawn as a
 # band of indoor floor colour.
 GFX_SHELL_BAND = 4.0
@@ -3278,7 +3303,9 @@ def render_map_layers_for_gfx(json_data, output_path):
     slice_bottom = min((layer.z_range()[0] for layer in slices if layer.boxes), default=-np.inf)
     # Floors below every map layer, shown in GFX_OTHER_LEVEL_COLOR (as (2D triangle, elevation) arrays).
     under_floors = []
-    # Where the scene has anything at all (object positions and floors), for finding land and water.
+    # The scene's water surfaces, as 2D world triangles.
+    water_triangles = []
+    # Where the scene has anything at all (object positions and floors), for finding what a shell encloses.
     scene_points = [np.array([[(mesh.get("entity") or {}).get("position", {}).get(axis, 0.0) for axis in ("x", "y")]
                               for mesh in json_data.get("meshes", []) if mesh.get("entity")]).reshape(-1, 2)]
 
@@ -3297,6 +3324,11 @@ def render_map_layers_for_gfx(json_data, output_path):
         seen_instances.add(instance_key)
         local_vertices, triangle_indices, exterior = mesh_data(obj)
         if len(triangle_indices) == 0:
+            continue
+        if is_water_object(obj):
+            # Water is neither floor nor wall: it only cuts the land of the background.
+            world_vertices = local_vertices @ matrix[:3, :3].T + matrix[:3, 3]
+            water_triangles.append(world_vertices[triangle_indices][:, :, :2])
             continue
         local_min, local_max = local_vertices.min(axis=0), local_vertices.max(axis=0)
         corners = np.array([(x, y, z, 1.0) for x in (local_min[0], local_max[0])
@@ -3564,20 +3596,23 @@ def render_map_layers_for_gfx(json_data, output_path):
     def land_mask():
         """Land on a grid over the canvas: everything but water, and nothing outside an enclosing shell.
 
-        Water is a gap wider than GFX_WATER_MINIMUM_WIDTH between the scene's objects and floors inside the area
-        they enclose; further away from the scene the official maps still show land. Where shell ledges (a silo
-        wall) enclose the scene, the canvas outside them is not land, and the ledge next to the land is returned
-        as a band, as (land, band, resolution).
+        Water is where the scene's water surfaces lie. Where shell ledges (a silo wall) enclose the scene, the
+        canvas outside them is not land, and the ledge next to the land is returned as a band, as
+        (land, band, resolution).
         """
         resolution = GFX_LAND_RESOLUTION
         shape = (int(np.ceil(height / resolution)), int(np.ceil(width / resolution)))
+        water = np.zeros(shape, dtype=bool)
+        if water_triangles:
+            triangles = to_canvas(np.concatenate(water_triangles))
+            water = rasterize_triangles(triangles, np.zeros(len(triangles)), np.zeros(2), resolution, shape) >= 0
         points = to_canvas(np.concatenate(scene_points)) if scene_points else np.empty((0, 2))
         cells = np.floor(points / resolution).astype(np.int64)
         inside = (cells[:, 0] >= 0) & (cells[:, 0] < shape[1]) & (cells[:, 1] >= 0) & (cells[:, 1] < shape[0])
         occupied = np.zeros(shape, dtype=bool)
         occupied[cells[inside, 1], cells[inside, 0]] = True
         if not occupied.any():
-            return np.ones(shape, dtype=bool), np.zeros(shape, dtype=bool), resolution
+            return ~water, np.zeros(shape, dtype=bool), resolution
         barrier = np.zeros(shape, dtype=bool)
         # The floors drawn on the map layers: what lies inside the shell.
         walked = np.zeros(shape, dtype=bool)
@@ -3598,17 +3633,6 @@ def render_map_layers_for_gfx(json_data, output_path):
             inside = walked & ~barrier
             reached = np.unique(labels[inside if inside.any() else occupied & ~barrier])
             void = barrier | (~barrier & ~np.isin(labels, reached[reached >= 0]))
-
-        def close(mask, width):
-            # Past the canvas edge counts as closed, so water may run off the canvas like a river does.
-            reach = int(np.ceil(width / 2 / resolution))
-            return erode(dilate(mask, reach), reach)
-
-        water = ~close(occupied, GFX_WATER_MINIMUM_WIDTH) & close(occupied, GFX_WATER_ENCLOSURE) & ~void
-        labels, sizes = label_regions(water)
-        if len(sizes):
-            keep = sizes >= max(GFX_WATER_KEEP_FRACTION * sizes.max(), GFX_MINIMUM_WATER_AREA / resolution ** 2)
-            water &= keep[np.maximum(labels, 0)]
         land = ~water & ~void
         band = void & dilate(land, int(round(GFX_SHELL_BAND / resolution))) if barrier.any() else barrier
         return land, band, resolution
@@ -3786,11 +3810,22 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
         bpy.context.scene.collection.children.link(root_coll)
 
 
+    # Water surfaces, by mesh hash. In an ALOC build they still come from their PRIMs (NavKit extracts those), as
+    # water seldom has collision; ZPrimitiveProxyEntity meshes have a <TBLU> reference instead of a PRIM hash.
+    water_hashes = set()
+    water_prim_hashes = set()
     for hash_and_entity in data['meshes']:
-        if mesh_type == "ALOC":
+        is_water = bool(hash_and_entity.get('isWater'))
+        prim_hash = hash_and_entity.get('primHash') or ""
+        if is_water and mesh_type == "ALOC" and prim_hash and not prim_hash.startswith("<"):
+            mesh_hash = prim_hash
+            water_prim_hashes.add(mesh_hash)
+        elif mesh_type == "ALOC":
             mesh_hash = hash_and_entity['alocHash']
         else:
             mesh_hash = hash_and_entity['primHash']
+        if is_water:
+            water_hashes.add(mesh_hash)
 
         room_folder_name = hash_and_entity["roomFolderName"][:63] if hash_and_entity["roomFolderName"] else "Default"
         if room_folder_name not in room_folder_collections:
@@ -3826,7 +3861,15 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
     path_to_aloc_or_prim_dir = os.path.join(output_dir, mesh_type.lower())
     log("INFO", "Path to " + mesh_type.lower() + " dir:" + path_to_aloc_or_prim_dir, "glacier2glb")
     file_list = sorted(os.listdir(path_to_aloc_or_prim_dir))
-    aloc_or_prim_list = [item for item in file_list if item.lower().endswith('.' + mesh_type.lower())]
+    # (file name, folder, ALOC or PRIM) of each mesh file to load.
+    mesh_files = [(item, path_to_aloc_or_prim_dir, mesh_type) for item in file_list
+                  if item.lower().endswith('.' + mesh_type.lower())]
+    path_to_prim_dir = os.path.join(output_dir, "prim")
+    if water_prim_hashes and os.path.isdir(path_to_prim_dir):
+        mesh_files += [(item, path_to_prim_dir, "PRIM") for item in sorted(os.listdir(path_to_prim_dir))
+                       if item.lower().endswith(".prim") and item[:-5] in water_prim_hashes]
+    if water_hashes:
+        log("INFO", "Water mesh count: " + str(len(water_hashes)), "glacier2glb")
 
     excluded_collision_types = [
         # PhysicsCollisionType.NONE,
@@ -3837,12 +3880,10 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
     excluded_mesh_hashes = [
         # "00C47B7553348F32"
     ]
-    aloc_or_prim_file_count = len(aloc_or_prim_list)
     mesh_count = 0
     meshes_in_scenario_count = 0
     processed_mesh_hashes = []
-    for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
-        aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
+    for aloc_or_prim_filename, _, _ in mesh_files:
         mesh_hash = aloc_or_prim_filename[:-5]
         if mesh_hash in transforms:
             meshes_in_scenario_count += 1
@@ -3855,8 +3896,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
     log("INFO", mesh_type + " count: " + str(meshes_in_scenario_count), "glacier2glb")
     log("INFO", "Mesh count: " + str(mesh_count), "glacier2glb")
     log_threshold = max(1, round(meshes_in_scenario_count / 10, -2))
-    for aloc_or_prim_i in range(0, aloc_or_prim_file_count):
-        aloc_or_prim_filename = aloc_or_prim_list[aloc_or_prim_i]
+    for aloc_or_prim_filename, mesh_file_dir, mesh_file_type in mesh_files:
         mesh_hash = aloc_or_prim_filename[:-5]
         if mesh_hash not in transforms:
             continue
@@ -3865,7 +3905,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
             log("DEBUG", "Skipping " + mesh_type + " file " + mesh_hash, mesh_hash)
             mesh_i += len(transforms[mesh_hash])
             continue
-        aloc_or_prim_path = os.path.join(path_to_aloc_or_prim_dir, aloc_or_prim_filename)
+        aloc_or_prim_path = os.path.join(mesh_file_dir, aloc_or_prim_filename)
 
         log("DEBUG", "Loading " + mesh_type + ": " + mesh_hash, "glacier2glb")
         if current_mesh_in_scene_index % log_threshold == 0:
@@ -3873,7 +3913,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
         collision_type = None
         material_indices = []
         try:
-            if mesh_type == "ALOC":
+            if mesh_file_type == "ALOC":
                 aloc, submeshes = load_aloc(aloc_or_prim_path, temp_coll)
                 if aloc == -2:
                     log("ERROR", "=========================== Problem Loading " + mesh_type + ": " + str(
@@ -3917,6 +3957,11 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                     collision_type), "glacier2glb")
             mesh_i += len(transforms[mesh_hash])
             continue
+        is_water = mesh_hash in water_hashes
+        if is_water:
+            log("DEBUG", "Marking water mesh: " + mesh_hash, "glacier2glb")
+            for submesh in submeshes:
+                apply_water_material(submesh)
         if build_type == "instance":
             # different instances transforms
             mesh_positions = [mathutils.Vector(
@@ -3989,7 +4034,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
 
                 submesh.hide_viewport = True
 
-                if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis:
+                if mesh_type == "PRIM" and apply_textures and mesh_hash in prim_matis and not is_water:
                     log("TRACE", "Adding texture", "glacier2glb")
                     try:
                         add_textures(submesh, matis, mesh_hash, output_dir, prim_matis, submesh_i, material_indices[submesh_i])
@@ -4065,7 +4110,7 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                                                                  positions[submesh_instance_index][mesh_index][1],
                                                                  positions[submesh_instance_index][mesh_index][2]))
 
-                    if mesh_type == "PRIM" and apply_textures:
+                    if mesh_type == "PRIM" and apply_textures and not is_water:
                         try:
                             add_textures(current_submesh, matis, mesh_hash, output_dir, prim_matis, submesh_instance_index, material_indices[submesh_instance_index])
                         except struct.error as err:

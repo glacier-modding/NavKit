@@ -372,9 +372,42 @@ void RecastAdapter::drawInputGeom() const {
     if (!inputGeom || !inputGeom->getMesh()) {
         return;
     }
-    duDebugDrawTriMesh(debugDraw, inputGeom->getMesh()->getVerts(), inputGeom->getMesh()->getVertCount(),
-        inputGeom->getMesh()->getTris(), inputGeom->getMesh()->getNormals(), inputGeom->getMesh()->getTriCount(),
-        nullptr, 1.0f);
+    const rcMeshLoaderGlb* mesh = inputGeom->getMesh();
+    const unsigned char* waterTris = mesh->getWaterTris();
+    if (!waterTris) {
+        duDebugDrawTriMesh(debugDraw, mesh->getVerts(), mesh->getVertCount(), mesh->getTris(), mesh->getNormals(),
+            mesh->getTriCount(), nullptr, 1.0f);
+        return;
+    }
+    // As duDebugDrawTriMesh, with water surfaces in WATER_COLOR.
+    const float* verts = mesh->getVerts();
+    const int* tris = mesh->getTris();
+    const float* normals = mesh->getNormals();
+    const unsigned int water = duRGBAf(WATER_COLOR.r, WATER_COLOR.g, WATER_COLOR.b, WATER_COLOR.a);
+    debugDraw->texture(true);
+    debugDraw->begin(DU_DRAW_TRIS);
+    for (int i = 0; i < mesh->getTriCount() * 3; i += 3) {
+        const float* norm = &normals[i];
+        const auto shade = static_cast<unsigned char>(220 * (2 + norm[0] + norm[1]) / 4);
+        const unsigned int grey = duRGBA(shade, shade, shade, 255);
+        const unsigned int color = waterTris[i / 3] ? duLerpCol(grey, water, 192) : grey;
+        int ax = 0;
+        if (std::abs(norm[1]) > std::abs(norm[ax])) {
+            ax = 1;
+        }
+        if (std::abs(norm[2]) > std::abs(norm[ax])) {
+            ax = 2;
+        }
+        ax = (1 << ax) & 3; // +1 mod 3
+        const int ay = (1 << ax) & 3; // +1 mod 3
+        for (int corner = 0; corner < 3; ++corner) {
+            const float* vertex = &verts[tris[i + corner] * 3];
+            const float uv[2] = {vertex[ax], vertex[ay]};
+            debugDraw->vertex(vertex, color, uv);
+        }
+    }
+    debugDraw->end();
+    debugDraw->texture(false);
 }
 
 bool RecastAdapter::loadInputGeom(const std::string& fileName) const {

@@ -30,7 +30,7 @@
 #include "../../../include/NavKit/module/SceneMesh.h"
 
 rcMeshLoaderGlb::rcMeshLoaderGlb() :
-    m_scale(1.0f), m_verts(0), m_tris(0), m_normals(0), m_vertCount(0), m_triCount(0) {}
+    m_scale(1.0f), m_verts(0), m_tris(0), m_normals(0), m_vertCount(0), m_triCount(0), m_waterTriCount(0) {}
 
 rcMeshLoaderGlb::~rcMeshLoaderGlb() {
     delete[] m_verts;
@@ -118,6 +118,8 @@ bool rcMeshLoaderGlb::load(const std::string& filename) {
         const std::string objectName =
             mesh->mName.length ? mesh->mName.C_Str() : "Mesh " + std::to_string(meshIndex + 1);
         const int firstTriangle = m_triCount;
+        const bool isWater = mesh->mMaterialIndex < scene->mNumMaterials &&
+            scene->mMaterials[mesh->mMaterialIndex]->GetName() == aiString(WATER_MATERIAL_NAME);
         for (unsigned int vertexIndex = 0; vertexIndex < mesh->mNumVertices; ++vertexIndex) {
             const aiVector3D& vertex = mesh->mVertices[vertexIndex];
             addVertex(vertex.x, vertex.y, vertex.z, vertexCapacity);
@@ -130,9 +132,14 @@ bool rcMeshLoaderGlb::load(const std::string& filename) {
                 vertexOffset + static_cast<int>(face.mIndices[1]), vertexOffset + static_cast<int>(face.mIndices[2]),
                 triangleCapacity);
         }
+        m_waterTris.resize(m_triCount, isWater ? 1 : 0);
+        if (isWater)
+            m_waterTriCount += m_triCount - firstTriangle;
         if (m_triCount > firstTriangle)
             sceneMesh.objectTriangleRanges[objectName] = {firstTriangle, m_triCount};
     }
+    if (m_waterTriCount)
+        Logger::log(NK_INFO, "Loaded %d water triangles from glTF '%s'.", m_waterTriCount, filename.c_str());
     if (m_vertCount == 0 || m_triCount == 0) {
         Logger::log(NK_ERROR, "GLB '%s' contains no usable triangle geometry.", filename.c_str());
         return false;

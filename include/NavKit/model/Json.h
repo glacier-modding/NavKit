@@ -157,6 +157,9 @@ namespace Json {
         std::string primHash;
         std::string roomName;
         std::string roomFolderName;
+        // A water surface, as the Editor SDK mod flags it ("isWater"). Water is kept out of the navmesh and drawn
+        // as water on the map GFX.
+        bool isWater = false;
         Entity entity;
         std::string name;
         Vec3 pos{};
