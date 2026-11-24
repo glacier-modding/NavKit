@@ -321,6 +321,54 @@ namespace {
         check(threw, "a package that is not an identifier must be rejected");
     }
 
+    // The shipped template must stay a well-formed GFX: a file rewritten as text (bytes above 0x7F turned into
+    // U+FFFD) still starts with "GFX" but FFDec can no longer read its tags, and the build fails.
+    void testShippedTemplateIsWellFormed() {
+        std::ifstream input("src/resource/map_template.gfx", std::ios::binary);
+        check(static_cast<bool>(input), "src/resource/map_template.gfx must be readable from the source folder");
+        const std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+        check(bytes.size() > 8 && bytes[0] == 'G' && bytes[1] == 'F' && bytes[2] == 'X',
+            "the template must be an uncompressed GFX");
+        const auto readU16 = [&bytes](const size_t at) {
+            check(at + 2 <= bytes.size(), "the template ends inside a field");
+            return static_cast<unsigned int>(bytes[at] | bytes[at + 1] << 8);
+        };
+        const auto readU32 = [&](const size_t at) { return readU16(at) | readU16(at + 2) << 16; };
+        check(readU32(4) == bytes.size(), "the template's header length must be its file size");
+        const std::string_view text(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        check(
+            text.find("ï¿½") == std::string_view::npos, "the template must not contain U+FFFD replacement characters");
+
+        const unsigned int rectBits = bytes[8] >> 3;
+        size_t position = 8 + (5 + 4 * rectBits + 7) / 8 + 4;
+        std::set<unsigned int> tagCodes;
+        bool ended = false;
+        while (position < bytes.size()) {
+            const unsigned int header = readU16(position);
+            position += 2;
+            size_t length = header & 0x3F;
+            if (length == 0x3F) {
+                length = readU32(position);
+                position += 4;
+            }
+            check(position + length <= bytes.size(), "a template tag runs past the end of the file");
+            position += length;
+            if ((header >> 6) == 0) {
+                ended = true;
+                break;
+            }
+            tagCodes.insert(header >> 6);
+        }
+        check(ended && position == bytes.size(), "the template's tags must end with an End tag at the end of file");
+        // FileAttributes, DefineShape3, DefineSprite, ShowFrame, ExportAssets, SymbolClass and DoABC2.
+        for (const unsigned int code : {69u, 32u, 39u, 1u, 56u, 76u, 82u}) {
+            check(tagCodes.contains(code), "the template is missing tag " + std::to_string(code));
+        }
+        check(text.find("Generated_Map.SLICE_00_ZMapView") != std::string_view::npos &&
+                text.find("Generated_Map_Main") != std::string_view::npos,
+            "the template binds Generated_Map's SLICE_00 and document class");
+    }
+
     // Wall rectangles (left, top, right, bottom) of a made-up floor plan, in metres on the map plane.
     const std::vector<std::array<float, 4>> planWalls = {
         {10, 10, 70, 11},
@@ -430,15 +478,16 @@ namespace {
 
 int main(const int argc, char** argv) {
     try {
-        if ((argc == 5 || argc == 7) && std::string_view(argv[1]) == "--generate") {
+        // --generate <template XML> <output XML> <layer count> [<canvas width> <canvas height> [<package>]]
+        if ((argc == 5 || argc == 7 || argc == 8) && std::string_view(argv[1]) == "--generate") {
             std::ifstream input(argv[2], std::ios::binary);
             const std::string source{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
             if (!input && source.empty()) {
                 throw std::runtime_error("could not read input XML");
             }
-            const std::string generated =
-                GfxMapLayerSwf::createMapLayerSwfXml(source, static_cast<size_t>(std::stoull(argv[4])),
-                    argc == 7 ? std::stod(argv[5]) : 900.0, argc == 7 ? std::stod(argv[6]) : 900.0);
+            const std::string generated = GfxMapLayerSwf::createMapLayerSwfXml(source,
+                static_cast<size_t>(std::stoull(argv[4])), argc >= 7 ? std::stod(argv[5]) : 900.0,
+                argc >= 7 ? std::stod(argv[6]) : 900.0, argc == 8 ? std::string_view(argv[7]) : std::string_view{});
             std::ofstream output(argv[3], std::ios::binary | std::ios::trunc);
             output.write(generated.data(), static_cast<std::streamsize>(generated.size()));
             if (!output) {
@@ -483,6 +532,7 @@ int main(const int argc, char** argv) {
         testBackgroundMapSpaceNames();
         testMapLayerPackage();
         testRenamedPackage();
+        testShippedTemplateIsWellFormed();
         testCanvasSizedShapes();
         testMapLayerPlacement();
         testSectionsAndFloorLevels();
