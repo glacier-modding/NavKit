@@ -2698,6 +2698,9 @@ GFX_WALL_FLOOR_DISTANCE = 0.75
 # walls, cliffs). Their upward faces are ledges of the shell, not floors: they hide the floors below them
 # instead of being drawn.
 GFX_SHELL_MINIMUM_HEIGHT = 8.0
+# A tall object whose floors within the map layers lie mostly (by area, more than this share) inside or above
+# indoor rooms is a building or a ship with a mast, not the shell: its decks are walked on and stay floors.
+GFX_SHELL_MAXIMUM_ROOM_SHARE = 0.5
 # Patches of floor smaller than this many square metres that touch no other floor (such as the tops of props
 # standing on a shell ledge) are left out.
 GFX_MINIMUM_FLOOR_ISLAND = 10.0
@@ -3314,12 +3317,18 @@ def render_map_layers_for_gfx(json_data, output_path):
         normals = np.zeros_like(cross)
         normals[valid] = cross[valid] / lengths[valid, None]
         up = valid & (normals[:, 2] > 0.85)
+        centroids = triangles.mean(axis=1)
         shell = upper[2] > map_top and upper[2] - lower[2] >= GFX_SHELL_MINIMUM_HEIGHT
+        if shell and indoor_rooms:
+            decks = up & (centroids[:, 2] >= slice_bottom) & (centroids[:, 2] <= map_top)
+            if np.any(decks):
+                areas = lengths[decks] / 2
+                over_rooms = areas[interior_points(centroids[decks])].sum()
+                shell = over_rooms <= GFX_SHELL_MAXIMUM_ROOM_SHARE * areas.sum()
         stairs = np.zeros_like(up) if shell else stair_step_mask(triangles, normals, up)
         # Every face that is not flat takes part in the cross-sections, so that they close.
         sloped = valid & (np.abs(normals[:, 2]) < 0.99)
         footprint = max(upper[0] - lower[0], upper[1] - lower[1])
-        centroids = triangles.mean(axis=1)
         if obj.original.name.split("_")[0].upper() in rock_hashes:
             if np.any(up):
                 under_floors.append((triangles[up][:, :, :2], centroids[up, 2]))
@@ -3570,16 +3579,24 @@ def render_map_layers_for_gfx(json_data, output_path):
         if not occupied.any():
             return np.ones(shape, dtype=bool), np.zeros(shape, dtype=bool), resolution
         barrier = np.zeros(shape, dtype=bool)
+        # The floors drawn on the map layers: what lies inside the shell.
+        walked = np.zeros(shape, dtype=bool)
         for layer in all_slices:
             triangles, elevations, kinds = layer.floors()
             hidden = kinds == GFX_FLOOR_HIDDEN
             if np.any(hidden):
                 barrier |= rasterize_triangles(to_canvas(triangles[hidden]), elevations[hidden], np.zeros(2),
                                                resolution, shape) >= 0
+            if layer is not background and np.any(~hidden):
+                walked |= rasterize_triangles(to_canvas(triangles[~hidden]), elevations[~hidden], np.zeros(2),
+                                              resolution, shape) >= 0
         void = np.zeros(shape, dtype=bool)
         if barrier.any():
             labels, _ = label_regions(~barrier)
-            reached = np.unique(labels[occupied & ~barrier])
+            # Props outside the shell (backstage scaffolding high above every layer) do not make it land, so the
+            # floors of the map layers decide what is inside, or the scene's objects when there are none.
+            inside = walked & ~barrier
+            reached = np.unique(labels[inside if inside.any() else occupied & ~barrier])
             void = barrier | (~barrier & ~np.isin(labels, reached[reached >= 0]))
 
         def close(mask, width):
