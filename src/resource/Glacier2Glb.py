@@ -3776,13 +3776,11 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
 
         room_folder_name = hash_and_entity["roomFolderName"][:63] if hash_and_entity["roomFolderName"] else "Default"
         if room_folder_name not in room_folder_collections:
-            coll = bpy.data.collections.get(room_folder_name)
-            if coll is None:
-                coll = bpy.data.collections.new(room_folder_name)
-                root_coll.children.link(coll)
-                coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
-                room_folder_color_index += 1
-                log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2glb")
+            coll = bpy.data.collections.new(room_folder_name)
+            root_coll.children.link(coll)
+            coll.color_tag = "COLOR_0" + str(room_folder_color_index % 8 + 1)
+            room_folder_color_index += 1
+            log("DEBUG", "Adding new collection for room folder name: " + room_folder_name, "glacier2glb")
             room_folder_collections[room_folder_name] = coll
 
         room_folder_coll = room_folder_collections[room_folder_name]
@@ -4056,6 +4054,14 @@ def glacier2glb(path_to_nav_json: str, output_path: str, mesh_type: str, lod_mas
                             log("ERROR", "Error adding texture " + str(err), "glacier2glb")
                     if current_submesh:
                         current_submesh.select_set(False)
+
+    # Rooms whose meshes were all culled, missing or excluded are left empty, and so are folders of such rooms.
+    for room_coll in room_collections.values():
+        if not room_coll.objects and not room_coll.children:
+            bpy.data.collections.remove(room_coll)
+    for room_folder_coll in room_folder_collections.values():
+        if not room_folder_coll.objects and not room_folder_coll.children:
+            bpy.data.collections.remove(room_folder_coll)
 
     missing_mesh_hashes = transforms.keys() - processed_mesh_hashes
     if len(missing_mesh_hashes) > 0:

@@ -253,6 +253,38 @@ class InstanceBuildCullingTests(unittest.TestCase):
                         "only the instance inside the include box should be exported, at its own position")
         self.assertNotIn("00000000000000BB", [obj.name for obj in bpy.context.scene.objects])
 
+    def test_rooms_nest_under_their_folder_and_empty_rooms_are_removed(self):
+        def entry(prim_hash, entity_id, x, folder, room):
+            mesh = self.mesh_entry(prim_hash, entity_id, x)
+            mesh["roomFolderName"], mesh["roomName"] = folder, room
+            return mesh
+
+        nav_data = {
+            "pfBoxes": [{"id": "include", "type": {"data": "PFBT_INCLUDE_MESH_COLLISION"},
+                         "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                         "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                         "scale": {"data": {"x": 100.0, "y": 100.0, "z": 100.0}}}],
+            "meshes": [entry("00000000000000AA", "a", 0.0, "Rooms_Gardener (f)", "700_Room (a)"),
+                       entry("00000000000000AA", "b", 10.0, "Rooms_Gardener (f)", "701_Room (b)"),
+                       entry("00000000000000AA", "c", 5000.0, "Rooms_Gardener (f)", "702_Room (c)"),
+                       entry("00000000000000AA", "d", 5000.0, "No_Room", "Setpiece (d)")],
+        }
+        with tempfile.TemporaryDirectory() as output_dir:
+            output_dir = Path(output_dir)
+            (output_dir / "prim").mkdir()
+            (output_dir / "prim" / "00000000000000AA.prim").write_bytes(b"")
+            nav_json = output_dir / "scene.nav.json"
+            nav_json.write_text(json.dumps(nav_data), encoding="utf-8")
+            self.assertEqual(glacier.glacier2glb(str(nav_json), str(output_dir / "output.blend"), "PRIM", "11111111",
+                                                 "instance", True, False, False, False), 0)
+
+        environment = bpy.data.collections["Environment"]
+        folder, = environment.children
+        self.assertEqual(folder.name, "Rooms_Gardener (f)")
+        self.assertEqual(sorted(child.name for child in folder.children), ["700_Room (a)", "701_Room (b)"])
+        self.assertNotIn("702_Room (c)", bpy.data.collections)
+        self.assertNotIn("No_Room", bpy.data.collections)
+
 
 suite = unittest.TestSuite()
 for test_case in (CollectionHierarchyTests, InstanceBuildCullingTests):
