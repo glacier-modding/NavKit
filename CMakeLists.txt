@@ -272,6 +272,7 @@ if(BUILD_INSTALLER AND WIN32)
                 OUTPUT "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
                 COMMAND ${WIX_EXECUTABLE} build
                 -ext WixToolset.UI.wixext
+                -ext WixToolset.Util.wixext
                 -b "${CMAKE_BINARY_DIR}/installer_layout"
                 -d "ProductName=${PROJECT_NAME}"
                 -d "ProductVersion=${PROJECT_VERSION}"

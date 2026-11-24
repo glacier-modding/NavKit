@@ -10,6 +10,38 @@
              Scope="$(var.InstallScope)">
         <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseFile)" />
         <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+        <!--
+            A major upgrade uninstalls the previous version before installing this one, which deletes
+            the user's NavKit.ini; this package's default NavKit.ini is then installed in its place.
+            The auto-updater works around that by copying NavKit.ini aside before running the MSI and
+            restoring it as NavKit.ini.old, which NavKit merges into NavKit.ini on its next start.
+            Do the same here so settings also survive running the MSI by hand: copy the installed
+            version's NavKit.ini to NavKit.ini.old in the target folder before the old version is
+            removed.
+
+            This has to happen before the install script starts (RemoveExistingProducts runs between
+            InstallValidate and InstallInitialize), so it is an immediate custom action rather than
+            CopyFile/MoveFiles. Removing the old version only after installing the new one would keep
+            NavKit.ini without a copy, but fails when the auto-updater of an installed version keeps
+            DLLs in the install folder loaded (error 1310, rollback).
+        -->
+        <Property Id="PREVIOUSINSTALLFOLDER">
+            <!-- Recorded by every version since 3.0 (RemoveFolderComponent below). -->
+            <RegistrySearch Id="PreviousInstallFolderSearch" Root="HKCU"
+                            Key="Software\$(var.ProductManufacturer)\$(var.ProductName)"
+                            Name="Path" Type="raw" />
+        </Property>
+        <SetProperty Id="WixQuietExecCmdLine" Sequence="execute" After="CostFinalize"
+                     Condition="WIX_UPGRADE_DETECTED AND PREVIOUSINSTALLFOLDER"
+                     Value="&quot;[SystemFolder]cmd.exe&quot; /d /c if exist &quot;[PREVIOUSINSTALLFOLDER]NavKit.ini&quot; ( mkdir &quot;[INSTALLFOLDER].&quot; 2&gt;nul &amp; copy /y &quot;[PREVIOUSINSTALLFOLDER]NavKit.ini&quot; &quot;[INSTALLFOLDER]NavKit.ini.old&quot; )" />
+        <CustomAction Id="PreservePreviousSettings" BinaryRef="Wix4UtilCA_X86" DllEntry="WixQuietExec"
+                      Execute="immediate" Return="ignore" />
+        <InstallExecuteSequence>
+            <Custom Action="PreservePreviousSettings" After="SetWixQuietExecCmdLine"
+                    Condition="WIX_UPGRADE_DETECTED AND PREVIOUSINSTALLFOLDER" />
+        </InstallExecuteSequence>
+
         <MediaTemplate EmbedCab="true" />
 
         <ui:WixUI Id="WixUI_InstallDir"
