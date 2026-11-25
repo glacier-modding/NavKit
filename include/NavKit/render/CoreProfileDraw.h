@@ -17,6 +17,14 @@ void setCoreProfileFogEnabled(bool enabled);
 
 class CoreProfileVertexBuffer {
 public:
+    CoreProfileVertexBuffer() = default;
+    CoreProfileVertexBuffer(const CoreProfileVertexBuffer&) = delete;
+    CoreProfileVertexBuffer& operator=(const CoreProfileVertexBuffer&) = delete;
+    CoreProfileVertexBuffer(CoreProfileVertexBuffer&& other) noexcept;
+    CoreProfileVertexBuffer& operator=(CoreProfileVertexBuffer&& other) noexcept;
+
+    // Not done in a destructor: it needs a current GL context, which teardown and tests lack.
+    void release();
     void upload(std::span<const CoreProfileVertex> vertices);
     void draw(GLenum primitive, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection) const;
 

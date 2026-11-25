@@ -60,8 +60,10 @@ void Gui::drawGui() {
         imguiDrawText(10, renderer.height - 100, IMGUI_ALIGN_LEFT, loadedAirgText, imguiRGBA(255, 255, 255, 128));
         int resourceTextY = renderer.height - 120;
         const Crmd& crmd = Crmd::getInstance();
-        if (crmd.crmdLoaded && !crmd.loadedCrmdText.empty()) {
-            const std::string loadedCrmdText = "Loaded Crmd: " + fileNameFromPath(crmd.loadedCrmdText);
+        if (const size_t crowdMapCount = crmd.crowdMapCount(); crowdMapCount > 0) {
+            const int selected = crmd.getSelectedCrowdMapIndex();
+            const std::string loadedCrmdText = "Loaded Crmds: " + std::to_string(crowdMapCount) +
+                ", shown: " + (selected < 0 ? "None" : fileNameFromPath(crmd.selectedCrowdMapName()));
             imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, loadedCrmdText.c_str(), imguiRGBA(255, 255, 255, 128));
             resourceTextY -= 20;
         }

@@ -62,7 +62,7 @@ void showHelpDialog() {
                 {"New Navp", "Clears the loaded NavPower navigation mesh.",
                     "Clears the loaded NavPower navigation mesh.", ""},
                 {"New Airg", "Clears the loaded AIRG file.", "Clears the loaded AIRG file.", ""},
-                {"New Crmd", "Clears the loaded CRMD file.", "Clears the loaded crowd-map data.", ""},
+                {"New Crmd", "Clears all loaded CRMD files.", "Clears the loaded crowd-map data.", ""},
                 {"New Gfxf", "Clears the loaded Gfxf file.", "Clears the displayed SWF-backed map.", ""},
                 {"Open Scene", "Loads a NavKit scene file.",
                     "Provides scene geometry for inspection and as input to builds.", ""},
@@ -81,9 +81,11 @@ void showHelpDialog() {
                     "Loads game-packaged AIRG data directly, without a separate extraction step.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version so the "
                     "package index is ready."},
-                {"Open Crmd", "Loads a CRMD crowd-map file.",
+                {"Open Crmd", "Loads one or more CRMD crowd-map files, adding them to those already loaded.",
                     "Provides crowd-map cells, group data, and flow directions for viewport inspection.", ""},
-                {"Open Crmd from Rpkg", "Opens a picker to extract and load a CRMD from game resource packages.",
+                {"Open Crmd from Rpkg",
+                    "Opens a picker to extract one or more CRMDs from game resource packages and add them to those "
+                    "loaded.",
                     "Loads game-packaged crowd-map data directly, without a separate manual extraction step.",
                     "Set the HITMAN game directory in NavKit Settings and use a recognized game version so the "
                     "package index is ready."},
@@ -108,8 +110,8 @@ void showHelpDialog() {
                     "Preserves Navp edits or creates a file for use in game.", "Load a Navp."},
                 {"Save Airg", "Saves the loaded Airg data.", "Preserves changes made to AIRG data.",
                     "Load an AIRG and make sure no AIRG save is in progress."},
-                {"Save Crmd", "Saves the loaded Crmd data.", "Preserves changes made to CRMD data.",
-                    "Load a CRMD and make sure no CRMD save is in progress."},
+                {"Save Crmd", "Saves the CRMD shown in View > CRMD.", "Preserves changes made to CRMD data.",
+                    "Load a CRMD, select it in the View menu, and make sure no CRMD save is in progress."},
                 {"Save Gfxf", "Packs the current GFX into a Gfxf file.", "Creates a Gfxf map resource for use in game.",
                     "Build a GFX from a scene or open a Gfx or Gfxf, and make sure no save is in progress."},
                 {"Save Gfx", "Saves the current map as a raw GFX file.",
@@ -178,7 +180,7 @@ void showHelpDialog() {
                     "Displays intermediate geometry used by Recast for the Navp.", ""},
                 {"Show Airg", "Shows or hides loaded AIRG data.", "Displays AIRG cells and waypoints for inspection.",
                     ""},
-                {"Show Crmd", "Shows or hides the loaded CRMD crowd map.",
+                {"CRMD: None / CRMD 1, 2, ...", "Picks which loaded CRMD crowd map is shown, or none.",
                     "Displays the CRMD map and cell layers, with flow arrows only on walkable cells.", ""},
                 {"Show Airg Indices", "Shows or hides AIRG cell and waypoint indices.",
                     "Displays indices to identify AIRG elements during inspection and editing.", ""},
@@ -249,14 +251,16 @@ void showHelpDialog() {
                 {"Build Airg from Navp and GLB", "Builds AIRG grid and waypoint data from a Navp and GLB.",
                     "Generates AIRG grid and waypoint data from the loaded Navp.",
                     "Load a Navp and make sure no AIRG load, save, or build is in progress."},
-                {"Build Crmd from Scene, Navp and GLB", "Bakes a CRMD crowd map for one of the scene's crowds.",
+                {"Build All Crmds from Scene, Navp and GLB",
+                    "Bakes a CRMD crowd map for each of the scene's crowds, replacing earlier builds of the same "
+                    "crowd.",
                     "Takes walkable cells from the Navp and the crowd's volumes, exits and groups from the scene, and "
                     "snaps grid heights to the GLB, which sits below the Navp.",
                     "Load a scene containing a crowd, a Navp, and the GLB, and make sure no CRMD load, save, or build "
                     "is in progress."},
             }},
         {"CRMD",
-            "CRMD overlays show crowd-map grid data. Open a CRMD file and enable View > Show CRMD to display it. "
+            "CRMD overlays show crowd-map grid data. Open or build CRMDs and pick one under View > CRMD to display it. "
             "Colors identify different data layers; they do not represent height or confidence.",
             {
                 {"Blue cells", "Show the CRMD map grid.",

@@ -15,5 +15,7 @@ public:
 
     static void updateMenuState();
 
+    static void updateCrmdViewItems();
+
     static void setMenuItemChecked(int menuId, bool isChecked, const char* itemName);
 };
