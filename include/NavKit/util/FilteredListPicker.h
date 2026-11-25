@@ -10,11 +10,13 @@ class wxTextCtrl;
 
 class FilteredListPicker : public wxPanel {
 public:
-    FilteredListPicker(wxWindow* parent, wxWindowID id);
+    FilteredListPicker(wxWindow* parent, wxWindowID id, bool multiSelect = false);
 
     void setItems(std::vector<std::string> items);
 
     [[nodiscard]] std::string getSelection() const;
+
+    [[nodiscard]] std::vector<std::string> getSelections() const;
 
     void onActivate(std::function<void()> callback);
 

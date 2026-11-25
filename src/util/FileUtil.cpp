@@ -101,6 +101,36 @@ namespace FileUtil {
         return nullptr;
     }
 
+    std::vector<std::string> openNfdLoadMultipleDialog(
+        const nfdu8filteritem_t* filters, const nfdfiltersize_t filterCount) {
+        DialogFilters dialogFilters(filters, filterCount);
+        const std::string defaultPath = lastDialogFolder();
+        const nfdopendialogu8args_t args = {
+            .filterList = dialogFilters.data(),
+            .filterCount = dialogFilters.count(),
+            .defaultPath = defaultPath.empty() ? nullptr : defaultPath.c_str(),
+        };
+        const nfdpathset_t* pathSet = nullptr;
+        if (NFD_OpenDialogMultipleU8_With(&pathSet, &args) != NFD_OKAY) {
+            return {};
+        }
+        std::vector<std::string> paths;
+        nfdpathsetsize_t count = 0;
+        NFD_PathSet_GetCount(pathSet, &count);
+        for (nfdpathsetsize_t i = 0; i < count; ++i) {
+            nfdu8char_t* path = nullptr;
+            if (NFD_PathSet_GetPathU8(pathSet, i, &path) == NFD_OKAY) {
+                paths.emplace_back(path);
+                NFD_PathSet_FreePathU8(path);
+            }
+        }
+        NFD_PathSet_Free(pathSet);
+        if (!paths.empty()) {
+            rememberDialogFolder(paths.front().c_str());
+        }
+        return paths;
+    }
+
     char* openNfdSaveDialog(
         const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName) {
         nfdu8char_t* outPath;

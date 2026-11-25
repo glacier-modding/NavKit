@@ -19,6 +19,7 @@
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/WxApplication.h"
+#include <algorithm>
 #include <wx/msgdlg.h>
 #include <wx/thread.h>
 
@@ -100,7 +101,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_LAYER, "Airg Cell: Layer");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_DEAD_END, "Airg Cell: Dead End");
     view->AppendSeparator();
-    view->AppendCheckItem(IDM_VIEW_CRMD_SHOW_CRMD, "Show &CRMD")->Check();
+    view->AppendRadioItem(IDM_VIEW_CRMD_NONE, "CRMD: None")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
     view->AppendCheckItem(IDM_VIEW_GFXF_SHOW_GFXF, "Show GFX&F")->Check();
@@ -125,7 +126,7 @@ wxMenuBar* Menu::createMenuBar() {
     build->AppendSeparator();
     build->Append(IDM_BUILD_AIRG, "Build &Airg from Navp and GLB");
     build->AppendSeparator();
-    build->Append(IDM_BUILD_CRMD, "Build &Crmd from Scene, Navp and GLB");
+    build->Append(IDM_BUILD_ALL_CRMDS, "Build &All Crmds from Scene, Navp and GLB");
     bar->Append(build, "&Build");
 
     auto* help = new wxMenu();
@@ -216,10 +217,11 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_GLB, obj.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
-    setMenuItemEnabled(IDM_FILE_NEW_PROJECT, !crmd.building);
-    setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmd.saving && !crmd.building);
-    setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmd.saving && !crmd.building);
-    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmd.saving && !crmd.building);
+    const bool crmdBusy = crmd.loading || crmd.saving || crmd.building;
+    setMenuItemEnabled(IDM_FILE_NEW_PROJECT, !crmd.loading && !crmd.building);
+    setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmdBusy);
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmdBusy);
+    setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmdBusy);
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF, gfxf.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_GFX, gfxf.canLoad());
     setMenuItemEnabled(IDM_FILE_OPEN_GFXF_FROM_RPKG, Rpkg::canExtract() && gfxf.canLoad() && hasGfxfResources);
@@ -239,7 +241,7 @@ void Menu::updateMenuState() {
 
     setMenuItemEnabled(IDM_BUILD_NAVP, navp.canBuildNavp());
     setMenuItemEnabled(IDM_BUILD_AIRG, airg.canBuildAirg());
-    setMenuItemEnabled(IDM_BUILD_CRMD, crmd.canBuildCrmd());
+    setMenuItemEnabled(IDM_BUILD_ALL_CRMDS, crmd.canBuildAllCrmds());
     setMenuItemEnabled(IDM_BUILD_GLB_FROM_SCENE, obj.canBuildGlbFromScene());
     setMenuItemEnabled(IDM_BUILD_GLB_FROM_NAVP, obj.canBuildGlbFromNavp());
     setMenuItemEnabled(IDM_BUILD_BLEND_FROM_SCENE, obj.canBuildBlendFromScene());
@@ -261,6 +263,46 @@ void Menu::updateMenuState() {
         IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
     setMenuItemChecked(
         IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled, "Disconnect Waypoint Mode Enabled");
+    updateCrmdViewItems();
+}
+
+void Menu::updateCrmdViewItems() {
+    wxFrame* frame = getMainFrame();
+    if (!frame || !frame->GetMenuBar()) {
+        return;
+    }
+    wxMenu* view = nullptr;
+    if (!frame->GetMenuBar()->FindItem(IDM_VIEW_CRMD_NONE, &view) || !view) {
+        return;
+    }
+    const Crmd& crmd = Crmd::getInstance();
+    std::vector<std::string> names = crmd.crowdMapNames();
+    names.resize(std::min<size_t>(names.size(), IDM_VIEW_CRMD_LAST - IDM_VIEW_CRMD_FIRST + 1));
+    std::vector<wxString> labels;
+    labels.reserve(names.size());
+    for (size_t i = 0; i < names.size(); ++i) {
+        const size_t separator = names[i].find_last_of("/\\");
+        wxString name = wxString::FromUTF8(separator == std::string::npos ? names[i] : names[i].substr(separator + 1));
+        name.Replace("&", "&&");
+        labels.push_back(name);
+    }
+    static std::vector<wxString> shownLabels;
+    if (labels != shownLabels) {
+        for (int id = IDM_VIEW_CRMD_FIRST; id <= IDM_VIEW_CRMD_LAST; ++id) {
+            if (view->FindItem(id)) {
+                view->Destroy(id);
+            }
+        }
+        size_t nonePosition = 0;
+        view->FindChildItem(IDM_VIEW_CRMD_NONE, &nonePosition);
+        for (size_t i = 0; i < labels.size(); ++i) {
+            view->InsertRadioItem(nonePosition + 1 + i, IDM_VIEW_CRMD_FIRST + static_cast<int>(i), labels[i]);
+        }
+        shownLabels = labels;
+    }
+    const int selected = crmd.getSelectedCrowdMapIndex();
+    const bool selectedHasItem = selected >= 0 && static_cast<size_t>(selected) < labels.size();
+    frame->GetMenuBar()->Check(selectedHasItem ? IDM_VIEW_CRMD_FIRST + selected : IDM_VIEW_CRMD_NONE, true);
 }
 
 void Menu::setMenuItemChecked(const int menuId, const bool isChecked, const char* itemName) {
@@ -274,6 +316,12 @@ int Menu::handleMenuClicked(const int menuId) {
     SceneMesh& obj = SceneMesh::getInstance();
     Airg& airg = Airg::getInstance();
     SceneExtract& sceneExtract = SceneExtract::getInstance();
+    if (menuId >= IDM_VIEW_CRMD_NONE && menuId <= IDM_VIEW_CRMD_LAST) {
+        Crmd::getInstance().selectCrowdMap(menuId - IDM_VIEW_CRMD_FIRST);
+        updateCrmdViewItems();
+        Logger::log(NK_DEBUG, "View -> CRMD %d selected", menuId - IDM_VIEW_CRMD_NONE);
+        return 0;
+    }
     switch (menuId) {
     case IDM_FILE_NEW_PROJECT:
         Scene::getInstance().clear();
@@ -473,9 +521,6 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_VIEW_AIRG_SHOW_AIRG:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_AIRG, Airg::getInstance().showAirg, "Show Airg");
         break;
-    case IDM_VIEW_CRMD_SHOW_CRMD:
-        handleCheckboxMenuItem(IDM_VIEW_CRMD_SHOW_CRMD, Crmd::getInstance().showCrmd, "Show Crmd");
-        break;
     case IDM_VIEW_AIRG_SHOW_INDICES:
         handleCheckboxMenuItem(IDM_VIEW_AIRG_SHOW_INDICES, Airg::getInstance().showAirgIndices, "Show Airg Indices");
         break;
@@ -518,8 +563,8 @@ int Menu::handleMenuClicked(const int menuId) {
     case IDM_BUILD_AIRG:
         airg.handleBuildAirgClicked();
         break;
-    case IDM_BUILD_CRMD:
-        Crmd::getInstance().handleBuildCrmdClicked();
+    case IDM_BUILD_ALL_CRMDS:
+        Crmd::getInstance().handleBuildAllCrmdsClicked();
         break;
 
     case IDM_EXTRACT_SCENE:

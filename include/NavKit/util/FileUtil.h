@@ -3,9 +3,12 @@
 #include <nfd.h>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace FileUtil {
     char* openNfdLoadDialog(const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount);
+
+    std::vector<std::string> openNfdLoadMultipleDialog(const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount);
 
     char* openNfdSaveDialog(
         const nfdu8filteritem_t* filters, nfdfiltersize_t filterCount, const nfdu8char_t* defaultName);

@@ -861,21 +861,38 @@ namespace {
 
     void testCrmdFixtureLoading() {
         Crmd crmd;
-        crmd.loadCrowdMapData("tests/resources/yacht.crmd");
+        crmd.loadCrowdMapData("tests/resources/yacht.crmd", "yacht.crmd");
 
-        check(crmd.crmdLoaded, "CRMD fixture should load successfully");
-        check(crmd.crowdMapData != nullptr, "CRMD fixture should populate crowd-map data");
-        check(crmd.crowdMapData->m_nGridSizeX == 163 && crmd.crowdMapData->m_nGridSizeY == 249,
-            "CRMD fixture should load grid dimensions");
-        check(crmd.crowdMapData->m_nCellSizeX == 162 && crmd.crowdMapData->m_nCellSizeY == 248,
+        const SCrowdMapData* data = crmd.crowdMapData(0);
+        check(crmd.crowdMapCount() == 1 && crmd.getSelectedCrowdMapIndex() == 0,
+            "CRMD fixture should load successfully and be selected");
+        check(data != nullptr, "CRMD fixture should populate crowd-map data");
+        check(data->m_nGridSizeX == 163 && data->m_nGridSizeY == 249, "CRMD fixture should load grid dimensions");
+        check(data->m_nCellSizeX == 162 && data->m_nCellSizeY == 248,
             "CRMD fixture should load cell dimensions separately from map dimensions");
-        check(crmd.crowdMapData->m_GridMap.size() == 163 * 249, "CRMD fixture should load grid map cells");
-        check(crmd.crowdMapData->m_CellFlags.size() == 314, "CRMD fixture should load cell flags");
-        check(crmd.crowdMapData->m_CellGroups.size() == 314, "CRMD fixture should load cell groups");
-        check(crmd.crowdMapData->m_aFlowChannels.size() == 6, "CRMD fixture should load flow channels");
+        check(data->m_GridMap.size() == 163 * 249, "CRMD fixture should load grid map cells");
+        check(data->m_CellFlags.size() == 314, "CRMD fixture should load cell flags");
+        check(data->m_CellGroups.size() == 314, "CRMD fixture should load cell groups");
+        check(data->m_aFlowChannels.size() == 6, "CRMD fixture should load flow channels");
 
-        delete crmd.crowdMapData;
-        crmd.crowdMapData = nullptr;
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        const std::filesystem::path copyPath =
+            std::filesystem::temp_directory_path() / ("navkit-crmd-copy-" + std::to_string(stamp) + ".crmd");
+        std::filesystem::copy_file(
+            "tests/resources/yacht.crmd", copyPath, std::filesystem::copy_options::overwrite_existing);
+        crmd.loadCrowdMapData(copyPath.string(), "second.crmd");
+        std::filesystem::remove(copyPath);
+        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
+                crmd.selectedCrowdMapName() == "second.crmd",
+            "loading another CRMD should add it alongside the first and select it");
+        crmd.loadCrowdMapData("tests/../tests/resources/yacht.crmd", "again.crmd");
+        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 0 &&
+                crmd.selectedCrowdMapName() == "again.crmd",
+            "reopening the same CRMD file should reload it in place rather than add another");
+        crmd.selectCrowdMap(-1);
+        check(crmd.getSelectedCrowdMapIndex() == -1 && !crmd.canSave(), "selecting none should leave nothing to save");
+        crmd.clear();
+        check(crmd.crowdMapCount() == 0, "clearing should remove every loaded CRMD");
     }
 
     void testCrmdSaveRoundTrip() {
@@ -884,9 +901,9 @@ namespace {
         const std::filesystem::path savedPath =
             std::filesystem::temp_directory_path() / ("navkit-crmd-roundtrip-" + std::to_string(stamp) + ".crmd");
         Crmd crmd;
-        crmd.loadCrowdMapData(fixturePath);
-        check(crmd.crmdLoaded, "CRMD fixture should load before saving");
-        crmd.saveCrmd(savedPath.string());
+        crmd.loadCrowdMapData(fixturePath, "yacht.crmd");
+        check(crmd.crowdMapCount() == 1, "CRMD fixture should load before saving");
+        crmd.saveCrmd(savedPath.string(), 0);
 
         const auto readBytes = [](const std::filesystem::path& path) {
             std::ifstream stream(path, std::ios::binary);
@@ -895,8 +912,6 @@ namespace {
         check(readBytes(fixturePath) == readBytes(savedPath), "saved CRMD should be byte-identical to the fixture");
 
         std::filesystem::remove(savedPath);
-        delete crmd.crowdMapData;
-        crmd.crowdMapData = nullptr;
     }
 
     std::vector<unsigned char> readGfxfTestBytes(const std::filesystem::path& path) {
@@ -1201,13 +1216,15 @@ namespace {
         }
 
         Crmd crmd;
-        crmd.setCrowdMap(map, crowd.name);
-        check(crmd.crmdLoaded && crmd.crowdMapData->m_nCellSizeX == 8 && crmd.crowdMapData->m_CellFlags.size() == 1 &&
-                crmd.crowdMapData->m_aFlowChannels.size() == 3 &&
-                crmd.crowdMapData->m_aFlowChannels[1].m_aFlowCost.size() == 64,
+        crmd.setCrowdMap(map, crowd.name, "synthetic-crowd");
+        const SCrowdMapData* data = crmd.crowdMapData(0);
+        check(data != nullptr && data->m_nCellSizeX == 8 && data->m_CellFlags.size() == 1 &&
+                data->m_aFlowChannels.size() == 3 && data->m_aFlowChannels[1].m_aFlowCost.size() == 64,
             "a built crowd map should become the loaded CRMD");
-        delete crmd.crowdMapData;
-        crmd.crowdMapData = nullptr;
+        crmd.setCrowdMap(snapped, crowd.name, "other-crowd");
+        crmd.setCrowdMap(map, crowd.name, "synthetic-crowd");
+        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 0,
+            "rebuilding a crowd should replace its CRMD rather than add another");
     }
 
     void testCrmdBuilderReservesChannelsForSkippedExits() {

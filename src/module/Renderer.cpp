@@ -439,9 +439,7 @@ void Renderer::renderFrame() {
         const RecastAdapter& recastAirgAdapter = RecastAdapter::getAirgInstance();
         recastAirgAdapter.renderRecastNavmesh(true);
     }
-    if (Crmd& crmd = Crmd::getInstance(); crmd.crmdLoaded && crmd.showCrmd) {
-        crmd.renderCrowdMapData();
-    }
+    Crmd::getInstance().renderCrowdMapData();
 
     const Grid grid = Grid::getInstance();
     if (grid.showGrid) {

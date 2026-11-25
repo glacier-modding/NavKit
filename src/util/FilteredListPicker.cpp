@@ -4,10 +4,12 @@
 #include <wx/sizer.h>
 #include <wx/textctrl.h>
 
-FilteredListPicker::FilteredListPicker(wxWindow* parent, const wxWindowID id) : wxPanel(parent, id) {
+FilteredListPicker::FilteredListPicker(wxWindow* parent, const wxWindowID id, const bool multiSelect) :
+    wxPanel(parent, id) {
     filterField = new wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
     filterField->SetHint("Filter");
-    list = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 300), 0, nullptr, wxLB_SINGLE);
+    list = new wxListBox(
+        this, wxID_ANY, wxDefaultPosition, wxSize(-1, 300), 0, nullptr, multiSelect ? wxLB_EXTENDED : wxLB_SINGLE);
 
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(filterField, 0, wxEXPAND | wxBOTTOM, 5);
@@ -16,7 +18,7 @@ FilteredListPicker::FilteredListPicker(wxWindow* parent, const wxWindowID id) : 
 
     filterField->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { applyFilter(); });
     filterField->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) {
-        if (activateCallback && list->GetSelection() != wxNOT_FOUND) {
+        if (wxArrayInt selections; activateCallback && list->GetSelections(selections) > 0) {
             activateCallback();
         }
     });
@@ -33,8 +35,19 @@ void FilteredListPicker::setItems(std::vector<std::string> items) {
 }
 
 std::string FilteredListPicker::getSelection() const {
-    const int selection = list->GetSelection();
-    return selection == wxNOT_FOUND ? "" : list->GetString(selection).utf8_string();
+    const std::vector<std::string> selections = getSelections();
+    return selections.empty() ? "" : selections.front();
+}
+
+std::vector<std::string> FilteredListPicker::getSelections() const {
+    wxArrayInt selections;
+    list->GetSelections(selections);
+    std::vector<std::string> items;
+    items.reserve(selections.size());
+    for (const int selection : selections) {
+        items.push_back(list->GetString(selection).utf8_string());
+    }
+    return items;
 }
 
 void FilteredListPicker::onActivate(std::function<void()> callback) {
