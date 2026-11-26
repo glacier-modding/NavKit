@@ -534,6 +534,9 @@ void SceneMesh::finalizeSceneMeshBuild() {
         glbToLoad = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedGlbName).string();
         loadGlb = !blendFileOnlyBuild;
         lastGlbFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedGlbName).string();
+        if (loadGlb) {
+            source = FileSource::generated();
+        }
         blenderSceneMeshBuildStarted = false;
         blenderSceneMeshGenerationDone = false;
         sceneExtract.alsoBuildGlb = false;
@@ -642,6 +645,7 @@ void SceneMesh::loadGlbMesh() {
     } else {
         Logger::log(NK_ERROR, "Error loading GLB. It may be invalid, too large, or contain no triangles.");
         model.meshes.clear();
+        glbLoadFailed = true;
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();
     }
@@ -707,12 +711,21 @@ void SceneMesh::setLastSaveFileName(const char* fileName) {
 
 void SceneMesh::handleOpenGlbClicked() {
     if (const char* fileName = openLoadGlbFileDialog()) {
-        setLastLoadFileName(fileName);
-        glbLoaded = false;
-        glbToLoad = fileName;
-        loadGlb = true;
-        Menu::updateMenuState();
+        loadGlbFromFile(fileName, FileSource::disk(fileName));
     }
+}
+
+void SceneMesh::loadGlbFromFile(const std::string& fileName, const FileSource& fileSource) {
+    setLastLoadFileName(fileName.c_str());
+    source = fileSource;
+    glbLoaded = false;
+    glbToLoad = fileName;
+    loadGlb = true;
+    Menu::updateMenuState();
+}
+
+bool SceneMesh::isLoadingGlb() const {
+    return loadGlb || !glbToLoad.empty() || !glbLoadDone.empty();
 }
 
 void SceneMesh::handleSaveGlbClicked() {
@@ -809,6 +822,13 @@ void SceneMesh::finalizeLoad() {
         Logger::log(NK_INFO, msg.data());
         backgroundWorker.emplace(&SceneMesh::loadGlbMesh, this);
         loadGlb = false;
+    }
+
+    if (glbLoadFailed) {
+        glbLoadFailed = false;
+        glbToLoad.clear();
+        source = {};
+        Menu::updateMenuState();
     }
 
     if (!glbLoadDone.empty()) {
@@ -908,7 +928,9 @@ void SceneMesh::clear() {
     lastGlbFileName = "Load GLB";
     lastSaveGlbFileName = "Save GLB";
     generatedGlbName.clear();
+    source = {};
     glbLoaded = false;
+    glbLoadFailed = false;
     loadGlb = false;
     files.clear();
     glbToLoad.clear();

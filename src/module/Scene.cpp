@@ -46,7 +46,7 @@ char* Scene::openSaveSceneFileDialog() {
     return FileUtil::openNfdSaveDialog(filters, 1, "output.nav.json");
 }
 
-void Scene::setLastLoadFileName(char* fileName) {
+void Scene::setLastLoadFileName(const char* fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadSceneName = fileName;
         lastLoadSceneFile = loadSceneName.data();
@@ -439,22 +439,26 @@ void Scene::saveScene(const std::string& fileName) const {
 }
 
 void Scene::handleOpenSceneClicked() {
-    if (char* fileName = openLoadSceneFileDialog()) {
-        setLastLoadFileName(fileName);
-        std::string msg = "Loading nav.json file: '";
-        msg += fileName;
-        msg += "'...";
-        Logger::log(NK_INFO, msg.data());
-        std::string fileNameToLoad = fileName;
-        backgroundWorker.emplace(
-            &Scene::loadScene, this, fileNameToLoad,
-            [fileNameToLoad]() {
-                getInstance().sceneLoaded = true;
-                Menu::updateMenuState();
-                Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameToLoad + "'.").c_str());
-            },
-            []() { Logger::log(NK_ERROR, "Error loading scene file."); });
+    if (const char* fileName = openLoadSceneFileDialog()) {
+        loadSceneFromFile(fileName, FileSource::disk(fileName));
     }
+}
+
+void Scene::loadSceneFromFile(const std::string& fileName, const FileSource& fileSource) {
+    setLastLoadFileName(fileName.c_str());
+    Logger::log(NK_INFO, "Loading nav.json file: '%s'...", fileName.c_str());
+    source = fileSource;
+    loading = true;
+    backgroundWorker.emplace(
+        &Scene::loadScene, this, fileName,
+        [fileName]() {
+            Scene& scene = getInstance();
+            scene.sceneLoaded = true;
+            scene.loading = false;
+            Menu::updateMenuState();
+            Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileName + "'.").c_str());
+        },
+        []() { Logger::log(NK_ERROR, "Error loading scene file."); });
 }
 
 void Scene::handleSaveSceneClicked() {
@@ -495,6 +499,8 @@ void Scene::resetBBoxDefaults() {
 
 void Scene::clear() {
     sceneLoaded = false;
+    loading = false;
+    source = {};
     lastLoadSceneFile.clear();
     loadSceneName = "Load NavKit Scene";
     saveSceneName = "Save NavKit Scene";

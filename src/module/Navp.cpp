@@ -868,6 +868,8 @@ void Navp::loadNavMesh(
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
+        loading = false;
+        Menu::updateMenuState();
         return;
     }
     catch (...) {
@@ -875,6 +877,8 @@ void Navp::loadNavMesh(
         msg += fileName;
         msg += "'...";
         Logger::log(NK_ERROR, msg.c_str());
+        loading = false;
+        Menu::updateMenuState();
         return;
     }
 
@@ -966,7 +970,7 @@ void Navp::setLastSaveFileName(const char* fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
-void Navp::loadNavpFromFile(const std::string& fileName) {
+bool Navp::loadNavpFromFile(const std::string& fileName) {
     Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
     setLastLoadFileName(fileName.c_str());
     std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
@@ -977,14 +981,22 @@ void Navp::loadNavpFromFile(const std::string& fileName) {
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
+        loading = true;
+        source = FileSource::disk(fileName);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
-    } else if (extension == "NAVP") {
+        return true;
+    }
+    if (extension == "NAVP") {
         std::string msg = "Loading Navp file: '";
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
+        loading = true;
+        source = FileSource::disk(fileName);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
+        return true;
     }
+    return false;
 }
 
 void Navp::handleOpenNavpClicked() {
@@ -1066,20 +1078,21 @@ bool Navp::canSave() const {
     return navpLoaded && !loading && !building;
 }
 
-void Navp::handleEditStairsClicked() const {
+void Navp::handleEditStairsClicked() {
     toggleSelectedAreaUsage(NavPower::AreaUsageFlags::AREA_STEPS);
 }
 
-void Navp::handleEditPlannerExcludedClicked() const {
+void Navp::handleEditPlannerExcludedClicked() {
     toggleSelectedAreaUsage(NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED);
 }
 
-void Navp::toggleSelectedAreaUsage(const NavPower::AreaUsageFlags usage) const {
+void Navp::toggleSelectedAreaUsage(const NavPower::AreaUsageFlags usage) {
     if (selectedNavpAreaIndex == -1) {
         return;
     }
     NavPower::AreaUsageFlags& areaUsage = getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags;
     areaUsage = areaUsage == usage ? NavPower::AreaUsageFlags::AREA_FLAT : usage;
+    source.markEdited();
     Logger::log(NK_INFO, ("Setting area type to: " + NavPower::AreaUsageFlagToString(areaUsage)).c_str());
     navMeshDirty = true;
     Menu::updateMenuState();
@@ -1187,6 +1200,7 @@ void Navp::finalizeBuild() {
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         outputNavpFilename = (std::filesystem::u8path(navKitSettings.outputFolder) / "output.navp.json").string();
         recastAdapter.save(outputNavpFilename, false);
+        source = FileSource::generated();
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
         navpBuildDone.store(false);
         building = false;
@@ -1207,13 +1221,18 @@ void Navp::updateNavpDialogControls(wxDialog* dialog) {
     picker->setItems(std::move(items));
 }
 
-void Navp::extractNavpFromRpkgs(const std::string& hash) {
-    if (!Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
-        const std::string fileName =
-            (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "navp" / (hash + ".NAVP")).string();
-        Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
-        getInstance().loadNavpFromFile(fileName);
+bool Navp::extractNavpFromRpkgs(const std::string& hash) {
+    if (Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
+        return false;
     }
+    const std::string fileName =
+        (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "navp" / (hash + ".NAVP")).string();
+    Navp& navp = getInstance();
+    if (!navp.loadNavpFromFile(fileName)) {
+        return false;
+    }
+    navp.source = FileSource::rpkg(hash);
+    return true;
 }
 
 void Navp::showExtractNavpDialog() {
@@ -1280,6 +1299,7 @@ void Navp::clear() {
     loading = false;
     building = false;
     navpBuildDone = false;
+    source = {};
     stairsCheckboxValue = false;
     doNavpHitTest = false;
     doNavpExclusionBoxHitTest = false;

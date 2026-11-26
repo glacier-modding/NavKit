@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <mutex>
 #include <map>
 #include <optional>
@@ -40,6 +41,7 @@ public:
         const std::map<std::string, std::string>& hashToIoiString, std::mutex& mutex, const std::string& hash);
 
     static bool extractionDataInitComplete;
+    static std::atomic_bool extractionDataInitInProgress;
     static std::string gameVersion;
     static PartitionManager* partitionManager;
     static HashList* hashList;

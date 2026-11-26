@@ -11,6 +11,7 @@
 #include <vector>
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include "../model/FileSource.h"
 #include "../render/CoreProfileDraw.h"
 #include "../util/CrowdMapBuilder.h"
 
@@ -26,10 +27,17 @@ struct LoadedCrowdMap {
     std::unique_ptr<SCrowdMapData> data;
     std::string name;
     std::string sourceKey;
+    FileSource source;
     bool renderGeometryDirty{true};
     CoreProfileVertexBuffer cellTriangleBuffer;
     CoreProfileVertexBuffer flowArrowLineBuffer;
     glm::mat4 renderModel{1.0f};
+};
+
+struct CrmdFileToLoad {
+    std::string fileName;
+    std::string name;
+    FileSource source;
 };
 
 class Crmd {
@@ -44,8 +52,8 @@ public:
     }
 
     void renderCrowdMapData();
-    void loadCrmdFromFiles(const std::vector<std::pair<std::string, std::string>>& filesAndNames);
-    void loadCrowdMapData(const std::string& fileName, const std::string& name);
+    bool loadCrmdFromFiles(const std::vector<CrmdFileToLoad>& files);
+    void loadCrowdMapData(const std::string& fileName, const std::string& name, const FileSource& fileSource = {});
     void handleOpenCrmdClicked();
     void handleSaveCrmdClicked();
     void saveCrmd(const std::string& fileName, size_t index) const;
@@ -53,7 +61,7 @@ public:
     void clear();
     static void updateCrmdDialogControls(wxDialog* dialog);
     void showExtractCrmdDialog();
-    static void extractCrmdsFromRpkgs(const std::vector<std::pair<std::string, std::string>>& hashesAndNames);
+    static bool extractCrmdsFromRpkgs(const std::vector<std::pair<std::string, std::string>>& hashesAndNames);
     bool canBuildAllCrmds() const;
     void handleBuildAllCrmdsClicked();
     void setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name, const std::string& crowdId = {});
@@ -61,6 +69,8 @@ public:
     int getSelectedCrowdMapIndex() const;
     size_t crowdMapCount() const;
     std::vector<std::string> crowdMapNames() const;
+    std::vector<FileSource> crowdMapSources() const;
+    void setCrowdMapSource(size_t index, const FileSource& fileSource);
     std::string selectedCrowdMapName() const;
     const SCrowdMapData* crowdMapData(size_t index) const;
     void loadSettings();
@@ -79,7 +89,8 @@ public:
 
 private:
     static void rebuildRenderGeometry(LoadedCrowdMap& crowdMap);
-    void addCrowdMap(std::unique_ptr<SCrowdMapData> data, const std::string& name, const std::string& sourceKey);
+    void addCrowdMap(std::unique_ptr<SCrowdMapData> data, const std::string& name, const std::string& sourceKey,
+        const FileSource& fileSource);
     void saveCrmdAndReport(const std::string& fileName, size_t index);
     void buildCrmds(const std::vector<Json::Crowd>& crowds, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
         const std::vector<glm::dvec3>& navmeshTriangles, const std::vector<std::vector<glm::dvec3>>& glbTriangles);

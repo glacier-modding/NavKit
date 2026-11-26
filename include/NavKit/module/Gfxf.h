@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "../model/FileSource.h"
 #include "../render/Model.h"
 #include "../util/GfxMapAlignment.h"
 #include <glm/mat4x4.hpp>
@@ -61,7 +62,7 @@ class Gfxf {
     Model model;
     void buildGfx();
 
-    void startLoad(const std::string& fileName);
+    bool startLoad(const std::string& fileName);
 
     void placeFromScene();
 
@@ -85,6 +86,7 @@ public:
     int offsetY = 0;
     int offsetZ = 0;
     std::string loadedFile;
+    FileSource source;
     std::vector<std::string> layerNames;
     size_t selectedLayerIndex = 0;
 
@@ -99,7 +101,8 @@ public:
     void handleOpenGfxfClicked();
     void handleOpenGfxClicked();
 
-    void loadGfxfFromFile(const std::string& fileName);
+    bool loadGfxfFromFile(const std::string& fileName);
+    static bool extractGfxfFromRpkgs(const std::string& hash);
     void exportGfxfToGfxfFile(const std::string& fileName);
     void exportGfxToGfxFile(const std::string& fileName);
     void setGfxData(std::vector<unsigned char> bytes);

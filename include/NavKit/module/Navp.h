@@ -10,6 +10,7 @@
 #include <GL/glew.h>
 
 #include "../../NavWeakness/NavPower.h"
+#include "../model/FileSource.h"
 #include "../model/Json.h"
 
 struct Vec3;
@@ -95,7 +96,7 @@ public:
 
     void showExtractNavpDialog();
 
-    static void extractNavpFromRpkgs(const std::string& hash);
+    static bool extractNavpFromRpkgs(const std::string& hash);
 
     void buildAreaMaps();
 
@@ -137,6 +138,7 @@ public:
     bool doNavpExclusionBoxHitTest;
     bool doNavpPfSeedPointHitTest;
     bool loading;
+    FileSource source;
 
     bool stairsCheckboxValue;
 
@@ -150,7 +152,7 @@ public:
 
     void setLastSaveFileName(const char* fileName);
 
-    void loadNavpFromFile(const std::string& fileName);
+    bool loadNavpFromFile(const std::string& fileName);
 
     void handleOpenNavpClicked();
 
@@ -166,9 +168,9 @@ public:
 
     bool canSave() const;
 
-    void handleEditStairsClicked() const;
+    void handleEditStairsClicked();
 
-    void handleEditPlannerExcludedClicked() const;
+    void handleEditPlannerExcludedClicked();
 
     void handleBuildNavpClicked();
 
@@ -198,7 +200,7 @@ private:
 
     bool selectedAreaHasUsage(NavPower::AreaUsageFlags usage) const;
 
-    void toggleSelectedAreaUsage(NavPower::AreaUsageFlags usage) const;
+    void toggleSelectedAreaUsage(NavPower::AreaUsageFlags usage);
 
     static char* openLoadNavpFileDialog();
 

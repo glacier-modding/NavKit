@@ -166,6 +166,7 @@ void Airg::clear() {
     airgLoaded = false;
     airgLoading = false;
     airgBuilding = false;
+    source = {};
     connectWaypointModeEnabled = false;
     disconnectWaypointModeEnabled = false;
     selectedWaypointIndex = -1;
@@ -204,19 +205,23 @@ void Airg::setLastSaveFileName(const char* fileName) {
     saveAirgName = saveAirgName.substr(saveAirgName.find_last_of("/\\") + 1);
 }
 
-void Airg::loadAirgFromFile(const std::string& fileName) {
+bool Airg::loadAirgFromFile(const std::string& fileName) {
     setLastLoadFileName(fileName.c_str());
     std::string fileNameStr = fileName;
     std::string extension = airgName.substr(airgName.length() - 4, airgName.length());
     std::ranges::transform(extension, extension.begin(), ::toupper);
 
-    if (extension == "AIRG") {
-        delete reasoningGrid;
-        reasoningGrid = new ReasoningGrid();
-        Logger::log(NK_INFO, "Loading Airg file: '%s'...", fileNameStr.c_str());
-        backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr);
-    }
     airgDirty = true;
+    if (extension != "AIRG") {
+        return false;
+    }
+    delete reasoningGrid;
+    reasoningGrid = new ReasoningGrid();
+    Logger::log(NK_INFO, "Loading Airg file: '%s'...", fileNameStr.c_str());
+    airgLoading = true;
+    source = FileSource::disk(fileName);
+    backgroundWorker.emplace(&Airg::loadAirg, this, fileNameStr);
+    return true;
 }
 
 void Airg::handleOpenAirgClicked() {
@@ -260,6 +265,7 @@ void Airg::handleBuildAirgClicked() {
     airgLoaded = false;
     Menu::updateMenuState();
     airgBuilding = true;
+    source = FileSource::generated();
     delete reasoningGrid;
     reasoningGrid = new ReasoningGrid();
     airgDirty = true;
@@ -343,6 +349,7 @@ void Airg::connectWaypoints(const int startWaypointIndex, const int endWaypointI
     }
     startWaypoint.nNeighbors[bestDirection] = endWaypointIndex;
     endWaypoint.nNeighbors[(bestDirection + 4) % 8] = startWaypointIndex;
+    source.markEdited();
     Logger::log(NK_INFO,
         ("Connected waypoints: " + std::to_string(startWaypointIndex) + " and " + std::to_string(endWaypointIndex))
             .c_str());
@@ -364,6 +371,7 @@ void Airg::disconnectWaypoints(const int startWaypointIndex, const int endWaypoi
         Logger::log(NK_INFO, "Waypoints already disconnected.");
         return;
     }
+    source.markEdited();
     Waypoint& endWaypoint = reasoningGrid->m_WaypointList[endWaypointIndex];
 
     for (int direction = 0; direction < 8; ++direction) {
@@ -963,13 +971,19 @@ void Airg::updateAirgDialogControls(wxDialog* dialog) {
     picker->setItems(std::move(items));
 }
 
-void Airg::extractAirgFromRpkgs(const std::string& hash) {
-    if (!Rpkg::extractResourcesFromRpkgs({hash}, AIRG)) {
-        const std::string fileName =
-            (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "airg" / (hash + ".AIRG")).string();
-        Logger::log(NK_INFO, ("Loading airg from file: " + fileName).c_str());
-        getInstance().loadAirgFromFile(fileName);
+bool Airg::extractAirgFromRpkgs(const std::string& hash) {
+    if (Rpkg::extractResourcesFromRpkgs({hash}, AIRG)) {
+        return false;
     }
+    const std::string fileName =
+        (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "airg" / (hash + ".AIRG")).string();
+    Logger::log(NK_INFO, ("Loading airg from file: " + fileName).c_str());
+    Airg& airg = getInstance();
+    if (!airg.loadAirgFromFile(fileName)) {
+        return false;
+    }
+    airg.source = FileSource::rpkg(hash);
+    return true;
 }
 
 void Airg::showExtractAirgDialog() {

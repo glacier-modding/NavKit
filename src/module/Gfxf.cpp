@@ -580,12 +580,37 @@ void Gfxf::handleOpenGfxClicked() {
     }
 }
 
-void Gfxf::loadGfxfFromFile(const std::string& fileName) {
+bool Gfxf::loadGfxfFromFile(const std::string& fileName) {
     if (!isRegularFile(std::filesystem::u8path(fileName))) {
         showGfxfError("The selected GFXF/GFX/SWF file does not exist or is not a regular file.");
-        return;
+        return false;
     }
-    startLoad(fileName);
+    if (!startLoad(fileName)) {
+        return false;
+    }
+    source = FileSource::disk(fileName);
+    return true;
+}
+
+bool Gfxf::extractGfxfFromRpkgs(const std::string& hash) {
+    const std::filesystem::path outputFile =
+        std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".gfx");
+    std::error_code removeError;
+    std::filesystem::remove(outputFile, removeError);
+    if (removeError) {
+        showGfxfError("Could not remove the previous GFXF extraction: " + removeError.message());
+        return false;
+    }
+    if (Rpkg::extractResourcesFromRpkgs({hash}, GFXF) != 0 || !isRegularFile(outputFile)) {
+        showGfxfError("The RPKG library did not produce the expected GFX payload: " + pathToUtf8(outputFile));
+        return false;
+    }
+    Gfxf& gfxf = getInstance();
+    if (!gfxf.loadGfxfFromFile(pathToUtf8(outputFile))) {
+        return false;
+    }
+    gfxf.source = FileSource::rpkg(hash);
+    return true;
 }
 
 bool Gfxf::canSave() const {
@@ -938,14 +963,18 @@ void Gfxf::buildGfx() {
     const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
     Logger::log(NK_INFO, "Finished GFX build in %s seconds", std::to_string(duration.count()).c_str());
     if (!gfxfPath.empty() && wxTheApp != nullptr) {
-        wxTheApp->CallAfter([gfxfPath] { getInstance().loadGfxfFromFile(pathToUtf8(gfxfPath)); });
+        wxTheApp->CallAfter([gfxfPath] {
+            if (Gfxf& gfxf = getInstance(); gfxf.loadGfxfFromFile(pathToUtf8(gfxfPath))) {
+                gfxf.source = FileSource::generated();
+            }
+        });
     }
     building = false;
 }
 
-void Gfxf::startLoad(const std::string& fileName) {
+bool Gfxf::startLoad(const std::string& fileName) {
     if (!canLoad()) {
-        return;
+        return false;
     }
     closeGfxfSettingsDialog();
 
@@ -953,7 +982,7 @@ void Gfxf::startLoad(const std::string& fileName) {
     if (ffdecCommand.prefix.empty()) {
         showGfxfError("The bundled FFDec CLI is missing. Repair the NavKit installation or set FFDEC_PATH to an "
                       "FFDec CLI executable.");
-        return;
+        return false;
     }
 
     ++loadGeneration;
@@ -1064,6 +1093,7 @@ void Gfxf::startLoad(const std::string& fileName) {
         std::lock_guard lock(resultMutex);
         completedLoad = std::move(result);
     });
+    return true;
 }
 
 void Gfxf::showExtractGfxfDialog() {
@@ -1117,18 +1147,7 @@ void Gfxf::showExtractGfxfDialog() {
             return Rpkg::displayName(candidate.first, candidate.second) == selected;
         });
         if (entry != entries.end()) {
-            const std::string& hash = entry->first;
-            const std::filesystem::path outputFile =
-                std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".gfx");
-            std::error_code removeError;
-            std::filesystem::remove(outputFile, removeError);
-            if (removeError) {
-                showGfxfError("Could not remove the previous GFXF extraction: " + removeError.message());
-            } else if (Rpkg::extractResourcesFromRpkgs({hash}, GFXF) != 0 || !isRegularFile(outputFile)) {
-                showGfxfError("The RPKG library did not produce the expected GFX payload: " + pathToUtf8(outputFile));
-            } else {
-                Gfxf::getInstance().loadGfxfFromFile(pathToUtf8(outputFile));
-            }
+            extractGfxfFromRpkgs(entry->first);
         }
         dialog->Close();
     });
@@ -1620,6 +1639,7 @@ void Gfxf::clear() {
     closeGfxfSettingsDialog();
     gfxfLoaded = false;
     loadedFile.clear();
+    source = {};
     layerNames.clear();
     layerImages.clear();
     layerPlacements.clear();

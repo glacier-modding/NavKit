@@ -1938,6 +1938,32 @@ namespace {
         Gfxf::getInstance().showGfxf = true;
     }
 
+    void testEditedRpkgSourcesBecomeGenerated() {
+        FileSource source = FileSource::rpkg("00ABCDEF01234567");
+        source.markEdited();
+        check(source == FileSource::generated(), "Editing rpkg data makes it generated");
+        FileSource diskSource = FileSource::disk("a.navp");
+        diskSource.markEdited();
+        check(diskSource == FileSource::disk("a.navp"), "Editing disk data keeps its path");
+
+        Airg& airg = Airg::getInstance();
+        airg.clear();
+        airg.reasoningGrid->m_WaypointList.resize(2);
+        airg.reasoningGrid->m_WaypointList[0].nNeighbors[2] = 1;
+        airg.reasoningGrid->m_WaypointList[1].nNeighbors[6] = 0;
+        airg.source = FileSource::rpkg("00ABCDEF01234567");
+        airg.disconnectWaypoints(0, 1);
+        check(airg.source == FileSource::generated(), "Disconnecting waypoints in an rpkg Airg makes it generated");
+        airg.clear();
+    }
+
+    void testSceneClearResetsLoading() {
+        Scene& scene = Scene::getInstance();
+        scene.loading = true;
+        scene.clear();
+        check(!scene.loading, "Clearing the scene resets its loading flag");
+    }
+
     void testRpkgDisplayNames() {
         check(Rpkg::displayName("00AB", "") == "00AB", "Resources without an IOI string show their hash");
         check(Rpkg::displayName("00AB", "[assembly:/a.navp]") == "[assembly:/a.navp]", "IOI strings are preferred");
@@ -2187,6 +2213,8 @@ void runDomainTests() {
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
     run("Clear and New Project file menu options", testClearAndNewProjectOptions);
+    run("Edited rpkg sources become generated", testEditedRpkgSourcesBecomeGenerated);
+    run("Scene clear resets loading", testSceneClearResetsLoading);
     run("Rpkg display names", testRpkgDisplayNames);
     runWithGameFile(
         "GFXF save matches vanilla GFXF apart from the array count", vanillaGfxf, testGfxfSaveMatchesVanillaGfxf);

@@ -111,6 +111,7 @@ void SceneExtract::finalizeExtractScene() {
         const std::string sceneFile =
             (std::filesystem::u8path(navKitSettings.outputFolder) / Scene::OUTPUT_SCENE_FILE_NAME).string();
         Logger::log(NK_INFO, "Loading nav.json file: '%s'.", sceneFile.c_str());
+        scene.source = FileSource::generated();
 
         backgroundWorker.emplace(
             &Scene::loadScene, &scene, sceneFile,
