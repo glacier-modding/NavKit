@@ -155,7 +155,7 @@ void Airg::UpdateDialogControls(wxDialog* dialog) {
 
 void Airg::resetDefaults() {
     Grid& grid = Grid::getInstance();
-    grid.spacing = 2.25;
+    grid.saveSpacing(Grid::defaultSpacing());
     grid.xOffset = 0;
     grid.yOffset = 0;
 }

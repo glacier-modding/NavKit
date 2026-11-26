@@ -25,7 +25,7 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include <array>
@@ -862,9 +862,9 @@ std::string SceneMesh::buildPrimLodsString() const {
 }
 
 void SceneMesh::loadSettings() {
-    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
-    const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
+    const ProjectSettings& projectSettings = ProjectSettings::getInstance();
+    meshTypeForBuild = strcmp(projectSettings.getValue("Obj", "meshTypeForBuild"), "ALOC") == 0 ? ALOC : PRIM;
+    const std::string primLodsStr = projectSettings.getValue("Obj", "primLods");
     for (int i = 0; i < 8; ++i) {
         if (i < primLodsStr.size()) {
             primLods[i] = primLodsStr[i] == '1';
@@ -872,43 +872,36 @@ void SceneMesh::loadSettings() {
             primLods[i] = true;
         }
     }
-    sceneMeshBuildType =
-        strcmp(persistedSettings.getValue("Obj", "sceneMeshBuildType", "COPY"), "COPY") == 0 ? COPY : INSTANCE;
-    skipExtractingAlocsOrPrims =
-        strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"), "true") == 0;
-    filterToIncludeBox = strcmp(persistedSettings.getValue("Obj", "filterToIncludeBox", "true"), "true") == 0;
-    extractTextures = strcmp(persistedSettings.getValue("Obj", "extractTextures", "false"), "true") == 0;
-    applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
+    sceneMeshBuildType = strcmp(projectSettings.getValue("Obj", "sceneMeshBuildType"), "COPY") == 0 ? COPY : INSTANCE;
+    skipExtractingAlocsOrPrims = strcmp(projectSettings.getValue("Obj", "skipExtractingAlocsOrPrims"), "true") == 0;
+    filterToIncludeBox = strcmp(projectSettings.getValue("Obj", "filterToIncludeBox"), "true") == 0;
+    extractTextures = strcmp(projectSettings.getValue("Obj", "extractTextures"), "true") == 0;
+    applyTextures = strcmp(projectSettings.getValue("Obj", "applyTextures"), "true") == 0;
 }
 
 void SceneMesh::saveSceneMeshSettings() const {
-    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    ProjectSettings& projectSettings = ProjectSettings::getInstance();
 
     const char* meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
-    persistedSettings.setValue("Obj", "meshTypeForBuild", meshTypeStr);
+    projectSettings.setValue("Obj", "meshTypeForBuild", meshTypeStr);
 
     const std::string primLodsStr = buildPrimLodsString();
-    persistedSettings.setValue("Obj", "primLods", primLodsStr);
+    projectSettings.setValue("Obj", "primLods", primLodsStr);
 
     const char* buildTypeStr = (sceneMeshBuildType == COPY) ? "COPY" : "INSTANCE";
-    persistedSettings.setValue("Obj", "sceneMeshBuildType", buildTypeStr);
+    projectSettings.setValue("Obj", "sceneMeshBuildType", buildTypeStr);
 
     const char* skipRpkgExtract = skipExtractingAlocsOrPrims ? "true" : "false";
-    persistedSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
+    projectSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
 
     const char* filterEnabled = filterToIncludeBox ? "true" : "false";
-    persistedSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
-
-    const char* onlyCollidableEnabled = onlyCollidable ? "true" : "false";
-    persistedSettings.setValue("Obj", "onlyCollidable", onlyCollidableEnabled);
+    projectSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
 
     const char* extractTexturesEnabled = extractTextures ? "true" : "false";
-    persistedSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
+    projectSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
 
     const char* applyTexturesEnabled = applyTextures ? "true" : "false";
-    persistedSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
-
-    persistedSettings.save();
+    projectSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
 }
 
 void SceneMesh::resetDefaults() {

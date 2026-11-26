@@ -1,11 +1,9 @@
 #include "../../include/NavKit/module/PersistedSettings.h"
 #include <filesystem>
 
-#include "../../include/NavKit/adapter/RecastAdapter.h"
-#include "../../include/NavKit/module/Crmd.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
-#include "../../include/NavKit/module/SceneMesh.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/util/FileUtil.h"
 
@@ -30,9 +28,7 @@ void PersistedSettings::load() {
     loadFile();
     NavKitSettings::getInstance().loadSettings();
     Renderer::getInstance().loadSettings();
-    SceneMesh::getInstance().loadSettings();
-    RecastAdapter::getInstance().loadSettings();
-    Crmd::getInstance().loadSettings();
+    ProjectSettings::getInstance().applyToModules();
 }
 
 void PersistedSettings::loadFile() {

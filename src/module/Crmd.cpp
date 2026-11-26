@@ -7,7 +7,7 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
@@ -932,14 +932,12 @@ void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolum
 }
 
 void Crmd::loadSettings() {
-    snapHeightsToGlb =
-        PersistedSettings::getInstance().getValue("Crmd", "snapHeightsToGlb", "true") == std::string("true");
+    snapHeightsToGlb = ProjectSettings::getInstance().getValue("Crmd", "snapHeightsToGlb") == std::string("true");
 }
 
 void Crmd::saveSettings() const {
-    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    persistedSettings.setValue("Crmd", "snapHeightsToGlb", snapHeightsToGlb ? "true" : "false");
-    persistedSettings.save();
+    ProjectSettings& projectSettings = ProjectSettings::getInstance();
+    projectSettings.setValue("Crmd", "snapHeightsToGlb", snapHeightsToGlb ? "true" : "false");
 }
 
 void Crmd::showCrmdSettingsDialog() {
