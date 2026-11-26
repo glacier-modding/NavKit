@@ -21,6 +21,7 @@ class NavKitSettings;
 
 std::string Rpkg::gameVersion = "HM3";
 bool Rpkg::extractionDataInitComplete = false;
+std::atomic_bool Rpkg::extractionDataInitInProgress = false;
 bool Rpkg::unknownGameVersion = false;
 PartitionManager* Rpkg::partitionManager = nullptr;
 HashList* Rpkg::hashList = nullptr;
@@ -30,16 +31,19 @@ std::mutex Rpkg::hashMapsMutex;
 std::optional<std::jthread> Rpkg::backgroundWorker{};
 
 void Rpkg::initExtractionData() {
+    extractionDataInitInProgress = true;
     const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
     const std::filesystem::path hitmanPath = std::filesystem::u8path(navKitSettings.hitmanFolder);
     if (!exists(hitmanPath)) {
         Logger::log(NK_ERROR, "Invalid hitman path.");
+        extractionDataInitInProgress = false;
         return;
     }
     const std::string retailFolder = (hitmanPath / "Retail").string();
     Logger::log(NK_INFO, "Checking Hitman Platform.");
     checkHitmanVersion();
     if (unknownGameVersion) {
+        extractionDataInitInProgress = false;
         return;
     }
     CPPTRACE_TRY {
@@ -287,6 +291,7 @@ void Rpkg::initExtractionData() {
             "Assassination installation directory.\n\nStack Trace: \n" +
             cpptrace::from_current_exception().to_string());
     }
+    extractionDataInitInProgress = false;
 }
 
 void Rpkg::checkHitmanVersion() {
@@ -329,6 +334,17 @@ void Rpkg::checkHitmanVersion() {
         Logger::log(
             NK_INFO, "Detected game platform: %s. Currently supported version: %s", platform.c_str(), GAME_VERSION);
     }
+}
+
+std::string Rpkg::displayName(const std::string& hash, const std::string& ioiString) {
+    return ioiString.empty() ? hash : ioiString;
+}
+
+std::string Rpkg::displayNameForHash(
+    const std::map<std::string, std::string>& hashToIoiString, std::mutex& mutex, const std::string& hash) {
+    std::lock_guard lock(mutex);
+    const auto entry = hashToIoiString.find(hash);
+    return displayName(hash, entry == hashToIoiString.end() ? std::string{} : entry->second);
 }
 
 bool Rpkg::canExtract() {

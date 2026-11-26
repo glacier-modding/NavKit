@@ -41,6 +41,7 @@
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneMesh.h"
@@ -580,12 +581,37 @@ void Gfxf::handleOpenGfxClicked() {
     }
 }
 
-void Gfxf::loadGfxfFromFile(const std::string& fileName) {
+bool Gfxf::loadGfxfFromFile(const std::string& fileName) {
     if (!isRegularFile(std::filesystem::u8path(fileName))) {
         showGfxfError("The selected GFXF/GFX/SWF file does not exist or is not a regular file.");
-        return;
+        return false;
     }
-    startLoad(fileName);
+    if (!startLoad(fileName)) {
+        return false;
+    }
+    source = FileSource::disk(fileName);
+    return true;
+}
+
+bool Gfxf::extractGfxfFromRpkgs(const std::string& hash) {
+    const std::filesystem::path outputFile =
+        std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".GFX");
+    std::error_code removeError;
+    std::filesystem::remove(outputFile, removeError);
+    if (removeError) {
+        showGfxfError("Could not remove the previous GFXF extraction: " + removeError.message());
+        return false;
+    }
+    if (Rpkg::extractResourcesFromRpkgs({hash}, GFXF) != 0 || !isRegularFile(outputFile)) {
+        showGfxfError("The RPKG library did not produce the expected GFX payload: " + pathToUtf8(outputFile));
+        return false;
+    }
+    Gfxf& gfxf = getInstance();
+    if (!gfxf.loadGfxfFromFile(pathToUtf8(outputFile))) {
+        return false;
+    }
+    gfxf.source = FileSource::rpkg(hash);
+    return true;
 }
 
 bool Gfxf::canSave() const {
@@ -593,8 +619,8 @@ bool Gfxf::canSave() const {
 }
 
 char* Gfxf::openSaveGfxfFileDialog() {
-    const nfdu8filteritem_t filter = {"GFXF files", "gfxf"};
-    return FileUtil::openNfdSaveDialog(&filter, 1, "output.gfxf");
+    const nfdu8filteritem_t filter = {"GFXF files", "GFXF"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.GFXF");
 }
 
 std::vector<unsigned char> Gfxf::extractGfxFromGfxf(const std::vector<unsigned char>& gfxfBytes) {
@@ -667,8 +693,9 @@ void Gfxf::setGfxData(std::vector<unsigned char> bytes) {
     Menu::updateMenuState();
 }
 
-void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
+bool Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
     saving = true;
+    bool saved = false;
     Menu::updateMenuState();
     const auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Saving Gfxf to file: '%s'...", fileName.c_str());
@@ -683,23 +710,30 @@ void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             Logger::log(NK_INFO, "Finished saving Gfxf in %lld ms.", duration.count());
+            saved = true;
         }
     }
 
     saving = false;
     Menu::updateMenuState();
+    return saved;
 }
 
 void Gfxf::handleSaveGfxfClicked() {
     if (char* fileName = openSaveGfxfFileDialog()) {
         const std::string path = fileName;
         NFD_FreePathU8(fileName);
-        saveWorker.emplace(&Gfxf::exportGfxfToGfxfFile, this, path);
+        saveWorker.emplace([this, path] {
+            if (exportGfxfToGfxfFile(path)) {
+                Project::fileSaved([this, path] { source = FileSource::disk(path); });
+            }
+        });
     }
 }
 
-void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
+bool Gfxf::exportGfxToGfxFile(const std::string& fileName) {
     saving = true;
+    bool saved = false;
     Menu::updateMenuState();
     Logger::log(NK_INFO, "Saving Gfx to file: '%s'...", fileName.c_str());
 
@@ -713,6 +747,7 @@ void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
             output.close();
             if (output) {
                 Logger::log(NK_INFO, "Finished saving Gfx.");
+                saved = true;
             } else {
                 Logger::log(NK_ERROR, "Error saving Gfx file '%s'.", fileName.c_str());
             }
@@ -721,6 +756,7 @@ void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
 
     saving = false;
     Menu::updateMenuState();
+    return saved;
 }
 
 void Gfxf::handleSaveGfxClicked() {
@@ -728,7 +764,11 @@ void Gfxf::handleSaveGfxClicked() {
     if (char* fileName = FileUtil::openNfdSaveDialog(&filter, 1, "output.gfx")) {
         const std::string path = fileName;
         NFD_FreePathU8(fileName);
-        saveWorker.emplace(&Gfxf::exportGfxToGfxFile, this, path);
+        saveWorker.emplace([this, path] {
+            if (exportGfxToGfxFile(path)) {
+                Project::fileSaved([this, path] { source = FileSource::disk(path); });
+            }
+        });
     }
 }
 
@@ -938,14 +978,18 @@ void Gfxf::buildGfx() {
     const auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
     Logger::log(NK_INFO, "Finished GFX build in %s seconds", std::to_string(duration.count()).c_str());
     if (!gfxfPath.empty() && wxTheApp != nullptr) {
-        wxTheApp->CallAfter([gfxfPath] { getInstance().loadGfxfFromFile(pathToUtf8(gfxfPath)); });
+        wxTheApp->CallAfter([gfxfPath] {
+            if (Gfxf& gfxf = getInstance(); gfxf.loadGfxfFromFile(pathToUtf8(gfxfPath))) {
+                gfxf.source = FileSource::generated();
+            }
+        });
     }
     building = false;
 }
 
-void Gfxf::startLoad(const std::string& fileName) {
+bool Gfxf::startLoad(const std::string& fileName) {
     if (!canLoad()) {
-        return;
+        return false;
     }
     closeGfxfSettingsDialog();
 
@@ -953,7 +997,7 @@ void Gfxf::startLoad(const std::string& fileName) {
     if (ffdecCommand.prefix.empty()) {
         showGfxfError("The bundled FFDec CLI is missing. Repair the NavKit installation or set FFDEC_PATH to an "
                       "FFDec CLI executable.");
-        return;
+        return false;
     }
 
     ++loadGeneration;
@@ -1064,6 +1108,7 @@ void Gfxf::startLoad(const std::string& fileName) {
         std::lock_guard lock(resultMutex);
         completedLoad = std::move(result);
     });
+    return true;
 }
 
 void Gfxf::showExtractGfxfDialog() {
@@ -1093,7 +1138,7 @@ void Gfxf::showExtractGfxfDialog() {
     std::vector<std::string> items;
     items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        items.push_back(ioiString.empty() ? hash : ioiString);
+        items.push_back(Rpkg::displayName(hash, ioiString));
     }
     picker->setItems(std::move(items));
 
@@ -1114,21 +1159,10 @@ void Gfxf::showExtractGfxfDialog() {
     open->Bind(wxEVT_BUTTON, [dialog, picker, entries = std::move(entries)](wxCommandEvent&) {
         const std::string selected = picker->getSelection();
         const auto entry = std::ranges::find_if(entries, [&selected](const auto& candidate) {
-            return (candidate.second.empty() ? candidate.first : candidate.second) == selected;
+            return Rpkg::displayName(candidate.first, candidate.second) == selected;
         });
         if (entry != entries.end()) {
-            const std::string& hash = entry->first;
-            const std::filesystem::path outputFile =
-                std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".gfx");
-            std::error_code removeError;
-            std::filesystem::remove(outputFile, removeError);
-            if (removeError) {
-                showGfxfError("Could not remove the previous GFXF extraction: " + removeError.message());
-            } else if (Rpkg::extractResourcesFromRpkgs({hash}, GFXF) != 0 || !isRegularFile(outputFile)) {
-                showGfxfError("The RPKG library did not produce the expected GFX payload: " + pathToUtf8(outputFile));
-            } else {
-                Gfxf::getInstance().loadGfxfFromFile(pathToUtf8(outputFile));
-            }
+            extractGfxfFromRpkgs(entry->first);
         }
         dialog->Close();
     });
@@ -1620,6 +1654,7 @@ void Gfxf::clear() {
     closeGfxfSettingsDialog();
     gfxfLoaded = false;
     loadedFile.clear();
+    source = {};
     layerNames.clear();
     layerImages.clear();
     layerPlacements.clear();

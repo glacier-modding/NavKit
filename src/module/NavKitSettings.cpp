@@ -231,6 +231,7 @@ void NavKitSettings::setHitmanFolder(const std::string& folderName) {
         hitmanFolder = folderName;
         Logger::log(NK_INFO, ("Setting Hitman folder to: " + hitmanFolder).c_str());
         if (shouldReinitExtractionData) {
+            Rpkg::extractionDataInitInProgress = true;
             Rpkg::backgroundWorker.emplace(&Rpkg::initExtractionData);
         }
     } else {

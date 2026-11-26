@@ -1,8 +1,10 @@
 #pragma once
+#include <atomic>
 #include <functional>
 #include <wx/dialog.h>
 #include <map>
 #include <thread>
+#include "../model/FileSource.h"
 #include "../model/Json.h"
 
 class Scene {
@@ -15,16 +17,18 @@ public:
 
     static char* openSaveSceneFileDialog();
 
-    void setLastLoadFileName(char* file_name);
+    void setLastLoadFileName(const char* fileName);
 
     void setLastSaveFileName(char* file_name);
 
     void loadRoomsAndVolumes(const std::function<void()>& errorCallback,
         simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
-    void saveScene(const std::string& fileName) const;
+    bool saveScene(const std::string& fileName) const;
 
     void handleOpenSceneClicked();
+
+    void loadSceneFromFile(const std::string& fileName, const FileSource& fileSource);
 
     void handleSaveSceneClicked();
 
@@ -71,6 +75,8 @@ public:
 
     std::string lastLoadSceneFile;
     bool sceneLoaded;
+    std::atomic_bool loading = false;
+    FileSource source;
 
     std::vector<Json::Gate> gates;
     std::vector<Json::Room> rooms;

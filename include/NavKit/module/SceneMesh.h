@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <map>
 #include <optional>
 #include <string>
@@ -10,6 +11,7 @@
 
 #include "../render/Model.h"
 #include "../render/Shader.h"
+#include "../model/FileSource.h"
 #include "../model/Json.h"
 
 enum MeshType { ALOC, PRIM };
@@ -42,6 +44,8 @@ public:
     std::vector<std::string> files;
     std::string glbToLoad;
     std::vector<bool> glbLoadDone;
+    std::atomic_bool glbLoadFailed = false;
+    FileSource source;
     bool startedSceneMeshGeneration;
     bool blenderSceneMeshBuildStarted;
     bool blenderSceneMeshGenerationDone;
@@ -76,7 +80,7 @@ public:
 
     void handleBuildBlendAndGlbAndGfxFromSceneClicked();
 
-    static void copyFile(const std::string& from, const std::string& to, const std::string& filetype);
+    static bool copyFile(const std::string& from, const std::string& to, const std::string& filetype);
 
     void saveGlbMesh(char* glbToCopy, char* newFileName);
 
@@ -103,6 +107,10 @@ public:
     void setLastSaveFileName(const char* fileName);
 
     void handleOpenGlbClicked();
+
+    void loadGlbFromFile(const std::string& fileName, const FileSource& fileSource);
+
+    [[nodiscard]] bool isLoadingGlb() const;
 
     void handleSaveGlbClicked();
 

@@ -9,6 +9,7 @@
 #include <GL/glew.h>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
+#include "../model/FileSource.h"
 #include "../model/ReasoningGrid.h"
 
 struct Vec3;
@@ -46,6 +47,7 @@ public:
     bool airgLoaded;
     bool airgLoading;
     bool airgBuilding;
+    FileSource source;
     bool connectWaypointModeEnabled;
     bool disconnectWaypointModeEnabled;
     std::vector<bool> airgSaveState;
@@ -93,13 +95,13 @@ public:
 
     void handleSaveAirgClicked();
 
-    void loadAirgFromFile(const std::string& fileName);
+    bool loadAirgFromFile(const std::string& fileName);
 
     static void updateAirgDialogControls(wxDialog* dialog);
 
     void showExtractAirgDialog();
 
-    static void extractAirgFromRpkgs(const std::string& hash);
+    static bool extractAirgFromRpkgs(const std::string& hash);
 
     [[nodiscard]] bool canLoad() const;
 
@@ -134,6 +136,8 @@ public:
     static std::map<std::string, std::string> airgHashIoiStringMap;
     static std::mutex airgHashIoiStringMapMutex;
 
+    static bool saveAirg(Airg* airg, const std::string& fileName);
+
 private:
     static GLuint airgLineVbo;
 
@@ -152,8 +156,6 @@ private:
     static char* openSaveAirgFileDialog();
 
     static char* openAirgFileDialog();
-
-    static void saveAirg(Airg* airg, const std::string& fileName);
 
     static void loadAirg(Airg* airg, const std::string& fileName);
 };

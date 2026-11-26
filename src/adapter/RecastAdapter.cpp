@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <sstream>
 
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 RecastAdapter::RecastAdapter() {
@@ -1032,18 +1032,16 @@ SceneMeshHitTestResult RecastAdapter::doHitTest(const int mx, const int my) {
 }
 
 void RecastAdapter::loadSettings() const {
-    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    sample->m_cellSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "cellSize", "0.1f")));
-    sample->m_cellHeight = static_cast<float>(atof(persistedSettings.getValue("Recast", "cellHeight", "0.1f")));
-    sample->m_agentHeight = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentHeight", "1.8f")));
-    sample->m_agentRadius = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentRadius", "0.2f")));
-    sample->m_agentMaxClimb = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentMaxClimb", "0.41f")));
-    sample->m_agentMaxSlope = static_cast<float>(atof(persistedSettings.getValue("Recast", "agentMaxSlope", "45.0f")));
-    sample->m_regionMinSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "regionMinSize", "25f")));
-    sample->m_regionMergeSize =
-        static_cast<float>(atof(persistedSettings.getValue("Recast", "regionMergeSize", "30f")));
-    if (const char* partitionTypeStr(
-            persistedSettings.getValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED"));
+    const ProjectSettings& projectSettings = ProjectSettings::getInstance();
+    sample->m_cellSize = static_cast<float>(atof(projectSettings.getValue("Recast", "cellSize")));
+    sample->m_cellHeight = static_cast<float>(atof(projectSettings.getValue("Recast", "cellHeight")));
+    sample->m_agentHeight = static_cast<float>(atof(projectSettings.getValue("Recast", "agentHeight")));
+    sample->m_agentRadius = static_cast<float>(atof(projectSettings.getValue("Recast", "agentRadius")));
+    sample->m_agentMaxClimb = static_cast<float>(atof(projectSettings.getValue("Recast", "agentMaxClimb")));
+    sample->m_agentMaxSlope = static_cast<float>(atof(projectSettings.getValue("Recast", "agentMaxSlope")));
+    sample->m_regionMinSize = static_cast<float>(atof(projectSettings.getValue("Recast", "regionMinSize")));
+    sample->m_regionMergeSize = static_cast<float>(atof(projectSettings.getValue("Recast", "regionMergeSize")));
+    if (const char* partitionTypeStr(projectSettings.getValue("Recast", "partitionType"));
         strcmp(partitionTypeStr, "SAMPLE_PARTITION_MONOTONE") == 0) {
         sample->m_partitionType = SAMPLE_PARTITION_MONOTONE;
     } else if (strcmp(partitionTypeStr, "SAMPLE_PARTITION_LAYERS") == 0) {
@@ -1052,58 +1050,52 @@ void RecastAdapter::loadSettings() const {
         sample->m_partitionType = SAMPLE_PARTITION_WATERSHED;
     }
     sample->m_filterLowHangingObstacles =
-        static_cast<bool>(atoi(persistedSettings.getValue("Recast", "filterLowHangingObstacles", "1f")));
-    sample->m_filterLedgeSpans =
-        static_cast<bool>(atoi(persistedSettings.getValue("Recast", "filterLedgeSpans", "1f")));
+        static_cast<bool>(atoi(projectSettings.getValue("Recast", "filterLowHangingObstacles")));
+    sample->m_filterLedgeSpans = static_cast<bool>(atoi(projectSettings.getValue("Recast", "filterLedgeSpans")));
     sample->m_filterWalkableLowHeightSpans =
-        static_cast<bool>(atoi(persistedSettings.getValue("Recast", "filterWalkableLowHeightSpans", "1f")));
-    sample->m_edgeMaxLen =
-        static_cast<float>(atof(persistedSettings.getValue("Recast", "polygonizationEdgeMaxLen", "5.0f")));
-    sample->m_edgeMaxError =
-        static_cast<float>(atof(persistedSettings.getValue("Recast", "polygonizationEdgeMaxError", "1.4f")));
-    sample->m_vertsPerPoly =
-        static_cast<float>(atof(persistedSettings.getValue("Recast", "polygonizationVertsPerPoly", "3")));
-    sample->m_detailSampleDist =
-        static_cast<float>(atof(persistedSettings.getValue("Recast", "detailSampleDist", "1.5f")));
+        static_cast<bool>(atoi(projectSettings.getValue("Recast", "filterWalkableLowHeightSpans")));
+    sample->m_edgeMaxLen = static_cast<float>(atof(projectSettings.getValue("Recast", "polygonizationEdgeMaxLen")));
+    sample->m_edgeMaxError = static_cast<float>(atof(projectSettings.getValue("Recast", "polygonizationEdgeMaxError")));
+    sample->m_vertsPerPoly = static_cast<float>(atof(projectSettings.getValue("Recast", "polygonizationVertsPerPoly")));
+    sample->m_detailSampleDist = static_cast<float>(atof(projectSettings.getValue("Recast", "detailSampleDist")));
     sample->m_detailSampleMaxError =
-        static_cast<float>(atof(persistedSettings.getValue("Recast", "detailSampleMaxError", "1.4f")));
-    sample->m_tileSize = static_cast<float>(atof(persistedSettings.getValue("Recast", "tilingTileSize", "64f")));
+        static_cast<float>(atof(projectSettings.getValue("Recast", "detailSampleMaxError")));
+    sample->m_tileSize = static_cast<float>(atof(projectSettings.getValue("Recast", "tilingTileSize")));
 }
 
 void RecastAdapter::saveSettings() const {
-    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    persistedSettings.setValue("Recast", "cellSize", std::to_string(sample->m_cellSize));
-    persistedSettings.setValue("Recast", "cellHeight", std::to_string(sample->m_cellHeight));
-    persistedSettings.setValue("Recast", "agentHeight", std::to_string(sample->m_agentHeight));
-    persistedSettings.setValue("Recast", "agentRadius", std::to_string(sample->m_agentRadius));
-    persistedSettings.setValue("Recast", "agentMaxClimb", std::to_string(sample->m_agentMaxClimb));
-    persistedSettings.setValue("Recast", "agentMaxSlope", std::to_string(sample->m_agentMaxSlope));
-    persistedSettings.setValue("Recast", "regionMinSize", std::to_string(sample->m_regionMinSize));
-    persistedSettings.setValue("Recast", "regionMergeSize", std::to_string(sample->m_regionMergeSize));
-    persistedSettings.setValue(
+    ProjectSettings& projectSettings = ProjectSettings::getInstance();
+    projectSettings.setValue("Recast", "cellSize", std::to_string(sample->m_cellSize));
+    projectSettings.setValue("Recast", "cellHeight", std::to_string(sample->m_cellHeight));
+    projectSettings.setValue("Recast", "agentHeight", std::to_string(sample->m_agentHeight));
+    projectSettings.setValue("Recast", "agentRadius", std::to_string(sample->m_agentRadius));
+    projectSettings.setValue("Recast", "agentMaxClimb", std::to_string(sample->m_agentMaxClimb));
+    projectSettings.setValue("Recast", "agentMaxSlope", std::to_string(sample->m_agentMaxSlope));
+    projectSettings.setValue("Recast", "regionMinSize", std::to_string(sample->m_regionMinSize));
+    projectSettings.setValue("Recast", "regionMergeSize", std::to_string(sample->m_regionMergeSize));
+    projectSettings.setValue(
         "Recast", "filterLowHangingObstacles", std::to_string(sample->m_filterLowHangingObstacles));
-    persistedSettings.setValue("Recast", "filterLedgeSpans", std::to_string(sample->m_filterLedgeSpans));
-    persistedSettings.setValue(
+    projectSettings.setValue("Recast", "filterLedgeSpans", std::to_string(sample->m_filterLedgeSpans));
+    projectSettings.setValue(
         "Recast", "filterWalkableLowHeightSpans", std::to_string(sample->m_filterWalkableLowHeightSpans));
-    persistedSettings.setValue("Recast", "polygonizationEdgeMaxLen", std::to_string(sample->m_edgeMaxLen));
-    persistedSettings.setValue("Recast", "polygonizationEdgeMaxError", std::to_string(sample->m_edgeMaxError));
-    persistedSettings.setValue("Recast", "polygonizationVertsPerPoly", std::to_string(sample->m_vertsPerPoly));
-    persistedSettings.setValue("Recast", "detailSampleDist", std::to_string(sample->m_detailSampleDist));
-    persistedSettings.setValue("Recast", "detailSampleMaxError", std::to_string(sample->m_detailSampleMaxError));
-    persistedSettings.setValue("Recast", "tilingTileSize", std::to_string(sample->m_tileSize));
+    projectSettings.setValue("Recast", "polygonizationEdgeMaxLen", std::to_string(sample->m_edgeMaxLen));
+    projectSettings.setValue("Recast", "polygonizationEdgeMaxError", std::to_string(sample->m_edgeMaxError));
+    projectSettings.setValue("Recast", "polygonizationVertsPerPoly", std::to_string(sample->m_vertsPerPoly));
+    projectSettings.setValue("Recast", "detailSampleDist", std::to_string(sample->m_detailSampleDist));
+    projectSettings.setValue("Recast", "detailSampleMaxError", std::to_string(sample->m_detailSampleMaxError));
+    projectSettings.setValue("Recast", "tilingTileSize", std::to_string(sample->m_tileSize));
     switch (sample->m_partitionType) {
     case SAMPLE_PARTITION_MONOTONE:
-        persistedSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_MONOTONE");
+        projectSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_MONOTONE");
         break;
     case SAMPLE_PARTITION_LAYERS:
-        persistedSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_LAYERS");
+        projectSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_LAYERS");
         break;
     case SAMPLE_PARTITION_WATERSHED:
     default:
-        persistedSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED");
+        projectSettings.setValue("Recast", "partitionType", "SAMPLE_PARTITION_WATERSHED");
         break;
     }
-    persistedSettings.save();
 }
 
 Vec3 RecastAdapter::convertFromNavPowerToRecast(Vec3 pos) {

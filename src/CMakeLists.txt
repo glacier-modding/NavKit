@@ -35,6 +35,8 @@ set(MODULE_SOURCES
         module/NavKitSettings.cpp
         module/Navp.cpp
         module/PersistedSettings.cpp
+        module/Project.cpp
+        module/ProjectSettings.cpp
         module/Renderer.cpp
         module/Rpkg.cpp
         module/Scene.cpp
