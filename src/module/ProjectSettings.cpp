@@ -36,7 +36,7 @@ namespace {
             {
                 {"meshTypeForBuild", "ALOC"},
                 {"primLods", "11111111"},
-                {"sceneMeshBuildType", "COPY"},
+                {"sceneMeshBuildType", "INSTANCE"},
                 {"skipExtractingAlocsOrPrims", "false"},
                 {"filterToIncludeBox", "true"},
                 {"extractTextures", "false"},
