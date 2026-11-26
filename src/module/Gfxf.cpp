@@ -595,7 +595,7 @@ bool Gfxf::loadGfxfFromFile(const std::string& fileName) {
 
 bool Gfxf::extractGfxfFromRpkgs(const std::string& hash) {
     const std::filesystem::path outputFile =
-        std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".gfx");
+        std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "gfxf" / (hash + ".GFX");
     std::error_code removeError;
     std::filesystem::remove(outputFile, removeError);
     if (removeError) {
