@@ -39,6 +39,7 @@
 #include "../include/NavKit/module/Navp.h"
 #include "../include/NavKit/module/SceneMesh.h"
 #include "../include/NavKit/module/PersistedSettings.h"
+#include "../include/NavKit/module/Project.h"
 #include "../include/NavKit/module/Renderer.h"
 #include "../include/NavKit/module/SceneExtract.h"
 #include "../include/NavKit/util/ErrorHandler.h"
@@ -62,6 +63,7 @@ void runFrameIteration() {
     Gfxf::getInstance().finalizeLoad();
     Airg::getInstance().finalizeSave();
     SceneMesh::getInstance().finalizeExtractResources();
+    Project::getInstance().update();
     Renderer::getInstance().finalizeFrame();
 }
 

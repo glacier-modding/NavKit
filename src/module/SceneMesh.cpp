@@ -25,7 +25,8 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/Project.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/WxApplication.h"
 #include <array>
@@ -534,6 +535,9 @@ void SceneMesh::finalizeSceneMeshBuild() {
         glbToLoad = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedGlbName).string();
         loadGlb = !blendFileOnlyBuild;
         lastGlbFileName = (std::filesystem::u8path(navKitSettings.outputFolder) / generatedGlbName).string();
+        if (loadGlb) {
+            source = FileSource::generated();
+        }
         blenderSceneMeshBuildStarted = false;
         blenderSceneMeshGenerationDone = false;
         sceneExtract.alsoBuildGlb = false;
@@ -552,10 +556,10 @@ void SceneMesh::finalizeSceneMeshBuild() {
     Menu::updateMenuState();
 }
 
-void SceneMesh::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
+bool SceneMesh::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
     if (from == to) {
         Logger::log(NK_ERROR, "Cannot overwrite current %s file: %s", filetype.c_str(), from.c_str());
-        return;
+        return false;
     }
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -566,8 +570,10 @@ void SceneMesh::copyFile(const std::string& from, const std::string& to, const s
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving %s in %lld ms.", filetype.c_str(), duration.count());
+        return true;
     } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
+        return false;
     }
 }
 
@@ -578,7 +584,11 @@ void SceneMesh::saveGlbMesh(char* glbToCopy, char* newFileName) {
     Logger::log(NK_INFO, msg.data());
     const std::string sourcePath = glbToCopy;
     const std::string destinationPath = newFileName;
-    backgroundWorker.emplace(&SceneMesh::copyFile, sourcePath, destinationPath, "GLB");
+    backgroundWorker.emplace([this, sourcePath, destinationPath] {
+        if (copyFile(sourcePath, destinationPath, "GLB")) {
+            Project::fileSaved([this, destinationPath] { source = FileSource::disk(destinationPath); });
+        }
+    });
 }
 
 void SceneMesh::saveBlendMesh(std::string blendToCopy, std::string newFileName) {
@@ -642,6 +652,7 @@ void SceneMesh::loadGlbMesh() {
     } else {
         Logger::log(NK_ERROR, "Error loading GLB. It may be invalid, too large, or contain no triangles.");
         model.meshes.clear();
+        glbLoadFailed = true;
         SceneExtract::getInstance().alsoBuildAll = false;
         Menu::updateMenuState();
     }
@@ -707,12 +718,21 @@ void SceneMesh::setLastSaveFileName(const char* fileName) {
 
 void SceneMesh::handleOpenGlbClicked() {
     if (const char* fileName = openLoadGlbFileDialog()) {
-        setLastLoadFileName(fileName);
-        glbLoaded = false;
-        glbToLoad = fileName;
-        loadGlb = true;
-        Menu::updateMenuState();
+        loadGlbFromFile(fileName, FileSource::disk(fileName));
     }
+}
+
+void SceneMesh::loadGlbFromFile(const std::string& fileName, const FileSource& fileSource) {
+    setLastLoadFileName(fileName.c_str());
+    source = fileSource;
+    glbLoaded = false;
+    glbToLoad = fileName;
+    loadGlb = true;
+    Menu::updateMenuState();
+}
+
+bool SceneMesh::isLoadingGlb() const {
+    return loadGlb || !glbToLoad.empty() || !glbLoadDone.empty();
 }
 
 void SceneMesh::handleSaveGlbClicked() {
@@ -811,6 +831,13 @@ void SceneMesh::finalizeLoad() {
         loadGlb = false;
     }
 
+    if (glbLoadFailed) {
+        glbLoadFailed = false;
+        glbToLoad.clear();
+        source = {};
+        Menu::updateMenuState();
+    }
+
     if (!glbLoadDone.empty()) {
         if (const RecastAdapter& recastAdapter = RecastAdapter::getInstance(); recastAdapter.inputGeom) {
             Logger::log(NK_INFO, "Creating OpenGL buffers for model...");
@@ -842,9 +869,9 @@ std::string SceneMesh::buildPrimLodsString() const {
 }
 
 void SceneMesh::loadSettings() {
-    const PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    meshTypeForBuild = strcmp(persistedSettings.getValue("Obj", "meshTypeForBuild", "ALOC"), "ALOC") == 0 ? ALOC : PRIM;
-    const std::string primLodsStr = persistedSettings.getValue("Obj", "primLods", "11111111");
+    const ProjectSettings& projectSettings = ProjectSettings::getInstance();
+    meshTypeForBuild = strcmp(projectSettings.getValue("Obj", "meshTypeForBuild"), "ALOC") == 0 ? ALOC : PRIM;
+    const std::string primLodsStr = projectSettings.getValue("Obj", "primLods");
     for (int i = 0; i < 8; ++i) {
         if (i < primLodsStr.size()) {
             primLods[i] = primLodsStr[i] == '1';
@@ -852,43 +879,36 @@ void SceneMesh::loadSettings() {
             primLods[i] = true;
         }
     }
-    sceneMeshBuildType =
-        strcmp(persistedSettings.getValue("Obj", "sceneMeshBuildType", "COPY"), "COPY") == 0 ? COPY : INSTANCE;
-    skipExtractingAlocsOrPrims =
-        strcmp(persistedSettings.getValue("Obj", "skipExtractingAlocsOrPrims", "false"), "true") == 0;
-    filterToIncludeBox = strcmp(persistedSettings.getValue("Obj", "filterToIncludeBox", "true"), "true") == 0;
-    extractTextures = strcmp(persistedSettings.getValue("Obj", "extractTextures", "false"), "true") == 0;
-    applyTextures = strcmp(persistedSettings.getValue("Obj", "applyTextures", "false"), "true") == 0;
+    sceneMeshBuildType = strcmp(projectSettings.getValue("Obj", "sceneMeshBuildType"), "COPY") == 0 ? COPY : INSTANCE;
+    skipExtractingAlocsOrPrims = strcmp(projectSettings.getValue("Obj", "skipExtractingAlocsOrPrims"), "true") == 0;
+    filterToIncludeBox = strcmp(projectSettings.getValue("Obj", "filterToIncludeBox"), "true") == 0;
+    extractTextures = strcmp(projectSettings.getValue("Obj", "extractTextures"), "true") == 0;
+    applyTextures = strcmp(projectSettings.getValue("Obj", "applyTextures"), "true") == 0;
 }
 
 void SceneMesh::saveSceneMeshSettings() const {
-    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
+    ProjectSettings& projectSettings = ProjectSettings::getInstance();
 
     const char* meshTypeStr = (meshTypeForBuild == PRIM) ? "PRIM" : "ALOC";
-    persistedSettings.setValue("Obj", "meshTypeForBuild", meshTypeStr);
+    projectSettings.setValue("Obj", "meshTypeForBuild", meshTypeStr);
 
     const std::string primLodsStr = buildPrimLodsString();
-    persistedSettings.setValue("Obj", "primLods", primLodsStr);
+    projectSettings.setValue("Obj", "primLods", primLodsStr);
 
     const char* buildTypeStr = (sceneMeshBuildType == COPY) ? "COPY" : "INSTANCE";
-    persistedSettings.setValue("Obj", "sceneMeshBuildType", buildTypeStr);
+    projectSettings.setValue("Obj", "sceneMeshBuildType", buildTypeStr);
 
     const char* skipRpkgExtract = skipExtractingAlocsOrPrims ? "true" : "false";
-    persistedSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
+    projectSettings.setValue("Obj", "skipExtractingAlocsOrPrims", skipRpkgExtract);
 
     const char* filterEnabled = filterToIncludeBox ? "true" : "false";
-    persistedSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
-
-    const char* onlyCollidableEnabled = onlyCollidable ? "true" : "false";
-    persistedSettings.setValue("Obj", "onlyCollidable", onlyCollidableEnabled);
+    projectSettings.setValue("Obj", "filterToIncludeBox", filterEnabled);
 
     const char* extractTexturesEnabled = extractTextures ? "true" : "false";
-    persistedSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
+    projectSettings.setValue("Obj", "extractTextures", extractTexturesEnabled);
 
     const char* applyTexturesEnabled = applyTextures ? "true" : "false";
-    persistedSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
-
-    persistedSettings.save();
+    projectSettings.setValue("Obj", "applyTextures", applyTexturesEnabled);
 }
 
 void SceneMesh::resetDefaults() {
@@ -908,7 +928,9 @@ void SceneMesh::clear() {
     lastGlbFileName = "Load GLB";
     lastSaveGlbFileName = "Save GLB";
     generatedGlbName.clear();
+    source = {};
     glbLoaded = false;
+    glbLoadFailed = false;
     loadGlb = false;
     files.clear();
     glbToLoad.clear();

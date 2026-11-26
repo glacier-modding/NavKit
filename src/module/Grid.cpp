@@ -3,16 +3,19 @@
 #include "../../include/NavKit/module/Grid.h"
 #include "../../include/NavKit/model/ReasoningGrid.h"
 #include "../../include/NavKit/module/Airg.h"
+#include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/Renderer.h"
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
+#include <cmath>
+#include <cstdlib>
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 Grid::Grid() {
-    spacing = 2.25;
+    spacing = defaultSpacing();
     xMin = -22.5;
     yMin = -22.5;
     xMax = 22.5;
@@ -34,8 +37,26 @@ void Grid::loadBoundsFromAirg() {
     gridWidth = std::ceil((xMax - xMin) / spacing);
 }
 
+float Grid::defaultSpacing() {
+    return std::strtof(ProjectSettings::getDefaultValue("Airg", "spacing"), nullptr);
+}
+
+void Grid::loadSettings() {
+    const char* spacingText = ProjectSettings::getInstance().getValue("Airg", "spacing");
+    char* end = nullptr;
+    const float loadedSpacing = std::strtof(spacingText, &end);
+    if (end == spacingText || *end != '\0' || !std::isfinite(loadedSpacing) || loadedSpacing <= 0.0f) {
+        Logger::log(NK_WARN, "Ignoring invalid Airg spacing '%s'; using the default of %s.", spacingText,
+            ProjectSettings::getDefaultValue("Airg", "spacing"));
+        spacing = defaultSpacing();
+    } else {
+        spacing = loadedSpacing;
+    }
+    gridWidth = std::ceil((xMax - xMin) / spacing);
+}
+
 void Grid::saveSpacing(const float newSpacing) {
-    PersistedSettings::getInstance().setValue("Airg", "spacing", std::to_string(newSpacing));
+    ProjectSettings::getInstance().setValue("Airg", "spacing", std::to_string(newSpacing));
     spacing = newSpacing;
 }
 

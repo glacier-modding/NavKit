@@ -5,9 +5,10 @@
 #include "../../include/NavKit/module/Airg.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
-#include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/ProjectSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
@@ -613,33 +614,36 @@ void Crmd::rebuildRenderGeometry(LoadedCrowdMap& crowdMap) {
     }
     flowArrowLineBuffer.upload(arrows);
 }
-void Crmd::loadCrmdFromFiles(const std::vector<std::pair<std::string, std::string>>& filesAndNames) {
-    if (filesAndNames.empty()) {
-        return;
+bool Crmd::loadCrmdFromFiles(const std::vector<CrmdFileToLoad>& files) {
+    if (files.empty()) {
+        return false;
     }
     if (loading || saving || building) {
         Logger::log(NK_WARN, "Crmd load skipped: another Crmd load, save, or build is in progress.");
-        return;
+        return false;
     }
     loading = true;
     Menu::updateMenuState();
-    backgroundWorker.emplace([this, filesAndNames] {
-        for (const auto& [fileName, name] : filesAndNames) {
-            loadCrowdMapData(fileName, name);
+    backgroundWorker.emplace([this, files] {
+        for (const auto& [fileName, name, fileSource, crowdKey] : files) {
+            loadCrowdMapData(fileName, name, fileSource, crowdKey);
         }
         loading = false;
         Menu::updateMenuState();
     });
+    return true;
 }
 
-void Crmd::loadCrowdMapData(const std::string& fileName, const std::string& name) {
+void Crmd::loadCrowdMapData(
+    const std::string& fileName, const std::string& name, const FileSource& fileSource, const std::string& crowdKey) {
     Logger::log(NK_INFO, ("Loading Crmd file: '" + fileName + "'...").c_str());
     const auto start = std::chrono::high_resolution_clock::now();
     CPPTRACE_TRY {
         std::error_code error;
         const std::filesystem::path canonicalPath =
             std::filesystem::weakly_canonical(std::filesystem::u8path(fileName), error);
-        addCrowdMap(readCrowdMap(fileName), name, "file:" + (error ? fileName : canonicalPath.string()));
+        addCrowdMap(readCrowdMap(fileName), name, "file:" + (error ? fileName : canonicalPath.string()), crowdKey,
+            fileSource.kind == FileSource::Kind::None ? FileSource::disk(fileName) : fileSource);
     }
     CPPTRACE_CATCH(const std::exception& e) {
         const std::string stackTrace = cpptrace::from_current_exception().to_string();
@@ -660,19 +664,23 @@ void Crmd::loadCrowdMapData(const std::string& fileName, const std::string& name
 }
 
 void Crmd::handleOpenCrmdClicked() {
-    std::vector<std::pair<std::string, std::string>> filesAndNames;
+    std::vector<CrmdFileToLoad> files;
     for (const std::string& fileName : openLoadCrmdFilesDialog()) {
-        filesAndNames.emplace_back(fileName, std::filesystem::u8path(fileName).filename().string());
+        files.push_back({fileName, std::filesystem::u8path(fileName).filename().string(), FileSource::disk(fileName)});
     }
-    loadCrmdFromFiles(filesAndNames);
+    loadCrmdFromFiles(files);
 }
 
-void Crmd::addCrowdMap(std::unique_ptr<SCrowdMapData> data, const std::string& name, const std::string& sourceKey) {
+void Crmd::addCrowdMap(std::unique_ptr<SCrowdMapData> data, const std::string& name, const std::string& sourceKey,
+    const std::string& crowdKey, const FileSource& fileSource) {
     {
         std::lock_guard lock(crowdMapsMutex);
-        const auto existing = sourceKey.empty()
+        auto existing = crowdKey.empty()
             ? crowdMaps.end()
-            : std::ranges::find_if(crowdMaps, [&](const auto& map) { return map->sourceKey == sourceKey; });
+            : std::ranges::find_if(crowdMaps, [&](const auto& map) { return map->crowdKey == crowdKey; });
+        if (existing == crowdMaps.end() && !sourceKey.empty()) {
+            existing = std::ranges::find_if(crowdMaps, [&](const auto& map) { return map->sourceKey == sourceKey; });
+        }
         if (existing == crowdMaps.end()) {
             crowdMaps.push_back(std::make_unique<LoadedCrowdMap>());
             selectedCrowdMapIndex = static_cast<int>(crowdMaps.size() - 1);
@@ -682,7 +690,13 @@ void Crmd::addCrowdMap(std::unique_ptr<SCrowdMapData> data, const std::string& n
         LoadedCrowdMap& crowdMap = *crowdMaps[selectedCrowdMapIndex];
         crowdMap.data = std::move(data);
         crowdMap.name = name;
-        crowdMap.sourceKey = sourceKey;
+        if (!sourceKey.empty()) {
+            crowdMap.sourceKey = sourceKey;
+        }
+        if (!crowdKey.empty()) {
+            crowdMap.crowdKey = crowdKey;
+        }
+        crowdMap.source = fileSource;
         crowdMap.renderGeometryDirty = true;
     }
     Menu::updateMenuState();
@@ -723,6 +737,23 @@ std::vector<std::string> Crmd::crowdMapNames() const {
     return names;
 }
 
+std::vector<CrmdSource> Crmd::crowdMapSources() const {
+    std::lock_guard lock(crowdMapsMutex);
+    std::vector<CrmdSource> sources;
+    sources.reserve(crowdMaps.size());
+    for (const auto& crowdMap : crowdMaps) {
+        sources.push_back({crowdMap->source, crowdMap->crowdKey});
+    }
+    return sources;
+}
+
+void Crmd::setCrowdMapSource(const size_t index, const FileSource& fileSource) {
+    std::lock_guard lock(crowdMapsMutex);
+    if (index < crowdMaps.size()) {
+        crowdMaps[index]->source = fileSource;
+    }
+}
+
 std::string Crmd::selectedCrowdMapName() const {
     std::lock_guard lock(crowdMapsMutex);
     return selectedCrowdMapIndex >= 0 ? crowdMaps[selectedCrowdMapIndex]->name : std::string{};
@@ -741,7 +772,7 @@ void Crmd::updateCrmdDialogControls(wxDialog* dialog) {
     std::vector<std::string> items;
     items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        items.push_back(ioiString.empty() ? hash : ioiString);
+        items.push_back(Rpkg::displayName(hash, ioiString));
     }
     picker->setItems(std::move(items));
 }
@@ -769,15 +800,15 @@ void Crmd::showExtractCrmdDialog() {
     sizer->Add(buttons, 0, wxALIGN_RIGHT | wxALL, 10);
     dialog->SetSizer(sizer);
     open->Bind(wxEVT_BUTTON, [dialog, picker](wxCommandEvent&) {
-        std::vector<std::pair<std::string, std::string>> hashesAndNames;
+        std::vector<CrmdResourceToLoad> resources;
         for (const std::string& selection : picker->getSelections()) {
             for (const auto& [hash, ioiString] : crmdHashIoiStringMap) {
                 if (hash == selection || ioiString == selection) {
-                    hashesAndNames.emplace_back(hash, selection);
+                    resources.push_back({hash, selection, {}});
                 }
             }
         }
-        extractCrmdsFromRpkgs(hashesAndNames);
+        extractCrmdsFromRpkgs(resources);
         dialog->Close();
     });
     cancel->Bind(wxEVT_BUTTON, [dialog](wxCommandEvent&) { dialog->Close(); });
@@ -797,24 +828,25 @@ void Crmd::showExtractCrmdDialog() {
     dialog->Show();
 }
 
-void Crmd::extractCrmdsFromRpkgs(const std::vector<std::pair<std::string, std::string>>& hashesAndNames) {
-    if (hashesAndNames.empty()) {
-        return;
+bool Crmd::extractCrmdsFromRpkgs(const std::vector<CrmdResourceToLoad>& resources) {
+    if (resources.empty()) {
+        return false;
     }
     std::vector<std::string> hashes;
-    for (const auto& [hash, name] : hashesAndNames) {
-        hashes.push_back(hash);
+    for (const CrmdResourceToLoad& resource : resources) {
+        hashes.push_back(resource.hash);
     }
     if (Rpkg::extractResourcesFromRpkgs(hashes, CRMD)) {
-        return;
+        return false;
     }
     const std::filesystem::path crmdFolder =
         std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "crmd";
-    std::vector<std::pair<std::string, std::string>> filesAndNames;
-    for (const auto& [hash, name] : hashesAndNames) {
-        filesAndNames.emplace_back((crmdFolder / (hash + ".CRMD")).string(), resourceFileName(name));
+    std::vector<CrmdFileToLoad> files;
+    for (const auto& [hash, name, crowdKey] : resources) {
+        files.push_back(
+            {(crmdFolder / (hash + ".CRMD")).string(), resourceFileName(name), FileSource::rpkg(hash), crowdKey});
     }
-    getInstance().loadCrmdFromFiles(filesAndNames);
+    return getInstance().loadCrmdFromFiles(files);
 }
 
 bool Crmd::canBuildAllCrmds() const {
@@ -877,7 +909,7 @@ void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolum
         CrowdMapBuilder::Report report;
         const CrowdMapBuilder::CrowdMap map =
             CrowdMapBuilder::build(crowd, sceneVolumes, navmeshTriangles, glbTriangles, report);
-        setCrowdMap(map, crowd.name, crowd.id);
+        setCrowdMap(map, crowd.name, crowdKey(crowd));
         const auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
         Logger::log(NK_INFO,
@@ -911,14 +943,12 @@ void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolum
 }
 
 void Crmd::loadSettings() {
-    snapHeightsToGlb =
-        PersistedSettings::getInstance().getValue("Crmd", "snapHeightsToGlb", "true") == std::string("true");
+    snapHeightsToGlb = ProjectSettings::getInstance().getValue("Crmd", "snapHeightsToGlb") == std::string("true");
 }
 
 void Crmd::saveSettings() const {
-    PersistedSettings& persistedSettings = PersistedSettings::getInstance();
-    persistedSettings.setValue("Crmd", "snapHeightsToGlb", snapHeightsToGlb ? "true" : "false");
-    persistedSettings.save();
+    ProjectSettings& projectSettings = ProjectSettings::getInstance();
+    projectSettings.setValue("Crmd", "snapHeightsToGlb", snapHeightsToGlb ? "true" : "false");
 }
 
 void Crmd::showCrmdSettingsDialog() {
@@ -949,8 +979,15 @@ void Crmd::showCrmdSettingsDialog() {
     dialog->Show();
 }
 
-void Crmd::setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name, const std::string& crowdId) {
-    addCrowdMap(toCrowdMapData(map), name, crowdId.empty() ? std::string{} : "crowd:" + crowdId);
+std::string Crmd::crowdKey(const Json::Crowd& crowd) {
+    if (crowd.id.empty()) {
+        return {};
+    }
+    return crowd.tblu.empty() ? crowd.id : crowd.tblu + ":" + crowd.id;
+}
+
+void Crmd::setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name, const std::string& crowdKey) {
+    addCrowdMap(toCrowdMapData(map), name, {}, crowdKey, FileSource::generated());
 }
 
 bool Crmd::canSave() const {
@@ -1005,6 +1042,7 @@ void Crmd::saveCrmdAndReport(const std::string& fileName, const size_t index) {
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
         Logger::log(NK_INFO,
             ("Finished saving Crmd to " + fileName + " in " + std::to_string(duration.count()) + " ms").c_str());
+        Project::fileSaved([this, fileName, index] { setCrowdMapSource(index, FileSource::disk(fileName)); });
     } catch (const std::exception& error) {
         ErrorHandler::openErrorDialog("Error saving Crmd file '" + fileName + "': " + error.what());
         Logger::log(NK_ERROR, ("Failed to save CRMD file: " + std::string(error.what())).c_str());

@@ -14,6 +14,7 @@
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/Scene.h"
@@ -27,6 +28,11 @@ wxMenuBar* Menu::createMenuBar() {
     auto* bar = new wxMenuBar();
     auto* file = new wxMenu();
     file->Append(IDM_FILE_NEW_PROJECT, "New &Project");
+    file->Append(IDM_FILE_OPEN_PROJECT, "&Open Project");
+    file->Append(IDM_FILE_SAVE_PROJECT, "Save &Project");
+    file->Append(IDM_FILE_SAVE_PROJECT_AS, "Save Project &As");
+    file->Append(IDM_FILE_EXPORT_PROJECT, "&Export Project");
+    file->AppendSeparator();
     file->Append(IDM_FILE_NEW_SCENE, "New &Scene");
     file->Append(IDM_FILE_NEW_SCENE_MESH, "New Scene &Mesh");
     file->Append(IDM_FILE_NEW_NAVP, "New &Navp");
@@ -218,7 +224,12 @@ void Menu::updateMenuState() {
     setMenuItemEnabled(IDM_FILE_OPEN_NAVP_FROM_RPKG, Rpkg::canExtract());
     setMenuItemEnabled(IDM_FILE_OPEN_AIRG_FROM_RPKG, Rpkg::canExtract());
     const bool crmdBusy = crmd.loading || crmd.saving || crmd.building;
-    setMenuItemEnabled(IDM_FILE_NEW_PROJECT, !crmd.loading && !crmd.building);
+    const bool projectBusy = Project::getInstance().isBusy();
+    setMenuItemEnabled(IDM_FILE_NEW_PROJECT, !crmd.loading && !crmd.building && !projectBusy);
+    setMenuItemEnabled(IDM_FILE_OPEN_PROJECT, !crmdBusy && !projectBusy);
+    setMenuItemEnabled(IDM_FILE_SAVE_PROJECT, !projectBusy);
+    setMenuItemEnabled(IDM_FILE_SAVE_PROJECT_AS, !projectBusy);
+    setMenuItemEnabled(IDM_FILE_EXPORT_PROJECT, !crmdBusy && !projectBusy);
     setMenuItemEnabled(IDM_FILE_NEW_CRMD, !crmdBusy);
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD, !crmdBusy);
     setMenuItemEnabled(IDM_FILE_OPEN_CRMD_FROM_RPKG, Rpkg::canExtract() && !crmdBusy);
@@ -263,6 +274,21 @@ void Menu::updateMenuState() {
         IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
     setMenuItemChecked(
         IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled, "Disconnect Waypoint Mode Enabled");
+    if (projectBusy) {
+        for (const int menuId : {IDM_FILE_NEW_SCENE, IDM_FILE_NEW_SCENE_MESH, IDM_FILE_NEW_NAVP, IDM_FILE_NEW_AIRG,
+                 IDM_FILE_NEW_CRMD, IDM_FILE_NEW_GFXF, IDM_FILE_OPEN_SCENE, IDM_FILE_OPEN_GLB, IDM_FILE_OPEN_NAVP,
+                 IDM_FILE_OPEN_NAVP_FROM_RPKG, IDM_FILE_OPEN_AIRG, IDM_FILE_OPEN_AIRG_FROM_RPKG, IDM_FILE_OPEN_CRMD,
+                 IDM_FILE_OPEN_CRMD_FROM_RPKG, IDM_FILE_OPEN_GFXF, IDM_FILE_OPEN_GFXF_FROM_RPKG, IDM_FILE_OPEN_GFX,
+                 IDM_FILE_SAVE_SCENE, IDM_FILE_SAVE_GLB, IDM_FILE_SAVE_BLEND, IDM_FILE_SAVE_NAVP, IDM_FILE_SAVE_AIRG,
+                 IDM_FILE_SAVE_CRMD, IDM_FILE_SAVE_GFXF, IDM_FILE_SAVE_GFX, IDM_EDIT_NAVP_STAIRS,
+                 IDM_EDIT_NAVP_PLANNER_EXCLUDED, IDM_EDIT_AIRG_CONNECT_WAYPOINT, IDM_EDIT_AIRG_DISCONNECT_WAYPOINT,
+                 IDM_EXTRACT_SCENE, IDM_EXTRACT_SCENE_AND_BUILD_GLB, IDM_EXTRACT_SCENE_AND_BUILD_ALL,
+                 IDM_BUILD_GLB_FROM_SCENE, IDM_BUILD_GLB_FROM_NAVP, IDM_BUILD_BLEND_FROM_SCENE,
+                 IDM_BUILD_BLEND_AND_GLB_FROM_SCENE, IDM_BUILD_BLEND_AND_GLB_AND_GFX_FROM_SCENE, IDM_BUILD_NAVP,
+                 IDM_BUILD_AIRG, IDM_BUILD_ALL_CRMDS}) {
+            setMenuItemEnabled(menuId, false);
+        }
+    }
     updateCrmdViewItems();
 }
 
@@ -324,14 +350,24 @@ int Menu::handleMenuClicked(const int menuId) {
     }
     switch (menuId) {
     case IDM_FILE_NEW_PROJECT:
-        Scene::getInstance().clear();
-        SceneMesh::getInstance().clear();
-        Gfxf::getInstance().clear();
-        Navp::getInstance().clear();
-        Airg::getInstance().clear();
-        Crmd::getInstance().clear();
-        updateMenuState();
+        Project::getInstance().handleNewProjectClicked();
         Logger::log(NK_DEBUG, "File -> New Project clicked");
+        break;
+    case IDM_FILE_OPEN_PROJECT:
+        Project::getInstance().handleOpenProjectClicked();
+        Logger::log(NK_DEBUG, "File -> Open Project clicked");
+        break;
+    case IDM_FILE_SAVE_PROJECT:
+        Project::getInstance().handleSaveProjectClicked();
+        Logger::log(NK_DEBUG, "File -> Save Project clicked");
+        break;
+    case IDM_FILE_SAVE_PROJECT_AS:
+        Project::getInstance().handleSaveProjectAsClicked();
+        Logger::log(NK_DEBUG, "File -> Save Project As clicked");
+        break;
+    case IDM_FILE_EXPORT_PROJECT:
+        Project::getInstance().handleExportProjectClicked();
+        Logger::log(NK_DEBUG, "File -> Export Project clicked");
         break;
     case IDM_FILE_NEW_SCENE:
         Scene::getInstance().clear();

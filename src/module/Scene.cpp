@@ -9,6 +9,7 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
@@ -46,7 +47,7 @@ char* Scene::openSaveSceneFileDialog() {
     return FileUtil::openNfdSaveDialog(filters, 1, "output.nav.json");
 }
 
-void Scene::setLastLoadFileName(char* fileName) {
+void Scene::setLastLoadFileName(const char* fileName) {
     if (std::filesystem::exists(fileName) && !std::filesystem::is_directory(fileName)) {
         loadSceneName = fileName;
         lastLoadSceneFile = loadSceneName.data();
@@ -290,7 +291,7 @@ void Scene::showLoadErrorsIfAny() {
     });
 }
 
-void Scene::saveScene(const std::string& fileName) const {
+bool Scene::saveScene(const std::string& fileName) const {
     std::stringstream ss;
     ss << std::setprecision(std::numeric_limits<float>::max_digits10);
 
@@ -429,32 +430,37 @@ void Scene::saveScene(const std::string& fileName) const {
         f << ss.rdbuf();
         f.close();
         Logger::log(NK_INFO, "Done saving Scene.");
-    } else {
-        const std::string message = "Failed to open file for saving scene: " + fileName;
-        Logger::log(NK_ERROR, "%s", message.c_str());
-        wxTheApp->CallAfter([message] {
-            wxMessageBox(wxString::FromUTF8(message), "Scene save failed", wxOK | wxICON_ERROR, getMainFrame());
-        });
+        return true;
     }
+    const std::string message = "Failed to open file for saving scene: " + fileName;
+    Logger::log(NK_ERROR, "%s", message.c_str());
+    wxTheApp->CallAfter([message] {
+        wxMessageBox(wxString::FromUTF8(message), "Scene save failed", wxOK | wxICON_ERROR, getMainFrame());
+    });
+    return false;
 }
 
 void Scene::handleOpenSceneClicked() {
-    if (char* fileName = openLoadSceneFileDialog()) {
-        setLastLoadFileName(fileName);
-        std::string msg = "Loading nav.json file: '";
-        msg += fileName;
-        msg += "'...";
-        Logger::log(NK_INFO, msg.data());
-        std::string fileNameToLoad = fileName;
-        backgroundWorker.emplace(
-            &Scene::loadScene, this, fileNameToLoad,
-            [fileNameToLoad]() {
-                getInstance().sceneLoaded = true;
-                Menu::updateMenuState();
-                Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileNameToLoad + "'.").c_str());
-            },
-            []() { Logger::log(NK_ERROR, "Error loading scene file."); });
+    if (const char* fileName = openLoadSceneFileDialog()) {
+        loadSceneFromFile(fileName, FileSource::disk(fileName));
     }
+}
+
+void Scene::loadSceneFromFile(const std::string& fileName, const FileSource& fileSource) {
+    setLastLoadFileName(fileName.c_str());
+    Logger::log(NK_INFO, "Loading nav.json file: '%s'...", fileName.c_str());
+    source = fileSource;
+    loading = true;
+    backgroundWorker.emplace(
+        &Scene::loadScene, this, fileName,
+        [fileName]() {
+            Scene& scene = getInstance();
+            scene.sceneLoaded = true;
+            scene.loading = false;
+            Menu::updateMenuState();
+            Logger::log(NK_INFO, ("Done loading nav.json file: '" + fileName + "'.").c_str());
+        },
+        []() { Logger::log(NK_ERROR, "Error loading scene file."); });
 }
 
 void Scene::handleSaveSceneClicked() {
@@ -465,7 +471,11 @@ void Scene::handleSaveSceneClicked() {
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&Scene::saveScene, this, fileNameStr);
+        backgroundWorker.emplace([this, fileNameStr] {
+            if (saveScene(fileNameStr)) {
+                Project::fileSaved([this, fileNameStr] { source = FileSource::disk(fileNameStr); });
+            }
+        });
     }
 }
 
@@ -495,6 +505,8 @@ void Scene::resetBBoxDefaults() {
 
 void Scene::clear() {
     sceneLoaded = false;
+    loading = false;
+    source = {};
     lastLoadSceneFile.clear();
     loadSceneName = "Load NavKit Scene";
     saveSceneName = "Save NavKit Scene";

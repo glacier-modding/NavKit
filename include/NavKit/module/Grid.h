@@ -10,9 +10,13 @@ public:
 
     void saveSpacing(float newSpacing);
 
+    void loadSettings();
+
     void renderGrid() const;
 
     void renderGridText() const;
+
+    [[nodiscard]] static float defaultSpacing();
 
     static Grid& getInstance() {
         static Grid instance;

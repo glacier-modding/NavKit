@@ -19,6 +19,7 @@
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
@@ -868,6 +869,8 @@ void Navp::loadNavMesh(
         msg += " Stack trace: ";
         msg += cpptrace::from_current_exception().to_string();
         Logger::log(NK_ERROR, msg.c_str());
+        loading = false;
+        Menu::updateMenuState();
         return;
     }
     catch (...) {
@@ -875,6 +878,8 @@ void Navp::loadNavMesh(
         msg += fileName;
         msg += "'...";
         Logger::log(NK_ERROR, msg.c_str());
+        loading = false;
+        Menu::updateMenuState();
         return;
     }
 
@@ -966,7 +971,7 @@ void Navp::setLastSaveFileName(const char* fileName) {
     saveNavpName = saveNavpName.substr(saveNavpName.find_last_of("/\\") + 1);
 }
 
-void Navp::loadNavpFromFile(const std::string& fileName) {
+bool Navp::loadNavpFromFile(const std::string& fileName) {
     Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
     setLastLoadFileName(fileName.c_str());
     std::string extension = loadNavpName.substr(loadNavpName.length() - 4, loadNavpName.length());
@@ -977,14 +982,22 @@ void Navp::loadNavpFromFile(const std::string& fileName) {
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
+        loading = true;
+        source = FileSource::disk(fileName);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, true, false, false);
-    } else if (extension == "NAVP") {
+        return true;
+    }
+    if (extension == "NAVP") {
         std::string msg = "Loading Navp file: '";
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
+        loading = true;
+        source = FileSource::disk(fileName);
         backgroundWorker.emplace(&Navp::loadNavMesh, this, lastLoadNavpFile, false, false, false);
+        return true;
     }
+    return false;
 }
 
 void Navp::handleOpenNavpClicked() {
@@ -994,8 +1007,9 @@ void Navp::handleOpenNavpClicked() {
     }
 }
 
-void Navp::saveNavMesh(const std::string& fileName, const std::string& extension) {
+bool Navp::saveNavMesh(const std::string& fileName, const std::string& extension) {
     loading = true;
+    bool saved = false;
 
     const auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Saving Navp to file: '%s'...", fileName.c_str());
@@ -1018,11 +1032,14 @@ void Navp::saveNavMesh(const std::string& fileName, const std::string& extension
 
             NavWeakness::OutputNavMesh_NAVP_Write(navMesh, fileName.c_str());
             buildAreaMaps();
+        } else {
+            throw std::runtime_error("Unsupported Navp extension '" + extension + "'.");
         }
 
         const auto end = std::chrono::high_resolution_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving Navp in %lld ms.", duration.count());
+        saved = true;
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, "Error saving Navp file '%s': %s", fileName.c_str(), e.what());
     } catch (...) {
@@ -1030,6 +1047,7 @@ void Navp::saveNavMesh(const std::string& fileName, const std::string& extension
     }
 
     loading = false;
+    return saved;
 }
 
 void Navp::handleSaveNavpClicked() {
@@ -1037,7 +1055,11 @@ void Navp::handleSaveNavpClicked() {
         setLastSaveFileName(fileName);
         std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
 
-        backgroundWorker.emplace(&Navp::saveNavMesh, this, lastSaveNavpFile, extension);
+        backgroundWorker.emplace([this, fileName = lastSaveNavpFile, extension] {
+            if (saveNavMesh(fileName, extension)) {
+                Project::fileSaved([this, fileName] { source = FileSource::disk(fileName); });
+            }
+        });
     }
 }
 
@@ -1066,20 +1088,21 @@ bool Navp::canSave() const {
     return navpLoaded && !loading && !building;
 }
 
-void Navp::handleEditStairsClicked() const {
+void Navp::handleEditStairsClicked() {
     toggleSelectedAreaUsage(NavPower::AreaUsageFlags::AREA_STEPS);
 }
 
-void Navp::handleEditPlannerExcludedClicked() const {
+void Navp::handleEditPlannerExcludedClicked() {
     toggleSelectedAreaUsage(NavPower::AreaUsageFlags::AREA_PLANNER_EXCLUDED);
 }
 
-void Navp::toggleSelectedAreaUsage(const NavPower::AreaUsageFlags usage) const {
+void Navp::toggleSelectedAreaUsage(const NavPower::AreaUsageFlags usage) {
     if (selectedNavpAreaIndex == -1) {
         return;
     }
     NavPower::AreaUsageFlags& areaUsage = getAreaByIndex(navMesh, selectedNavpAreaIndex).m_area->m_usageFlags;
     areaUsage = areaUsage == usage ? NavPower::AreaUsageFlags::AREA_FLAT : usage;
+    source.markEdited();
     Logger::log(NK_INFO, ("Setting area type to: " + NavPower::AreaUsageFlagToString(areaUsage)).c_str());
     navMeshDirty = true;
     Menu::updateMenuState();
@@ -1187,6 +1210,7 @@ void Navp::finalizeBuild() {
         const NavKitSettings& navKitSettings = NavKitSettings::getInstance();
         outputNavpFilename = (std::filesystem::u8path(navKitSettings.outputFolder) / "output.navp.json").string();
         recastAdapter.save(outputNavpFilename, false);
+        source = FileSource::generated();
         backgroundWorker.emplace(&Navp::loadNavMesh, this, outputNavpFilename, true, true, false);
         navpBuildDone.store(false);
         building = false;
@@ -1202,18 +1226,23 @@ void Navp::updateNavpDialogControls(wxDialog* dialog) {
     std::vector<std::string> items;
     items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        items.push_back(ioiString.empty() ? hash : ioiString);
+        items.push_back(Rpkg::displayName(hash, ioiString));
     }
     picker->setItems(std::move(items));
 }
 
-void Navp::extractNavpFromRpkgs(const std::string& hash) {
-    if (!Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
-        const std::string fileName =
-            (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "navp" / (hash + ".NAVP")).string();
-        Logger::log(NK_INFO, ("Loading navp from file: " + fileName).c_str());
-        getInstance().loadNavpFromFile(fileName);
+bool Navp::extractNavpFromRpkgs(const std::string& hash) {
+    if (Rpkg::extractResourcesFromRpkgs({hash}, NAVP)) {
+        return false;
     }
+    const std::string fileName =
+        (std::filesystem::u8path(NavKitSettings::getInstance().outputFolder) / "navp" / (hash + ".NAVP")).string();
+    Navp& navp = getInstance();
+    if (!navp.loadNavpFromFile(fileName)) {
+        return false;
+    }
+    navp.source = FileSource::rpkg(hash);
+    return true;
 }
 
 void Navp::showExtractNavpDialog() {
@@ -1280,6 +1309,7 @@ void Navp::clear() {
     loading = false;
     building = false;
     navpBuildDone = false;
+    source = {};
     stairsCheckboxValue = false;
     doNavpHitTest = false;
     doNavpExclusionBoxHitTest = false;

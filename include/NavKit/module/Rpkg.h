@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <mutex>
 #include <map>
 #include <optional>
@@ -34,7 +35,13 @@ public:
 
     static int getHashList();
 
+    static std::string displayName(const std::string& hash, const std::string& ioiString);
+
+    static std::string displayNameForHash(
+        const std::map<std::string, std::string>& hashToIoiString, std::mutex& mutex, const std::string& hash);
+
     static bool extractionDataInitComplete;
+    static std::atomic_bool extractionDataInitInProgress;
     static std::string gameVersion;
     static PartitionManager* partitionManager;
     static HashList* hashList;
