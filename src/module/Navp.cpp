@@ -1202,7 +1202,7 @@ void Navp::updateNavpDialogControls(wxDialog* dialog) {
     std::vector<std::string> items;
     items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        items.push_back(ioiString.empty() ? hash : ioiString);
+        items.push_back(Rpkg::displayName(hash, ioiString));
     }
     picker->setItems(std::move(items));
 }

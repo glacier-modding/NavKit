@@ -1093,7 +1093,7 @@ void Gfxf::showExtractGfxfDialog() {
     std::vector<std::string> items;
     items.reserve(entries.size());
     for (const auto& [hash, ioiString] : entries) {
-        items.push_back(ioiString.empty() ? hash : ioiString);
+        items.push_back(Rpkg::displayName(hash, ioiString));
     }
     picker->setItems(std::move(items));
 
@@ -1114,7 +1114,7 @@ void Gfxf::showExtractGfxfDialog() {
     open->Bind(wxEVT_BUTTON, [dialog, picker, entries = std::move(entries)](wxCommandEvent&) {
         const std::string selected = picker->getSelection();
         const auto entry = std::ranges::find_if(entries, [&selected](const auto& candidate) {
-            return (candidate.second.empty() ? candidate.first : candidate.second) == selected;
+            return Rpkg::displayName(candidate.first, candidate.second) == selected;
         });
         if (entry != entries.end()) {
             const std::string& hash = entry->first;

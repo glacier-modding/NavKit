@@ -331,6 +331,17 @@ void Rpkg::checkHitmanVersion() {
     }
 }
 
+std::string Rpkg::displayName(const std::string& hash, const std::string& ioiString) {
+    return ioiString.empty() ? hash : ioiString;
+}
+
+std::string Rpkg::displayNameForHash(
+    const std::map<std::string, std::string>& hashToIoiString, std::mutex& mutex, const std::string& hash) {
+    std::lock_guard lock(mutex);
+    const auto entry = hashToIoiString.find(hash);
+    return displayName(hash, entry == hashToIoiString.end() ? std::string{} : entry->second);
+}
+
 bool Rpkg::canExtract() {
     return extractionDataInitComplete && !unknownGameVersion;
 }

@@ -1938,6 +1938,15 @@ namespace {
         Gfxf::getInstance().showGfxf = true;
     }
 
+    void testRpkgDisplayNames() {
+        check(Rpkg::displayName("00AB", "") == "00AB", "Resources without an IOI string show their hash");
+        check(Rpkg::displayName("00AB", "[assembly:/a.navp]") == "[assembly:/a.navp]", "IOI strings are preferred");
+        std::map<std::string, std::string> names = {{"00AB", "[assembly:/a.navp]"}};
+        std::mutex mutex;
+        check(Rpkg::displayNameForHash(names, mutex, "00AB") == "[assembly:/a.navp]", "Known hashes show their name");
+        check(Rpkg::displayNameForHash(names, mutex, "00CD") == "00CD", "Unknown hashes show the hash");
+    }
+
     // Navmesh fixture for the waypoint connection tests: a walkable plane with a wall sliver between
     // x=4.6 and x=4.7 running from z=1 to z=9, with an open corridor along the bottom (z < 1) that connects
     // both sides of the wall. The two regions are joined exclusively through that corridor, so the path
@@ -2178,6 +2187,7 @@ void runDomainTests() {
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
     run("Clear and New Project file menu options", testClearAndNewProjectOptions);
+    run("Rpkg display names", testRpkgDisplayNames);
     runWithGameFile(
         "GFXF save matches vanilla GFXF apart from the array count", vanillaGfxf, testGfxfSaveMatchesVanillaGfxf);
     runWithGameFile("GFXF reads payloads with and without the array count", vanillaGfxf, testGfxfReadsBothCountLayouts);
