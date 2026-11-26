@@ -51,30 +51,22 @@ namespace {
         return (path.is_absolute() ? path : projectDirectory / path).lexically_normal().string();
     }
 
-    void writeSource(std::ostream& out, const FileSource& source, const std::filesystem::path& projectDirectory) {
+    void writeSource(std::ostream& out, const FileSource& source, const std::filesystem::path& projectDirectory,
+        const std::string& crowdKey = {}) {
         out << R"({"source":")" << sourceKindName(source.kind) << '"';
         if (source.kind == FileSource::Kind::Disk) {
             out << R"(,"path":")" << Json::escaped(toStoredPath(source.path, projectDirectory)) << '"';
         } else if (source.kind == FileSource::Kind::Rpkg) {
             out << R"(,"hash":")" << Json::escaped(source.hash) << '"';
         }
+        if (!crowdKey.empty()) {
+            out << R"(,"crowd":")" << Json::escaped(crowdKey) << '"';
+        }
         out << '}';
     }
 
-    FileSource readSource(simdjson::ondemand::value value, const std::filesystem::path& projectDirectory) {
-        std::string kind;
-        std::string path;
-        std::string hash;
-        for (auto field : value.get_object()) {
-            const std::string_view key = field.unescaped_key().value();
-            if (key == "source") {
-                kind = std::string(field.value().get_string().value());
-            } else if (key == "path") {
-                path = std::string(field.value().get_string().value());
-            } else if (key == "hash") {
-                hash = std::string(field.value().get_string().value());
-            }
-        }
+    FileSource toFileSource(const std::string& kind, const std::string& path, const std::string& hash,
+        const std::filesystem::path& projectDirectory) {
         if (kind == "disk") {
             if (path.empty()) {
                 throw std::runtime_error("A disk source is missing its path.");
@@ -91,6 +83,30 @@ namespace {
             return FileSource::generated();
         }
         throw std::runtime_error("Unknown source type: '" + kind + "'.");
+    }
+
+    CrmdSource readCrmdSource(simdjson::ondemand::value value, const std::filesystem::path& projectDirectory) {
+        std::string kind;
+        std::string path;
+        std::string hash;
+        std::string crowdKey;
+        for (auto field : value.get_object()) {
+            const std::string_view key = field.unescaped_key().value();
+            if (key == "source") {
+                kind = std::string(field.value().get_string().value());
+            } else if (key == "path") {
+                path = std::string(field.value().get_string().value());
+            } else if (key == "hash") {
+                hash = std::string(field.value().get_string().value());
+            } else if (key == "crowd") {
+                crowdKey = std::string(field.value().get_string().value());
+            }
+        }
+        return {toFileSource(kind, path, hash, projectDirectory), crowdKey};
+    }
+
+    FileSource readSource(simdjson::ondemand::value value, const std::filesystem::path& projectDirectory) {
+        return readCrmdSource(value, projectDirectory).file;
     }
 
     std::string sanitizeFileName(std::string name) {
@@ -254,8 +270,8 @@ ProjectFile Project::captureCurrentProject() {
     project.navp = loadedSource(Navp::getInstance().navpLoaded, Navp::getInstance().source);
     project.airg = loadedSource(Airg::getInstance().airgLoaded, Airg::getInstance().source);
     project.gfxf = loadedSource(Gfxf::getInstance().gfxfLoaded, Gfxf::getInstance().source);
-    for (const FileSource& source : Crmd::getInstance().crowdMapSources()) {
-        project.crmds.push_back(loadedSource(true, source));
+    for (const auto& [file, crowdKey] : Crmd::getInstance().crowdMapSources()) {
+        project.crmds.push_back({loadedSource(true, file), crowdKey});
     }
     project.settings = ProjectSettings::getInstance().getValues();
     return project;
@@ -281,9 +297,9 @@ std::string Project::toJson(const ProjectFile& project, const std::filesystem::p
     if (!project.crmds.empty()) {
         out << separator << R"("crmds":[)";
         const char* crmdSeparator = "";
-        for (const FileSource& source : project.crmds) {
+        for (const auto& [file, crowdKey] : project.crmds) {
             out << crmdSeparator;
-            writeSource(out, source, projectDirectory);
+            writeSource(out, file, projectDirectory, crowdKey);
             crmdSeparator = ",";
         }
         out << ']';
@@ -331,7 +347,7 @@ ProjectFile Project::fromJson(const std::string& json, const std::filesystem::pa
                     project.gfxf = readSource(fileField.value(), projectDirectory);
                 } else if (fileKey == "crmds") {
                     for (auto crmdResult : fileField.value().get_array()) {
-                        project.crmds.push_back(readSource(crmdResult.value(), projectDirectory));
+                        project.crmds.push_back(readCrmdSource(crmdResult.value(), projectDirectory));
                     }
                 }
             }
@@ -364,6 +380,21 @@ bool Project::saveProject(const std::string& fileName) {
     Logger::log(NK_INFO, "Saved project to '%s'.", projectFile.c_str());
     Menu::updateMenuState();
     return true;
+}
+
+void Project::fileSaved(std::function<void()> recordSavedSource) {
+    auto apply = [recordSavedSource = std::move(recordSavedSource)] {
+        recordSavedSource();
+        Project& project = getInstance();
+        if (!project.projectFile.empty() && !project.isBusy()) {
+            project.saveProject(project.projectFile);
+        }
+    };
+    if (wxTheApp) {
+        wxTheApp->CallAfter(std::move(apply));
+    } else {
+        apply();
+    }
 }
 
 bool Project::openProject(const std::string& fileName) {
@@ -477,19 +508,20 @@ void Project::queueLoadSteps(const ProjectFile& project) {
         [&airg] { return airg.airgLoading; }, [&airg] { return airg.airgLoaded; });
 
     Crmd& crmd = Crmd::getInstance();
-    for (const FileSource& source : project.crmds) {
+    for (const CrmdSource& source : project.crmds) {
         auto countBeforeLoad = std::make_shared<size_t>(0);
         addStep(
-            "Crmd", source,
-            [&crmd, countBeforeLoad](const std::string& path) {
+            "Crmd", source.file,
+            [&crmd, countBeforeLoad, crowdKey = source.crowdKey](const std::string& path) {
                 *countBeforeLoad = crmd.crowdMapCount();
                 return crmd.loadCrmdFromFiles(
-                    {{path, std::filesystem::u8path(path).filename().string(), FileSource::disk(path)}});
+                    {{path, std::filesystem::u8path(path).filename().string(), FileSource::disk(path), crowdKey}});
             },
-            [&crmd, countBeforeLoad](const std::string& hash) {
+            [&crmd, countBeforeLoad, crowdKey = source.crowdKey](const std::string& hash) {
                 *countBeforeLoad = crmd.crowdMapCount();
-                return Crmd::extractCrmdsFromRpkgs({{hash,
-                    Rpkg::displayNameForHash(Crmd::crmdHashIoiStringMap, Crmd::crmdHashIoiStringMapMutex, hash)}});
+                return Crmd::extractCrmdsFromRpkgs(
+                    {{hash, Rpkg::displayNameForHash(Crmd::crmdHashIoiStringMap, Crmd::crmdHashIoiStringMapMutex, hash),
+                        crowdKey}});
             },
             [&crmd] { return crmd.loading.load(); },
             [&crmd, countBeforeLoad] { return crmd.crowdMapCount() > *countBeforeLoad; });
@@ -571,7 +603,7 @@ void Project::exportProject() {
 
     Navp& navp = Navp::getInstance();
     if (navp.navpLoaded && navp.source.kind != FileSource::Kind::Rpkg) {
-        const std::string path = target(name + ".navp");
+        const std::string path = target(name + ".NAVP");
         exportTasks.push_back({"Navp", path,
             [&navp, path] {
                 if (!removeExisting(path)) {
@@ -585,7 +617,7 @@ void Project::exportProject() {
 
     Airg& airg = Airg::getInstance();
     if (airg.airgLoaded && airg.source.kind != FileSource::Kind::Rpkg) {
-        const std::string path = target(name + ".airg");
+        const std::string path = target(name + ".AIRG");
         exportTasks.push_back({"Airg", path,
             [&airg, path] {
                 if (!removeExisting(path)) {
@@ -599,10 +631,10 @@ void Project::exportProject() {
 
     Crmd& crmd = Crmd::getInstance();
     const std::vector<std::string> crowdMapNames = crmd.crowdMapNames();
-    const std::vector<FileSource> crowdMapSources = crmd.crowdMapSources();
+    const std::vector<CrmdSource> crowdMapSources = crmd.crowdMapSources();
     std::set<std::string> usedCrmdNames;
     for (size_t index = 0; index < crowdMapSources.size() && index < crowdMapNames.size(); ++index) {
-        if (crowdMapSources[index].kind == FileSource::Kind::Rpkg) {
+        if (crowdMapSources[index].file.kind == FileSource::Kind::Rpkg) {
             continue;
         }
         const std::string baseName = sanitizeFileName(crowdMapNames[index]);
@@ -633,7 +665,7 @@ void Project::exportProject() {
             std::string extension = std::filesystem::u8path(gfxf.loadedFile).extension().string();
             std::ranges::transform(extension, extension.begin(), ::tolower);
             const bool asGfx = extension == ".gfx" && gfxf.source.kind == FileSource::Kind::Disk;
-            const std::string path = target(name + (asGfx ? ".gfx" : ".gfxf"));
+            const std::string path = target(name + (asGfx ? ".gfx" : ".GFXF"));
             exportTasks.push_back({"Gfxf", path,
                 [&gfxf, path, asGfx] {
                     if (!removeExisting(path)) {

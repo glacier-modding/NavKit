@@ -25,6 +25,7 @@
 #include "../../include/NavKit/module/Menu.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/ProjectSettings.h"
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/WxApplication.h"
@@ -555,10 +556,10 @@ void SceneMesh::finalizeSceneMeshBuild() {
     Menu::updateMenuState();
 }
 
-void SceneMesh::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
+bool SceneMesh::copyFile(const std::string& from, const std::string& to, const std::string& filetype) {
     if (from == to) {
         Logger::log(NK_ERROR, "Cannot overwrite current %s file: %s", filetype.c_str(), from.c_str());
-        return;
+        return false;
     }
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -569,8 +570,10 @@ void SceneMesh::copyFile(const std::string& from, const std::string& to, const s
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving %s in %lld ms.", filetype.c_str(), duration.count());
+        return true;
     } catch (const std::filesystem::filesystem_error& e) {
         Logger::log(NK_ERROR, "Error copying %s file: %s", filetype.c_str(), e.what());
+        return false;
     }
 }
 
@@ -581,7 +584,11 @@ void SceneMesh::saveGlbMesh(char* glbToCopy, char* newFileName) {
     Logger::log(NK_INFO, msg.data());
     const std::string sourcePath = glbToCopy;
     const std::string destinationPath = newFileName;
-    backgroundWorker.emplace(&SceneMesh::copyFile, sourcePath, destinationPath, "GLB");
+    backgroundWorker.emplace([this, sourcePath, destinationPath] {
+        if (copyFile(sourcePath, destinationPath, "GLB")) {
+            Project::fileSaved([this, destinationPath] { source = FileSource::disk(destinationPath); });
+        }
+    });
 }
 
 void SceneMesh::saveBlendMesh(std::string blendToCopy, std::string newFileName) {

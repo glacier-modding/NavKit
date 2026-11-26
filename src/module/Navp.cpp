@@ -19,6 +19,7 @@
 #include "../../include/NavKit/module/InputHandler.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
@@ -1006,8 +1007,9 @@ void Navp::handleOpenNavpClicked() {
     }
 }
 
-void Navp::saveNavMesh(const std::string& fileName, const std::string& extension) {
+bool Navp::saveNavMesh(const std::string& fileName, const std::string& extension) {
     loading = true;
+    bool saved = false;
 
     const auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Saving Navp to file: '%s'...", fileName.c_str());
@@ -1030,11 +1032,14 @@ void Navp::saveNavMesh(const std::string& fileName, const std::string& extension
 
             NavWeakness::OutputNavMesh_NAVP_Write(navMesh, fileName.c_str());
             buildAreaMaps();
+        } else {
+            throw std::runtime_error("Unsupported Navp extension '" + extension + "'.");
         }
 
         const auto end = std::chrono::high_resolution_clock::now();
         const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         Logger::log(NK_INFO, "Finished saving Navp in %lld ms.", duration.count());
+        saved = true;
     } catch (const std::exception& e) {
         Logger::log(NK_ERROR, "Error saving Navp file '%s': %s", fileName.c_str(), e.what());
     } catch (...) {
@@ -1042,6 +1047,7 @@ void Navp::saveNavMesh(const std::string& fileName, const std::string& extension
     }
 
     loading = false;
+    return saved;
 }
 
 void Navp::handleSaveNavpClicked() {
@@ -1049,7 +1055,11 @@ void Navp::handleSaveNavpClicked() {
         setLastSaveFileName(fileName);
         std::string extension = saveNavpName.substr(saveNavpName.length() - 4, saveNavpName.length());
 
-        backgroundWorker.emplace(&Navp::saveNavMesh, this, lastSaveNavpFile, extension);
+        backgroundWorker.emplace([this, fileName = lastSaveNavpFile, extension] {
+            if (saveNavMesh(fileName, extension)) {
+                Project::fileSaved([this, fileName] { source = FileSource::disk(fileName); });
+            }
+        });
     }
 }
 

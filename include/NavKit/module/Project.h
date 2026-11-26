@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 
+#include "../model/CrmdSource.h"
 #include "../model/FileSource.h"
 #include "ProjectSettings.h"
 
@@ -16,7 +17,7 @@ struct ProjectFile {
     FileSource navp;
     FileSource airg;
     FileSource gfxf;
-    std::vector<FileSource> crmds;
+    std::vector<CrmdSource> crmds;
     ProjectSettings::SectionValues settings;
 };
 
@@ -54,6 +55,8 @@ public:
     void exportProject();
 
     void update();
+
+    static void fileSaved(std::function<void()> recordSavedSource);
 
     [[nodiscard]] bool isBusy() const;
 

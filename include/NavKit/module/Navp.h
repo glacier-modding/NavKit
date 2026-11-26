@@ -156,7 +156,7 @@ public:
 
     void handleOpenNavpClicked();
 
-    void saveNavMesh(const std::string& fileName, const std::string& extension);
+    bool saveNavMesh(const std::string& fileName, const std::string& extension);
 
     void handleSaveNavpClicked();
 

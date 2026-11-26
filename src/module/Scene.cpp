@@ -9,6 +9,7 @@
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
 #include "../../include/NavKit/module/Renderer.h"
@@ -290,7 +291,7 @@ void Scene::showLoadErrorsIfAny() {
     });
 }
 
-void Scene::saveScene(const std::string& fileName) const {
+bool Scene::saveScene(const std::string& fileName) const {
     std::stringstream ss;
     ss << std::setprecision(std::numeric_limits<float>::max_digits10);
 
@@ -429,13 +430,14 @@ void Scene::saveScene(const std::string& fileName) const {
         f << ss.rdbuf();
         f.close();
         Logger::log(NK_INFO, "Done saving Scene.");
-    } else {
-        const std::string message = "Failed to open file for saving scene: " + fileName;
-        Logger::log(NK_ERROR, "%s", message.c_str());
-        wxTheApp->CallAfter([message] {
-            wxMessageBox(wxString::FromUTF8(message), "Scene save failed", wxOK | wxICON_ERROR, getMainFrame());
-        });
+        return true;
     }
+    const std::string message = "Failed to open file for saving scene: " + fileName;
+    Logger::log(NK_ERROR, "%s", message.c_str());
+    wxTheApp->CallAfter([message] {
+        wxMessageBox(wxString::FromUTF8(message), "Scene save failed", wxOK | wxICON_ERROR, getMainFrame());
+    });
+    return false;
 }
 
 void Scene::handleOpenSceneClicked() {
@@ -469,7 +471,11 @@ void Scene::handleSaveSceneClicked() {
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&Scene::saveScene, this, fileNameStr);
+        backgroundWorker.emplace([this, fileNameStr] {
+            if (saveScene(fileNameStr)) {
+                Project::fileSaved([this, fileNameStr] { source = FileSource::disk(fileNameStr); });
+            }
+        });
     }
 }
 

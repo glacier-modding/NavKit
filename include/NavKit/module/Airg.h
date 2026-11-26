@@ -136,7 +136,7 @@ public:
     static std::map<std::string, std::string> airgHashIoiStringMap;
     static std::mutex airgHashIoiStringMapMutex;
 
-    static void saveAirg(Airg* airg, const std::string& fileName);
+    static bool saveAirg(Airg* airg, const std::string& fileName);
 
 private:
     static GLuint airgLineVbo;

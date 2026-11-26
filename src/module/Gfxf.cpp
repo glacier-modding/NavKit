@@ -41,6 +41,7 @@
 #include "../../include/NavKit/UiIds.h"
 #include "../../include/NavKit/module/Logger.h"
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Rpkg.h"
 #include "../../include/NavKit/module/SceneMesh.h"
@@ -618,8 +619,8 @@ bool Gfxf::canSave() const {
 }
 
 char* Gfxf::openSaveGfxfFileDialog() {
-    const nfdu8filteritem_t filter = {"GFXF files", "gfxf"};
-    return FileUtil::openNfdSaveDialog(&filter, 1, "output.gfxf");
+    const nfdu8filteritem_t filter = {"GFXF files", "GFXF"};
+    return FileUtil::openNfdSaveDialog(&filter, 1, "output.GFXF");
 }
 
 std::vector<unsigned char> Gfxf::extractGfxFromGfxf(const std::vector<unsigned char>& gfxfBytes) {
@@ -692,8 +693,9 @@ void Gfxf::setGfxData(std::vector<unsigned char> bytes) {
     Menu::updateMenuState();
 }
 
-void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
+bool Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
     saving = true;
+    bool saved = false;
     Menu::updateMenuState();
     const auto start = std::chrono::high_resolution_clock::now();
     Logger::log(NK_INFO, "Saving Gfxf to file: '%s'...", fileName.c_str());
@@ -708,23 +710,30 @@ void Gfxf::exportGfxfToGfxfFile(const std::string& fileName) {
             const auto end = std::chrono::high_resolution_clock::now();
             const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             Logger::log(NK_INFO, "Finished saving Gfxf in %lld ms.", duration.count());
+            saved = true;
         }
     }
 
     saving = false;
     Menu::updateMenuState();
+    return saved;
 }
 
 void Gfxf::handleSaveGfxfClicked() {
     if (char* fileName = openSaveGfxfFileDialog()) {
         const std::string path = fileName;
         NFD_FreePathU8(fileName);
-        saveWorker.emplace(&Gfxf::exportGfxfToGfxfFile, this, path);
+        saveWorker.emplace([this, path] {
+            if (exportGfxfToGfxfFile(path)) {
+                Project::fileSaved([this, path] { source = FileSource::disk(path); });
+            }
+        });
     }
 }
 
-void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
+bool Gfxf::exportGfxToGfxFile(const std::string& fileName) {
     saving = true;
+    bool saved = false;
     Menu::updateMenuState();
     Logger::log(NK_INFO, "Saving Gfx to file: '%s'...", fileName.c_str());
 
@@ -738,6 +747,7 @@ void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
             output.close();
             if (output) {
                 Logger::log(NK_INFO, "Finished saving Gfx.");
+                saved = true;
             } else {
                 Logger::log(NK_ERROR, "Error saving Gfx file '%s'.", fileName.c_str());
             }
@@ -746,6 +756,7 @@ void Gfxf::exportGfxToGfxFile(const std::string& fileName) {
 
     saving = false;
     Menu::updateMenuState();
+    return saved;
 }
 
 void Gfxf::handleSaveGfxClicked() {
@@ -753,7 +764,11 @@ void Gfxf::handleSaveGfxClicked() {
     if (char* fileName = FileUtil::openNfdSaveDialog(&filter, 1, "output.gfx")) {
         const std::string path = fileName;
         NFD_FreePathU8(fileName);
-        saveWorker.emplace(&Gfxf::exportGfxToGfxFile, this, path);
+        saveWorker.emplace([this, path] {
+            if (exportGfxToGfxFile(path)) {
+                Project::fileSaved([this, path] { source = FileSource::disk(path); });
+            }
+        });
     }
 }
 

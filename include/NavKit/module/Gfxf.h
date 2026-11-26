@@ -103,8 +103,8 @@ public:
 
     bool loadGfxfFromFile(const std::string& fileName);
     static bool extractGfxfFromRpkgs(const std::string& hash);
-    void exportGfxfToGfxfFile(const std::string& fileName);
-    void exportGfxToGfxFile(const std::string& fileName);
+    bool exportGfxfToGfxfFile(const std::string& fileName);
+    bool exportGfxToGfxFile(const std::string& fileName);
     void setGfxData(std::vector<unsigned char> bytes);
 
     static std::vector<unsigned char> extractGfxFromGfxf(const std::vector<unsigned char>& gfxfBytes);

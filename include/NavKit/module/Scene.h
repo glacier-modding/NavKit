@@ -24,7 +24,7 @@ public:
     void loadRoomsAndVolumes(const std::function<void()>& errorCallback,
         simdjson::simdjson_result<simdjson::ondemand::document>& jsonDocument);
 
-    void saveScene(const std::string& fileName) const;
+    bool saveScene(const std::string& fileName) const;
 
     void handleOpenSceneClicked();
 

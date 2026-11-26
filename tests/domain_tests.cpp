@@ -883,7 +883,6 @@ namespace {
         std::filesystem::copy_file(
             "tests/resources/yacht.crmd", copyPath, std::filesystem::copy_options::overwrite_existing);
         crmd.loadCrowdMapData(copyPath.string(), "second.crmd");
-        std::filesystem::remove(copyPath);
         check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
                 crmd.selectedCrowdMapName() == "second.crmd",
             "loading another CRMD should add it alongside the first and select it");
@@ -891,6 +890,15 @@ namespace {
         check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 0 &&
                 crmd.selectedCrowdMapName() == "again.crmd",
             "reopening the same CRMD file should reload it in place rather than add another");
+        crmd.loadCrowdMapData(copyPath.string(), "linked.crmd", FileSource::disk(copyPath.string()), "AB:01");
+        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
+                crmd.crowdMapSources()[1] == CrmdSource{FileSource::disk(copyPath.string()), "AB:01"},
+            "a CRMD loaded with a crowd key should keep it");
+        crmd.loadCrowdMapData("tests/resources/yacht.crmd", "relinked.crmd", FileSource::rpkg("0011"), "AB:01");
+        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
+                crmd.crowdMapSources()[1] == CrmdSource{FileSource::rpkg("0011"), "AB:01"},
+            "a CRMD for an already loaded crowd should replace it rather than add another");
+        std::filesystem::remove(copyPath);
         crmd.selectCrowdMap(-1);
         check(crmd.getSelectedCrowdMapIndex() == -1 && !crmd.canSave(), "selecting none should leave nothing to save");
         crmd.clear();
@@ -1227,6 +1235,13 @@ namespace {
         crmd.setCrowdMap(map, crowd.name, "synthetic-crowd");
         check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 0,
             "rebuilding a crowd should replace its CRMD rather than add another");
+
+        Json::Crowd keyed;
+        check(Crmd::crowdKey(keyed).empty(), "a crowd without an id has no key");
+        keyed.id = "0123456789abcdef";
+        check(Crmd::crowdKey(keyed) == "0123456789abcdef", "a crowd without a tblu is keyed by its id");
+        keyed.tblu = "00ABCDEF01234567";
+        check(Crmd::crowdKey(keyed) == "00ABCDEF01234567:0123456789abcdef", "a crowd key holds its tblu and id");
     }
 
     void testCrmdBuilderReservesChannelsForSkippedExits() {
@@ -1955,8 +1970,8 @@ namespace {
         project.sceneMesh = FileSource::disk(outside.string());
         project.navp = FileSource::rpkg("00ABCDEF01234567");
         project.airg = FileSource::generated();
-        project.crmds = {FileSource::disk((directory / "a.CRMD").string()), FileSource::rpkg("0011223344556677"),
-            FileSource::generated()};
+        project.crmds = {{FileSource::disk((directory / "a.CRMD").string()), "00ABCDEF01234567:0123456789abcdef"},
+            {FileSource::rpkg("0011223344556677"), {}}, {FileSource::generated(), {}}};
         project.settings["Recast"]["cellSize"] = "0.250000";
         project.settings["Crmd"]["snapHeightsToGlb"] = "false";
 
@@ -1976,7 +1991,8 @@ namespace {
         check(loaded.airg == FileSource::generated(), "Generated source round trips");
         check(loaded.gfxf.kind == FileSource::Kind::None, "Missing entries stay empty");
         check(loaded.crmds.size() == 3, "All Crmd sources round trip");
-        check(loaded.crmds[1] == FileSource::rpkg("0011223344556677"), "Crmd rpkg source round trips");
+        check(loaded.crmds[0].crowdKey == "00ABCDEF01234567:0123456789abcdef", "Crmd crowd key round trips");
+        check(loaded.crmds[1] == CrmdSource{FileSource::rpkg("0011223344556677"), {}}, "Crmd rpkg source round trips");
         check(loaded.settings == project.settings, "Settings round trip");
         std::filesystem::remove_all(directory);
     }
@@ -2119,6 +2135,35 @@ namespace {
         check(!project.isBusy(), "A missing file is skipped");
         check(!Navp::getInstance().navpLoaded, "Nothing is loaded for a missing file");
         check(!Scene::getInstance().sceneLoaded, "Nothing is loaded for a generated file");
+
+        project.newProject();
+        std::filesystem::remove_all(directory);
+    }
+
+    void testSavingOneFileUpdatesProject() {
+        const std::filesystem::path directory = makeProjectTestDirectory();
+        Project& project = Project::getInstance();
+        project.newProject();
+        Navp& navp = Navp::getInstance();
+        navp.navpLoaded = true;
+        navp.source = FileSource::generated();
+        const std::string navpPath = (directory / "Saved.NAVP").string();
+
+        Project::fileSaved([&navp, navpPath] { navp.source = FileSource::disk(navpPath); });
+        check(navp.source == FileSource::disk(navpPath), "Saving a file without a project still records its path");
+        check(!std::filesystem::exists(directory / "Test.nvproj.json"), "No project file is written without a project");
+
+        const std::string projectPath = (directory / "Test.nvproj.json").string();
+        check(project.saveProject(projectPath), "Project saves");
+        const std::string otherPath = (directory / "Other.NAVP").string();
+        Project::fileSaved([&navp, otherPath] { navp.source = FileSource::disk(otherPath); });
+        {
+            std::ifstream in(projectPath);
+            std::stringstream contents;
+            contents << in.rdbuf();
+            check(Project::fromJson(contents.str(), directory).navp == FileSource::disk(otherPath),
+                "Saving a file rewrites the open project to point at it");
+        }
 
         project.newProject();
         std::filesystem::remove_all(directory);
@@ -2373,6 +2418,7 @@ void runDomainTests() {
     run("Rpkg display names", testRpkgDisplayNames);
     run("Project captures loaded sources", testProjectCapturesLoadedSources);
     run("Project save and open", testSaveAndOpenProject);
+    run("Saving one file updates the project", testSavingOneFileUpdatesProject);
     runWithGameFile(
         "GFXF save matches vanilla GFXF apart from the array count", vanillaGfxf, testGfxfSaveMatchesVanillaGfxf);
     runWithGameFile("GFXF reads payloads with and without the array count", vanillaGfxf, testGfxfReadsBothCountLayouts);

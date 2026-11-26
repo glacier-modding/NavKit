@@ -80,7 +80,7 @@ public:
 
     void handleBuildBlendAndGlbAndGfxFromSceneClicked();
 
-    static void copyFile(const std::string& from, const std::string& to, const std::string& filetype);
+    static bool copyFile(const std::string& from, const std::string& to, const std::string& filetype);
 
     void saveGlbMesh(char* glbToCopy, char* newFileName);
 

@@ -21,6 +21,7 @@
 #include <wx/slider.h>
 #include <wx/stattext.h>
 #include "../../include/NavKit/module/Menu.h"
+#include "../../include/NavKit/module/Project.h"
 #include "../../include/NavKit/module/NavKitSettings.h"
 #include "../../include/NavKit/module/Navp.h"
 #include "../../include/NavKit/module/SceneMesh.h"
@@ -239,7 +240,11 @@ void Airg::handleSaveAirgClicked() {
         msg += fileName;
         msg += "'...";
         Logger::log(NK_INFO, msg.data());
-        backgroundWorker.emplace(&Airg::saveAirg, this, fileNameString);
+        backgroundWorker.emplace([this, fileNameString] {
+            if (saveAirg(this, fileNameString)) {
+                Project::fileSaved([this, fileNameString] { source = FileSource::disk(fileNameString); });
+            }
+        });
     }
 }
 
@@ -814,8 +819,9 @@ void Airg::setSelectedAirgWaypointIndex(const int index) {
     Menu::updateMenuState();
 }
 
-void Airg::saveAirg(Airg* airg, const std::string& fileName) {
+bool Airg::saveAirg(Airg* airg, const std::string& fileName) {
     airg->airgSaveState.push_back(true);
+    bool saved = false;
     try {
         const std::time_t startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         std::string msg = "Saving Airg to file at ";
@@ -830,12 +836,14 @@ void Airg::saveAirg(Airg* airg, const std::string& fileName) {
         msg += std::to_string(duration.count());
         msg += " seconds";
         Logger::log(NK_INFO, msg.data());
+        saved = true;
     } catch (const std::exception& error) {
         Logger::log(NK_ERROR, ("Failed to save AIRG file: " + std::string(error.what())).c_str());
     } catch (...) {
         Logger::log(NK_ERROR, "Failed to save AIRG file due to an unknown error.");
     }
     airg->airgSaveState.push_back(true);
+    return saved;
 }
 
 void Airg::loadAirg(Airg* airg, const std::string& fileName) {
