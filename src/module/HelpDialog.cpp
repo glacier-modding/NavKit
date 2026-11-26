@@ -55,8 +55,25 @@ void showHelpDialog() {
             {}},
         {"File", "Load source data, save your work, or exit NavKit.",
             {
-                {"New Project", "Clears all open files.",
-                    "Clears all open files so that new files can be opened or generated without distraction.", ""},
+                {"New Project", "Clears all open files and resets the generation settings.",
+                    "Starts an empty project: closes every open file and resets the Recast, Scene Mesh, Airg and "
+                    "Crmd settings to their defaults.",
+                    ""},
+                {"Open Project", "Opens a .nvproj.json project file.",
+                    "Restores the project's generation settings, then loads each file it lists from disk or from the "
+                    "game's resource packages.",
+                    "Files loaded from resource packages need the HITMAN game directory set in NavKit Settings."},
+                {"Save Project", "Saves the open files and generation settings to the project file.",
+                    "Records where each open file came from (disk, resource packages, or generated) along with the "
+                    "generation settings. Asks for a file name if the project has not been saved yet.",
+                    ""},
+                {"Save Project As", "Saves the project to a new .nvproj.json file.",
+                    "Saves the project under a new name and location.", ""},
+                {"Export Project", "Writes every generated or edited file next to the project file.",
+                    "Saves the scene, GLB, Blend, Navp, Airg, Crmds and Gfxf next to the project file, named after "
+                    "the project, then saves the project so it points at the exported files. Files loaded from "
+                    "resource packages are left as resource package references.",
+                    "Asks for a project file name first if the project has not been saved yet."},
                 {"New Scene", "Clears the loaded NavKit scene file.", "Clears the loaded NavKitscene file", ""},
                 {"New GLB", "Clears the loaded GLB scene mesh.", "Clears the loaded GLB scene mesh.", ""},
                 {"New Navp", "Clears the loaded NavPower navigation mesh.",

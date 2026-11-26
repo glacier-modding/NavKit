@@ -11,6 +11,8 @@
 #include "../include/NavKit/module/Menu.h"
 #include "../include/NavKit/module/NavKitSettings.h"
 #include "../include/NavKit/module/Navp.h"
+#include "../include/NavKit/module/Project.h"
+#include "../include/NavKit/module/ProjectSettings.h"
 #include "../include/NavKit/module/Rpkg.h"
 #include "../include/NavKit/module/Renderer.h"
 #include "../include/NavKit/module/Scene.h"
@@ -1938,6 +1940,98 @@ namespace {
         Gfxf::getInstance().showGfxf = true;
     }
 
+    std::filesystem::path makeProjectTestDirectory() {
+        const std::filesystem::path directory = std::filesystem::temp_directory_path() /
+            ("navkit-project-tests-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::create_directories(directory);
+        return directory;
+    }
+
+    void testProjectJsonRoundTrip() {
+        const std::filesystem::path directory = makeProjectTestDirectory();
+        const std::filesystem::path outside = std::filesystem::temp_directory_path() / "navkit-outside" / "scene.glb";
+        ProjectFile project;
+        project.scene = FileSource::disk((directory / "sub" / "scene \"quoted\".nav.json").string());
+        project.sceneMesh = FileSource::disk(outside.string());
+        project.navp = FileSource::rpkg("00ABCDEF01234567");
+        project.airg = FileSource::generated();
+        project.crmds = {FileSource::disk((directory / "a.CRMD").string()), FileSource::rpkg("0011223344556677"),
+            FileSource::generated()};
+        project.settings["Recast"]["cellSize"] = "0.250000";
+        project.settings["Crmd"]["snapHeightsToGlb"] = "false";
+
+        const std::string json = Project::toJson(project, directory);
+        check(json.find(R"("path":"sub/scene \"quoted\".nav.json")") != std::string::npos,
+            "Paths inside the project folder are stored relative to it");
+        check(json.find(outside.lexically_normal().generic_string()) != std::string::npos,
+            "Paths outside the project folder are stored absolute");
+        check(json.find("gfxf") == std::string::npos, "Files that are not loaded are left out");
+
+        const ProjectFile loaded = Project::fromJson(json, directory);
+        check(loaded.scene ==
+                FileSource::disk((directory / "sub" / "scene \"quoted\".nav.json").lexically_normal().string()),
+            "Relative scene path resolves against the project folder");
+        check(loaded.sceneMesh == FileSource::disk(outside.lexically_normal().string()), "Absolute path round trips");
+        check(loaded.navp == FileSource::rpkg("00ABCDEF01234567"), "Rpkg source keeps only its hash");
+        check(loaded.airg == FileSource::generated(), "Generated source round trips");
+        check(loaded.gfxf.kind == FileSource::Kind::None, "Missing entries stay empty");
+        check(loaded.crmds.size() == 3, "All Crmd sources round trip");
+        check(loaded.crmds[1] == FileSource::rpkg("0011223344556677"), "Crmd rpkg source round trips");
+        check(loaded.settings == project.settings, "Settings round trip");
+        std::filesystem::remove_all(directory);
+    }
+
+    void testProjectSettingsApplyAndReset() {
+        ProjectSettings& projectSettings = ProjectSettings::getInstance();
+        projectSettings.replaceValues({{"Crmd", {{"snapHeightsToGlb", "false"}}}, {"Airg", {{"spacing", "1.5"}}},
+            {"Obj", {{"meshTypeForBuild", "PRIM"}}}});
+        projectSettings.applyToModules();
+        check(!Crmd::getInstance().snapHeightsToGlb, "Crmd reads its settings from the project");
+        checkNear(Grid::getInstance().spacing, 1.5f);
+        check(SceneMesh::getInstance().meshTypeForBuild == PRIM, "Scene mesh reads its settings from the project");
+
+        Project::getInstance().projectFile = "somewhere.nvproj.json";
+        Menu::handleMenuClicked(IDM_FILE_NEW_PROJECT);
+        check(projectSettings.getValues().empty(), "New Project clears the project settings");
+        check(Crmd::getInstance().snapHeightsToGlb, "New Project restores the Crmd default");
+        checkNear(Grid::getInstance().spacing, 2.25f);
+        check(SceneMesh::getInstance().meshTypeForBuild == ALOC, "New Project restores the scene mesh default");
+        check(Project::getInstance().projectFile.empty(), "New Project forgets the project file");
+    }
+
+    void testProjectSettingsOnlyStoreChanges() {
+        Project::getInstance().newProject();
+        ProjectSettings& projectSettings = ProjectSettings::getInstance();
+        RecastAdapter::getInstance().saveSettings();
+        SceneMesh::getInstance().saveSceneMeshSettings();
+        Crmd::getInstance().saveSettings();
+        check(projectSettings.getValues().empty(), "Saving default settings stores nothing");
+
+        projectSettings.setValue("Recast", "cellSize", "0.300000");
+        check(projectSettings.getValues().at("Recast").at("cellSize") == "0.300000", "A changed setting is stored");
+        projectSettings.setValue("Recast", "cellSize", std::to_string(0.1f));
+        check(projectSettings.getValues().empty(), "Setting a value back to its default removes it");
+        check(std::string(projectSettings.getValue("Recast", "agentHeight")) == "1.8", "Unset settings read defaults");
+
+        projectSettings.replaceValues({{"Airg", {{"spacing", "2.250000"}}}, {"Crmd", {{"snapHeightsToGlb", "false"}}}});
+        check(projectSettings.getValues().size() == 1 && projectSettings.getValues().contains("Crmd"),
+            "Loaded settings that match their defaults are dropped");
+        Project::getInstance().newProject();
+    }
+
+    void testProjectRejectsInvalidAirgSpacing() {
+        ProjectSettings& projectSettings = ProjectSettings::getInstance();
+        for (const char* invalidSpacing : {"0", "-1", "abc", "inf"}) {
+            projectSettings.replaceValues({{"Airg", {{"spacing", invalidSpacing}}}});
+            projectSettings.applyToModules();
+            checkNear(Grid::getInstance().spacing, Grid::defaultSpacing());
+        }
+        projectSettings.replaceValues({{"Airg", {{"spacing", "1.25"}}}});
+        projectSettings.applyToModules();
+        checkNear(Grid::getInstance().spacing, 1.25f);
+        Project::getInstance().newProject();
+    }
+
     void testEditedRpkgSourcesBecomeGenerated() {
         FileSource source = FileSource::rpkg("00ABCDEF01234567");
         source.markEdited();
@@ -1971,6 +2065,63 @@ namespace {
         std::mutex mutex;
         check(Rpkg::displayNameForHash(names, mutex, "00AB") == "[assembly:/a.navp]", "Known hashes show their name");
         check(Rpkg::displayNameForHash(names, mutex, "00CD") == "00CD", "Unknown hashes show the hash");
+    }
+
+    void testProjectCapturesLoadedSources() {
+        Project::getInstance().newProject();
+        Scene& scene = Scene::getInstance();
+        Navp& navp = Navp::getInstance();
+        Airg& airg = Airg::getInstance();
+        SceneMesh& sceneMesh = SceneMesh::getInstance();
+        scene.sceneLoaded = true;
+        scene.source = FileSource::disk("scene.nav.json");
+        navp.navpLoaded = true;
+        navp.source = FileSource::rpkg("00ABCDEF01234567");
+        airg.airgLoaded = true;
+        sceneMesh.source = FileSource::disk("not-loaded.glb");
+
+        const ProjectFile project = Project::captureCurrentProject();
+        check(project.scene == FileSource::disk("scene.nav.json"), "Loaded scene source is captured");
+        check(project.navp == FileSource::rpkg("00ABCDEF01234567"), "Loaded navp rpkg source is captured");
+        check(project.airg == FileSource::generated(), "Loaded data with no recorded source counts as generated");
+        check(project.sceneMesh.kind == FileSource::Kind::None, "Sources of unloaded files are left out");
+        Project::getInstance().newProject();
+        check(scene.source.kind == FileSource::Kind::None && navp.source.kind == FileSource::Kind::None,
+            "Clearing a module forgets its source");
+    }
+
+    void testSaveAndOpenProject() {
+        const std::filesystem::path directory = makeProjectTestDirectory();
+        Project& project = Project::getInstance();
+        project.newProject();
+        ProjectSettings::getInstance().setValue("Crmd", "snapHeightsToGlb", "false");
+        const std::string projectPath = (directory / "Test.nvproj.json").string();
+        check(project.saveProject(projectPath), "Project saves");
+        check(project.projectFile == projectPath, "Saving remembers the project file");
+        {
+            std::ifstream in(projectPath);
+            std::stringstream contents;
+            contents << in.rdbuf();
+            const ProjectFile saved = Project::fromJson(contents.str(), directory);
+            check(saved.settings.at("Crmd").at("snapHeightsToGlb") == "false", "Saved project holds the settings");
+        }
+
+        {
+            std::ofstream out(directory / "Broken.nvproj.json");
+            out << R"({"version":1,"files":{"scene":{"source":"generated"},)"
+                << R"("navp":{"source":"disk","path":"missing.navp"}},"settings":{"Airg":{"spacing":"3.5"}}})";
+        }
+        project.newProject();
+        check(project.openProject((directory / "Broken.nvproj.json").string()), "Project with problems still opens");
+        checkNear(Grid::getInstance().spacing, 3.5f);
+        check(project.isBusy(), "The missing navp is queued for loading");
+        project.update();
+        check(!project.isBusy(), "A missing file is skipped");
+        check(!Navp::getInstance().navpLoaded, "Nothing is loaded for a missing file");
+        check(!Scene::getInstance().sceneLoaded, "Nothing is loaded for a generated file");
+
+        project.newProject();
+        std::filesystem::remove_all(directory);
     }
 
     // Navmesh fixture for the waypoint connection tests: a walkable plane with a wall sliver between
@@ -2213,9 +2364,15 @@ void runDomainTests() {
     run("Module defaults and extraction gating", testModuleDefaultsAndRpkgGating);
     run("Module state and capability predicates", testModuleStateAndCapabilities);
     run("Clear and New Project file menu options", testClearAndNewProjectOptions);
+    run("Project JSON round trip", testProjectJsonRoundTrip);
+    run("Project settings apply and reset", testProjectSettingsApplyAndReset);
+    run("Project settings only store changes", testProjectSettingsOnlyStoreChanges);
+    run("Project rejects invalid Airg spacing", testProjectRejectsInvalidAirgSpacing);
     run("Edited rpkg sources become generated", testEditedRpkgSourcesBecomeGenerated);
     run("Scene clear resets loading", testSceneClearResetsLoading);
     run("Rpkg display names", testRpkgDisplayNames);
+    run("Project captures loaded sources", testProjectCapturesLoadedSources);
+    run("Project save and open", testSaveAndOpenProject);
     runWithGameFile(
         "GFXF save matches vanilla GFXF apart from the array count", vanillaGfxf, testGfxfSaveMatchesVanillaGfxf);
     runWithGameFile("GFXF reads payloads with and without the array count", vanillaGfxf, testGfxfReadsBothCountLayouts);
