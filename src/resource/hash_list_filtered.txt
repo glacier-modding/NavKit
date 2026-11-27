@@ -59,6 +59,7 @@
 007B3CB603E76F21.NAVP,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01.navp].pc_navp
 0038FF4EF4F9FDB1.NAVP,[assembly:/_pro/scenes/missions/paris/_scene_frenchmartini.navp].pc_navp
 00B67EC300F24587.NAVP,[assembly:/_pro/scenes/missions/rocky/scene_dugong.navp].pc_navp
+00889921D7E72641.NAVP,[assembly:/_pro/scenes/missions/rocky/scene_grog.navp].pc_navp
 00FA82B8022B6C9B.NAVP,[assembly:/_pro/scenes/missions/rocky/scene_rocky_hot_poker.navp].pc_navp
 00EB68B0CB7348A3.NAVP,[assembly:/_pro/scenes/missions/rocky/scene_rocky_mild_poker.navp].pc_navp
 001A26A3DED87D75.NAVP,[assembly:/_pro/scenes/missions/salty/mission_seagull/scene_seagull.navp].pc_navp
@@ -126,6 +127,7 @@
 005D543656F539F3.AIRG,[assembly:/_pro/scenes/missions/paris/_scene_fashionshowhit_01_scene.airg].pc_airg
 00D147B9750F423F.AIRG,[assembly:/_pro/scenes/missions/paris/_scene_frenchmartini_scene.airg].pc_airg
 00885F24BB2BDB68.AIRG,[assembly:/_pro/scenes/missions/rocky/scene_dugong_scene.airg].pc_airg
+0010196E42876C29.AIRG,[assembly:/_pro/scenes/missions/rocky/scene_grog_scene.airg].pc_airg
 00630004DAD6D55D.AIRG,[assembly:/_pro/scenes/missions/rocky/scene_rocky_hot_poker_scene.airg].pc_airg
 00570FA12D544138.AIRG,[assembly:/_pro/scenes/missions/salty/mission_seagull/scene_seagull_scene.airg].pc_airg
 006FCE4E51BA236B.AIRG,[assembly:/_pro/scenes/missions/sheep/scene_adonis_scene.airg].pc_airg
@@ -237,6 +239,7 @@
 00DEB8B328252CCD.GFXF,[assembly:/_pro/scenes/missions/opulent/mission_stingray/maps/scene_stingray_basic/scene_stingray_basic.swf].pc_swf
 00A51168E6512C9F.GFXF,[assembly:/_pro/scenes/missions/paris/maps/_scene_fashionshowhit_01/_scene_fashionshowhit_01.swf].pc_swf
 003FAEA4B93A7DBB.GFXF,[assembly:/_pro/scenes/missions/rocky/maps/scene_dugong/scene_dugong.swf].pc_swf
+0058E3B36476D1C6.GFXF,[assembly:/_pro/scenes/missions/rocky/maps/scene_grog/scene_grog.swf].pc_swf
 00CEC914C8280520.GFXF,[assembly:/_pro/scenes/missions/sheep/maps/scene_sheep/scene_sheep.swf].pc_swf
 0008886EE5B0A9D2.GFXF,[assembly:/_pro/scenes/missions/skunk/maps/scene_skunk/scene_skunk.swf].pc_swf
 004CEA6D5A69CAC0.GFXF,[assembly:/_pro/scenes/missions/theark/maps/scene_magpie/scene_magpie.swf].pc_swf
