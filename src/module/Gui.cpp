@@ -7,6 +7,7 @@
 #include "../../include/NavKit/module/Renderer.h"
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/PersistedSettings.h"
+#include <algorithm>
 #include <deque>
 #include <string>
 
@@ -61,9 +62,10 @@ void Gui::drawGui() {
         int resourceTextY = renderer.height - 120;
         const Crmd& crmd = Crmd::getInstance();
         if (const size_t crowdMapCount = crmd.crowdMapCount(); crowdMapCount > 0) {
-            const int selected = crmd.getSelectedCrowdMapIndex();
-            const std::string loadedCrmdText = "Loaded Crmds: " + std::to_string(crowdMapCount) +
-                ", shown: " + (selected < 0 ? "None" : fileNameFromPath(crmd.selectedCrowdMapName()));
+            const std::vector<bool> visibility = crmd.crowdMapVisibility();
+            const auto shownCount = crmd.showCrmd ? std::ranges::count(visibility, true) : 0;
+            const std::string loadedCrmdText =
+                "Loaded Crmds: " + std::to_string(crowdMapCount) + ", shown: " + std::to_string(shownCount);
             imguiDrawText(10, resourceTextY, IMGUI_ALIGN_LEFT, loadedCrmdText.c_str(), imguiRGBA(255, 255, 255, 128));
             resourceTextY -= 20;
         }

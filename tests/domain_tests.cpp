@@ -866,8 +866,8 @@ namespace {
         crmd.loadCrowdMapData("tests/resources/yacht.crmd", "yacht.crmd");
 
         const SCrowdMapData* data = crmd.crowdMapData(0);
-        check(crmd.crowdMapCount() == 1 && crmd.getSelectedCrowdMapIndex() == 0,
-            "CRMD fixture should load successfully and be selected");
+        check(crmd.crowdMapCount() == 1 && crmd.crowdMapVisibility() == std::vector<bool>{true},
+            "CRMD fixture should load successfully and be shown");
         check(data != nullptr, "CRMD fixture should populate crowd-map data");
         check(data->m_nGridSizeX == 163 && data->m_nGridSizeY == 249, "CRMD fixture should load grid dimensions");
         check(data->m_nCellSizeX == 162 && data->m_nCellSizeY == 248,
@@ -883,26 +883,26 @@ namespace {
         std::filesystem::copy_file(
             "tests/resources/yacht.crmd", copyPath, std::filesystem::copy_options::overwrite_existing);
         crmd.loadCrowdMapData(copyPath.string(), "second.crmd");
-        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
-                crmd.selectedCrowdMapName() == "second.crmd",
-            "loading another CRMD should add it alongside the first and select it");
+        check(crmd.crowdMapCount() == 2 && crmd.crowdMapNames()[1] == "second.crmd" &&
+                crmd.crowdMapVisibility() == std::vector<bool>{true, true},
+            "loading another CRMD should add it alongside the first and show both");
+        crmd.setCrowdMapVisible(0, false);
         crmd.loadCrowdMapData("tests/../tests/resources/yacht.crmd", "again.crmd");
-        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 0 &&
-                crmd.selectedCrowdMapName() == "again.crmd",
-            "reopening the same CRMD file should reload it in place rather than add another");
+        check(crmd.crowdMapCount() == 2 && crmd.crowdMapNames()[0] == "again.crmd" && crmd.crowdMapVisibility()[0],
+            "reopening the same CRMD file should reload it in place, shown, rather than add another");
         crmd.loadCrowdMapData(copyPath.string(), "linked.crmd", FileSource::disk(copyPath.string()), "AB:01");
-        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
+        check(crmd.crowdMapCount() == 2 &&
                 crmd.crowdMapSources()[1] == CrmdSource{FileSource::disk(copyPath.string()), "AB:01"},
             "a CRMD loaded with a crowd key should keep it");
         crmd.loadCrowdMapData("tests/resources/yacht.crmd", "relinked.crmd", FileSource::rpkg("0011"), "AB:01");
-        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 1 &&
-                crmd.crowdMapSources()[1] == CrmdSource{FileSource::rpkg("0011"), "AB:01"},
+        check(crmd.crowdMapCount() == 2 && crmd.crowdMapSources()[1] == CrmdSource{FileSource::rpkg("0011"), "AB:01"},
             "a CRMD for an already loaded crowd should replace it rather than add another");
         std::filesystem::remove(copyPath);
-        crmd.selectCrowdMap(-1);
-        check(crmd.getSelectedCrowdMapIndex() == -1 && !crmd.canSave(), "selecting none should leave nothing to save");
+        crmd.setCrowdMapVisible(0, false);
+        crmd.setCrowdMapVisible(1, false);
+        check(crmd.canSave(), "hidden CRMDs should still be saveable");
         crmd.clear();
-        check(crmd.crowdMapCount() == 0, "clearing should remove every loaded CRMD");
+        check(crmd.crowdMapCount() == 0 && !crmd.canSave(), "clearing should remove every loaded CRMD");
     }
 
     void testCrmdSaveRoundTrip() {
@@ -1233,8 +1233,7 @@ namespace {
             "a built crowd map should become the loaded CRMD");
         crmd.setCrowdMap(snapped, crowd.name, "other-crowd");
         crmd.setCrowdMap(map, crowd.name, "synthetic-crowd");
-        check(crmd.crowdMapCount() == 2 && crmd.getSelectedCrowdMapIndex() == 0,
-            "rebuilding a crowd should replace its CRMD rather than add another");
+        check(crmd.crowdMapCount() == 2, "rebuilding a crowd should replace its CRMD rather than add another");
 
         Json::Crowd keyed;
         check(Crmd::crowdKey(keyed).empty(), "a crowd without an id has no key");
@@ -1953,6 +1952,11 @@ namespace {
         Menu::handleMenuClicked(IDM_VIEW_GFXF_SHOW_GFXF);
         check(!Gfxf::getInstance().showGfxf, "Show GFXF should toggle viewport visibility");
         Gfxf::getInstance().showGfxf = true;
+
+        Crmd::getInstance().showCrmd = true;
+        Menu::handleMenuClicked(IDM_VIEW_CRMD_SHOW_CRMD);
+        check(!Crmd::getInstance().showCrmd, "Show Crmd should toggle viewport visibility");
+        Crmd::getInstance().showCrmd = true;
     }
 
     std::filesystem::path makeProjectTestDirectory() {
