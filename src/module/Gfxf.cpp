@@ -1233,6 +1233,7 @@ void Gfxf::showGfxfSettingsDialog() {
     } else {
         content->Add(new wxStaticText(dialog, wxID_ANY, "No GFXF map is currently loaded."), 0, wxALL, 10);
     }
+    content->Add(new wxStaticText(dialog, wxID_ANY, "Project Settings:"), 0, wxLEFT | wxRIGHT | wxTOP, 10);
 
     offsetX = std::clamp(offsetX, -100, 100);
     offsetY = std::clamp(offsetY, -100, 100);

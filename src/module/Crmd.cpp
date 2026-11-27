@@ -40,6 +40,8 @@
 #include <cpptrace/from_current.hpp>
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/checklst.h>
+#include <wx/choicdlg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include "../../include/ResourceLib_HM3/Generated/HM3/ZHMGen.h"
@@ -450,20 +452,23 @@ void Crmd::renderCrowdMapData() {
         crowdMap->flowArrowLineBuffer.release();
     }
     crowdMapsAwaitingRelease.clear();
-    if (selectedCrowdMapIndex < 0 || static_cast<size_t>(selectedCrowdMapIndex) >= crowdMaps.size()) {
+    if (!showCrmd) {
         return;
-    }
-    LoadedCrowdMap& crowdMap = *crowdMaps[selectedCrowdMapIndex];
-    if (!crowdMap.data || crowdMap.data->m_nGridSizeX == 0 || crowdMap.data->m_nGridSizeY == 0) {
-        return;
-    }
-    if (crowdMap.renderGeometryDirty) {
-        crowdMap.renderGeometryDirty = false;
-        rebuildRenderGeometry(crowdMap);
     }
     const Renderer& renderer = Renderer::getInstance();
-    crowdMap.cellTriangleBuffer.draw(GL_TRIANGLES, crowdMap.renderModel, renderer.view, renderer.projection);
-    crowdMap.flowArrowLineBuffer.draw(GL_LINES, crowdMap.renderModel, renderer.view, renderer.projection);
+    for (const auto& crowdMapPointer : crowdMaps) {
+        LoadedCrowdMap& crowdMap = *crowdMapPointer;
+        if (!crowdMap.visible || !crowdMap.data || crowdMap.data->m_nGridSizeX == 0 ||
+            crowdMap.data->m_nGridSizeY == 0) {
+            continue;
+        }
+        if (crowdMap.renderGeometryDirty) {
+            crowdMap.renderGeometryDirty = false;
+            rebuildRenderGeometry(crowdMap);
+        }
+        crowdMap.cellTriangleBuffer.draw(GL_TRIANGLES, crowdMap.renderModel, renderer.view, renderer.projection);
+        crowdMap.flowArrowLineBuffer.draw(GL_LINES, crowdMap.renderModel, renderer.view, renderer.projection);
+    }
 }
 
 void Crmd::rebuildRenderGeometry(LoadedCrowdMap& crowdMap) {
@@ -683,11 +688,10 @@ void Crmd::addCrowdMap(std::unique_ptr<SCrowdMapData> data, const std::string& n
         }
         if (existing == crowdMaps.end()) {
             crowdMaps.push_back(std::make_unique<LoadedCrowdMap>());
-            selectedCrowdMapIndex = static_cast<int>(crowdMaps.size() - 1);
-        } else {
-            selectedCrowdMapIndex = static_cast<int>(existing - crowdMaps.begin());
+            existing = crowdMaps.end() - 1;
         }
-        LoadedCrowdMap& crowdMap = *crowdMaps[selectedCrowdMapIndex];
+        LoadedCrowdMap& crowdMap = **existing;
+        crowdMap.visible = true;
         crowdMap.data = std::move(data);
         crowdMap.name = name;
         if (!sourceKey.empty()) {
@@ -707,19 +711,8 @@ void Crmd::clear() {
         std::lock_guard lock(crowdMapsMutex);
         std::ranges::move(crowdMaps, std::back_inserter(crowdMapsAwaitingRelease));
         crowdMaps.clear();
-        selectedCrowdMapIndex = -1;
     }
     Menu::updateMenuState();
-}
-
-void Crmd::selectCrowdMap(const int index) {
-    std::lock_guard lock(crowdMapsMutex);
-    selectedCrowdMapIndex = index >= 0 && static_cast<size_t>(index) < crowdMaps.size() ? index : -1;
-}
-
-int Crmd::getSelectedCrowdMapIndex() const {
-    std::lock_guard lock(crowdMapsMutex);
-    return selectedCrowdMapIndex;
 }
 
 size_t Crmd::crowdMapCount() const {
@@ -737,6 +730,23 @@ std::vector<std::string> Crmd::crowdMapNames() const {
     return names;
 }
 
+std::vector<bool> Crmd::crowdMapVisibility() const {
+    std::lock_guard lock(crowdMapsMutex);
+    std::vector<bool> visibility;
+    visibility.reserve(crowdMaps.size());
+    for (const auto& crowdMap : crowdMaps) {
+        visibility.push_back(crowdMap->visible);
+    }
+    return visibility;
+}
+
+void Crmd::setCrowdMapVisible(const size_t index, const bool visible) {
+    std::lock_guard lock(crowdMapsMutex);
+    if (index < crowdMaps.size()) {
+        crowdMaps[index]->visible = visible;
+    }
+}
+
 std::vector<CrmdSource> Crmd::crowdMapSources() const {
     std::lock_guard lock(crowdMapsMutex);
     std::vector<CrmdSource> sources;
@@ -752,11 +762,6 @@ void Crmd::setCrowdMapSource(const size_t index, const FileSource& fileSource) {
     if (index < crowdMaps.size()) {
         crowdMaps[index]->source = fileSource;
     }
-}
-
-std::string Crmd::selectedCrowdMapName() const {
-    std::lock_guard lock(crowdMapsMutex);
-    return selectedCrowdMapIndex >= 0 ? crowdMaps[selectedCrowdMapIndex]->name : std::string{};
 }
 
 const SCrowdMapData* Crmd::crowdMapData(const size_t index) const {
@@ -961,8 +966,18 @@ void Crmd::showCrmdSettingsDialog() {
     auto* snapCheck = new wxCheckBox(dialog, IDC_CHECK_CRMD_SNAP_HEIGHTS_TO_GLB, "Snap Navp heights to GLB");
     snapCheck->SetValue(snapHeightsToGlb);
     auto* content = new wxBoxSizer(wxVERTICAL);
+    content->Add(new wxStaticText(dialog, wxID_ANY, "Shown Crmds:"), 0, wxLEFT | wxRIGHT | wxTOP, 10);
+    auto* visibleList = new wxCheckListBox(dialog, IDC_CHECKLIST_CRMD_VISIBLE, wxDefaultPosition, wxSize(360, 160));
+    content->Add(visibleList, 1, wxEXPAND | wxALL, 10);
+    content->Add(new wxStaticText(dialog, wxID_ANY, "Project Settings:"), 0, wxLEFT | wxRIGHT, 10);
     content->Add(snapCheck, 0, wxALL, 10);
     dialog->SetSizerAndFit(content);
+    updateCrmdSettingsDialogList();
+
+    visibleList->Bind(wxEVT_CHECKLISTBOX, [this, visibleList](const wxCommandEvent& event) {
+        const int index = event.GetInt();
+        setCrowdMapVisible(static_cast<size_t>(index), visibleList->IsChecked(index));
+    });
 
     snapCheck->Bind(wxEVT_CHECKBOX, [this](const wxCommandEvent& event) {
         snapHeightsToGlb = event.IsChecked();
@@ -979,6 +994,30 @@ void Crmd::showCrmdSettingsDialog() {
     dialog->Show();
 }
 
+void Crmd::updateCrmdSettingsDialogList() {
+    if (hCrmdSettingsDialog == nullptr) {
+        return;
+    }
+    auto* visibleList = static_cast<wxCheckListBox*>(hCrmdSettingsDialog->FindWindow(IDC_CHECKLIST_CRMD_VISIBLE));
+    if (visibleList == nullptr) {
+        return;
+    }
+    const Crmd& crmd = getInstance();
+    const std::vector<std::string> names = crmd.crowdMapNames();
+    const std::vector<bool> visibility = crmd.crowdMapVisibility();
+    wxArrayString labels;
+    for (const std::string& name : names) {
+        const size_t separator = name.find_last_of("/\\");
+        labels.Add(wxString::FromUTF8(separator == std::string::npos ? name : name.substr(separator + 1)));
+    }
+    if (visibleList->GetStrings() != labels) {
+        visibleList->Set(labels);
+    }
+    for (size_t index = 0; index < visibility.size() && index < labels.size(); ++index) {
+        visibleList->Check(static_cast<unsigned int>(index), visibility[index]);
+    }
+}
+
 std::string Crmd::crowdKey(const Json::Crowd& crowd) {
     if (crowd.id.empty()) {
         return {};
@@ -991,7 +1030,7 @@ void Crmd::setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& 
 }
 
 bool Crmd::canSave() const {
-    return !loading && !saving && !building && getSelectedCrowdMapIndex() >= 0;
+    return !loading && !saving && !building && crowdMapCount() > 0;
 }
 
 void Crmd::saveCrmd(const std::string& fileName, const size_t index) const {
@@ -1014,11 +1053,27 @@ void Crmd::saveCrmd(const std::string& fileName, const size_t index) const {
 }
 
 void Crmd::handleSaveCrmdClicked() {
-    const int index = getSelectedCrowdMapIndex();
-    if (index < 0) {
+    const std::vector<std::string> names = crowdMapNames();
+    if (names.empty()) {
         return;
     }
-    std::string defaultName = selectedCrowdMapName();
+    int index = 0;
+    if (names.size() > 1) {
+        const std::vector<bool> visibility = crowdMapVisibility();
+        wxArrayString choices;
+        for (const std::string& name : names) {
+            choices.Add(wxString::FromUTF8(name));
+        }
+        wxSingleChoiceDialog chooser(getMainFrame(), "Crmd to save:", "Save Crmd", choices);
+        const auto firstVisible = std::ranges::find(visibility, true);
+        chooser.SetSelection(
+            firstVisible == visibility.end() ? 0 : static_cast<int>(firstVisible - visibility.begin()));
+        if (chooser.ShowModal() != wxID_OK) {
+            return;
+        }
+        index = chooser.GetSelection();
+    }
+    std::string defaultName = names[index];
     if (const size_t extension = defaultName.find_last_of('.'); extension != std::string::npos) {
         defaultName.erase(extension);
     }

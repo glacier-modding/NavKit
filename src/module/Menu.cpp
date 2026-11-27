@@ -107,7 +107,7 @@ wxMenuBar* Menu::createMenuBar() {
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_LAYER, "Airg Cell: Layer");
     view->AppendRadioItem(IDM_VIEW_AIRG_CELL_COLOR_DEAD_END, "Airg Cell: Dead End");
     view->AppendSeparator();
-    view->AppendRadioItem(IDM_VIEW_CRMD_NONE, "CRMD: None")->Check();
+    view->AppendCheckItem(IDM_VIEW_CRMD_SHOW_CRMD, "Show &Crmd")->Check();
     view->AppendSeparator();
     view->AppendCheckItem(IDM_VIEW_GLB_SHOW_GLB, "Show &GLB")->Check();
     view->AppendCheckItem(IDM_VIEW_GFXF_SHOW_GFXF, "Show GFX&F")->Check();
@@ -293,46 +293,7 @@ void Menu::updateMenuState() {
             setMenuItemEnabled(menuId, false);
         }
     }
-    updateCrmdViewItems();
-}
-
-void Menu::updateCrmdViewItems() {
-    wxFrame* frame = getMainFrame();
-    if (!frame || !frame->GetMenuBar()) {
-        return;
-    }
-    wxMenu* view = nullptr;
-    if (!frame->GetMenuBar()->FindItem(IDM_VIEW_CRMD_NONE, &view) || !view) {
-        return;
-    }
-    const Crmd& crmd = Crmd::getInstance();
-    std::vector<std::string> names = crmd.crowdMapNames();
-    names.resize(std::min<size_t>(names.size(), IDM_VIEW_CRMD_LAST - IDM_VIEW_CRMD_FIRST + 1));
-    std::vector<wxString> labels;
-    labels.reserve(names.size());
-    for (size_t i = 0; i < names.size(); ++i) {
-        const size_t separator = names[i].find_last_of("/\\");
-        wxString name = wxString::FromUTF8(separator == std::string::npos ? names[i] : names[i].substr(separator + 1));
-        name.Replace("&", "&&");
-        labels.push_back(name);
-    }
-    static std::vector<wxString> shownLabels;
-    if (labels != shownLabels) {
-        for (int id = IDM_VIEW_CRMD_FIRST; id <= IDM_VIEW_CRMD_LAST; ++id) {
-            if (view->FindItem(id)) {
-                view->Destroy(id);
-            }
-        }
-        size_t nonePosition = 0;
-        view->FindChildItem(IDM_VIEW_CRMD_NONE, &nonePosition);
-        for (size_t i = 0; i < labels.size(); ++i) {
-            view->InsertRadioItem(nonePosition + 1 + i, IDM_VIEW_CRMD_FIRST + static_cast<int>(i), labels[i]);
-        }
-        shownLabels = labels;
-    }
-    const int selected = crmd.getSelectedCrowdMapIndex();
-    const bool selectedHasItem = selected >= 0 && static_cast<size_t>(selected) < labels.size();
-    frame->GetMenuBar()->Check(selectedHasItem ? IDM_VIEW_CRMD_FIRST + selected : IDM_VIEW_CRMD_NONE, true);
+    Crmd::updateCrmdSettingsDialogList();
 }
 
 void Menu::setMenuItemChecked(const int menuId, const bool isChecked, const char* itemName) {
@@ -346,12 +307,6 @@ int Menu::handleMenuClicked(const int menuId) {
     SceneMesh& obj = SceneMesh::getInstance();
     Airg& airg = Airg::getInstance();
     SceneExtract& sceneExtract = SceneExtract::getInstance();
-    if (menuId >= IDM_VIEW_CRMD_NONE && menuId <= IDM_VIEW_CRMD_LAST) {
-        Crmd::getInstance().selectCrowdMap(menuId - IDM_VIEW_CRMD_FIRST);
-        updateCrmdViewItems();
-        Logger::log(NK_DEBUG, "View -> CRMD %d selected", menuId - IDM_VIEW_CRMD_NONE);
-        return 0;
-    }
     switch (menuId) {
     case IDM_FILE_NEW_PROJECT:
         Project::getInstance().handleNewProjectClicked();
@@ -554,6 +509,9 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_VIEW_GLB_SHOW_GLB:
         handleCheckboxMenuItem(IDM_VIEW_GLB_SHOW_GLB, SceneMesh::getInstance().showGlb, "Show GLB");
+        break;
+    case IDM_VIEW_CRMD_SHOW_CRMD:
+        handleCheckboxMenuItem(IDM_VIEW_CRMD_SHOW_CRMD, Crmd::getInstance().showCrmd, "Show Crmd");
         break;
     case IDM_VIEW_GFXF_SHOW_GFXF:
         handleCheckboxMenuItem(IDM_VIEW_GFXF_SHOW_GFXF, Gfxf::getInstance().showGfxf, "Show Gfxf");

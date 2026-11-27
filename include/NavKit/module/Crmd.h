@@ -30,6 +30,7 @@ struct LoadedCrowdMap {
     std::string crowdKey;
     FileSource source;
     bool renderGeometryDirty{true};
+    bool visible{true};
     CoreProfileVertexBuffer cellTriangleBuffer;
     CoreProfileVertexBuffer flowArrowLineBuffer;
     glm::mat4 renderModel{1.0f};
@@ -75,23 +76,24 @@ public:
     void handleBuildAllCrmdsClicked();
     static std::string crowdKey(const Json::Crowd& crowd);
     void setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name, const std::string& crowdKey = {});
-    void selectCrowdMap(int index);
-    int getSelectedCrowdMapIndex() const;
     size_t crowdMapCount() const;
     std::vector<std::string> crowdMapNames() const;
+    std::vector<bool> crowdMapVisibility() const;
+    void setCrowdMapVisible(size_t index, bool visible);
     std::vector<CrmdSource> crowdMapSources() const;
     void setCrowdMapSource(size_t index, const FileSource& fileSource);
-    std::string selectedCrowdMapName() const;
     const SCrowdMapData* crowdMapData(size_t index) const;
     void loadSettings();
     void saveSettings() const;
     void showCrmdSettingsDialog();
+    static void updateCrmdSettingsDialogList();
 
     std::optional<std::jthread> backgroundWorker;
     std::atomic<bool> loading;
     std::atomic<bool> saving;
     std::atomic<bool> building;
     bool snapHeightsToGlb;
+    bool showCrmd = true;
     static std::map<std::string, std::string> crmdHashIoiStringMap;
     static std::mutex crmdHashIoiStringMapMutex;
     static wxDialog* hCrmdDialog;
@@ -111,5 +113,4 @@ private:
     mutable std::mutex crowdMapsMutex;
     std::vector<std::unique_ptr<LoadedCrowdMap>> crowdMaps;
     std::vector<std::unique_ptr<LoadedCrowdMap>> crowdMapsAwaitingRelease;
-    int selectedCrowdMapIndex{-1};
 };
