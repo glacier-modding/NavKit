@@ -274,6 +274,10 @@ void Menu::updateMenuState() {
         IDM_EDIT_AIRG_CONNECT_WAYPOINT, airg.connectWaypointModeEnabled, "Connect Waypoint Mode Enabled");
     setMenuItemChecked(
         IDM_EDIT_AIRG_DISCONNECT_WAYPOINT, airg.disconnectWaypointModeEnabled, "Disconnect Waypoint Mode Enabled");
+    for (const int menuId : {IDM_FILE_NEW_SCENE, IDM_FILE_NEW_SCENE_MESH, IDM_FILE_NEW_NAVP, IDM_FILE_NEW_AIRG,
+             IDM_FILE_NEW_GFXF, IDM_FILE_OPEN_SCENE, IDM_FILE_OPEN_NAVP}) {
+        setMenuItemEnabled(menuId, true);
+    }
     if (projectBusy) {
         for (const int menuId : {IDM_FILE_NEW_SCENE, IDM_FILE_NEW_SCENE_MESH, IDM_FILE_NEW_NAVP, IDM_FILE_NEW_AIRG,
                  IDM_FILE_NEW_CRMD, IDM_FILE_NEW_GFXF, IDM_FILE_OPEN_SCENE, IDM_FILE_OPEN_GLB, IDM_FILE_OPEN_NAVP,
