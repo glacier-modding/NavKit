@@ -5,6 +5,9 @@ class Menu {
 public:
     static wxMenuBar* createMenuBar();
 
+    /// Starts another of NavKit's programs from this program's folder, or tells the user why it could not.
+    static void openSiblingApplication(const char* executableName, wxWindow* parent);
+
     static int handleMenuClicked(int menuId);
 
     static void setMenuItemEnabled(int menuId, bool isEnabled);

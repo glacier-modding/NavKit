@@ -77,12 +77,13 @@ NavKitSettings::NavKitSettings() :
     backgroundColor(0.30f), hitmanSet(false), outputSet(false), blenderSet(false), showDebugLogs(false), darkMode(true),
     shouldOpenSettingsDialog(false) {}
 
-void NavKitSettings::showNavKitSettingsDialog() {
+void NavKitSettings::showNavKitSettingsDialog(wxWindow* parent) {
     if (hSettingsDialog) {
         hSettingsDialog->Raise();
         return;
     }
-    auto* dialog = new wxDialog(getMainFrame(), wxID_ANY, "NavKit Settings", wxDefaultPosition, wxSize(640, 380));
+    auto* dialog = new wxDialog(
+        parent != nullptr ? parent : getMainFrame(), wxID_ANY, "NavKit Settings", wxDefaultPosition, wxSize(640, 380));
     hSettingsDialog = dialog;
     auto settings = std::make_shared<DialogSettings>(DialogSettings{
         backgroundColor, hitmanFolder, outputFolder, blenderPath, showDebugLogs, Threading::getMaxThreads(), darkMode});

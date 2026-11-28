@@ -236,6 +236,15 @@ if(BUILD_INSTALLER AND WIN32)
             install(TARGETS NavKit
                     RUNTIME DESTINATION .
             )
+            set(WIX_BULK_TOOL 0)
+            set(INSTALLER_TOOL_TARGETS)
+            if (TARGET NavKitBulkGenerationTool)
+                install(TARGETS NavKitBulkGenerationTool
+                        RUNTIME DESTINATION .
+                )
+                set(WIX_BULK_TOOL 1)
+                list(APPEND INSTALLER_TOOL_TARGETS NavKitBulkGenerationTool)
+            endif ()
             install(FILES
                     $<TARGET_FILE:navkit-rpkg-lib>
                     DESTINATION .
@@ -258,7 +267,7 @@ if(BUILD_INSTALLER AND WIN32)
                 -ag -srd -sreg -cg NavKit_Components -dr INSTALLFOLDER
                 -t "${CMAKE_SOURCE_DIR}/wix/heat_exclude_navkit.xslt"
                 -o ${HARVESTED_COMPONENTS_FILE}
-                DEPENDS NavKit ${THIRD_PARTY_DLL_PATHS} ${RUNTIME_FILE_DEPENDENCIES}
+                DEPENDS NavKit ${INSTALLER_TOOL_TARGETS} ${THIRD_PARTY_DLL_PATHS} ${RUNTIME_FILE_DEPENDENCIES}
                         $<TARGET_FILE:navkit-rpkg-lib>
                         "${CMAKE_BINARY_DIR}/cmake_install.cmake"
                         "${CMAKE_SOURCE_DIR}/wix/heat_exclude_navkit.xslt"
@@ -284,6 +293,7 @@ if(BUILD_INSTALLER AND WIN32)
                 -d "LayoutDir=${CMAKE_BINARY_DIR}/installer_layout"
                 -d "InstallScope=perUser"
                 -d "PerUserInstall=1"
+                -d "BulkTool=${WIX_BULK_TOOL}"
                 -o "${CMAKE_BINARY_DIR}/${WIX_INSTALLER_NAME}"
                 "${CMAKE_SOURCE_DIR}/wix/Package.wxs"
                 "${HARVESTED_COMPONENTS_FILE}"

@@ -286,6 +286,10 @@ void Scene::showLoadErrorsIfAny() {
     for (const auto& error : loadErrors) {
         message += "\n- " + error;
     }
+    // Headless tools such as the demo mod generator have no main frame; the errors are already logged.
+    if (!wxTheApp || getMainFrame() == nullptr) {
+        return;
+    }
     wxTheApp->CallAfter([message] {
         wxMessageBox(wxString::FromUTF8(message), "Scene load failed", wxOK | wxICON_ERROR, getMainFrame());
     });

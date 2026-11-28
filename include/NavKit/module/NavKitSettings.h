@@ -43,7 +43,8 @@ public:
 
     void setBlenderFile(const std::string& fileName);
 
-    void showNavKitSettingsDialog();
+    /// Opens the dialog over @p parent, or over NavKit's main window when none is given.
+    void showNavKitSettingsDialog(wxWindow* parent = nullptr);
 
     void loadSettings();
 };

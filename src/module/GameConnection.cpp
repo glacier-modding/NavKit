@@ -198,9 +198,21 @@ int GameConnection::listNavKitSceneEntities() const {
 
     bool done = false;
     int messagesReceived = 0;
+    // A game that stops answering would otherwise leave this waiting forever.
+    constexpr auto idleTimeout = std::chrono::minutes(5);
+    auto lastMessageTime = std::chrono::steady_clock::now();
     while (!done) {
         if (!ws || ws->getReadyState() == WebSocket::CLOSED) {
             Logger::log(NK_ERROR, "GameConnection: Editor connection closed unexpectedly.");
+            file_write_queue->push(SENTINEL_MESSAGE);
+            if (writer_thread.joinable()) {
+                writer_thread.join();
+            }
+            return 1;
+        }
+        if (std::chrono::steady_clock::now() - lastMessageTime > idleTimeout) {
+            Logger::log(NK_ERROR, "GameConnection: The game sent nothing for 5 minutes after %d entities; giving up.",
+                messagesReceived);
             file_write_queue->push(SENTINEL_MESSAGE);
             if (writer_thread.joinable()) {
                 writer_thread.join();
@@ -215,6 +227,7 @@ int GameConnection::listNavKitSceneEntities() const {
 
         ws->dispatch([&](const std::string& message) {
             messagesReceived++;
+            lastMessageTime = std::chrono::steady_clock::now();
             if (message == "Done sending entities.") {
                 done = true;
                 return;

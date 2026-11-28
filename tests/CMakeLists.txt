@@ -43,15 +43,43 @@ if (WIN32)
 endif ()
 
 option(NAVKIT_BUILD_INTEGRATION_TESTS "Build the manually run live game integration test" OFF)
+option(NAVKIT_BUILD_DEMO_MOD_GENERATOR "Build the NavKit Demo Mod generator and its generate-demo-mod target" OFF)
 if (NAVKIT_BUILD_INTEGRATION_TESTS)
     add_executable(NavKitIntegrationTests
             pipeline_tests.cpp
     )
     target_link_libraries(NavKitIntegrationTests PRIVATE
-            NavKitLib
+            NavKitBulk
     )
     target_compile_definitions(NavKitIntegrationTests PRIVATE
             NAVKIT_TEST_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+    )
+endif ()
+if (NAVKIT_BUILD_DEMO_MOD_GENERATOR)
+    set(NAVKIT_DEMO_MOD_DIR "" CACHE PATH
+            "NavKitDemoMod folder to regenerate (default: <Hitman folder>/Simple Mod Framework/Mods/NavKitDemoMod)")
+    set(NAVKIT_DEMO_MOD_ARGS "" CACHE STRING
+            "Extra NavKitDemoModGenerator arguments for generate-demo-mod, such as --mission arrival;--smoketest;false")
+    add_executable(NavKitDemoModGenerator
+            demo_mod_generator.cpp
+    )
+    target_link_libraries(NavKitDemoModGenerator PRIVATE
+            NavKitBulk
+    )
+    target_compile_definitions(NavKitDemoModGenerator PRIVATE
+            NAVKIT_TEST_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+            NAVKIT_DEMO_MOD_DIR="${NAVKIT_DEMO_MOD_DIR}"
+            NAVKIT_DEMO_MOD_WORK_DIR="${CMAKE_CURRENT_BINARY_DIR}/demo-mod-work"
+    )
+    # Builds the generator, then regenerates the demo mod: launches HITMAN for each mission, builds the NAVP, AIRG and
+    # CRMDs, writes them into the mod, deploys it with SMF, verifies the deployed RPKGs and loads each mission.
+    add_custom_target(generate-demo-mod
+            COMMAND NavKitDemoModGenerator ${NAVKIT_DEMO_MOD_ARGS}
+            DEPENDS NavKitDemoModGenerator
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+            COMMENT "Regenerating the NavKit Demo Mod"
+            USES_TERMINAL
+            VERBATIM
     )
 endif ()
 
@@ -65,6 +93,9 @@ if (WIN32)
 endif ()
 if (NAVKIT_BUILD_INTEGRATION_TESTS)
     list(APPEND TEST_TARGETS NavKitIntegrationTests)
+endif ()
+if (NAVKIT_BUILD_DEMO_MOD_GENERATOR)
+    list(APPEND TEST_TARGETS NavKitDemoModGenerator)
 endif ()
 if (TEST_DLLS)
     foreach (TEST_TARGET ${TEST_TARGETS})

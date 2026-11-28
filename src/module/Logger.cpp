@@ -1,4 +1,6 @@
 #include "../../include/NavKit/module/Logger.h"
+#include <functional>
+#include <mutex>
 #include "../../include/NavKit/adapter/RecastAdapter.h"
 #include "../../include/NavKit/module/InputHandler.h"
 
@@ -69,11 +71,27 @@ std::deque<std::string>& Logger::getLogBuffer() {
     return logBuffer;
 }
 
+namespace {
+    std::mutex listenerMutex;
+    std::function<void(LogCategory, const std::string&)> logListener;
+} // namespace
+
+void Logger::setListener(std::function<void(LogCategory category, const std::string& message)> listener) {
+    std::lock_guard lock(listenerMutex);
+    logListener = std::move(listener);
+}
+
 void Logger::logRunner() {
     Logger& logger = getInstance();
     while (logger.running || !logger.logQueue->empty()) {
         if (std::optional<std::pair<LogCategory, std::string>> message = logger.logQueue->try_pop();
             message.has_value()) {
+            {
+                std::lock_guard lock(listenerMutex);
+                if (logListener) {
+                    logListener(message.value().first, message.value().second);
+                }
+            }
             std::string msg;
             switch (message.value().first) {
             case NK_ERROR:

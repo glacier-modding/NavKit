@@ -4330,6 +4330,14 @@ def pack_gltf_into_glb(gltf_path: str, glb_path: str):
         os.remove(bin_path)
 
 
+def save_glb_file(output_path: str):
+    log("INFO", "Attempting to save GLB file to :" + output_path, "main")
+    with open(os.devnull, "w") as devnull, \
+            contextlib.redirect_stdout(devnull), \
+            contextlib.redirect_stderr(devnull):
+        bpy.ops.export_scene.gltf(filepath=output_path, export_format='GLB', export_apply=True)
+
+
 def save_blend_file(output_path: str):
     log("INFO", "Saving blender file to: " + output_path, "main")
     bpy.ops.wm.save_as_mainfile(filepath=output_path, relative_remap=False)

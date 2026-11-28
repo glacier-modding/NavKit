@@ -1,3 +1,47 @@
+set(NAVKIT_RPKG_LIB_LOCAL_DIR "" CACHE PATH
+        "Optional navkit-rpkg-lib checkout to link instead of the release download; build it first with cargo build (and cargo build --release)")
+if (NAVKIT_RPKG_LIB_LOCAL_DIR)
+    if (WIN32)
+        set(NAVKIT_RPKG_LIB_LOCAL_NAME navkit_rpkg_lib.dll)
+    elseif (APPLE)
+        set(NAVKIT_RPKG_LIB_LOCAL_NAME libnavkit_rpkg_lib.dylib)
+    else ()
+        set(NAVKIT_RPKG_LIB_LOCAL_NAME libnavkit_rpkg_lib.so)
+    endif ()
+    set(NAVKIT_RPKG_LIB_LOCAL_RELEASE "${NAVKIT_RPKG_LIB_LOCAL_DIR}/target/release")
+    set(NAVKIT_RPKG_LIB_LOCAL_DEBUG "${NAVKIT_RPKG_LIB_LOCAL_DIR}/target/debug")
+    if (NOT EXISTS "${NAVKIT_RPKG_LIB_LOCAL_RELEASE}/${NAVKIT_RPKG_LIB_LOCAL_NAME}")
+        message(FATAL_ERROR "NAVKIT_RPKG_LIB_LOCAL_DIR is set, but ${NAVKIT_RPKG_LIB_LOCAL_RELEASE}/${NAVKIT_RPKG_LIB_LOCAL_NAME} does not exist. Run cargo build --release in ${NAVKIT_RPKG_LIB_LOCAL_DIR}.")
+    endif ()
+    if (NOT EXISTS "${NAVKIT_RPKG_LIB_LOCAL_DEBUG}/${NAVKIT_RPKG_LIB_LOCAL_NAME}")
+        set(NAVKIT_RPKG_LIB_LOCAL_DEBUG "${NAVKIT_RPKG_LIB_LOCAL_RELEASE}")
+    endif ()
+    message(STATUS "Using local navkit-rpkg-lib build from ${NAVKIT_RPKG_LIB_LOCAL_DIR}")
+    add_library(navkit-rpkg-lib SHARED IMPORTED GLOBAL)
+    set_target_properties(navkit-rpkg-lib PROPERTIES
+            IMPORTED_CONFIGURATIONS "DEBUG;RELEASE"
+            IMPORTED_LOCATION_DEBUG "${NAVKIT_RPKG_LIB_LOCAL_DEBUG}/${NAVKIT_RPKG_LIB_LOCAL_NAME}"
+            IMPORTED_LOCATION_RELEASE "${NAVKIT_RPKG_LIB_LOCAL_RELEASE}/${NAVKIT_RPKG_LIB_LOCAL_NAME}"
+            MAP_IMPORTED_CONFIG_NOCONFIG Release
+            MAP_IMPORTED_CONFIG_MINSIZEREL Release
+            MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+    )
+    if (WIN32)
+        set_target_properties(navkit-rpkg-lib PROPERTIES
+                IMPORTED_IMPLIB_DEBUG "${NAVKIT_RPKG_LIB_LOCAL_DEBUG}/${NAVKIT_RPKG_LIB_LOCAL_NAME}.lib"
+                IMPORTED_IMPLIB_RELEASE "${NAVKIT_RPKG_LIB_LOCAL_RELEASE}/${NAVKIT_RPKG_LIB_LOCAL_NAME}.lib"
+        )
+    elseif (APPLE)
+        set_target_properties(navkit-rpkg-lib PROPERTIES
+                IMPORTED_SONAME_DEBUG "@rpath/libnavkit_rpkg_lib.dylib"
+                IMPORTED_SONAME_RELEASE "@rpath/libnavkit_rpkg_lib.dylib"
+        )
+    else ()
+        set_target_properties(navkit-rpkg-lib PROPERTIES IMPORTED_NO_SONAME TRUE)
+    endif ()
+    return()
+endif ()
+
 if (NOT NAVKIT_RPKG_LIB_VERSION STREQUAL "v1.10.0")
     message(FATAL_ERROR "Only v1.10.0 SHA-256 values are configured; update the release hashes in src/navkit-rpkg-lib.cmake before selecting another version.")
 endif ()

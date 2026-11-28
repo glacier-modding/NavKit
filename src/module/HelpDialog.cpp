@@ -46,7 +46,7 @@ namespace {
 } // namespace
 
 void showHelpDialog() {
-    const std::array<HelpPage, 9> pages = {{
+    const std::array<HelpPage, 10> pages = {{
         {"General",
             "NavKit helps you inspect and create navigation data for HITMAN: World of Assassination and 007 First "
             "Light.\nLoad a scene, NAVP, or AIRG file to explore it in the viewport, edit navigation data, or build "
@@ -275,6 +275,18 @@ void showHelpDialog() {
                     "snaps grid heights to the GLB, which sits below the Navp.",
                     "Load a scene containing a crowd, a Navp, and the GLB, and make sure no CRMD load, save, or build "
                     "is in progress."},
+            }},
+        {"Tools", "Open NavKit's other programs.",
+            {
+                {"Open Bulk Generation Tool", "Opens the NavKit Bulk Generation Tool in its own window.",
+                    "Generates NAVP, AIRG and CRMD files for a queue of vanilla missions: it launches HITMAN on each "
+                    "mission, extracts the scene, builds the files, and writes them to the game files directory as "
+                    "<chunk>\\<mission>\\<hash>.<type>. It can also keep each mission's .nav.json, .glb and .blend in "
+                    "a "
+                    "separate source files directory. When the game files directory is a Simple Mod Framework mod's "
+                    "content folder, it deploys the mod and checks the deployed files once the queue is finished. Its "
+                    "File > Help describes each step.",
+                    "Set the HITMAN folder and Blender in NavKit Settings, and install ZHMModSDK with the Editor mod."},
             }},
         {"CRMD",
             "CRMD overlays show crowd-map grid data. Open or build CRMDs and pick one under View > CRMD to display it. "

@@ -4,6 +4,7 @@
 #include <thread>
 #include "../../ConcurrentQueue/ConcurrentQueue.h"
 #include <fstream>
+#include <functional>
 
 enum LogCategory { NK_INFO = 1, NK_WARN, NK_ERROR, NK_DEBUG };
 
@@ -44,6 +45,10 @@ public:
     void stop();
 
     static void rustLogCallback(const char* message);
+
+    /// Also sends every message, debug messages included whatever the debug log setting, to @p listener, on the
+    /// logging thread. Pass an empty function to stop.
+    static void setListener(std::function<void(LogCategory category, const std::string& message)> listener);
 
     std::mutex& getLogMutex();
 };

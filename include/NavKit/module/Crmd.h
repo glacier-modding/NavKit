@@ -83,6 +83,24 @@ public:
     std::vector<CrmdSource> crowdMapSources() const;
     void setCrowdMapSource(size_t index, const FileSource& fileSource);
     const SCrowdMapData* crowdMapData(size_t index) const;
+    static void extractCrmdFromRpkgs(const std::string& hash);
+    bool canBuildCrmd() const;
+    /// Builds the crowd map for @p crowd from the loaded scene, Navp and (when snapping heights) GLB on the calling
+    /// thread, and makes it the loaded Crmd. Throws on failure; does not open dialogs.
+    CrowdMapBuilder::Report buildCrmdForCrowd(const Json::Crowd& crowd);
+
+    /// The loaded crowd map's dimensions, used to compare generated and official maps.
+    struct Summary {
+        uint32_t cellsX = 0;
+        uint32_t cellsY = 0;
+        float cellSize = 0;
+        glm::vec3 origin{};
+        size_t walkableCells = 0;
+    };
+
+    std::optional<Summary> summary() const;
+    void handleBuildCrmdClicked();
+    void setCrowdMap(const CrowdMapBuilder::CrowdMap& map, const std::string& name);
     void loadSettings();
     void saveSettings() const;
     void showCrmdSettingsDialog();

@@ -91,6 +91,18 @@ Functions available are loading and saving Navp and Navp.json, loading Airg and 
 1. Copy the Hex value, and rename your airg to [hex value].airg Where [hex value] is the Hex value you calculated
 1. Deploy the mod
 
+# Generating files for many missions (NavKit Bulk Generation Tool)
+
+The installer also includes the NavKit Bulk Generation Tool (`NavKitBulkGenerationTool.exe`, in the Start menu as "NavKit Bulk Generation Tool"). It generates NAVP, AIRG and CRMD files for a queue of vanilla missions without any manual steps. It uses the Hitman and Blender paths set in NavKit's settings, and needs ZHMModSDK with the Editor mod installed, like scene extraction in NavKit.
+
+1. Choose the **Game files directory**. Files are written as `<game files directory>\<chunk>\<mission>\<hash>.<type>`, under the official resource hashes, which is the layout Simple Mod Framework expects in a mod's `content` folder.
+1. Tick the **File types** to write. GFXF is not available yet.
+1. When the tool opens, it scans the game's RPKG files for every mission scene that uses a NAVP or AIRG and lists them in the **Mission Selector**. Select missions (Ctrl and Shift select several) and press **Add to Queue >**. **Remove from Queue <** takes them out again. **Select All** and **Deselect All** act on the list you last clicked.
+1. Press **Start**. For each mission in the queue, the tool removes it from the queue, launches HITMAN on the scene, extracts it, closes the game, builds the GLB with Blender, builds the NAVP, AIRG and a CRMD for each crowd, and saves the selected file types. **Pause** stops after the mission in progress; **Start** continues the queue.
+1. When the queue is finished and the game files directory is a Simple Mod Framework mod's `content` folder (`...\Simple Mod Framework\Mods\<mod>\content`), the tool deploys the mods with SMF and checks that the deployed RPKGs hold the generated files.
+
+A variant scene, such as an escalation, also uses its base mission's NAVP, AIRG or crowd maps; the tool leaves those files to the base mission and only writes the variant's own. The **Log level** sets how much the log shows: **Basic** lists the operations for each mission and their results, **Full** adds everything NavKit normally logs, and **Debug** adds NavKit's debug messages. Tick **Keep .nav.json, .glb and .blend** to also save each mission's scene, geometry and Blender file to `<source files directory>\<mission>`; this adds a second Blender run per mission. The **Source files directory** defaults to a `navkit-source` folder beside the game files directory and cannot be inside it. The tool's **File** menu has Help, About and Exit, **Settings > NavKit Settings** changes the paths it shares with NavKit, and **Tools > Open NavKit** starts NavKit. NavKit's **Tools > Open Bulk Generation Tool** opens this tool. The tool can also run unattended: `NavKitBulkGenerationTool.exe --output <game files folder> [--source-output <source files folder>] --queue <mission name or part of its scene path>... [--keep-scene-files] --start --close-when-done`.
+
 # How NavKit generates Navp and Airg files
 
 NavKit performs the following series of steps to be able to generate Navp files.
@@ -154,6 +166,24 @@ To override all three paths at the command line:
 
 The test keeps each run's extracted scene, assets, GLB, NAVP, and AIRG in a uniquely named `integration-*` directory under the output directory. A nonzero exit code or `[fail]` message indicates that a stage failed.
 
+# 🎮 Regenerating the NavKit Demo Mod
+
+The `generate-demo-mod` target regenerates the [NavKit Demo Mod](https://github.com/dbierek/NavKitDemoMod), a Simple Mod Framework (SMF) mod that replaces vanilla missions' NAVP, AIRG and CRMD files with NavKit-generated ones for smoke testing. It builds `NavKitDemoModGenerator` and runs it. For each mission in the mod's `navkit-demo-missions.json`, the generator:
+
+1. Walks the scene's entity templates with `navkit-rpkg-lib` to find its official NAVP, AIRG and CRMD hashes and the chunk that holds them.
+2. Launches HITMAN on the scene (using the same steps as the integration test) and extracts it, then closes the game.
+3. Builds the GLB, NAVP and AIRG, and a CRMD for each crowd in the scene. Each CRMD replaces the official CRMD of the template that holds the crowd.
+4. Writes the files to `content/<chunk>/<mission>/<hash>.<type>` in the mod and records them in `navkit-demo-mod.generated.json`.
+
+Then it runs SMF's `Deploy.exe`, checks that the deployed RPKGs hold the generated files, and loads each mission in game with the deployed mod as a smoke test. A mission that fails keeps its official files, and the target reports failure.
+
+```powershell
+cmake --preset x64-release-demo-mod
+cmake --build --preset generate-demo-mod
+```
+
+The Hitman and Blender paths come from `NavKit.ini`, the same as for the integration test. Work files go to `build/x64-release-demo-mod/tests/demo-mod-work` unless you pass `--output`. By default the mod is `<Hitman folder>\Simple Mod Framework\Mods\NavKitDemoMod`; set `NAVKIT_DEMO_MOD_DIR` to use another folder. Set `NAVKIT_DEMO_MOD_ARGS` to pass more arguments, for example `--mission;Arrival` to regenerate one mission. Run `NavKitDemoModGenerator.exe --help` for all options. `--dryrun true` only lists each mission's official resources.
+
 # 🛠️ Pre-commit Hooks
 
 This repository uses local pre-commit hooks located in the `scripts/` directory. To activate them, run the following command in your terminal from the project root:
@@ -173,6 +203,8 @@ You shouldn't need to build the MSI yourself, but here are the instructions:
    `cmake --build . --target installer --config Release`  
    in this working directory:  
    `build\x64-release`
+
+To try NavKit against a local navkit-rpkg-lib change, build it with `cargo build` and `cargo build --release` and configure NavKit with `-DNAVKIT_RPKG_LIB_LOCAL_DIR=<navkit-rpkg-lib checkout>`.
 
 # 🛠️ Building instructions (Rider)
 

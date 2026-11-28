@@ -20,9 +20,12 @@
 #include "../../include/NavKit/module/Scene.h"
 #include "../../include/NavKit/module/SceneExtract.h"
 #include "../../include/NavKit/module/WxApplication.h"
+#include "../../include/NavKit/util/FileUtil.h"
+#include <filesystem>
 #include <algorithm>
 #include <wx/msgdlg.h>
 #include <wx/thread.h>
+#include <wx/utils.h>
 
 wxMenuBar* Menu::createMenuBar() {
     auto* bar = new wxMenuBar();
@@ -135,12 +138,33 @@ wxMenuBar* Menu::createMenuBar() {
     build->Append(IDM_BUILD_ALL_CRMDS, "Build &All Crmds from Scene, Navp and GLB");
     bar->Append(build, "&Build");
 
+#ifdef _WIN32
+    auto* tools = new wxMenu();
+    tools->Append(IDM_TOOLS_OPEN_BULK_GENERATION_TOOL, "Open &Bulk Generation Tool");
+    bar->Append(tools, "&Tools");
+#endif
+
     auto* help = new wxMenu();
     help->Append(IDM_HELP_CONTENTS, "&Help Contents");
     help->AppendSeparator();
     help->Append(IDM_HELP_ABOUT, "&About");
     bar->Append(help, "&Help");
     return bar;
+}
+
+void Menu::openSiblingApplication(const char* executableName, wxWindow* parent) {
+    const std::filesystem::path directory = std::filesystem::u8path(FileUtil::getExecutablePath()).parent_path();
+    const std::filesystem::path executable = directory / executableName;
+    if (!std::filesystem::is_regular_file(executable)) {
+        wxMessageBox("Could not find " + wxString(executable.wstring()) + ".", "NavKit", wxOK | wxICON_ERROR, parent);
+        return;
+    }
+    wxExecuteEnv environment;
+    environment.cwd = directory.wstring();
+    const wxString command = "\"" + wxString(executable.wstring()) + "\"";
+    if (wxExecute(command, wxEXEC_ASYNC, nullptr, &environment) == 0) {
+        wxMessageBox("Could not start " + wxString(executable.wstring()) + ".", "NavKit", wxOK | wxICON_ERROR, parent);
+    }
 }
 
 void Menu::setMenuItemEnabled(const int menuId, const bool isEnabled) {
@@ -563,6 +587,11 @@ int Menu::handleMenuClicked(const int menuId) {
         break;
     case IDM_BUILD_ALL_CRMDS:
         Crmd::getInstance().handleBuildAllCrmdsClicked();
+        break;
+
+    case IDM_TOOLS_OPEN_BULK_GENERATION_TOOL:
+        Logger::log(NK_DEBUG, "Tools -> Open Bulk Generation Tool clicked");
+        openSiblingApplication("NavKitBulkGenerationTool.exe", getMainFrame());
         break;
 
     case IDM_EXTRACT_SCENE:

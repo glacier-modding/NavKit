@@ -1,44 +1,21 @@
-#include "../include/NavKit/adapter/RecastAdapter.h"
-#include "../include/NavKit/module/Airg.h"
-#include "../include/NavKit/module/GameConnection.h"
-#include "../include/NavKit/module/Grid.h"
-#include "../include/NavKit/module/Logger.h"
+#include "../include/NavKit/bulk/LivePipeline.h"
 #include "../include/NavKit/module/NavKitSettings.h"
-#include "../include/NavKit/module/Navp.h"
-#include "../include/NavKit/module/Rpkg.h"
-#include "../include/NavKit/module/Scene.h"
-#include "../include/NavKit/module/SceneMesh.h"
-#include "../include/NavKit/module/ProcessFlow.h"
-#include "../include/NavKit/util/GridGenerator.h"
-#include "../include/navkit-rpkg-lib/navkit-rpkg-lib.h"
 
-#include <algorithm>
 #include <chrono>
-#include <cctype>
-#include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <iterator>
-#include <ranges>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 #ifdef _WIN32
 #include <conio.h>
-#include <tlhelp32.h>
-#include <windows.h>
 #endif
 #include <wx/init.h>
 #include <wx/stdpaths.h>
-#include <wx/utils.h>
-#include <SimpleIni.h>
 
 namespace {
-    constexpr SHORT integrationConsoleWidth = 240;
+    using namespace NavKit::LivePipeline;
 
     struct IntegrationArguments {
         std::filesystem::path hitmanDirectory;
@@ -47,342 +24,6 @@ namespace {
         std::string gameVersion = "steam";
         bool interactiveMode = false;
     };
-
-    void require(const bool condition, const std::string_view message) {
-        if (!condition) {
-            throw std::runtime_error(std::string(message));
-        }
-    }
-
-#ifdef _WIN32
-    void configureConsoleWidth() {
-        const HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-        CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
-        if (console == INVALID_HANDLE_VALUE || !GetConsoleScreenBufferInfo(console, &bufferInfo)) {
-            return;
-        }
-
-        const COORD largestWindow = GetLargestConsoleWindowSize(console);
-        const SHORT targetWidth = std::min(integrationConsoleWidth, largestWindow.X);
-        if (targetWidth <= bufferInfo.srWindow.Right - bufferInfo.srWindow.Left + 1) {
-            return;
-        }
-
-        SMALL_RECT window = bufferInfo.srWindow;
-        window.Right = static_cast<SHORT>(window.Left + targetWidth - 1);
-        const SHORT targetBufferWidth = std::max(targetWidth, bufferInfo.dwSize.X);
-        if (targetBufferWidth > bufferInfo.dwSize.X) {
-            SetConsoleScreenBufferSize(console, {targetBufferWidth, bufferInfo.dwSize.Y});
-        }
-        SetConsoleWindowInfo(console, TRUE, &window);
-    }
-#endif
-
-    wxString pathToWxString(const std::filesystem::path& path) {
-        return wxString(path.wstring());
-    }
-
-#ifdef _WIN32
-    std::wstring normalizedPath(const std::filesystem::path& path) {
-        std::error_code error;
-        std::filesystem::path normalized = std::filesystem::weakly_canonical(path, error);
-        if (error) {
-            normalized = std::filesystem::absolute(path, error);
-        }
-        require(!error, "Could not resolve the HITMAN executable path.");
-        return normalized.lexically_normal().wstring();
-    }
-
-    std::vector<DWORD> findHitmanProcesses(const std::filesystem::path& hitmanExecutable) {
-        const std::wstring expectedPath = normalizedPath(hitmanExecutable);
-        const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        require(snapshot != INVALID_HANDLE_VALUE, "Could not enumerate running processes to close HITMAN.");
-
-        std::vector<DWORD> processIds;
-        PROCESSENTRY32W processEntry{};
-        processEntry.dwSize = sizeof(processEntry);
-        if (Process32FirstW(snapshot, &processEntry)) {
-            do {
-                const HANDLE process =
-                    OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processEntry.th32ProcessID);
-                if (process == nullptr) {
-                    continue;
-                }
-                std::vector<wchar_t> executablePath(32768);
-                DWORD pathLength = static_cast<DWORD>(executablePath.size());
-                const BOOL pathFound = QueryFullProcessImageNameW(process, 0, executablePath.data(), &pathLength);
-                CloseHandle(process);
-                if (pathFound &&
-                    CompareStringOrdinal(expectedPath.c_str(), -1, executablePath.data(), static_cast<int>(pathLength),
-                        TRUE) == CSTR_EQUAL) {
-                    processIds.push_back(processEntry.th32ProcessID);
-                }
-            } while (Process32NextW(snapshot, &processEntry));
-        }
-        CloseHandle(snapshot);
-        return processIds;
-    }
-
-    struct CloseWindowContext {
-        DWORD processId;
-        bool closeRequested = false;
-    };
-
-    BOOL CALLBACK requestWindowClose(const HWND window, const LPARAM parameter) {
-        auto& context = *reinterpret_cast<CloseWindowContext*>(parameter);
-        DWORD windowProcessId = 0;
-        GetWindowThreadProcessId(window, &windowProcessId);
-        if (windowProcessId == context.processId && IsWindowVisible(window)) {
-            context.closeRequested = PostMessageW(window, WM_CLOSE, 0, 0) != FALSE || context.closeRequested;
-        }
-        return TRUE;
-    }
-#endif
-
-    void closeHitmanGame(const std::filesystem::path& hitmanDirectory) {
-#ifdef _WIN32
-        const std::filesystem::path hitmanExecutable = hitmanDirectory / "Retail" / "HITMAN3.exe";
-        const std::vector<DWORD> processIds = findHitmanProcesses(hitmanExecutable);
-        for (const DWORD processId : processIds) {
-            HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
-            require(process != nullptr, "Could not open the HITMAN process to request a normal shutdown.");
-
-            CloseWindowContext context{processId};
-            EnumWindows(requestWindowClose, reinterpret_cast<LPARAM>(&context));
-            if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) {
-                CloseHandle(process);
-                continue;
-            }
-            require(context.closeRequested, "Could not find a visible HITMAN window to close.");
-            std::cout << "[integration] Requested HITMAN to close; waiting for it to exit...\n" << std::flush;
-            const DWORD waitResult = WaitForSingleObject(process, 30000);
-            CloseHandle(process);
-            require(waitResult == WAIT_OBJECT_0, "HITMAN did not close within 30 seconds after the close request.");
-        }
-#else
-        (void)hitmanDirectory;
-        throw std::runtime_error("Closing the HITMAN game is only supported on Windows.");
-#endif
-    }
-
-    std::vector<char> readFile(const std::filesystem::path& path) {
-        std::ifstream stream(path, std::ios::binary);
-        require(stream.is_open(), "Could not open an integration-test output.");
-        return {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
-    }
-
-    void requireNonEmptyFile(const std::filesystem::path& path, const std::string_view description) {
-        require(std::filesystem::is_regular_file(path), std::string(description) + " was not created.");
-        require(std::filesystem::file_size(path) > 0, std::string(description) + " is empty.");
-    }
-
-    std::string trim(std::string value) {
-        const auto isNotSpace = [](const unsigned char character) { return !std::isspace(character); };
-        const auto first = std::ranges::find_if(value, isNotSpace);
-        const auto last = std::ranges::find_if(value | std::views::reverse, isNotSpace).base();
-        return first < last ? std::string(first, last) : std::string{};
-    }
-
-    std::vector<std::string> updateAutoLoadScene(
-        const std::filesystem::path& modsIni, const std::vector<std::string>& replacementSettings) {
-        require(std::filesystem::is_regular_file(modsIni), "Could not find Retail\\mods.ini.");
-        std::ifstream input(modsIni);
-        require(input.is_open(), "Could not read Retail\\mods.ini.");
-        std::vector<std::string> lines;
-        for (std::string line; std::getline(input, line);) {
-            if (!line.empty() && line.back() == '\r') {
-                line.pop_back();
-            }
-            lines.push_back(std::move(line));
-        }
-        require(input.eof(), "Could not finish reading Retail\\mods.ini.");
-
-        std::vector<std::string> originalSettings;
-        bool inSdkSection = false;
-        bool sdkSectionFound = false;
-        bool settingWritten = false;
-        std::vector<std::string> updatedLines;
-        updatedLines.reserve(lines.size() + 2);
-        for (size_t index = 0; index < lines.size(); ++index) {
-            const std::string& line = lines[index];
-            std::string content = trim(line);
-            if (index == 0 && content.starts_with("\xef\xbb\xbf")) {
-                content.erase(0, 3);
-                content = trim(std::move(content));
-            }
-            if (content.size() >= 2 && content.front() == '[' && content.back() == ']') {
-                if (inSdkSection && !settingWritten) {
-                    updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
-                    settingWritten = true;
-                }
-                inSdkSection = trim(content.substr(1, content.size() - 2)) == "sdk";
-                sdkSectionFound = sdkSectionFound || inSdkSection;
-                updatedLines.push_back(line);
-                continue;
-            }
-
-            if (inSdkSection) {
-                const size_t equals = content.find('=');
-                if (equals != std::string::npos && trim(content.substr(0, equals)) == "auto_load_scene") {
-                    originalSettings.push_back(line);
-                    if (!settingWritten) {
-                        updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
-                        settingWritten = true;
-                    }
-                    continue;
-                }
-            }
-            updatedLines.push_back(line);
-        }
-
-        if (inSdkSection && !settingWritten) {
-            updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
-            settingWritten = true;
-        }
-        if (!sdkSectionFound && !replacementSettings.empty()) {
-            if (!updatedLines.empty() && !updatedLines.back().empty()) {
-                updatedLines.emplace_back();
-            }
-            updatedLines.emplace_back("[sdk]");
-            updatedLines.insert(updatedLines.end(), replacementSettings.begin(), replacementSettings.end());
-        }
-
-        std::ofstream output(modsIni, std::ios::binary | std::ios::trunc);
-        require(output.is_open(), "Could not update Retail\\mods.ini.");
-        for (size_t index = 0; index < updatedLines.size(); ++index) {
-            if (index != 0) {
-                output << "\r\n";
-            }
-            output << updatedLines[index];
-        }
-        output << "\r\n";
-        output.flush();
-        require(output.good(), "Could not save the auto_load_scene setting to Retail\\mods.ini.");
-        return originalSettings;
-    }
-
-    class ScopedAutoLoadScene {
-    public:
-        explicit ScopedAutoLoadScene(const std::filesystem::path& modsIni) : modsIni(modsIni) {
-            originalSettings = updateAutoLoadScene(modsIni,
-                {"auto_load_scene = "
-                 "assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_intro_firsttime.entity"});
-        }
-
-        ~ScopedAutoLoadScene() {
-            if (!restored) {
-                try {
-                    restore();
-                } catch (const std::exception& error) {
-                    std::cerr << "[fail] Could not restore auto_load_scene: " << error.what() << '\n';
-                }
-            }
-        }
-
-        void restore() {
-            updateAutoLoadScene(modsIni, originalSettings);
-            restored = true;
-        }
-
-    private:
-        std::filesystem::path modsIni;
-        std::vector<std::string> originalSettings;
-        bool restored = false;
-    };
-
-    std::filesystem::path findSteamExecutable(const std::filesystem::path& hitmanDirectory) {
-#ifdef _WIN32
-        HKEY steamKey = nullptr;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Valve\\Steam", 0, KEY_QUERY_VALUE, &steamKey) ==
-            ERROR_SUCCESS) {
-            wchar_t steamPath[MAX_PATH]{};
-            DWORD valueSize = sizeof(steamPath);
-            DWORD valueType = 0;
-            const LONG queryResult = RegQueryValueExW(
-                steamKey, L"SteamPath", nullptr, &valueType, reinterpret_cast<BYTE*>(steamPath), &valueSize);
-            RegCloseKey(steamKey);
-            if (queryResult == ERROR_SUCCESS && (valueType == REG_SZ || valueType == REG_EXPAND_SZ)) {
-                const std::filesystem::path steamExecutable = std::filesystem::path(steamPath) / "steam.exe";
-                if (std::filesystem::is_regular_file(steamExecutable)) {
-                    return steamExecutable;
-                }
-            }
-        }
-#endif
-        const std::filesystem::path inferredRoot = hitmanDirectory.parent_path().parent_path().parent_path();
-        const std::filesystem::path inferredSteamExecutable = inferredRoot / "steam.exe";
-        require(std::filesystem::is_regular_file(inferredSteamExecutable),
-            "Could not locate Steam.exe from the Steam registry setting or HITMAN installation path.");
-        return inferredSteamExecutable;
-    }
-
-    wxExecuteEnv inheritedLaunchEnvironment(const std::filesystem::path& steamExecutable) {
-        wxExecuteEnv environment;
-        environment.cwd = wxString(steamExecutable.parent_path().wstring());
-#ifdef _WIN32
-        LPWCH environmentBlock = GetEnvironmentStringsW();
-        require(environmentBlock != nullptr, "Could not read the current process environment.");
-        for (const wchar_t* entry = environmentBlock; *entry != L'\0';) {
-            const std::wstring variable(entry);
-            entry += variable.size() + 1;
-            const size_t equals = variable.find(L'=');
-            if (equals != std::wstring::npos && equals != 0) {
-                environment.env[wxString(variable.substr(0, equals))] = wxString(variable.substr(equals + 1));
-            }
-        }
-        FreeEnvironmentStringsW(environmentBlock);
-#endif
-        environment.env["SteamGameId"] = "1659040";
-        environment.env["SteamAppId"] = "1659040";
-        environment.env["SteamOverlayGameId"] = "1659040";
-        return environment;
-    }
-
-    using IntegrationDeadline = std::chrono::steady_clock::time_point;
-
-    bool waitForNextAttempt(const IntegrationDeadline deadline) {
-        const auto now = std::chrono::steady_clock::now();
-        if (now >= deadline) {
-            return false;
-        }
-        std::this_thread::sleep_for(std::min(
-            std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::seconds(5)), deadline - now));
-        return std::chrono::steady_clock::now() < deadline;
-    }
-
-    void launchHitmanAndWaitForEditor(const std::filesystem::path& hitmanDirectory, const std::string_view gameVersion,
-        const IntegrationDeadline deadline) {
-        const std::filesystem::path hitmanExecutable = hitmanDirectory / "Retail" / "HITMAN3.exe";
-        require(std::filesystem::is_regular_file(hitmanExecutable), "Could not find Retail\\HITMAN3.exe.");
-        if (gameVersion != "steam") {
-            throw std::runtime_error("Unsupported game version '" + std::string(gameVersion) + "'.");
-        }
-        const std::filesystem::path steamExecutable = findSteamExecutable(hitmanDirectory);
-        const wxExecuteEnv environment = inheritedLaunchEnvironment(steamExecutable);
-        const wxString command = "\"" + wxString(steamExecutable.wstring()) + "\" -applaunch 1659040";
-        const long processId = wxExecute(command, wxEXEC_ASYNC, nullptr, &environment);
-        require(processId > 0, "Could not start HITMAN 3 through Steam.exe -applaunch 1659040.");
-        std::cout << "[integration] Requested HITMAN 3 launch through Steam; retrying the editor connection every "
-                     "5 seconds for up to 2 minutes...\n"
-                  << std::flush;
-
-        GameConnection& gameConnection = GameConnection::getInstance();
-        size_t connectionAttempt = 0;
-        while (std::chrono::steady_clock::now() < deadline) {
-            ++connectionAttempt;
-            std::cout << "[integration] Socket call: open editor connection (attempt " << connectionAttempt << ")...\n"
-                      << std::flush;
-            if (gameConnection.connectToGame() == 0) {
-                std::cout << "[integration] Socket opened: ws://localhost:46735/socket\n" << std::flush;
-                std::cout << "[integration] Connected to the HITMAN editor endpoint.\n";
-                return;
-            }
-            std::cout << "[integration] Socket open failed; will retry.\n" << std::flush;
-            waitForNextAttempt(deadline);
-        }
-
-        throw std::runtime_error("Could not connect to the HITMAN editor endpoint within 2 minutes.");
-    }
 
     std::filesystem::path makeRunDirectory(const std::filesystem::path& outputRoot) {
         const auto stamp = std::chrono::system_clock::now().time_since_epoch().count();
@@ -586,27 +227,11 @@ namespace {
             "[--gameversion steam] [--interactivemode true|false]");
         require(gameVersion == "steam", "Unsupported game version '" + gameVersion + "'; only 'steam' is supported.");
 
-        const std::filesystem::path defaultIniPath =
-            std::filesystem::u8path(NAVKIT_TEST_SOURCE_DIR) / "src" / "resource" / "NavKit.ini";
-        CSimpleIniA defaultIni;
-        defaultIni.SetUnicode();
-        require(defaultIni.LoadFile(defaultIniPath.string().c_str()) >= 0,
-            "Could not load the default NavKit.ini at " + defaultIniPath.string() + ".");
-
-        std::string hitman = defaultIni.GetValue("NavKit", "hitman", "");
-        std::string blender = defaultIni.GetValue("NavKit", "blender", "");
-        std::string output = defaultIni.GetValue("NavKit", "output", "");
-
-        const std::filesystem::path localIniPath = executablePath.parent_path() / "NavKit.ini";
-        if (std::filesystem::exists(localIniPath)) {
-            CSimpleIniA localIni;
-            localIni.SetUnicode();
-            require(localIni.LoadFile(localIniPath.string().c_str()) >= 0,
-                "Could not load the executable's NavKit.ini at " + localIniPath.string() + ".");
-            hitman = localIni.GetValue("NavKit", "hitman", hitman.c_str());
-            blender = localIni.GetValue("NavKit", "blender", blender.c_str());
-            output = localIni.GetValue("NavKit", "output", output.c_str());
-        }
+        const ConfiguredPaths configuredPaths = readConfiguredPaths(
+            executablePath, std::filesystem::u8path(NAVKIT_TEST_SOURCE_DIR) / "src" / "resource" / "NavKit.ini");
+        std::string hitman = configuredPaths.hitman;
+        std::string blender = configuredPaths.blender;
+        std::string output = configuredPaths.output;
 
         if (positionalArguments.size() > 0) {
             hitman = positionalArguments[0];
@@ -628,31 +253,16 @@ namespace {
 
     void runIntegration(const std::filesystem::path& hitmanDirectory, const std::filesystem::path& blenderExecutable,
         const std::filesystem::path& outputRoot, const std::string_view gameVersion) {
-        require(std::filesystem::is_directory(hitmanDirectory), "The supplied Hitman directory does not exist.");
-        require(std::filesystem::is_regular_file(blenderExecutable), "The supplied Blender executable does not exist.");
-        require(std::filesystem::is_directory(hitmanDirectory / "Runtime"),
-            "The supplied Hitman directory has no Runtime folder.");
-        require(std::filesystem::is_directory(hitmanDirectory / "Retail"),
-            "The supplied Hitman directory has no Retail folder.");
-        std::filesystem::create_directories(outputRoot);
+        initRpkg(hitmanDirectory, blenderExecutable, outputRoot);
 
-        NavKitSettings& settings = NavKitSettings::getInstance();
-        settings.hitmanFolder = hitmanDirectory.string();
-        settings.outputFolder = outputRoot.string();
-        settings.blenderPath = blenderExecutable.string();
-
-        std::cout << "[integration] Scanning the Hitman installation's RPKG files...\n";
-        Rpkg::initExtractionData();
-        require(Rpkg::canExtract() && Rpkg::partitionManager != nullptr,
-            "RPKG initialization failed; ensure this is a supported Hitman installation.");
-
-        ScopedAutoLoadScene autoLoadScene(hitmanDirectory / "Retail" / "mods.ini");
+        ScopedAutoLoadScene autoLoadScene(hitmanDirectory / "Retail" / "mods.ini",
+            "assembly:/_pro/scenes/missions/thefacility/_scene_mission_polarbear_intro_firsttime.entity");
         constexpr auto integrationTimeout = std::chrono::minutes(2);
-        const IntegrationDeadline deadline = std::chrono::steady_clock::now() + integrationTimeout;
+        const Deadline deadline = std::chrono::steady_clock::now() + integrationTimeout;
         launchHitmanAndWaitForEditor(hitmanDirectory, gameVersion, deadline);
 
         const std::filesystem::path outputDirectory = makeRunDirectory(outputRoot);
-        settings.outputFolder = outputDirectory.string();
+        NavKitSettings::getInstance().outputFolder = outputDirectory.string();
         std::cout << "[integration] Extracting the active mission from HITMAN...\n";
         extractSceneFromRunningGame(outputDirectory, deadline);
         closeHitmanGame(hitmanDirectory);
@@ -673,6 +283,7 @@ int main(const int argc, char** argv) {
 #endif
     int result = 0;
     bool interactiveMode = false;
+    setResourceDirectory(std::filesystem::u8path(NAVKIT_TEST_SOURCE_DIR) / "src" / "resource");
     wxInitializer wx;
     if (!wx) {
         std::cerr << "[fail] Could not initialize wxWidgets.\n";

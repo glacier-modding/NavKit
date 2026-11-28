@@ -904,6 +904,50 @@ void Crmd::buildCrmds(const std::vector<Json::Crowd>& crowds, const CrowdMapBuil
     Menu::updateMenuState();
 }
 
+CrowdMapBuilder::Report Crmd::buildCrmdForCrowd(const Json::Crowd& crowd) {
+    const Navp& navp = Navp::getInstance();
+    if (!navp.navpLoaded || navp.navMesh == nullptr) {
+        throw std::runtime_error("A Navp must be loaded to build a Crmd.");
+    }
+    std::vector<glm::dvec3> glbTriangles;
+    if (snapHeightsToGlb) {
+        const InputGeom* inputGeom = RecastAdapter::getInstance().inputGeom;
+        if (inputGeom == nullptr || inputGeom->getMesh() == nullptr) {
+            throw std::runtime_error("A GLB must be loaded to snap Crmd heights to it.");
+        }
+        const rcMeshLoaderGlb* mesh = inputGeom->getMesh();
+        glbTriangles =
+            CrowdMapBuilder::groundTrianglesNearCrowd(crowd, mesh->getVerts(), mesh->getTris(), mesh->getTriCount());
+    }
+    const Scene& scene = Scene::getInstance();
+    CrowdMapBuilder::Report report;
+    const CrowdMapBuilder::CrowdMap map =
+        CrowdMapBuilder::build(crowd, {scene.volumeBoxes, scene.volumeSpheres, scene.volumeShapes},
+            collectNavmeshTriangles(*navp.navMesh), glbTriangles, report);
+    setCrowdMap(map, crowd.name);
+    return report;
+}
+
+std::optional<Crmd::Summary> Crmd::summary() const {
+    if (!crmdLoaded || crowdMapData == nullptr) {
+        return std::nullopt;
+    }
+    Summary result;
+    result.cellsX = crowdMapData->m_nCellSizeX;
+    result.cellsY = crowdMapData->m_nCellSizeY;
+    result.cellSize = crowdMapData->m_nGridCellSize;
+    const float4& translation = crowdMapData->m_mObjectToWorld.Trans;
+    result.origin = {translation.x, translation.y, translation.z};
+    for (const SCrowdCells& block : crowdMapData->m_CellFlags) {
+        for (const uint8 flags : block.m_cells) {
+            if ((flags & CrowdMapBuilder::cellFlagWalkable) != 0) {
+                ++result.walkableCells;
+            }
+        }
+    }
+    return result;
+}
+
 void Crmd::buildCrmd(const Json::Crowd& crowd, const CrowdMapBuilder::SceneVolumes& sceneVolumes,
     const std::vector<glm::dvec3>& navmeshTriangles, const std::vector<glm::dvec3>& glbTriangles) {
     Logger::log(NK_INFO, "Building Crmd for crowd %s (%s) from %zu Navp triangles, %s...", crowd.name.c_str(),

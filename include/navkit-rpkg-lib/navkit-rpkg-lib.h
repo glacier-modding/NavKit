@@ -45,6 +45,10 @@ RustStringList* get_all_referenced_hashes_by_hash_from_rpkg_files(
 char* get_mati_json_by_hash(
     const char* resource_hash, const PartitionManager* partition_manager, void (*log_callback)(const char*));
 
+/// Added in navkit-rpkg-lib v1.10.0.
+char* get_resource_info_json(
+    const char* resource_hash, const PartitionManager* partition_manager, void (*log_callback)(const char*));
+
 uint32_t hash_list_get_version(const HashList* list);
 
 RustStringList* hash_list_get_all_hashes(const HashList* list);

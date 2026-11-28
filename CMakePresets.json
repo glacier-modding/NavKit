@@ -58,6 +58,18 @@
       "inherits": [ "base" ]
     },
     {
+      "name": "x64-release-demo-mod",
+      "displayName": "Demo mod generator",
+      "description": "Release build of the NavKit Demo Mod generator",
+      "inherits": "x64-release",
+      "cacheVariables": {
+        "NAVKIT_BUILD_DEMO_MOD_GENERATOR": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    },
+    {
       "name": "x64-release-installer",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -170,6 +182,12 @@
       "name": "x64-release",
       "configurePreset": "x64-release",
       "configuration": "Release"
+    },
+    {
+      "name": "generate-demo-mod",
+      "configurePreset": "x64-release-demo-mod",
+      "configuration": "Release",
+      "targets": [ "generate-demo-mod" ]
     },
     {
       "name": "x64-release-installer",

@@ -280,3 +280,31 @@ endif ()
 
 set_property(TARGET NavKit PROPERTY CXX_STANDARD 20)
 #add_definitions(-DDT_POLYREF64) # TODO: Add Recast Detour 64 bit support
+# Bulk generation: generating NavKit files for many vanilla missions, shared by the NavKit Bulk Generation Tool and the
+# NavKit Demo Mod generator
+add_library(NavKitBulk STATIC
+        bulk/BulkGenerator.cpp
+        bulk/LivePipeline.cpp
+)
+target_link_libraries(NavKitBulk PUBLIC
+        NavKitLib
+)
+set_property(TARGET NavKitBulk PROPERTY CXX_STANDARD 20)
+
+if (WIN32)
+    add_executable(NavKitBulkGenerationTool WIN32
+            bulk/BulkGenerationTool.cpp
+            NavKit.rc
+    )
+    target_link_libraries(NavKitBulkGenerationTool PRIVATE NavKitBulk)
+    set_property(TARGET NavKitBulkGenerationTool PROPERTY CXX_STANDARD 20)
+    # The tool reads NavKit's resources (Glacier2Glb.py, hash_list_filtered.txt, res.blend) and settings from its folder.
+    add_custom_command(TARGET NavKitBulkGenerationTool POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${STAGED_DLL_PATHS}
+            ${RUNTIME_FILE_DEPENDENCIES}
+            $<TARGET_FILE_DIR:NavKitBulkGenerationTool>
+            COMMENT "Copying runtime files for NavKitBulkGenerationTool..."
+            VERBATIM
+    )
+endif ()

@@ -9,7 +9,7 @@
 #include <wx/thread.h>
 
 void ErrorHandler::openErrorDialog(const std::string& message) {
-    if (!wxTheApp) {
+    if (!wxTheApp || getMainFrame() == nullptr) {
         Logger::log(NK_ERROR, "%s", message.c_str());
         return;
     }

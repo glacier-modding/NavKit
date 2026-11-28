@@ -9,4 +9,5 @@
     </xsl:template>
 
     <xsl:template match="wix:File[(@Source='$(var.LayoutDir)\NavKit.exe')]"/>
+    <xsl:template match="wix:File[(@Source='$(var.LayoutDir)\NavKitBulkGenerationTool.exe')]"/>
 </xsl:stylesheet>

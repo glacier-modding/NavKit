@@ -57,6 +57,10 @@
             <ComponentRef Id="ApplicationShortcut" />
             <ComponentRef Id="RemoveFolderComponent" />
             <ComponentRef Id="NavKitExecutable" />
+            <?if $(var.BulkTool) = 1?>
+                <ComponentRef Id="BulkGenerationToolExecutable" />
+                <ComponentRef Id="BulkGenerationToolShortcut" />
+            <?endif?>
         </Feature>
     </Package>
 
@@ -87,10 +91,25 @@
             <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
             <RegistryValue Root="HKCU" Key="Software\Glacier Modding\NavKit" Name="installed" Type="integer" Value="1" KeyPath="true"/>
         </Component>
+        <?if $(var.BulkTool) = 1?>
+            <Component Id="BulkGenerationToolShortcut" Guid="3f0d2b9e-6c1a-4f7e-9d52-8b4e1a7c6d20" Directory="ApplicationProgramsFolder">
+                <Shortcut Id="BulkGenerationToolStartMenuShortcut"
+                          Name="NavKit Bulk Generation Tool"
+                          Description="Generates NAVP, AIRG and CRMD files for many Hitman missions at once"
+                          Target="[#NavKitBulkGenerationTool.exe]"
+                          WorkingDirectory="INSTALLFOLDER" />
+                <RegistryValue Root="HKCU" Key="Software\Glacier Modding\NavKit" Name="bulkGenerationToolShortcut" Type="integer" Value="1" KeyPath="true"/>
+            </Component>
+        <?endif?>
         <DirectoryRef Id="INSTALLFOLDER">
             <Component Id="NavKitExecutable" Guid="d867f1ca-b135-4fc0-ad72-09b51e16826a">
                 <File Id="NavKit.exe" Source="$(var.LayoutDir)\NavKit.exe" KeyPath="true" />
             </Component>
+            <?if $(var.BulkTool) = 1?>
+                <Component Id="BulkGenerationToolExecutable" Guid="9a7c4e21-5b3d-4c8f-a1e6-2d9f0b6c8e47">
+                    <File Id="NavKitBulkGenerationTool.exe" Source="$(var.LayoutDir)\NavKitBulkGenerationTool.exe" KeyPath="true" />
+                </Component>
+            <?endif?>
             <Component Id="RemoveFolderComponent" Guid="*">
                 <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
                 <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]" Name="Path" Type="string" Value="[INSTALLFOLDER]" KeyPath="true" />
